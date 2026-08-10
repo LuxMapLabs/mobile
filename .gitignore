@@ -1,6 +1,11 @@
 # Build
 bin/
 obj/
+build/
+.gradle/
+.cxx/
+captures/
+local.properties
 
 # IDE
 .vs/
@@ -8,6 +13,7 @@ obj/
 .idea/
 *.user
 *.suo
+*.iml
 
 # Claude Code / AI — NEVER COMMIT
 CLAUDE.md
