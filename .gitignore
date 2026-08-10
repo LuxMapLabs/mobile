@@ -1,0 +1,43 @@
+# Build
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Claude Code / AI — NEVER COMMIT
+CLAUDE.md
+.claude/
+
+# Other AI coding tools
+.cursor/
+.windsurf/
+.continue/
+.aider*
+.aider/
+.cline/
+.roo/
+
+# Generic AI configuration
+AGENTS.md
+.ai/
+.ai-config/
+
+# macOS
+.DS_Store
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+
+appsettings.Development.local.json
+appsettings.Production.json
+
+# Temporary migration artifacts
+migration-preview.sql
+*.sql.bak
