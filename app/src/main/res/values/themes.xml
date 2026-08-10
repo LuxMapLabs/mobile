@@ -1,0 +1,6 @@
+<resources>
+    <!-- Chỉ dùng cho splash/launch trước khi Compose vẽ; theme thật nằm ở core/theme/Theme.kt -->
+    <style name="Theme.CivicFlow" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/civicflow_navy</item>
+    </style>
+</resources>
