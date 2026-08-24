@@ -9,59 +9,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.luxmap.core.theme.StatusDoneBg
-import com.luxmap.core.theme.StatusDoneText
-import com.luxmap.core.theme.StatusOverdueBg
-import com.luxmap.core.theme.StatusOverdueText
-import com.luxmap.core.theme.StatusProgressBg
-import com.luxmap.core.theme.StatusProgressText
-import com.luxmap.core.theme.StatusReceivedBg
-import com.luxmap.core.theme.StatusReceivedText
-import com.luxmap.core.theme.StatusRejectedBg
-import com.luxmap.core.theme.StatusRejectedText
+import com.luxmap.core.theme.BadgeColors
+import com.luxmap.core.theme.Dimens
 
-// 5 trạng thái dùng chung (mục C3 đặc tả) — cặp màu bg/text lấy đúng từ
-// design tokens CLAUDE.md, không đổi. Nhãn hiển thị do màn hình gọi cung cấp
-// (tra đúng chữ trong đặc tả từng màn, không đoán ở đây).
-enum class ReportStatus {
-    RECEIVED,
-    IN_PROGRESS,
-    DONE,
-    OVERDUE,
-    REJECTED,
-}
-
-private fun ReportStatus.backgroundColor(): Color =
-    when (this) {
-        ReportStatus.RECEIVED -> StatusReceivedBg
-        ReportStatus.IN_PROGRESS -> StatusProgressBg
-        ReportStatus.DONE -> StatusDoneBg
-        ReportStatus.OVERDUE -> StatusOverdueBg
-        ReportStatus.REJECTED -> StatusRejectedBg
-    }
-
-private fun ReportStatus.textColor(): Color =
-    when (this) {
-        ReportStatus.RECEIVED -> StatusReceivedText
-        ReportStatus.IN_PROGRESS -> StatusProgressText
-        ReportStatus.DONE -> StatusDoneText
-        ReportStatus.OVERDUE -> StatusOverdueText
-        ReportStatus.REJECTED -> StatusRejectedText
-    }
-
+// Component nền, không tự gắn cứng theo 1 bộ trạng thái — LuxMap có nhiều bộ trạng thái độc lập
+// (tình trạng tài sản, đồng bộ, ưu tiên work order, work_order.status...), mỗi bộ tự tra đúng cặp
+// màu ở core/theme/Color.kt (badgeColors()) rồi gọi StatusBadge này. Không gộp chung 1 enum.
 @Composable
 fun StatusBadge(
-    status: ReportStatus,
     text: String,
+    colors: BadgeColors,
     modifier: Modifier = Modifier,
 ) {
     Text(
         text = text,
-        color = status.textColor(),
+        color = colors.text,
         style = MaterialTheme.typography.bodySmall,
         modifier =
             modifier
-                .background(color = status.backgroundColor(), shape = RoundedCornerShape(8.dp))
+                .background(color = colors.background, shape = RoundedCornerShape(Dimens.radiusSmall))
                 .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+// Biến thể cho badge chỉ có màu chữ, không có nền riêng (VD: ưu tiên Work Order, mục 2.5 —
+// bảng chỉ định nghĩa 1 màu, không có cặp bg/text).
+@Composable
+fun TextOnlyStatusBadge(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        color = color,
+        style = MaterialTheme.typography.labelLarge,
+        modifier = modifier,
     )
 }
