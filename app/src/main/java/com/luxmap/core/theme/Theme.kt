@@ -1,10 +1,10 @@
-package com.civicflow.core.theme
+package com.luxmap.core.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val CivicFlowColorScheme =
+private val LuxMapColorScheme =
     lightColorScheme(
         primary = Navy,
         onPrimary = Bg,
@@ -22,9 +22,9 @@ private val CivicFlowColorScheme =
     )
 
 @Composable
-fun CivicFlowTheme(content: @Composable () -> Unit) {
+fun LuxMapTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = CivicFlowColorScheme,
+        colorScheme = LuxMapColorScheme,
         typography = Typography,
         content = content,
     )

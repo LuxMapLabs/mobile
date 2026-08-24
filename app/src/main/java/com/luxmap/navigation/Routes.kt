@@ -1,4 +1,4 @@
-package com.civicflow.navigation
+package com.luxmap.navigation
 
 sealed interface Routes {
     val route: String

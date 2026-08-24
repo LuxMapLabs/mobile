@@ -1,4 +1,4 @@
-package com.civicflow.core.ui.components
+package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
@@ -9,16 +9,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.civicflow.core.theme.StatusDoneBg
-import com.civicflow.core.theme.StatusDoneText
-import com.civicflow.core.theme.StatusOverdueBg
-import com.civicflow.core.theme.StatusOverdueText
-import com.civicflow.core.theme.StatusProgressBg
-import com.civicflow.core.theme.StatusProgressText
-import com.civicflow.core.theme.StatusReceivedBg
-import com.civicflow.core.theme.StatusReceivedText
-import com.civicflow.core.theme.StatusRejectedBg
-import com.civicflow.core.theme.StatusRejectedText
+import com.luxmap.core.theme.StatusDoneBg
+import com.luxmap.core.theme.StatusDoneText
+import com.luxmap.core.theme.StatusOverdueBg
+import com.luxmap.core.theme.StatusOverdueText
+import com.luxmap.core.theme.StatusProgressBg
+import com.luxmap.core.theme.StatusProgressText
+import com.luxmap.core.theme.StatusReceivedBg
+import com.luxmap.core.theme.StatusReceivedText
+import com.luxmap.core.theme.StatusRejectedBg
+import com.luxmap.core.theme.StatusRejectedText
 
 // 5 trạng thái dùng chung (mục C3 đặc tả) — cặp màu bg/text lấy đúng từ
 // design tokens CLAUDE.md, không đổi. Nhãn hiển thị do màn hình gọi cung cấp

@@ -1,4 +1,4 @@
-package com.civicflow.core.ui.components
+package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.civicflow.core.theme.TextSecondary
+import com.luxmap.core.theme.TextSecondary
 
 // Card tóm tắt 1 phản ánh dùng ở danh sách (M06) — chỉ nhận field tối thiểu,
 // dùng chung nhiều màn; field cụ thể của ReportDto tra ở feature/report khi
