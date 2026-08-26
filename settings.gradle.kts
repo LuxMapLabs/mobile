@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CivicFlow"
+rootProject.name = "LuxMap"
 include(":app")

@@ -1,4 +1,4 @@
-package com.civicflow.core.common
+package com.luxmap.core.common
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

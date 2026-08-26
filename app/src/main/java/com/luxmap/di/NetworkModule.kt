@@ -1,6 +1,6 @@
-package com.civicflow.di
+package com.luxmap.di
 
-import com.civicflow.core.network.ApiClient
+import com.luxmap.core.network.ApiClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

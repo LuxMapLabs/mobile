@@ -9,11 +9,11 @@ plugins {
 }
 
 android {
-    namespace = "com.civicflow"
+    namespace = "com.luxmap"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.civicflow"
+        applicationId = "com.luxmap"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.civicflow.navigation
+package com.luxmap.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController

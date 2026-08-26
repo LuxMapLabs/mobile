@@ -1,4 +1,4 @@
-package com.civicflow.di
+package com.luxmap.di
 
 import dagger.Module
 import dagger.hilt.InstallIn

@@ -1,4 +1,4 @@
-package com.civicflow
+package com.luxmap
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -13,7 +13,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.civicflow.core.theme.CivicFlowTheme
+import com.luxmap.core.theme.LuxMapTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            CivicFlowTheme {
+            LuxMapTheme {
                 Surface(
                     modifier =
                         Modifier
@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
                             .windowInsetsPadding(WindowInsets.safeDrawing),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    CivicFlowRoot()
+                    LuxMapRoot()
                 }
             }
         }
@@ -38,6 +38,6 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CivicFlowRoot() {
-    Text(text = "CivicFlow")
+private fun LuxMapRoot() {
+    Text(text = "LuxMap")
 }
