@@ -1,5 +1,8 @@
 package com.luxmap.di
 
+import com.luxmap.feature.map.data.FakeMapRepository
+import com.luxmap.feature.map.data.MapRepository
+import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -9,4 +12,7 @@ import dagger.hilt.components.SingletonComponent
 // Repository interface + FakeXxxRepository/RealXxxRepository.
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class RepositoryModule
+abstract class RepositoryModule {
+    @Binds
+    abstract fun bindMapRepository(impl: FakeMapRepository): MapRepository
+}
