@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.luxmap.feature.map.ui.MapScreen
 
 // Khung NavHost tối thiểu — nối các composable màn hình thật khi
 // từng feature (auth, home, ...) được implement theo mã FM-XX tương ứng.
@@ -17,6 +18,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         composable(Routes.Login.route) {
         }
         composable(Routes.Home.route) {
+        }
+        composable(Routes.Map.route) {
+            MapScreen()
         }
     }
 }

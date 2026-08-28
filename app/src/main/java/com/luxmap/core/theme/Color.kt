@@ -65,6 +65,16 @@ val DarkSemanticColors =
 // Component — badge tình trạng tài sản (mục 2.3), cặp bg/text theo theme, không đổi
 enum class AssetCondition { NORMAL, DIM, OUT, UNKNOWN }
 
+// Nhãn đúng chữ trong Design System v2.0 mục 2.3 — dùng chung cho badge, legend bản đồ...
+// không tự đặt tên khác ở từng nơi gọi.
+fun AssetCondition.label(): String =
+    when (this) {
+        AssetCondition.NORMAL -> "Bình thường"
+        AssetCondition.DIM -> "Đèn mờ"
+        AssetCondition.OUT -> "Hỏng/Tắt"
+        AssetCondition.UNKNOWN -> "Chưa xác định"
+    }
+
 data class BadgeColors(val background: Color, val text: Color)
 
 fun AssetCondition.badgeColors(isDark: Boolean): BadgeColors =
