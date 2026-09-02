@@ -3,9 +3,9 @@ package com.luxmap.feature.auth.data
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
-// DTO ánh xạ đúng field JSON của backend (snake_case, JsonNamingPolicy.SnakeCaseLower).
-// Xác nhận trực tiếp từ luxmap_backend/src/LuxMap.Modules.Identity/Auth/AuthContracts.cs (BE-07),
-// KHÔNG đoán tên field.
+// DTO fields match the backend JSON exactly (snake_case, JsonNamingPolicy.SnakeCaseLower).
+// Checked directly against luxmap_backend/src/LuxMap.Modules.Identity/Auth/AuthContracts.cs
+// (BE-07) — field names are NOT guessed.
 
 @Serializable
 data class LoginRequestDto(
@@ -23,7 +23,7 @@ data class LogoutRequestDto(
     val refresh_token: String,
 )
 
-// AuthTokenResponse: đúng 4 field, dùng chung cho login và refresh.
+// AuthTokenResponse: exactly 4 fields, shared by both login and refresh.
 @Serializable
 data class AuthTokenResponseDto(
     val access_token: String,
@@ -32,7 +32,8 @@ data class AuthTokenResponseDto(
     val expires_in: Int,
 )
 
-// Khuôn lỗi chung toàn API — CLAUDE.md backend mục 0: { "error": { "code", "message", "details" } }.
+// Shared error shape for the whole API — backend CLAUDE.md section 0:
+// { "error": { "code", "message", "details" } }.
 @Serializable
 data class ApiErrorEnvelope(
     val error: ApiErrorBody,

@@ -10,9 +10,9 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 
-// BASE_URL cấu hình qua BuildConfig.API_BASE_URL (xem app/build.gradle.kts) — mặc định trỏ
-// 10.0.2.2, địa chỉ loopback dành cho Android Emulator, khớp cổng http trong
-// luxmap_backend/src/LuxMap.Api/Properties/launchSettings.json.
+// BASE_URL comes from BuildConfig.API_BASE_URL (see app/build.gradle.kts) — defaults to
+// 10.0.2.2, the loopback address Android Emulator uses to reach the host machine, matching the
+// http port in luxmap_backend/src/LuxMap.Api/Properties/launchSettings.json.
 object ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonConverterFactory = json.asConverterFactory("application/json".toMediaType())
@@ -22,18 +22,18 @@ object ApiClient {
             level = HttpLoggingInterceptor.Level.BODY
         }
 
-    // Client "trần" — không gắn Authorization, không có Authenticator. AuthApi (login/refresh/
-    // logout) đi qua client này: refresh không cần access token, và không được tự đi qua client
-    // có Authenticator của chính nó — nếu không, một lần refresh thất bại (401) sẽ khiến
-    // Authenticator lại cố refresh, gọi vòng lặp vô hạn.
+    // "Plain" client — no Authorization header, no Authenticator. AuthApi (login/refresh/
+    // logout) uses this client: refresh doesn't need an access token, and it must not go
+    // through its own Authenticator — otherwise a failed refresh (401) would make the
+    // Authenticator try to refresh again, looping forever.
     fun plainOkHttpClient(): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
             .build()
 
-    // Client cho mọi API còn lại (bản đồ, work order...) — tự gắn Bearer token, tự làm mới token
-    // khi hết hạn qua authenticator. Vì AuthApi không dùng client này, interceptor không cần loại
-    // trừ theo path.
+    // Client for every other API (map, work orders...) — attaches the Bearer token
+    // automatically and refreshes it on expiry through the authenticator. AuthApi doesn't use
+    // this client, so the interceptor doesn't need to skip any path.
     fun authenticatedOkHttpClient(
         authHeaderInterceptor: Interceptor,
         tokenAuthenticator: Authenticator,

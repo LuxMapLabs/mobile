@@ -23,9 +23,10 @@ data class SessionTokens(
     val expiresAt: Long,
 )
 
-// access_token/refresh_token lưu dưới dạng ciphertext (TokenCipher, AndroidKeyStore) trong
-// DataStore — đúng cặp công nghệ CLAUDE.md mobile chỉ định: "DataStore lưu token... Android
-// Keystore bảo vệ token". expires_at là epoch giây, không nhạy cảm nên lưu thô để đọc nhanh.
+// access_token/refresh_token are stored as ciphertext (TokenCipher, AndroidKeyStore) inside
+// DataStore — the exact pairing mobile CLAUDE.md asks for: "DataStore stores the token...
+// Android Keystore protects it". expires_at is a plain epoch-second number; it isn't sensitive,
+// so it's stored unencrypted for a fast read.
 @Singleton
 class TokenStore
     @Inject
@@ -51,8 +52,8 @@ class TokenStore
 
         suspend fun currentTokens(): SessionTokens? = toSessionTokens(context.sessionDataStore.data.first())
 
-        // Dùng cho TokenAuthenticator (okhttp3.Authenticator) — API đồng bộ, chạy trên luồng nền
-        // của OkHttp, không phải main thread nên runBlocking chấp nhận được ở đây.
+        // Used by TokenAuthenticator (okhttp3.Authenticator) — a synchronous API that runs on
+        // an OkHttp background thread, not the main thread, so runBlocking is fine here.
         fun currentTokensBlocking(): SessionTokens? = runBlocking { currentTokens() }
 
         suspend fun clear() {

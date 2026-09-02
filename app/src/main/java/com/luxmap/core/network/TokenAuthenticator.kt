@@ -9,10 +9,11 @@ import okhttp3.Response
 import okhttp3.Route
 import javax.inject.Inject
 
-// Tự làm mới access token khi một request nhận 401 — đúng tiêu chí "Không bị đăng xuất giữa
-// chừng" của FM-05. Đồng bộ hoá bằng synchronized: OkHttp có thể gọi authenticate() từ nhiều
-// luồng cùng lúc khi nhiều request rớt 401 song song — chỉ luồng đầu tiên gọi /auth/refresh
-// thật, các luồng còn lại (chờ lock) phát hiện token đã đổi và dùng luôn token mới.
+// Refreshes the access token automatically when a request gets a 401 — this is FM-05's "never
+// silently logged out" requirement. Uses synchronized because OkHttp can call authenticate()
+// from several threads at once when multiple requests fail with 401 together — only the first
+// thread makes the real /auth/refresh call; the others (waiting on the lock) see the token has
+// already changed and reuse it.
 class TokenAuthenticator
     @Inject
     constructor(

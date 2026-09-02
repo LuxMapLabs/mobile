@@ -11,10 +11,10 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Bọc khoá AES/GCM trong AndroidKeyStore để mã hoá access/refresh token trước khi TokenStore
-// lưu xuống DataStore (CLAUDE.md mobile: DataStore lưu token, Android Keystore bảo vệ token).
-// Khoá sinh ra không bao giờ rời khỏi phần cứng bảo mật của thiết bị — chỉ IV + ciphertext được
-// lưu, dạng Base64 một chuỗi duy nhất (12 byte IV đứng trước).
+// Wraps an AES/GCM key in AndroidKeyStore to encrypt the access/refresh token before TokenStore
+// writes it to DataStore (mobile CLAUDE.md: "DataStore stores the token, Android Keystore
+// protects it"). The key itself never leaves the device's secure hardware — only the IV plus
+// ciphertext are stored, as one Base64 string with the 12-byte IV first.
 @Singleton
 class TokenCipher
     @Inject

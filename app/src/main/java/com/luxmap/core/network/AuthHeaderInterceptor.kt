@@ -5,9 +5,9 @@ import okhttp3.Interceptor
 import okhttp3.Response
 import javax.inject.Inject
 
-// Gắn "Authorization: Bearer <access_token>" cho mọi request đi qua client đã xác thực. Đọc
-// đồng bộ từ TokenStore — Interceptor luôn chạy trên luồng nền của OkHttp, không phải main
-// thread, nên chặn (block) ở đây là hành vi bình thường của cơ chế Interceptor.
+// Attaches "Authorization: Bearer <access_token>" to every request on the authenticated
+// client. Reads TokenStore synchronously — an Interceptor always runs on an OkHttp background
+// thread, not the main thread, so blocking here is normal for how Interceptors work.
 class AuthHeaderInterceptor
     @Inject
     constructor(

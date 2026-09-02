@@ -21,9 +21,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 10.0.2.2 là địa chỉ loopback dành riêng cho Android Emulator, trỏ về cổng http của
-        // luxmap_backend chạy trên máy host (xem launchSettings.json — profile "http": 5294).
-        // Test trên thiết bị thật (LAN) thì đổi tạm giá trị này sang IP LAN của máy chạy backend.
+        // 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
+        // matching the http port luxmap_backend listens on (see launchSettings.json — "http"
+        // profile: 5294). Testing on a real device (LAN): change this to the backend machine's
+        // LAN IP for that test, then change it back.
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5294/\"")
     }
 

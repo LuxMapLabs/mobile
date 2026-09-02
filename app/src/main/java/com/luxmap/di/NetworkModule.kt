@@ -16,8 +16,8 @@ import retrofit2.Retrofit
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
-// Client "trần" cho AuthApi (login/refresh/logout) — không có Authorization header, không có
-// Authenticator (xem ApiClient.kt vì sao refresh không được đi qua chính Authenticator của nó).
+// "Plain" client for AuthApi (login/refresh/logout) — no Authorization header, no
+// Authenticator (see ApiClient.kt for why refresh must not go through its own Authenticator).
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class PlainClient
@@ -53,7 +53,8 @@ object NetworkModule {
         @PlainClient retrofit: Retrofit,
     ): AuthApi = retrofit.create(AuthApi::class.java)
 
-    // Client dùng cho mọi API khác ngoài auth — tự gắn Bearer token, tự làm mới khi hết hạn.
+    // Client used by every API other than auth — attaches the Bearer token and refreshes it
+    // automatically on expiry.
     @Provides
     @Singleton
     fun provideAuthenticatedOkHttpClient(

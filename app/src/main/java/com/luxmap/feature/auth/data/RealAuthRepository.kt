@@ -10,8 +10,9 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Gọi BE-07 thật (api/v1/auth/login|logout) — xem AuthApi.kt. Mã lỗi tra theo
-// luxmap_backend/src/LuxMap.Shared/Contracts/Errors/ErrorCodes.cs (đọc, không sửa backend).
+// Calls the real BE-07 endpoints (api/v1/auth/login|logout) — see AuthApi.kt. Error codes are
+// looked up from luxmap_backend/src/LuxMap.Shared/Contracts/Errors/ErrorCodes.cs (read-only,
+// the backend is never modified).
 @Singleton
 class RealAuthRepository
     @Inject
@@ -36,8 +37,8 @@ class RealAuthRepository
                 )
         }
 
-        // Best-effort: server không thu hồi được refresh token nếu offline, nhưng phiên cục bộ
-        // vẫn phải xoá để người dùng đăng xuất được tại hiện trường không mạng.
+        // Best-effort: the server can't revoke the refresh token while offline, but the local
+        // session still has to be cleared so the user can log out in the field without network.
         override suspend fun logout(): Result<Unit> {
             val refreshToken = tokenStore.currentTokens()?.refreshToken
             if (refreshToken != null) {

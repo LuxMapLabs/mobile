@@ -8,8 +8,9 @@ interface AuthRepository {
         password: String,
     ): Result<Unit>
 
-    // Best-effort: luôn xoá phiên cục bộ dù gọi API logout thất bại (offline) — FM-26 dùng lại
-    // hàm này khi màn Cá nhân có nút đăng xuất, không cần đổi gì ở tầng repository.
+    // Best-effort: always clears the local session even if the logout API call fails
+    // (offline) — FM-26 will reuse this function for the Profile screen's logout button,
+    // no repository changes needed.
     suspend fun logout(): Result<Unit>
 
     fun observeIsLoggedIn(): Flow<Boolean>

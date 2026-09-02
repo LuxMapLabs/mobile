@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Chỉ áp dụng cho build debug (app/src/debug). Backend dev chạy HTTP thường, không TLS
-  (xem launchSettings.json). Chỉ mở cleartext cho đúng 2 host loopback dùng khi phát triển —
-  KHÔNG áp dụng cho build release.
+  Applies only to the debug build (app/src/debug). The dev backend runs plain HTTP, no TLS
+  (see launchSettings.json). Cleartext is allowed only for these 2 loopback hosts used during
+  development — this does NOT apply to the release build.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">

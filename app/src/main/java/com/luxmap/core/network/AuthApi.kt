@@ -8,9 +8,9 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-// Route xác nhận từ AuthController.cs (BE-07): [Route("api/v{version:apiVersion}/auth")], v1.0.
-// register KHÔNG có ở đây — FM-05 chỉ làm luồng đăng nhập (xem CLAUDE.md mobile), tài khoản
-// Tổ khảo sát/sửa chữa được cấp sẵn, không tự đăng ký qua app.
+// Route checked against AuthController.cs (BE-07): [Route("api/v{version:apiVersion}/auth")], v1.0.
+// register is NOT here — FM-05 only covers login (see mobile CLAUDE.md). Field Crew accounts
+// are already set up for each user; the app has no self-registration screen.
 interface AuthApi {
     @POST("api/v1/auth/login")
     suspend fun login(
