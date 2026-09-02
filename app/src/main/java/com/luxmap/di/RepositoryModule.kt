@@ -1,7 +1,7 @@
 package com.luxmap.di
 
 import com.luxmap.feature.auth.data.AuthRepository
-import com.luxmap.feature.auth.data.FakeAuthRepository
+import com.luxmap.feature.auth.data.RealAuthRepository
 import com.luxmap.feature.map.data.FakeMapRepository
 import com.luxmap.feature.map.data.MapRepository
 import dagger.Binds
@@ -19,5 +19,5 @@ abstract class RepositoryModule {
     abstract fun bindMapRepository(impl: FakeMapRepository): MapRepository
 
     @Binds
-    abstract fun bindAuthRepository(impl: FakeAuthRepository): AuthRepository
+    abstract fun bindAuthRepository(impl: RealAuthRepository): AuthRepository
 }
