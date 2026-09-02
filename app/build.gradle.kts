@@ -20,6 +20,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 10.0.2.2 là địa chỉ loopback dành riêng cho Android Emulator, trỏ về cổng http của
+        // luxmap_backend chạy trên máy host (xem launchSettings.json — profile "http": 5294).
+        // Test trên thiết bị thật (LAN) thì đổi tạm giá trị này sang IP LAN của máy chạy backend.
+        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5294/\"")
     }
 
     buildTypes {
@@ -43,6 +48,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
