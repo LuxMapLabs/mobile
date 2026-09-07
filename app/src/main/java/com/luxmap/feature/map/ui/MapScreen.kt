@@ -37,6 +37,8 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
@@ -50,6 +52,10 @@ private const val POLES_SOURCE_ID = "poles-source"
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
+
+// Lớp "tuyến đã khảo sát" (F12) — vẽ dưới marker cột đèn nên add layer này trước trong z-order.
+private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
+private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 // clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
 // out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
@@ -65,7 +71,10 @@ fun MapScreen(
     val uiState by viewModel.uiState.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     var geoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
+    var roadSegmentGeoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
+    var showFixtures by remember { mutableStateOf(true) }
+    var showRoadSegments by remember { mutableStateOf(true) }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -81,6 +90,13 @@ fun MapScreen(
                                 .zoom(MOCK_AREA_ZOOM)
                                 .build()
                         map.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { style ->
+                            val segmentSource =
+                                GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
+                            style.addSource(segmentSource)
+                            // Add trước layer cột đèn để tuyến vẽ dưới, marker nổi trên.
+                            style.addLayer(buildRoadSegmentsLineLayer())
+                            roadSegmentGeoJsonSource = segmentSource
+
                             val source =
                                 GeoJsonSource(
                                     POLES_SOURCE_ID,
@@ -92,6 +108,8 @@ fun MapScreen(
                             style.addLayer(buildClusterCountLayer())
                             style.addLayer(buildPoleCircleLayer())
                             geoJsonSource = source
+
+                            applyLayerVisibility(style, showFixtures, showRoadSegments)
                         }
                         // uiState đọc ở đây luôn là giá trị mới nhất mỗi lần chạm (State delegate),
                         // không phải giá trị đông cứng lúc đăng ký listener.
@@ -115,6 +133,8 @@ fun MapScreen(
                         }
                     } else {
                         geoJsonSource?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
+                        roadSegmentGeoJsonSource?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
+                        applyLayerVisibility(loadedStyle, showFixtures, showRoadSegments)
                     }
                 }
             },
@@ -124,6 +144,17 @@ fun MapScreen(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
+                    .padding(Spacing.lg),
+        )
+
+        MapLayerToggle(
+            showFixtures = showFixtures,
+            onShowFixturesChange = { showFixtures = it },
+            showRoadSegments = showRoadSegments,
+            onShowRoadSegmentsChange = { showRoadSegments = it },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
                     .padding(Spacing.lg),
         )
 
@@ -141,6 +172,33 @@ fun MapScreen(
 }
 
 private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orEmpty()
+
+private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
+
+// Tuyến đã khảo sát (F12) — 1 màu trung tính, không tô theo trạng thái sự cố điện (đó là
+// phân tích của Web GIS, không thuộc phạm vi mobile, xem RoadSegmentLine.kt).
+private fun buildRoadSegmentsLineLayer(): LineLayer =
+    LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.lineColor("#3E86C9"),
+            PropertyFactory.lineWidth(2f),
+            PropertyFactory.lineOpacity(0.7f),
+        )
+
+// Áp lại visibility mỗi lần toggle đổi hoặc mỗi lần AndroidView update chạy lại — rẻ hơn nhiều
+// so với add/remove layer, và không cần set lại GeoJSON.
+private fun applyLayerVisibility(
+    style: Style,
+    showFixtures: Boolean,
+    showRoadSegments: Boolean,
+) {
+    val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
+    val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
+    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
+}
 
 // Chỉ vẽ marker từng điểm cho feature KHÔNG bị gộp cụm (point_count chỉ tồn tại trên cluster).
 private fun buildPoleCircleLayer(): CircleLayer =
