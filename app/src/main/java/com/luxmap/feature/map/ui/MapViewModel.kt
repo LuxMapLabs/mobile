@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,11 +25,17 @@ class MapViewModel
             viewModelScope.launch {
                 repository
                     .observePoles()
-                    .catch { e ->
+                    .combine(repository.observeRoadSegments()) { poles, roadSegments ->
+                        poles to roadSegments
+                    }.catch { e ->
                         _uiState.value = MapUiState.Error(e.message ?: "Không tải được dữ liệu bản đồ")
-                    }.collect { poles ->
+                    }.collect { (poles, roadSegments) ->
                         _uiState.value =
-                            if (poles.isEmpty()) MapUiState.Empty else MapUiState.Success(poles)
+                            if (poles.isEmpty()) {
+                                MapUiState.Empty
+                            } else {
+                                MapUiState.Success(poles = poles, roadSegments = roadSegments)
+                            }
                     }
             }
         }
