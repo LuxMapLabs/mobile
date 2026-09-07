@@ -75,6 +75,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.maplibre.android.sdk)
+    implementation(libs.play.services.location)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

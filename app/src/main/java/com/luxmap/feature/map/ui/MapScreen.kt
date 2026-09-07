@@ -1,5 +1,9 @@
 package com.luxmap.feature.map.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -7,11 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -32,6 +42,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.feature.map.data.PoleMarker
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -57,6 +68,8 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
+private const val LOCATE_ME_ZOOM = 17.0
+
 // clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
 // out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
@@ -68,6 +81,7 @@ fun MapScreen(
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     var geoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
@@ -75,6 +89,22 @@ fun MapScreen(
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
+    var locateTarget by remember { mutableStateOf<LatLng?>(null) }
+    var showLocationPermissionDenied by remember { mutableStateOf(false) }
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.onLocateMeClicked()
+            } else {
+                showLocationPermissionDenied = true
+            }
+        }
+
+    // One-shot: mỗi lần bấm nút định vị chỉ bay camera đúng 1 lần, không phát lại khi recompose.
+    LaunchedEffect(Unit) {
+        viewModel.locateMeEvent.collect { latLng -> locateTarget = latLng }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -136,6 +166,11 @@ fun MapScreen(
                         roadSegmentGeoJsonSource?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
                         applyLayerVisibility(loadedStyle, showFixtures, showRoadSegments)
                     }
+
+                    locateTarget?.let { target ->
+                        map.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
+                        locateTarget = null
+                    }
                 }
             },
         )
@@ -158,11 +193,35 @@ fun MapScreen(
                     .padding(Spacing.lg),
         )
 
+        FloatingActionButton(
+            onClick = {
+                showLocationPermissionDenied = false
+                val granted =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+                if (granted) {
+                    viewModel.onLocateMeClicked()
+                } else {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(Spacing.lg),
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+        }
+
         when (uiState) {
             is MapUiState.Loading -> LoadingOverlay()
             is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
             is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
             is MapUiState.Success -> Unit
+        }
+
+        if (showLocationPermissionDenied) {
+            MessageOverlay(text = "Chưa cấp quyền vị trí")
         }
     }
 
