@@ -44,6 +44,7 @@ import com.luxmap.feature.map.data.PoleMarker
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
@@ -84,8 +85,12 @@ fun MapScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
-    var geoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
-    var roadSegmentGeoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
+    // Tham chiếu map thật, cập nhật đúng 1 lần khi sẵn sàng — các LaunchedEffect bên dưới đọc
+    // lại state (uiState/showFixtures/...) mỗi lần đổi và tự áp trực tiếp lên map qua tham
+    // chiếu này. KHÔNG dựa vào việc AndroidView gọi lại `update` mỗi lần recompose: Compose
+    // nhớ lại (memoize) lambda `update` vì mọi biến nó bắt đều là State ổn định, nên `update`
+    // trong thực tế chỉ chạy đúng 1 lần — set trực tiếp trong đó sẽ không phản ứng lại sau này.
+    var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
@@ -112,8 +117,7 @@ fun MapScreen(
             factory = { mapView },
             update = { view ->
                 view.getMapAsync { map ->
-                    val loadedStyle = map.style
-                    if (loadedStyle == null) {
+                    if (map.style == null) {
                         map.cameraPosition =
                             CameraPosition.Builder()
                                 .target(MOCK_AREA_CENTER)
@@ -125,7 +129,6 @@ fun MapScreen(
                             style.addSource(segmentSource)
                             // Add trước layer cột đèn để tuyến vẽ dưới, marker nổi trên.
                             style.addLayer(buildRoadSegmentsLineLayer())
-                            roadSegmentGeoJsonSource = segmentSource
 
                             val source =
                                 GeoJsonSource(
@@ -137,12 +140,13 @@ fun MapScreen(
                             style.addLayer(buildClusterCircleLayer())
                             style.addLayer(buildClusterCountLayer())
                             style.addLayer(buildPoleCircleLayer())
-                            geoJsonSource = source
 
                             applyLayerVisibility(style, showFixtures, showRoadSegments)
+                            // Style/source/layer chỉ chắc chắn sẵn sàng ở đây (trong callback
+                            // onStyleLoaded) — gán maplibreMap ở bước này để các LaunchedEffect
+                            // phản ứng state không chạy sớm hơn khi layer chưa tồn tại.
+                            maplibreMap = map
                         }
-                        // uiState đọc ở đây luôn là giá trị mới nhất mỗi lần chạm (State delegate),
-                        // không phải giá trị đông cứng lúc đăng ký listener.
                         map.addOnMapClickListener { latLng ->
                             val screenPoint = map.projection.toScreenLocation(latLng)
                             val tappedPoleId =
@@ -162,18 +166,31 @@ fun MapScreen(
                             }
                         }
                     } else {
-                        geoJsonSource?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
-                        roadSegmentGeoJsonSource?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
-                        applyLayerVisibility(loadedStyle, showFixtures, showRoadSegments)
-                    }
-
-                    locateTarget?.let { target ->
-                        map.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
-                        locateTarget = null
+                        maplibreMap = map
                     }
                 }
             },
         )
+
+        // Phản ứng state — không dựa vào `update` của AndroidView chạy lại (xem comment ở
+        // khai báo maplibreMap phía trên).
+        LaunchedEffect(maplibreMap, uiState) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
+            (style.getSource(ROAD_SEGMENTS_SOURCE_ID) as? GeoJsonSource)
+                ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
+        }
+
+        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            applyLayerVisibility(style, showFixtures, showRoadSegments)
+        }
+
+        LaunchedEffect(locateTarget) {
+            val target = locateTarget ?: return@LaunchedEffect
+            maplibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
+            locateTarget = null
+        }
 
         MapLegend(
             modifier =
