@@ -5,6 +5,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.map.ui.MapScreen
 
 // Khung NavHost tối thiểu — nối các composable màn hình thật khi
@@ -16,6 +17,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         startDestination = Routes.Login.route,
     ) {
         composable(Routes.Login.route) {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Routes.Map.route) {
+                        popUpTo(Routes.Login.route) { inclusive = true }
+                    }
+                },
+            )
         }
         composable(Routes.Home.route) {
         }

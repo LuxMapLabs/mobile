@@ -20,6 +20,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
+        // matching the http port luxmap_backend listens on (see launchSettings.json — "http"
+        // profile: 5294). Testing on a real device (LAN): change this to the backend machine's
+        // LAN IP for that test, then change it back.
+        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5294/\"")
     }
 
     buildTypes {
@@ -43,6 +49,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -75,6 +82,8 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.maplibre.android.sdk)
+
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
