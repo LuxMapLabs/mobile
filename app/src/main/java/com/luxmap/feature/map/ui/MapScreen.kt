@@ -36,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.map.MAP_STYLE_URL
+import com.luxmap.core.map.VECTOR_STYLE_URL
 import com.luxmap.core.map.markerColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
@@ -71,8 +72,15 @@ private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
 
-// clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
-// out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
+// Camera zoom cap while on the satellite basemap — see the comment where
+// map.setMaxZoomPreference() is called for why (rural satellite imagery gets blurry past its
+// source resolution when over-zoomed). The vector basemap is drawn with lines so it doesn't
+// blur, and allows zooming in much further.
+private const val SATELLITE_MAX_ZOOM = 18.5
+private const val VECTOR_MAX_ZOOM = 20.0
+
+// clusterProperties computes the "highest severity in the cluster" (Design System section
+// 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
 private const val CLUSTER_MAX_ZOOM = 14
 private const val CLUSTER_RADIUS = 50
@@ -94,6 +102,10 @@ fun MapScreen(
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
+    // Satellite is the initial default (matches "look like the web app"); the basemap toggle
+    // lets the user switch to vector when a sharper view is needed (see VECTOR_STYLE_URL in
+    // MapLibreConfig.kt).
+    var isSatelliteBasemap by remember { mutableStateOf(true) }
     var locateTarget by remember { mutableStateOf<LatLng?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
 
@@ -118,33 +130,17 @@ fun MapScreen(
             update = { view ->
                 view.getMapAsync { map ->
                     if (map.style == null) {
+                        map.setMaxZoomPreference(SATELLITE_MAX_ZOOM)
                         map.cameraPosition =
                             CameraPosition.Builder()
                                 .target(MOCK_AREA_CENTER)
                                 .zoom(MOCK_AREA_ZOOM)
                                 .build()
                         map.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { style ->
-                            val segmentSource =
-                                GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
-                            style.addSource(segmentSource)
-                            // Add trước layer cột đèn để tuyến vẽ dưới, marker nổi trên.
-                            style.addLayer(buildRoadSegmentsLineLayer())
-
-                            val source =
-                                GeoJsonSource(
-                                    POLES_SOURCE_ID,
-                                    uiState.polesOrEmpty().toGeoJson(),
-                                    buildClusterOptions(),
-                                )
-                            style.addSource(source)
-                            style.addLayer(buildClusterCircleLayer())
-                            style.addLayer(buildClusterCountLayer())
-                            style.addLayer(buildPoleCircleLayer())
-
-                            applyLayerVisibility(style, showFixtures, showRoadSegments)
-                            // Style/source/layer chỉ chắc chắn sẵn sàng ở đây (trong callback
-                            // onStyleLoaded) — gán maplibreMap ở bước này để các LaunchedEffect
-                            // phản ứng state không chạy sớm hơn khi layer chưa tồn tại.
+                            setupMapLayers(style, uiState, showFixtures, showRoadSegments)
+                            // Style/source/layer are only guaranteed ready here (inside the
+                            // onStyleLoaded callback) — assign maplibreMap at this point so the
+                            // LaunchedEffects reacting to state don't run before the layers exist.
                             maplibreMap = map
                         }
                         map.addOnMapClickListener { latLng ->
@@ -190,6 +186,32 @@ fun MapScreen(
             val target = locateTarget ?: return@LaunchedEffect
             maplibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
             locateTarget = null
+        }
+
+        // Satellite <-> vector basemap toggle (F12) — the free satellite imagery is only sharp
+        // in urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
+        // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
+        // because the source imagery just doesn't have that resolution — this button lets the
+        // field crew switch to the vector basemap (drawn with lines, always sharp) when needed.
+        FloatingActionButton(
+            onClick = {
+                isSatelliteBasemap = !isSatelliteBasemap
+                val map = maplibreMap ?: return@FloatingActionButton
+                map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
+                val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
+                map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
+                    setupMapLayers(style, uiState, showFixtures, showRoadSegments)
+                }
+            },
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(Spacing.lg),
+        ) {
+            Text(
+                text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
 
         MapLegend(
@@ -251,8 +273,31 @@ private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orE
 
 private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
 
-// Tuyến đã khảo sát (F12) — 1 màu trung tính, không tô theo trạng thái sự cố điện (đó là
-// phân tích của Web GIS, không thuộc phạm vi mobile, xem RoadSegmentLine.kt).
+// Add every F12 source/layer onto a freshly loaded Style — used both for the first load AND
+// every time the user taps the satellite/vector basemap toggle, because map.setStyle() replaces
+// the whole style so all old sources/layers are gone and must be added again from scratch.
+private fun setupMapLayers(
+    style: Style,
+    uiState: MapUiState,
+    showFixtures: Boolean,
+    showRoadSegments: Boolean,
+) {
+    val segmentSource = GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
+    style.addSource(segmentSource)
+    // Add before the pole layer so the route draws below, markers on top.
+    style.addLayer(buildRoadSegmentsLineLayer())
+
+    val source = GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions())
+    style.addSource(source)
+    style.addLayer(buildClusterCircleLayer())
+    style.addLayer(buildClusterCountLayer())
+    style.addLayer(buildPoleCircleLayer())
+
+    applyLayerVisibility(style, showFixtures, showRoadSegments)
+}
+
+// Surveyed route (F12) — one neutral color, not colored by fault status (that is Web GIS
+// analysis, out of scope for mobile, see RoadSegmentLine.kt).
 private fun buildRoadSegmentsLineLayer(): LineLayer =
     LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
         .withProperties(
