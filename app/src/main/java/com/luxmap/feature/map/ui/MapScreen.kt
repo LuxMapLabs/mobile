@@ -35,8 +35,12 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.luxmap.core.map.IOT_BADGE_ICON_ID
 import com.luxmap.core.map.MAP_STYLE_URL
+import com.luxmap.core.map.POI_BADGE_ICON_ID
 import com.luxmap.core.map.markerColorArgb
+import com.luxmap.core.map.registerMarkerBadgeIcons
+import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
@@ -56,23 +60,28 @@ import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 
-// Toạ độ trung tâm và bbox của mock-poles.geojson (khu vực HCMC-lân cận, 3 segment).
+// Center coordinate and bbox of mock-poles.geojson (HCMC-area mock, 3 segments).
 private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
 private const val MOCK_AREA_ZOOM = 15.0
 
 private const val POLES_SOURCE_ID = "poles-source"
+private const val POLES_GLOW_CIRCLE_LAYER_ID = "poles-glow-circle-layer"
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
+private const val POLES_LABEL_LAYER_ID = "poles-label-layer"
+private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
+private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 
-// Lớp "tuyến đã khảo sát" (F12) — vẽ dưới marker cột đèn nên add layer này trước trong z-order.
+// "Surveyed route" layer (F12) — drawn below the pole markers, so add this layer first in
+// z-order.
 private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
 
-// clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
-// out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
+// clusterProperties computes the "highest severity in the cluster" (Design System section
+// 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
 private const val CLUSTER_MAX_ZOOM = 14
 private const val CLUSTER_RADIUS = 50
@@ -85,15 +94,16 @@ fun MapScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
-    // Tham chiếu map thật, cập nhật đúng 1 lần khi sẵn sàng — các LaunchedEffect bên dưới đọc
-    // lại state (uiState/showFixtures/...) mỗi lần đổi và tự áp trực tiếp lên map qua tham
-    // chiếu này. KHÔNG dựa vào việc AndroidView gọi lại `update` mỗi lần recompose: Compose
-    // nhớ lại (memoize) lambda `update` vì mọi biến nó bắt đều là State ổn định, nên `update`
-    // trong thực tế chỉ chạy đúng 1 lần — set trực tiếp trong đó sẽ không phản ứng lại sau này.
+    // Reference to the real map, set exactly once when ready — the LaunchedEffects below read
+    // state (uiState/showFixtures/...) on every change and apply it directly to the map through
+    // this reference. Do NOT rely on AndroidView calling `update` again on recompose: Compose
+    // memoizes the `update` lambda because every variable it captures is stable State, so
+    // `update` in practice only runs once — setting things directly in it won't react later.
     var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
+    var showPoleLabels by remember { mutableStateOf(false) }
     var locateTarget by remember { mutableStateOf<LatLng?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
 
@@ -106,7 +116,8 @@ fun MapScreen(
             }
         }
 
-    // One-shot: mỗi lần bấm nút định vị chỉ bay camera đúng 1 lần, không phát lại khi recompose.
+    // One-shot: each tap on the locate button flies the camera exactly once, not replayed on
+    // recompose.
     LaunchedEffect(Unit) {
         viewModel.locateMeEvent.collect { latLng -> locateTarget = latLng }
     }
@@ -124,10 +135,12 @@ fun MapScreen(
                                 .zoom(MOCK_AREA_ZOOM)
                                 .build()
                         map.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { style ->
+                            registerMarkerBadgeIcons(context, style)
+
                             val segmentSource =
                                 GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
                             style.addSource(segmentSource)
-                            // Add trước layer cột đèn để tuyến vẽ dưới, marker nổi trên.
+                            // Add before the pole layer so the route draws below, markers on top.
                             style.addLayer(buildRoadSegmentsLineLayer())
 
                             val source =
@@ -139,12 +152,17 @@ fun MapScreen(
                             style.addSource(source)
                             style.addLayer(buildClusterCircleLayer())
                             style.addLayer(buildClusterCountLayer())
+                            // Add glow before the main dot so the dot sits on top of the glow.
+                            style.addLayer(buildPoleGlowCircleLayer())
                             style.addLayer(buildPoleCircleLayer())
+                            style.addLayer(buildPoleLabelLayer())
+                            style.addLayer(buildPoiBadgeLayer())
+                            style.addLayer(buildIotBadgeLayer())
 
-                            applyLayerVisibility(style, showFixtures, showRoadSegments)
-                            // Style/source/layer chỉ chắc chắn sẵn sàng ở đây (trong callback
-                            // onStyleLoaded) — gán maplibreMap ở bước này để các LaunchedEffect
-                            // phản ứng state không chạy sớm hơn khi layer chưa tồn tại.
+                            applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
+                            // Style/source/layer are only guaranteed ready here (inside the
+                            // onStyleLoaded callback) — assign maplibreMap at this point so the
+                            // LaunchedEffects reacting to state don't run before the layers exist.
                             maplibreMap = map
                         }
                         map.addOnMapClickListener { latLng ->
@@ -172,8 +190,8 @@ fun MapScreen(
             },
         )
 
-        // Phản ứng state — không dựa vào `update` của AndroidView chạy lại (xem comment ở
-        // khai báo maplibreMap phía trên).
+        // React to state — do not rely on AndroidView's `update` running again (see the comment
+        // where maplibreMap is declared above).
         LaunchedEffect(maplibreMap, uiState) {
             val style = maplibreMap?.style ?: return@LaunchedEffect
             (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
@@ -181,9 +199,9 @@ fun MapScreen(
                 ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
         }
 
-        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
+        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments, showPoleLabels) {
             val style = maplibreMap?.style ?: return@LaunchedEffect
-            applyLayerVisibility(style, showFixtures, showRoadSegments)
+            applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
         }
 
         LaunchedEffect(locateTarget) {
@@ -204,6 +222,8 @@ fun MapScreen(
             onShowFixturesChange = { showFixtures = it },
             showRoadSegments = showRoadSegments,
             onShowRoadSegmentsChange = { showRoadSegments = it },
+            showPoleLabels = showPoleLabels,
+            onShowPoleLabelsChange = { showPoleLabels = it },
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
@@ -251,32 +271,68 @@ private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orE
 
 private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
 
-// Tuyến đã khảo sát (F12) — 1 màu trung tính, không tô theo trạng thái sự cố điện (đó là
-// phân tích của Web GIS, không thuộc phạm vi mobile, xem RoadSegmentLine.kt).
+// "Surveyed route" (F12) — colored by has_active_segment_fault to match how Web GIS shows grid
+// faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
+// tap — that is still Web GIS scope, mobile only needs the color as a visual warning for the
+// field crew.
 private fun buildRoadSegmentsLineLayer(): LineLayer =
     LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
         .withProperties(
-            PropertyFactory.lineColor("#3E86C9"),
+            PropertyFactory.lineColor(
+                Expression.switchCase(
+                    Expression.get("has_active_segment_fault"),
+                    Expression.color(routeColorArgb(hasActiveSegmentFault = true)),
+                    Expression.color(routeColorArgb(hasActiveSegmentFault = false)),
+                ),
+            ),
             PropertyFactory.lineWidth(2f),
             PropertyFactory.lineOpacity(0.7f),
         )
 
-// Áp lại visibility mỗi lần toggle đổi hoặc mỗi lần AndroidView update chạy lại — rẻ hơn nhiều
-// so với add/remove layer, và không cần set lại GeoJSON.
+// Re-apply visibility every time a toggle changes or AndroidView's update runs again — much
+// cheaper than add/remove layer, and no need to reset the GeoJSON.
 private fun applyLayerVisibility(
     style: Style,
     showFixtures: Boolean,
     showRoadSegments: Boolean,
+    showPoleLabels: Boolean,
 ) {
     val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
     val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
+    // Labels only show when BOTH are true — no point showing labels for hidden markers.
+    val labelVisibility = if (showFixtures && showPoleLabels) Property.VISIBLE else Property.NONE
+    style.getLayer(POLES_GLOW_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(POLES_LABEL_LAYER_ID)?.setProperties(PropertyFactory.visibility(labelVisibility))
+    style.getLayer(POLES_POI_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
 }
 
-// Chỉ vẽ marker từng điểm cho feature KHÔNG bị gộp cụm (point_count chỉ tồn tại trên cluster).
+// Soft glow around each pole marker (F12) — matches the glow effect on Web GIS. Static, no
+// blinking: web only pulses the "out" state with a CSS animation, but adding a loop animation
+// on native MapLibre just for looks is over-engineering for F12 scope.
+private fun buildPoleGlowCircleLayer(): CircleLayer =
+    CircleLayer(POLES_GLOW_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.circleRadius(14f),
+            PropertyFactory.circleBlur(1f),
+            PropertyFactory.circleOpacity(0.35f),
+            PropertyFactory.circleColor(
+                Expression.match(
+                    Expression.get("fixture_status"),
+                    Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
+                    Expression.stop("normal", Expression.color(AssetCondition.NORMAL.markerColorArgb())),
+                    Expression.stop("dim", Expression.color(AssetCondition.DIM.markerColorArgb())),
+                    Expression.stop("out", Expression.color(AssetCondition.OUT.markerColorArgb())),
+                ),
+            ),
+        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
+
+// Only draw a marker for features NOT grouped into a cluster (point_count only exists on
+// clusters).
 private fun buildPoleCircleLayer(): CircleLayer =
     CircleLayer(POLES_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
@@ -294,9 +350,62 @@ private fun buildPoleCircleLayer(): CircleLayer =
             ),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
 
-// clusterProperties: mapExpression tính severity số (0..3) từ fixture_status của MỖI điểm
-// trước khi gộp cụm; reduceExpression lấy max tích luỹ — đúng yêu cầu "Cluster hiển thị số
-// lượng và mức nghiêm trọng cao nhất" (Design System §6.10).
+// pole_id label (F12, "Show pole labels" toggle) — same as the "Show labels" toggle on Web GIS,
+// off by default because showing every label at once is cluttered when poles are close
+// together. Do NOT turn on textAllowOverlap/textIgnorePlacement — poles along a road are often
+// very close, forcing every label to show makes text overlap and unreadable (looks "blurry").
+// Let MapLibre's default collision detection hide overlapping labels — that is what we want here.
+private fun buildPoleLabelLayer(): SymbolLayer =
+    SymbolLayer(POLES_LABEL_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.textField(Expression.get("pole_id")),
+            PropertyFactory.textSize(10f),
+            PropertyFactory.textColor("#0F172A"),
+            PropertyFactory.textHaloColor("#FFFFFF"),
+            PropertyFactory.textHaloWidth(1.2f),
+            PropertyFactory.textOffset(arrayOf(0f, 1.4f)),
+        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
+
+// "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
+// badge goes bottom-right so a pole that is both near a POI and has an IoT node doesn't overlap
+// badges.
+private fun buildPoiBadgeLayer(): SymbolLayer =
+    SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.iconImage(POI_BADGE_ICON_ID),
+            PropertyFactory.iconSize(0.5f),
+            PropertyFactory.iconOffset(arrayOf(6f, -6f)),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+        ).apply {
+            setFilter(
+                Expression.all(
+                    Expression.not(Expression.has("point_count")),
+                    Expression.eq(Expression.get("near_sensitive_poi"), Expression.literal(true)),
+                ),
+            )
+        }
+
+private fun buildIotBadgeLayer(): SymbolLayer =
+    SymbolLayer(POLES_IOT_BADGE_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
+            PropertyFactory.iconSize(0.5f),
+            PropertyFactory.iconOffset(arrayOf(6f, 6f)),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+        ).apply {
+            setFilter(
+                Expression.all(
+                    Expression.not(Expression.has("point_count")),
+                    Expression.eq(Expression.get("has_iot_node"), Expression.literal(true)),
+                ),
+            )
+        }
+
+// clusterProperties: mapExpression computes a numeric severity (0..3) from each point's
+// fixture_status before clustering; reduceExpression takes the running max — matches the
+// requirement "cluster shows count and highest severity" (Design System section 6.10).
 private fun buildClusterOptions(): GeoJsonOptions =
     GeoJsonOptions()
         .withCluster(true)
@@ -367,8 +476,8 @@ private fun BoxScope.MessageOverlay(text: String) {
     )
 }
 
-// MapView là Android View thuần, cần tự chuyển tiếp lifecycle (onStart/onResume/...) từ
-// Compose sang MapView — MapLibre chưa có Compose interop chính thức.
+// MapView is a plain Android View, its lifecycle (onStart/onResume/...) must be forwarded
+// manually from Compose to MapView — MapLibre has no official Compose interop yet.
 @Composable
 private fun rememberMapViewWithLifecycle(): MapView {
     val context = LocalContext.current

@@ -5,26 +5,28 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.luxmap.core.theme.Amber500
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.Blue500
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.Green400
 import com.luxmap.core.theme.Rose600
 import org.maplibre.android.MapLibre
 
-// Style OpenFreeMap "Liberty" — vector style dựng từ OSM, miễn phí, không cần API key,
-// đủ chi tiết đường/khu dân cư/địa danh Việt Nam cho bước prototype FM-06. Đổi sang nguồn
-// tile chính thức khi FM-15 chốt cùng Web GIS (WP5) — xem CLAUDE.md mục "Ngăn xếp công nghệ".
+// OpenFreeMap "Liberty" style — vector style built from OSM, free, no API key needed, detailed
+// enough for roads/neighborhoods/place names in Vietnam for the FM-06 prototype. Switch to the
+// official tile source once FM-15 is finalized with Web GIS (WP5) — see the "Tech stack"
+// section in CLAUDE.md.
 const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 
-// Gọi 1 lần khi app khởi động (LuxMapApp.onCreate), trước khi bất kỳ MapView nào được tạo.
+// Call once when the app starts (LuxMapApp.onCreate), before any MapView is created.
 fun initMapLibre(context: Context) {
     MapLibre.getInstance(context)
 }
 
-// Màu fill marker trên bản đồ — lấy đúng 3 màu primitive có sẵn từ core/theme/Color.kt
-// (Green400/Amber500/Rose600) + Gray500 cho unknown, KHÔNG dùng cặp bg/text của badge chữ
-// (mục 2.3 Design System) vì những màu đó tối/nhạt hơn, khó thấy ở kích thước chấm nhỏ.
-// Một nguồn màu duy nhất — MapScreen dùng bản ARGB cho MapLibre Expression, MapLegend dùng
-// thẳng Color cho Compose.
+// Marker fill color on the map — use the 3 existing primitive colors from core/theme/Color.kt
+// (Green400/Amber500/Rose600) + Gray500 for unknown, NOT the badge text bg/text pair (Design
+// System section 2.3) because those colors are darker/lighter and hard to see at dot size. One
+// color source — MapScreen uses the ARGB version for MapLibre Expression, MapLegend uses Color
+// directly for Compose.
 fun AssetCondition.markerColor(): Color =
     when (this) {
         AssetCondition.NORMAL -> Green400
@@ -34,3 +36,9 @@ fun AssetCondition.markerColor(): Color =
     }
 
 fun AssetCondition.markerColorArgb(): Int = markerColor().toArgb()
+
+// Route color for "surveyed route" (F12) — colored by has_active_segment_fault to match how
+// Web GIS shows grid faults, using the 2 existing tokens (Rose600/Blue500), no new color picked.
+fun routeColor(hasActiveSegmentFault: Boolean): Color = if (hasActiveSegmentFault) Rose600 else Blue500
+
+fun routeColorArgb(hasActiveSegmentFault: Boolean): Int = routeColor(hasActiveSegmentFault).toArgb()

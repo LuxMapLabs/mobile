@@ -2,13 +2,15 @@ package com.luxmap.feature.map.data
 
 import com.luxmap.feature.map.data.dto.RoadSegmentFeatureDto
 
-// Domain model rút gọn từ RoadSegmentFeatureDto, chỉ giữ field UI cần cho F12 (vẽ đường "tuyến
-// đã khảo sát" trên bản đồ) — KHÔNG giữ controllerNodeId/hasActiveSegmentFault, hai field đó
-// phục vụ phân tích điện lưới ở Web GIS (vai trò Kỹ sư bảo trì), không thuộc phạm vi F12 mobile.
+// Domain model trimmed from RoadSegmentFeatureDto, keeps only the UI fields F12 needs (draw the
+// "surveyed route" line on the map, colored by grid fault to match Web GIS) — does NOT keep
+// controllerNodeId, that field is only for the grid detail panel on Web GIS (Maintenance
+// Engineer role), F12 mobile has no such panel so it's not needed.
 data class RoadSegmentLine(
     val segmentId: String,
     val name: String,
-    // [lng, lat] theo từng điểm, đúng thứ tự GeoJSON
+    val hasActiveSegmentFault: Boolean,
+    // [lng, lat] per point, in GeoJSON order
     val coordinates: List<Pair<Double, Double>>,
 )
 
@@ -16,5 +18,6 @@ fun RoadSegmentFeatureDto.toRoadSegmentLine(): RoadSegmentLine =
     RoadSegmentLine(
         segmentId = properties.segmentId,
         name = properties.segmentName,
+        hasActiveSegmentFault = properties.hasActiveSegmentFault,
         coordinates = geometry.coordinates.map { (lng, lat) -> lng to lat },
     )

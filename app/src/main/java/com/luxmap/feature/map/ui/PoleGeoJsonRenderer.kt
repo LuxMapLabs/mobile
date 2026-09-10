@@ -6,9 +6,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-// Chuyển List<PoleMarker> (domain model) thành chuỗi GeoJSON để đưa vào GeoJsonSource của
-// MapLibre — chỉ giữ 2 field UI cần cho match expression (fixture_status) và bottom sheet
-// (pole_id), không phải bản sao đầy đủ của PoleFeatureDto.
+// Turn List<PoleMarker> (domain model) into a GeoJSON string for MapLibre's GeoJsonSource —
+// keep only the UI fields needed for the match expression (fixture_status), the bottom sheet
+// (pole_id), and the 2 POI/IoT badge markers (has_iot_node, near_sensitive_poi) — not a full
+// copy of PoleFeatureDto.
 private val renderJson = Json { encodeDefaults = true }
 
 fun List<PoleMarker>.toGeoJson(): String =
@@ -24,6 +25,8 @@ private fun PoleMarker.toRenderFeature() =
             RenderProperties(
                 poleId = poleId,
                 fixtureStatus = fixtureStatus.toGeoJsonValue(),
+                hasIotNode = hasIotNode,
+                nearSensitivePoi = nearSensitivePoi,
             ),
     )
 
@@ -58,4 +61,6 @@ private data class RenderGeometry(
 private data class RenderProperties(
     @SerialName("pole_id") val poleId: String,
     @SerialName("fixture_status") val fixtureStatus: String,
+    @SerialName("has_iot_node") val hasIotNode: Boolean,
+    @SerialName("near_sensitive_poi") val nearSensitivePoi: Boolean,
 )
