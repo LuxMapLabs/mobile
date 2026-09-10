@@ -82,6 +82,7 @@ dependencies {
     implementation(libs.coil.compose)
 
     implementation(libs.maplibre.android.sdk)
+    implementation(libs.play.services.location)
 
     implementation(libs.androidx.datastore.preferences)
 

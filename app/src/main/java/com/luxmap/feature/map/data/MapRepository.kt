@@ -6,4 +6,8 @@ import kotlinx.coroutines.flow.Flow
 // không thêm tham số thừa ở bước prototype này (xem plan FM-06).
 interface MapRepository {
     fun observePoles(): Flow<List<PoleMarker>>
+
+    // Lớp "tuyến đã khảo sát" (RoadSegment) của F12 — tách riêng khỏi observePoles() vì
+    // là 2 nguồn dữ liệu độc lập, mỗi method 1 trách nhiệm.
+    fun observeRoadSegments(): Flow<List<RoadSegmentLine>>
 }

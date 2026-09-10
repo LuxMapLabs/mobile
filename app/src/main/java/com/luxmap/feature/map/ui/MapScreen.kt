@@ -1,5 +1,9 @@
 package com.luxmap.feature.map.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -7,11 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -32,11 +42,15 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.feature.map.data.PoleMarker
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
@@ -51,6 +65,12 @@ private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 
+// Lớp "tuyến đã khảo sát" (F12) — vẽ dưới marker cột đèn nên add layer này trước trong z-order.
+private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
+private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
+
+private const val LOCATE_ME_ZOOM = 17.0
+
 // clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
 // out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
@@ -62,10 +82,34 @@ fun MapScreen(
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
-    var geoJsonSource by remember { mutableStateOf<GeoJsonSource?>(null) }
+    // Tham chiếu map thật, cập nhật đúng 1 lần khi sẵn sàng — các LaunchedEffect bên dưới đọc
+    // lại state (uiState/showFixtures/...) mỗi lần đổi và tự áp trực tiếp lên map qua tham
+    // chiếu này. KHÔNG dựa vào việc AndroidView gọi lại `update` mỗi lần recompose: Compose
+    // nhớ lại (memoize) lambda `update` vì mọi biến nó bắt đều là State ổn định, nên `update`
+    // trong thực tế chỉ chạy đúng 1 lần — set trực tiếp trong đó sẽ không phản ứng lại sau này.
+    var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
+    var showFixtures by remember { mutableStateOf(true) }
+    var showRoadSegments by remember { mutableStateOf(true) }
+    var locateTarget by remember { mutableStateOf<LatLng?>(null) }
+    var showLocationPermissionDenied by remember { mutableStateOf(false) }
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.onLocateMeClicked()
+            } else {
+                showLocationPermissionDenied = true
+            }
+        }
+
+    // One-shot: mỗi lần bấm nút định vị chỉ bay camera đúng 1 lần, không phát lại khi recompose.
+    LaunchedEffect(Unit) {
+        viewModel.locateMeEvent.collect { latLng -> locateTarget = latLng }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -73,14 +117,19 @@ fun MapScreen(
             factory = { mapView },
             update = { view ->
                 view.getMapAsync { map ->
-                    val loadedStyle = map.style
-                    if (loadedStyle == null) {
+                    if (map.style == null) {
                         map.cameraPosition =
                             CameraPosition.Builder()
                                 .target(MOCK_AREA_CENTER)
                                 .zoom(MOCK_AREA_ZOOM)
                                 .build()
                         map.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { style ->
+                            val segmentSource =
+                                GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
+                            style.addSource(segmentSource)
+                            // Add trước layer cột đèn để tuyến vẽ dưới, marker nổi trên.
+                            style.addLayer(buildRoadSegmentsLineLayer())
+
                             val source =
                                 GeoJsonSource(
                                     POLES_SOURCE_ID,
@@ -91,10 +140,13 @@ fun MapScreen(
                             style.addLayer(buildClusterCircleLayer())
                             style.addLayer(buildClusterCountLayer())
                             style.addLayer(buildPoleCircleLayer())
-                            geoJsonSource = source
+
+                            applyLayerVisibility(style, showFixtures, showRoadSegments)
+                            // Style/source/layer chỉ chắc chắn sẵn sàng ở đây (trong callback
+                            // onStyleLoaded) — gán maplibreMap ở bước này để các LaunchedEffect
+                            // phản ứng state không chạy sớm hơn khi layer chưa tồn tại.
+                            maplibreMap = map
                         }
-                        // uiState đọc ở đây luôn là giá trị mới nhất mỗi lần chạm (State delegate),
-                        // không phải giá trị đông cứng lúc đăng ký listener.
                         map.addOnMapClickListener { latLng ->
                             val screenPoint = map.projection.toScreenLocation(latLng)
                             val tappedPoleId =
@@ -114,11 +166,31 @@ fun MapScreen(
                             }
                         }
                     } else {
-                        geoJsonSource?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
+                        maplibreMap = map
                     }
                 }
             },
         )
+
+        // Phản ứng state — không dựa vào `update` của AndroidView chạy lại (xem comment ở
+        // khai báo maplibreMap phía trên).
+        LaunchedEffect(maplibreMap, uiState) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
+            (style.getSource(ROAD_SEGMENTS_SOURCE_ID) as? GeoJsonSource)
+                ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
+        }
+
+        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            applyLayerVisibility(style, showFixtures, showRoadSegments)
+        }
+
+        LaunchedEffect(locateTarget) {
+            val target = locateTarget ?: return@LaunchedEffect
+            maplibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
+            locateTarget = null
+        }
 
         MapLegend(
             modifier =
@@ -127,11 +199,46 @@ fun MapScreen(
                     .padding(Spacing.lg),
         )
 
+        MapLayerToggle(
+            showFixtures = showFixtures,
+            onShowFixturesChange = { showFixtures = it },
+            showRoadSegments = showRoadSegments,
+            onShowRoadSegmentsChange = { showRoadSegments = it },
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(Spacing.lg),
+        )
+
+        FloatingActionButton(
+            onClick = {
+                showLocationPermissionDenied = false
+                val granted =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+                if (granted) {
+                    viewModel.onLocateMeClicked()
+                } else {
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            },
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(Spacing.lg),
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+        }
+
         when (uiState) {
             is MapUiState.Loading -> LoadingOverlay()
             is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
             is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
             is MapUiState.Success -> Unit
+        }
+
+        if (showLocationPermissionDenied) {
+            MessageOverlay(text = "Chưa cấp quyền vị trí")
         }
     }
 
@@ -141,6 +248,33 @@ fun MapScreen(
 }
 
 private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orEmpty()
+
+private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
+
+// Tuyến đã khảo sát (F12) — 1 màu trung tính, không tô theo trạng thái sự cố điện (đó là
+// phân tích của Web GIS, không thuộc phạm vi mobile, xem RoadSegmentLine.kt).
+private fun buildRoadSegmentsLineLayer(): LineLayer =
+    LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.lineColor("#3E86C9"),
+            PropertyFactory.lineWidth(2f),
+            PropertyFactory.lineOpacity(0.7f),
+        )
+
+// Áp lại visibility mỗi lần toggle đổi hoặc mỗi lần AndroidView update chạy lại — rẻ hơn nhiều
+// so với add/remove layer, và không cần set lại GeoJSON.
+private fun applyLayerVisibility(
+    style: Style,
+    showFixtures: Boolean,
+    showRoadSegments: Boolean,
+) {
+    val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
+    val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
+    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
+}
 
 // Chỉ vẽ marker từng điểm cho feature KHÔNG bị gộp cụm (point_count chỉ tồn tại trên cluster).
 private fun buildPoleCircleLayer(): CircleLayer =

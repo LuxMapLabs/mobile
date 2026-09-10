@@ -2,6 +2,7 @@ package com.luxmap.feature.map.data
 
 import android.content.Context
 import com.luxmap.feature.map.data.dto.PoleFeatureCollectionDto
+import com.luxmap.feature.map.data.dto.RoadSegmentFeatureCollectionDto
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -28,7 +29,16 @@ class FakeMapRepository
                 emit(collection.features.map { it.toPoleMarker() })
             }
 
+        override fun observeRoadSegments(): Flow<List<RoadSegmentLine>> =
+            flow {
+                val text =
+                    context.assets.open(MOCK_ROAD_SEGMENTS_ASSET).bufferedReader().use { it.readText() }
+                val collection = json.decodeFromString<RoadSegmentFeatureCollectionDto>(text)
+                emit(collection.features.map { it.toRoadSegmentLine() })
+            }
+
         private companion object {
             const val MOCK_POLES_ASSET = "mock-poles.geojson"
+            const val MOCK_ROAD_SEGMENTS_ASSET = "mock-segments.geojson"
         }
     }
