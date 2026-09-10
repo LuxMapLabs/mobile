@@ -10,10 +10,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.navigation.NavGraph
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -30,14 +29,9 @@ class MainActivity : ComponentActivity() {
                             .windowInsetsPadding(WindowInsets.safeDrawing),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    LuxMapRoot()
+                    NavGraph()
                 }
             }
         }
     }
-}
-
-@Composable
-private fun LuxMapRoot() {
-    Text(text = "LuxMap")
 }

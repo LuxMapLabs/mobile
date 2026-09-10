@@ -16,7 +16,6 @@ local.properties
 *.iml
 
 # Claude Code / AI — NEVER COMMIT
-CLAUDE.md
 .claude/
 
 # Other AI coding tools
