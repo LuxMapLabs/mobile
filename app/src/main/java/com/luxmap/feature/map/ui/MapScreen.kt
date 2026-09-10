@@ -6,13 +6,16 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -31,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -88,6 +92,10 @@ private const val LOCATE_ME_ZOOM = 17.0
 // blur, and allows zooming in much further.
 private const val SATELLITE_MAX_ZOOM = 18.5
 private const val VECTOR_MAX_ZOOM = 20.0
+
+// Standard Material3 FloatingActionButton size — used to space the zoom +/- button cluster
+// right above the locate-me button, so they don't overlap.
+private val STANDARD_FAB_SIZE = 56.dp
 
 // clusterProperties computes the "highest severity in the cluster" (Design System section
 // 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
@@ -245,6 +253,28 @@ fun MapScreen(
                     .align(Alignment.TopEnd)
                     .padding(Spacing.lg),
         )
+
+        // Zoom +/- buttons (F12) — MapLibre Native has no built-in widget like maplibre-gl JS's
+        // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum touch
+        // target from the Design System) that call CameraUpdateFactory.zoomIn()/zoomOut()
+        // directly. Pinch-to-zoom still works as usual, this is just an extra option.
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = Spacing.lg + STANDARD_FAB_SIZE + Spacing.sm, end = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomIn()) }) {
+                Icon(imageVector = Icons.Filled.Add, contentDescription = "Phóng to")
+            }
+            FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomOut()) }) {
+                // Icons.Filled.Remove is not in material-icons-core (only in the extended
+                // package, not in our dependencies) — use the "−" character instead of adding
+                // a new library.
+                Text(text = "−", style = MaterialTheme.typography.headlineSmall)
+            }
+        }
 
         FloatingActionButton(
             onClick = {
