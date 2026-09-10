@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- "Has IoT node" badge (has_iot_node) on the pole marker (F12) — Blue500 blue dot + white
+         lightning bolt, white outline to stand out on the satellite basemap. -->
+    <path
+        android:fillColor="#FF3E86C9"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M12,2 C17.5228,2 22,6.4772 22,12 C22,17.5228 17.5228,22 12,22 C6.4772,22 2,17.5228 2,12 C2,6.4772 6.4772,2 12,2 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M13,6 L8.5,13 L11.3,13 L10.5,18 L15.5,11 L12.5,11 Z" />
+</vector>

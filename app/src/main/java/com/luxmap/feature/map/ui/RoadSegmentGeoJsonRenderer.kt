@@ -5,9 +5,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-// Chuyển List<RoadSegmentLine> (domain model) thành chuỗi GeoJSON LineString cho GeoJsonSource
-// của MapLibre — chỉ giữ segment_id (dùng làm key nếu cần tra cứu sau này), không phải bản
-// sao đầy đủ của RoadSegmentFeatureDto (xem lý do ở RoadSegmentLine.kt).
+// Turn List<RoadSegmentLine> (domain model) into a GeoJSON LineString string for MapLibre's
+// GeoJsonSource — keep segment_id (lookup key) and has_active_segment_fault (route color, see
+// buildRoadSegmentsLineLayer in MapScreen.kt), not a full copy of RoadSegmentFeatureDto (see the
+// reason in RoadSegmentLine.kt).
 private val renderJson = Json { encodeDefaults = true }
 
 fun List<RoadSegmentLine>.toGeoJson(): String =
@@ -19,7 +20,11 @@ fun List<RoadSegmentLine>.toGeoJson(): String =
 private fun RoadSegmentLine.toRenderFeature() =
     RenderSegmentFeature(
         geometry = RenderSegmentGeometry(coordinates = coordinates.map { (lng, lat) -> listOf(lng, lat) }),
-        properties = RenderSegmentProperties(segmentId = segmentId),
+        properties =
+            RenderSegmentProperties(
+                segmentId = segmentId,
+                hasActiveSegmentFault = hasActiveSegmentFault,
+            ),
     )
 
 @Serializable
@@ -44,4 +49,5 @@ private data class RenderSegmentGeometry(
 @Serializable
 private data class RenderSegmentProperties(
     @SerialName("segment_id") val segmentId: String,
+    @SerialName("has_active_segment_fault") val hasActiveSegmentFault: Boolean,
 )
