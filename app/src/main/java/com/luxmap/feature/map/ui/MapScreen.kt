@@ -97,23 +97,6 @@ private const val VECTOR_MAX_ZOOM = 20.0
 // right above the locate-me button, so they don't overlap.
 private val STANDARD_FAB_SIZE = 56.dp
 
-// Hoang Sa/Truong Sa sovereignty labels — drawn by the app itself, not relying on how a
-// third party (MapTiler/OSM) labels this area. Coordinates are a representative point for each
-// island group (Hoang Sa: Phu Lam island; Truong Sa: Truong Sa Lon island), not a full boundary
-// polygon — enough to show the name at country-level zoom, which F12 doesn't reach during
-// actual survey work so more detail isn't needed. Shown on both basemaps (satellite/vector),
-// always on — not a user-toggleable data layer.
-private const val VN_SOVEREIGNTY_LABELS_SOURCE_ID = "vn-sovereignty-labels-source"
-private const val VN_SOVEREIGNTY_LABELS_LAYER_ID = "vn-sovereignty-labels-layer"
-private const val VN_SOVEREIGNTY_LABELS_MAX_ZOOM = 10f
-private const val VN_SOVEREIGNTY_LABELS_GEOJSON =
-    """
-    {"type":"FeatureCollection","features":[
-    {"type":"Feature","geometry":{"type":"Point","coordinates":[112.338,16.833]},"properties":{"name":"Quần đảo Hoàng Sa"}},
-    {"type":"Feature","geometry":{"type":"Point","coordinates":[111.917,8.645]},"properties":{"name":"Quần đảo Trường Sa"}}
-    ]}
-    """
-
 // clusterProperties computes the "highest severity in the cluster" (Design System section
 // 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
@@ -363,21 +346,8 @@ private fun setupMapLayers(
     style.addLayer(buildPoiBadgeLayer())
     style.addLayer(buildIotBadgeLayer())
 
-    style.addSource(GeoJsonSource(VN_SOVEREIGNTY_LABELS_SOURCE_ID, VN_SOVEREIGNTY_LABELS_GEOJSON))
-    style.addLayer(buildVnSovereigntyLabelsLayer())
-
     applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
 }
-
-private fun buildVnSovereigntyLabelsLayer(): SymbolLayer =
-    SymbolLayer(VN_SOVEREIGNTY_LABELS_LAYER_ID, VN_SOVEREIGNTY_LABELS_SOURCE_ID)
-        .withProperties(
-            PropertyFactory.textField(Expression.get("name")),
-            PropertyFactory.textSize(11f),
-            PropertyFactory.textColor("#0F172A"),
-            PropertyFactory.textHaloColor("#FFFFFF"),
-            PropertyFactory.textHaloWidth(1.4f),
-        ).apply { maxZoom = VN_SOVEREIGNTY_LABELS_MAX_ZOOM }
 
 // "Surveyed route" (F12) — colored by has_active_segment_fault to match how Web GIS shows grid
 // faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
