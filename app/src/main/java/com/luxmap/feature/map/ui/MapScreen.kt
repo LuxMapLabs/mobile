@@ -1,7 +1,9 @@
 package com.luxmap.feature.map.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -51,6 +53,9 @@ import com.luxmap.feature.map.data.PoleMarker
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -110,6 +115,14 @@ fun MapScreen(
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
+    var hasLocationPermission by
+        remember {
+            mutableStateOf(
+                LOCATION_PERMISSIONS.any {
+                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                },
+            )
+        }
 
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
@@ -117,6 +130,7 @@ fun MapScreen(
             val coarseGranted = results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
             when {
                 fineGranted || coarseGranted -> {
+                    hasLocationPermission = true
                     showCoarseLocationNotice = !fineGranted && coarseGranted
                     viewModel.onLocateMeClicked()
                 }
@@ -196,6 +210,17 @@ fun MapScreen(
             },
         )
 
+        // Turns on the blue dot once both the style and permission are ready — fires again
+        // (harmlessly, enableLocationComponent no-ops if already activated) whenever either
+        // becomes available later, e.g. permission granted after the style already loaded.
+        LaunchedEffect(maplibreMap, hasLocationPermission) {
+            val map = maplibreMap ?: return@LaunchedEffect
+            val style = map.style ?: return@LaunchedEffect
+            if (hasLocationPermission) {
+                enableLocationComponent(context, map, style)
+            }
+        }
+
         // Phản ứng state — không dựa vào `update` của AndroidView chạy lại (xem comment ở
         // khai báo maplibreMap phía trên).
         LaunchedEffect(maplibreMap, uiState) {
@@ -243,6 +268,7 @@ fun MapScreen(
                         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
                     }
                 if (granted) {
+                    hasLocationPermission = true
                     viewModel.onLocateMeClicked()
                 } else {
                     locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
@@ -295,6 +321,30 @@ fun MapScreen(
 private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orEmpty()
 
 private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
+
+// Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
+// marker — draws the dot, accuracy ring and pulse itself, and keeps working across pan/zoom.
+// NOTE: a Style is only valid until the next map.setStyle() call — whoever adds another
+// setStyle() call later (e.g. a satellite/vector basemap toggle) must call this function
+// again in that same style-loaded callback, or the dot silently disappears after the switch.
+@SuppressLint("MissingPermission")
+private fun enableLocationComponent(
+    context: Context,
+    map: MapLibreMap,
+    style: Style,
+) {
+    if (map.locationComponent.isLocationComponentActivated) return
+    val options = LocationComponentOptions.builder(context).pulseEnabled(true).build()
+    val activationOptions =
+        LocationComponentActivationOptions
+            .builder(context, style)
+            .locationComponentOptions(options)
+            .useDefaultLocationEngine(true)
+            .build()
+    map.locationComponent.activateLocationComponent(activationOptions)
+    map.locationComponent.isLocationComponentEnabled = true
+    map.locationComponent.renderMode = RenderMode.NORMAL
+}
 
 // Tuyến đã khảo sát (F12) — 1 màu trung tính, không tô theo trạng thái sự cố điện (đó là
 // phân tích của Web GIS, không thuộc phạm vi mobile, xem RoadSegmentLine.kt).
