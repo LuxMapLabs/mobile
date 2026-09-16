@@ -1,12 +1,17 @@
 package com.luxmap.feature.map.ui
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -40,6 +46,7 @@ import com.luxmap.core.map.markerColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.PoleMarker
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -71,6 +78,11 @@ private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
 
+// Request both — coarse alone is still enough to show a location dot, just with a wider
+// accuracy circle (see the FAB permission check below).
+private val LOCATION_PERMISSIONS =
+    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+
 // clusterProperties tính "mức nghiêm trọng cao nhất trong cụm" (Design System §6.10):
 // out=3, dim=2, normal=1, unknown=0 — property này chỉ tồn tại trên feature cluster.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
@@ -96,13 +108,25 @@ fun MapScreen(
     var showRoadSegments by remember { mutableStateOf(true) }
     var locateTarget by remember { mutableStateOf<LatLng?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
+    var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
+    var showCoarseLocationNotice by remember { mutableStateOf(false) }
 
     val locationPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                viewModel.onLocateMeClicked()
-            } else {
-                showLocationPermissionDenied = true
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+            val fineGranted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            val coarseGranted = results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            when {
+                fineGranted || coarseGranted -> {
+                    showCoarseLocationNotice = !fineGranted && coarseGranted
+                    viewModel.onLocateMeClicked()
+                }
+                // Once the OS stops offering a rationale for a denied permission, the user
+                // picked "don't ask again" (or is on a second denial) — a 3rd system prompt
+                // won't show, only Settings can grant it from here on.
+                (context as? Activity)?.let { activity ->
+                    LOCATION_PERMISSIONS.none { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
+                } == true -> showLocationPermissionSettingsHint = true
+                else -> showLocationPermissionDenied = true
             }
         }
 
@@ -213,13 +237,15 @@ fun MapScreen(
         FloatingActionButton(
             onClick = {
                 showLocationPermissionDenied = false
+                showLocationPermissionSettingsHint = false
                 val granted =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-                        PackageManager.PERMISSION_GRANTED
+                    LOCATION_PERMISSIONS.any {
+                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                    }
                 if (granted) {
                     viewModel.onLocateMeClicked()
                 } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
                 }
             },
             modifier =
@@ -237,7 +263,26 @@ fun MapScreen(
             is MapUiState.Success -> Unit
         }
 
-        if (showLocationPermissionDenied) {
+        if (showCoarseLocationNotice) {
+            MessageOverlay(
+                text = "Độ chính xác vị trí có thể thấp. Bật Vị trí chính xác trong Cài đặt để có kết quả tốt hơn.",
+                actionLabel = "Bỏ qua",
+                onAction = { showCoarseLocationNotice = false },
+            )
+        }
+
+        if (showLocationPermissionSettingsHint) {
+            MessageOverlay(
+                text = "Chưa cấp quyền vị trí. Mở Cài đặt ứng dụng để cấp quyền.",
+                actionLabel = "Mở cài đặt",
+                onAction = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.fromParts("package", context.packageName, null)),
+                    )
+                },
+            )
+        } else if (showLocationPermissionDenied) {
             MessageOverlay(text = "Chưa cấp quyền vị trí")
         }
     }
@@ -351,10 +396,12 @@ private fun BoxScope.LoadingOverlay() {
 }
 
 @Composable
-private fun BoxScope.MessageOverlay(text: String) {
-    Text(
-        text = text,
-        color = MaterialTheme.colorScheme.onSurface,
+private fun BoxScope.MessageOverlay(
+    text: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
         modifier =
             Modifier
                 .align(Alignment.TopCenter)
@@ -364,7 +411,16 @@ private fun BoxScope.MessageOverlay(text: String) {
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(Dimens.radiusMedium),
                 ).padding(Spacing.md),
-    )
+    ) {
+        Text(text = text, color = MaterialTheme.colorScheme.onSurface)
+        if (actionLabel != null && onAction != null) {
+            PrimaryButton(
+                text = actionLabel,
+                onClick = onAction,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+        }
+    }
 }
 
 // MapView là Android View thuần, cần tự chuyển tiếp lifecycle (onStart/onResume/...) từ
