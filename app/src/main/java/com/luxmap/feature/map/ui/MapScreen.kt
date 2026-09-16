@@ -50,11 +50,13 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.PoleMarker
+import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.OnCameraTrackingChangedListener
+import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
@@ -82,6 +84,9 @@ private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
+private const val LOCATE_CAMERA_TRANSITION_MS = 750L
+private const val LOCATION_TIMEOUT_MS = 10_000L
+private const val LOCATION_POLL_INTERVAL_MS = 500L
 
 // Request both — coarse alone is still enough to show a location dot, just with a wider
 // accuracy circle (see the FAB permission check below).
@@ -111,10 +116,12 @@ fun MapScreen(
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
-    var locateTarget by remember { mutableStateOf<LatLng?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
+    var showLocationTimeout by remember { mutableStateOf(false) }
+    var isLocating by remember { mutableStateOf(false) }
+    var isFollowingUser by remember { mutableStateOf(false) }
     var hasLocationPermission by
         remember {
             mutableStateOf(
@@ -124,6 +131,21 @@ fun MapScreen(
             )
         }
 
+    // Switches the camera into TRACKING mode — does not request permission itself, callers
+    // (FAB click, permission-granted callback, timeout retry) must already know it's granted.
+    val beginTracking: () -> Unit = {
+        showLocationTimeout = false
+        isLocating = true
+        maplibreMap?.locationComponent?.setCameraMode(
+            CameraMode.TRACKING,
+            LOCATE_CAMERA_TRANSITION_MS,
+            LOCATE_ME_ZOOM,
+            null,
+            null,
+            null,
+        )
+    }
+
     val locationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
             val fineGranted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -132,7 +154,7 @@ fun MapScreen(
                 fineGranted || coarseGranted -> {
                     hasLocationPermission = true
                     showCoarseLocationNotice = !fineGranted && coarseGranted
-                    viewModel.onLocateMeClicked()
+                    beginTracking()
                 }
                 // Once the OS stops offering a rationale for a denied permission, the user
                 // picked "don't ask again" (or is on a second denial) — a 3rd system prompt
@@ -143,11 +165,6 @@ fun MapScreen(
                 else -> showLocationPermissionDenied = true
             }
         }
-
-    // One-shot: mỗi lần bấm nút định vị chỉ bay camera đúng 1 lần, không phát lại khi recompose.
-    LaunchedEffect(Unit) {
-        viewModel.locateMeEvent.collect { latLng -> locateTarget = latLng }
-    }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -235,10 +252,40 @@ fun MapScreen(
             applyLayerVisibility(style, showFixtures, showRoadSegments)
         }
 
-        LaunchedEffect(locateTarget) {
-            val target = locateTarget ?: return@LaunchedEffect
-            maplibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
-            locateTarget = null
+        // Fires whenever camera mode changes — including automatically, when the user's own
+        // drag/pinch gesture breaks tracking (built into LocationCameraController, no manual
+        // gesture detection needed here).
+        DisposableEffect(maplibreMap) {
+            val locationComponent = maplibreMap?.locationComponent
+            val listener =
+                object : OnCameraTrackingChangedListener {
+                    override fun onCameraTrackingDismissed() {
+                        isFollowingUser = false
+                    }
+
+                    override fun onCameraTrackingChanged(currentMode: Int) {
+                        isFollowingUser = currentMode == CameraMode.TRACKING
+                    }
+                }
+            locationComponent?.addOnCameraTrackingChangedListener(listener)
+            onDispose { locationComponent?.removeOnCameraTrackingChangedListener(listener) }
+        }
+
+        // No-fix timeout: poll instead of hooking into transition callbacks, since
+        // lastKnownLocation reflects every engine update regardless of camera mode. Polling
+        // stops as soon as a fix shows up or isLocating is cleared some other way.
+        LaunchedEffect(isLocating) {
+            if (!isLocating) return@LaunchedEffect
+            val deadline = System.currentTimeMillis() + LOCATION_TIMEOUT_MS
+            while (System.currentTimeMillis() < deadline) {
+                if (maplibreMap?.locationComponent?.lastKnownLocation != null) {
+                    isLocating = false
+                    return@LaunchedEffect
+                }
+                delay(LOCATION_POLL_INTERVAL_MS)
+            }
+            isLocating = false
+            showLocationTimeout = true
         }
 
         MapLegend(
@@ -269,7 +316,7 @@ fun MapScreen(
                     }
                 if (granted) {
                     hasLocationPermission = true
-                    viewModel.onLocateMeClicked()
+                    beginTracking()
                 } else {
                     locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
                 }
@@ -310,6 +357,14 @@ fun MapScreen(
             )
         } else if (showLocationPermissionDenied) {
             MessageOverlay(text = "Chưa cấp quyền vị trí")
+        }
+
+        if (showLocationTimeout) {
+            MessageOverlay(
+                text = "Không lấy được vị trí. Hãy bật GPS hoặc ra nơi thoáng, rồi thử lại.",
+                actionLabel = "Thử lại",
+                onAction = beginTracking,
+            )
         }
     }
 
