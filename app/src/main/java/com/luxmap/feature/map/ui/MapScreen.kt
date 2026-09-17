@@ -145,10 +145,10 @@ fun MapScreen(
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
     var showPoleLabels by remember { mutableStateOf(false) }
-    // Satellite is the initial default (matches "look like the web app"); the basemap toggle
-    // lets the user switch to vector when a sharper view is needed (see VECTOR_STYLE_URL in
-    // MapLibreConfig.kt).
-    var isSatelliteBasemap by remember { mutableStateOf(true) }
+    // Vector (OpenFreeMap) is the default for field operation — always sharp, no API key needed.
+    // The basemap toggle lets the user switch to satellite (MapTiler Hybrid) when they need to
+    // compare against real-world imagery (see MAP_STYLE_URL/VECTOR_STYLE_URL in MapLibreConfig.kt).
+    var isSatelliteBasemap by remember { mutableStateOf(false) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
@@ -206,13 +206,14 @@ fun MapScreen(
             update = { view ->
                 view.getMapAsync { map ->
                     if (map.style == null) {
-                        map.setMaxZoomPreference(SATELLITE_MAX_ZOOM)
+                        map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
                         map.cameraPosition =
                             CameraPosition.Builder()
                                 .target(MOCK_AREA_CENTER)
                                 .zoom(MOCK_AREA_ZOOM)
                                 .build()
-                        map.setStyle(Style.Builder().fromUri(MAP_STYLE_URL)) { style ->
+                        val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
+                        map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
                             setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
                             // Style/source/layer are only guaranteed ready here (inside the
                             // onStyleLoaded callback) — assign maplibreMap at this point so the
