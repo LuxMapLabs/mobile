@@ -111,7 +111,7 @@
    },
    "properties": {
     "segment_id": "SEG-001",
-    "segment_name": "Tuyen A - Tinh lo 8",
+    "segment_name": "Tuyến A - Tỉnh Lộ 8",
     "road_class": "inter_commune",
     "length_m": 1600,
     "pole_count": 46,
@@ -204,7 +204,7 @@
    },
    "properties": {
     "segment_id": "SEG-002",
-    "segment_name": "Tuyen B - Nguyen Van Ni",
+    "segment_name": "Tuyến B - Nguyễn Văn Ni",
     "road_class": "inter_commune",
     "length_m": 1200,
     "pole_count": 31,
@@ -313,7 +313,7 @@
    },
    "properties": {
     "segment_id": "SEG-003",
-    "segment_name": "Tuyen C - Huynh Van Co",
+    "segment_name": "Tuyến C - Huỳnh Văn Cọ",
     "road_class": "inter_village",
     "length_m": 900,
     "pole_count": 26,

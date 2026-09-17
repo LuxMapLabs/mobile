@@ -1,11 +1,11 @@
 {
  "pole_id": "POLE-0047",
  "segment_id": "SEG-002",
- "segment_name": "Tuyen B - duong lien xa",
+ "segment_name": "Tuyến B - Nguyễn Văn Ni",
  "commune_id": "COM-001",
  "location": {
-  "lat": 10.965989,
-  "lng": 106.492025
+  "lat": 10.964558,
+  "lng": 106.495788
  },
  "fixture": {
   "fixture_type": "solar_all_in_one",
