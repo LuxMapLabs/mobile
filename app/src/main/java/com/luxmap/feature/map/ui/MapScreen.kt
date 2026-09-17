@@ -89,7 +89,6 @@ private const val MOCK_AREA_ZOOM = 15.0
 private const val POLES_SOURCE_ID = "poles-source"
 private const val POLES_GLOW_CIRCLE_LAYER_ID = "poles-glow-circle-layer"
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
-private const val POLES_LABEL_LAYER_ID = "poles-label-layer"
 private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
 private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
@@ -144,7 +143,6 @@ fun MapScreen(
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
-    var showPoleLabels by remember { mutableStateOf(false) }
     // Vector (OpenFreeMap) is the default for field operation — always sharp, no API key needed.
     // The basemap toggle lets the user switch to satellite (MapTiler Hybrid) when they need to
     // compare against real-world imagery (see MAP_STYLE_URL/VECTOR_STYLE_URL in MapLibreConfig.kt).
@@ -214,7 +212,7 @@ fun MapScreen(
                                 .build()
                         val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                         map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
-                            setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
+                            setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
                             // Style/source/layer are only guaranteed ready here (inside the
                             // onStyleLoaded callback) — assign maplibreMap at this point so the
                             // LaunchedEffects reacting to state don't run before the layers exist.
@@ -265,9 +263,9 @@ fun MapScreen(
                 ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
         }
 
-        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments, showPoleLabels) {
+        LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
             val style = maplibreMap?.style ?: return@LaunchedEffect
-            applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
+            applyLayerVisibility(style, showFixtures, showRoadSegments)
         }
 
         // Fires whenever camera mode changes — including automatically, when the user's own
@@ -322,7 +320,7 @@ fun MapScreen(
                     map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
                     val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                     map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
-                        setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
+                        setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
                         // setStyle() drops the LocationComponent along with the rest of the old
                         // style — re-enable it here or the blue dot disappears after toggling
                         // basemap (see the NOTE on enableLocationComponent).
@@ -354,8 +352,6 @@ fun MapScreen(
                 onShowFixturesChange = { showFixtures = it },
                 showRoadSegments = showRoadSegments,
                 onShowRoadSegmentsChange = { showRoadSegments = it },
-                showPoleLabels = showPoleLabels,
-                onShowPoleLabelsChange = { showPoleLabels = it },
                 modifier =
                     Modifier
                         .align(Alignment.TopEnd)
@@ -465,7 +461,6 @@ private fun setupMapLayers(
     uiState: MapUiState,
     showFixtures: Boolean,
     showRoadSegments: Boolean,
-    showPoleLabels: Boolean,
 ) {
     registerMarkerBadgeIcons(context, style)
 
@@ -481,11 +476,10 @@ private fun setupMapLayers(
     // Add glow before the main dot so the dot sits on top of the glow.
     style.addLayer(buildPoleGlowCircleLayer())
     style.addLayer(buildPoleCircleLayer())
-    style.addLayer(buildPoleLabelLayer())
     style.addLayer(buildPoiBadgeLayer())
     style.addLayer(buildIotBadgeLayer())
 
-    applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
+    applyLayerVisibility(style, showFixtures, showRoadSegments)
 }
 
 // Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
@@ -536,15 +530,11 @@ private fun applyLayerVisibility(
     style: Style,
     showFixtures: Boolean,
     showRoadSegments: Boolean,
-    showPoleLabels: Boolean,
 ) {
     val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
     val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
-    // Labels only show when BOTH are true — no point showing labels for hidden markers.
-    val labelVisibility = if (showFixtures && showPoleLabels) Property.VISIBLE else Property.NONE
     style.getLayer(POLES_GLOW_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_LABEL_LAYER_ID)?.setProperties(PropertyFactory.visibility(labelVisibility))
     style.getLayer(POLES_POI_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
@@ -589,22 +579,6 @@ private fun buildPoleCircleLayer(): CircleLayer =
                     Expression.stop("out", Expression.color(AssetCondition.OUT.markerColorArgb())),
                 ),
             ),
-        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
-
-// pole_id label (F12, "Show pole labels" toggle) — same as the "Show labels" toggle on Web GIS,
-// off by default because showing every label at once is cluttered when poles are close
-// together. Do NOT turn on textAllowOverlap/textIgnorePlacement — poles along a road are often
-// very close, forcing every label to show makes text overlap and unreadable (looks "blurry").
-// Let MapLibre's default collision detection hide overlapping labels — that is what we want here.
-private fun buildPoleLabelLayer(): SymbolLayer =
-    SymbolLayer(POLES_LABEL_LAYER_ID, POLES_SOURCE_ID)
-        .withProperties(
-            PropertyFactory.textField(Expression.get("pole_id")),
-            PropertyFactory.textSize(10f),
-            PropertyFactory.textColor("#0F172A"),
-            PropertyFactory.textHaloColor("#FFFFFF"),
-            PropertyFactory.textHaloWidth(1.2f),
-            PropertyFactory.textOffset(arrayOf(0f, 1.4f)),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
 
 // "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
