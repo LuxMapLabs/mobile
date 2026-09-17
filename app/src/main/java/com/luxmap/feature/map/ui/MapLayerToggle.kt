@@ -18,14 +18,17 @@ import androidx.compose.ui.Modifier
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 
-// Bật/tắt lớp hiển thị (F12: "Bật/tắt lớp hiển thị") — Cột đèn theo tình trạng và Tuyến đã
-// khảo sát (RoadSegment). Mỗi hàng là 1 vùng chạm tối thiểu 48dp (một tay, có thể đeo găng tay).
+// Toggle map layers (F12: "Toggle map layers") — poles by status, surveyed route
+// (RoadSegment), and pole labels (pole_id, same as the "Show labels" toggle on Web GIS). Each
+// row has a minimum 48dp touch target (one-hand use, works with gloves).
 @Composable
 fun MapLayerToggle(
     showFixtures: Boolean,
     onShowFixturesChange: (Boolean) -> Unit,
     showRoadSegments: Boolean,
     onShowRoadSegmentsChange: (Boolean) -> Unit,
+    showPoleLabels: Boolean,
+    onShowPoleLabelsChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -43,6 +46,11 @@ fun MapLayerToggle(
             label = "Tuyến đã khảo sát",
             checked = showRoadSegments,
             onCheckedChange = onShowRoadSegmentsChange,
+        )
+        LayerToggleRow(
+            label = "Hiện nhãn cột đèn",
+            checked = showPoleLabels,
+            onCheckedChange = onShowPoleLabelsChange,
         )
     }
 }
