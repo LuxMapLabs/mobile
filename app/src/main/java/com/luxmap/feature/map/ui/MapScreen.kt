@@ -15,9 +15,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -302,139 +305,144 @@ fun MapScreen(
             showLocationTimeout = true
         }
 
-        // Satellite <-> vector basemap toggle (F12) — the free satellite imagery is only sharp
-        // in urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
-        // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
-        // because the source imagery just doesn't have that resolution — this button lets the
-        // field crew switch to the vector basemap (drawn with lines, always sharp) when needed.
-        FloatingActionButton(
-            onClick = {
-                isSatelliteBasemap = !isSatelliteBasemap
-                val map = maplibreMap ?: return@FloatingActionButton
-                map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
-                val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
-                map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
-                    setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
-                    // setStyle() drops the LocationComponent along with the rest of the old
-                    // style — re-enable it here or the blue dot disappears after toggling
-                    // basemap (see the NOTE on enableLocationComponent).
-                    if (hasLocationPermission) {
-                        enableLocationComponent(context, map, style)
+        // Map itself stays edge-to-edge (drawn under the status/navigation bars above), but the
+        // overlay controls must not — wrap them in their own inset-aware Box so a FAB never ends
+        // up under the status bar or the gesture navigation bar.
+        Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+            // Satellite <-> vector basemap toggle (F12) — the free satellite imagery is only sharp
+            // in urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
+            // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
+            // because the source imagery just doesn't have that resolution — this button lets the
+            // field crew switch to the vector basemap (drawn with lines, always sharp) when needed.
+            FloatingActionButton(
+                onClick = {
+                    isSatelliteBasemap = !isSatelliteBasemap
+                    val map = maplibreMap ?: return@FloatingActionButton
+                    map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
+                    val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
+                    map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
+                        setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
+                        // setStyle() drops the LocationComponent along with the rest of the old
+                        // style — re-enable it here or the blue dot disappears after toggling
+                        // basemap (see the NOTE on enableLocationComponent).
+                        if (hasLocationPermission) {
+                            enableLocationComponent(context, map, style)
+                        }
                     }
-                }
-            },
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(Spacing.lg),
-        ) {
-            Text(
-                text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-
-        MapLegend(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(Spacing.lg),
-        )
-
-        MapLayerToggle(
-            showFixtures = showFixtures,
-            onShowFixturesChange = { showFixtures = it },
-            showRoadSegments = showRoadSegments,
-            onShowRoadSegmentsChange = { showRoadSegments = it },
-            showPoleLabels = showPoleLabels,
-            onShowPoleLabelsChange = { showPoleLabels = it },
-            modifier =
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(Spacing.lg),
-        )
-
-        // Zoom +/- buttons (F12) — MapLibre Native has no built-in widget like maplibre-gl JS's
-        // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum touch
-        // target from the Design System) that call CameraUpdateFactory.zoomIn()/zoomOut()
-        // directly. Pinch-to-zoom still works as usual, this is just an extra option.
-        Column(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = Spacing.lg + STANDARD_FAB_SIZE + Spacing.sm, end = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomIn()) }) {
-                Icon(imageVector = Icons.Filled.Add, contentDescription = "Phóng to")
-            }
-            FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomOut()) }) {
-                // Icons.Filled.Remove is not in material-icons-core (only in the extended
-                // package, not in our dependencies) — use the "−" character instead of adding
-                // a new library.
-                Text(text = "−", style = MaterialTheme.typography.headlineSmall)
-            }
-        }
-
-        FloatingActionButton(
-            onClick = {
-                showLocationPermissionDenied = false
-                showLocationPermissionSettingsHint = false
-                val granted =
-                    LOCATION_PERMISSIONS.any {
-                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                    }
-                if (granted) {
-                    hasLocationPermission = true
-                    beginTracking()
-                } else {
-                    locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
-                }
-            },
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(Spacing.lg),
-        ) {
-            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
-        }
-
-        when (uiState) {
-            is MapUiState.Loading -> LoadingOverlay()
-            is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
-            is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
-            is MapUiState.Success -> Unit
-        }
-
-        if (showCoarseLocationNotice) {
-            MessageOverlay(
-                text = "Độ chính xác vị trí có thể thấp. Bật Vị trí chính xác trong Cài đặt để có kết quả tốt hơn.",
-                actionLabel = "Bỏ qua",
-                onAction = { showCoarseLocationNotice = false },
-            )
-        }
-
-        if (showLocationPermissionSettingsHint) {
-            MessageOverlay(
-                text = "Chưa cấp quyền vị trí. Mở Cài đặt ứng dụng để cấp quyền.",
-                actionLabel = "Mở cài đặt",
-                onAction = {
-                    context.startActivity(
-                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                            .setData(Uri.fromParts("package", context.packageName, null)),
-                    )
                 },
-            )
-        } else if (showLocationPermissionDenied) {
-            MessageOverlay(text = "Chưa cấp quyền vị trí")
-        }
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(Spacing.lg),
+            ) {
+                Text(
+                    text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
 
-        if (showLocationTimeout) {
-            MessageOverlay(
-                text = "Không lấy được vị trí. Hãy bật GPS hoặc ra nơi thoáng, rồi thử lại.",
-                actionLabel = "Thử lại",
-                onAction = beginTracking,
+            MapLegend(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(Spacing.lg),
             )
+
+            MapLayerToggle(
+                showFixtures = showFixtures,
+                onShowFixturesChange = { showFixtures = it },
+                showRoadSegments = showRoadSegments,
+                onShowRoadSegmentsChange = { showRoadSegments = it },
+                showPoleLabels = showPoleLabels,
+                onShowPoleLabelsChange = { showPoleLabels = it },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Spacing.lg),
+            )
+
+            // Zoom +/- buttons (F12) — MapLibre Native has no built-in widget like maplibre-gl JS's
+            // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum touch
+            // target from the Design System) that call CameraUpdateFactory.zoomIn()/zoomOut()
+            // directly. Pinch-to-zoom still works as usual, this is just an extra option.
+            Column(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = Spacing.lg + STANDARD_FAB_SIZE + Spacing.sm, end = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomIn()) }) {
+                    Icon(imageVector = Icons.Filled.Add, contentDescription = "Phóng to")
+                }
+                FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomOut()) }) {
+                    // Icons.Filled.Remove is not in material-icons-core (only in the extended
+                    // package, not in our dependencies) — use the "−" character instead of adding
+                    // a new library.
+                    Text(text = "−", style = MaterialTheme.typography.headlineSmall)
+                }
+            }
+
+            FloatingActionButton(
+                onClick = {
+                    showLocationPermissionDenied = false
+                    showLocationPermissionSettingsHint = false
+                    val granted =
+                        LOCATION_PERMISSIONS.any {
+                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                        }
+                    if (granted) {
+                        hasLocationPermission = true
+                        beginTracking()
+                    } else {
+                        locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                    }
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(Spacing.lg),
+            ) {
+                Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+            }
+
+            when (uiState) {
+                is MapUiState.Loading -> LoadingOverlay()
+                is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
+                is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
+                is MapUiState.Success -> Unit
+            }
+
+            if (showCoarseLocationNotice) {
+                MessageOverlay(
+                    text = "Độ chính xác vị trí có thể thấp. Bật Vị trí chính xác trong Cài đặt để có kết quả tốt hơn.",
+                    actionLabel = "Bỏ qua",
+                    onAction = { showCoarseLocationNotice = false },
+                )
+            }
+
+            if (showLocationPermissionSettingsHint) {
+                MessageOverlay(
+                    text = "Chưa cấp quyền vị trí. Mở Cài đặt ứng dụng để cấp quyền.",
+                    actionLabel = "Mở cài đặt",
+                    onAction = {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(Uri.fromParts("package", context.packageName, null)),
+                        )
+                    },
+                )
+            } else if (showLocationPermissionDenied) {
+                MessageOverlay(text = "Chưa cấp quyền vị trí")
+            }
+
+            if (showLocationTimeout) {
+                MessageOverlay(
+                    text = "Không lấy được vị trí. Hãy bật GPS hoặc ra nơi thoáng, rồi thử lại.",
+                    actionLabel = "Thử lại",
+                    onAction = beginTracking,
+                )
+            }
         }
     }
 
