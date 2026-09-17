@@ -17,6 +17,8 @@ object Spacing {
 object Dimens {
     val radiusSmall = 8.dp
     val radiusMedium = 12.dp
+    val radiusLarge = 16.dp
+    val radiusSheet = 28.dp
     val radiusPill = 999.dp
     val minTouchTarget = 48.dp
 }
