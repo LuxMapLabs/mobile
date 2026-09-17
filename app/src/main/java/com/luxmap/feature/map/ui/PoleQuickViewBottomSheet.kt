@@ -28,12 +28,14 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleMarker
 
 // Xem nhanh khi chạm marker (F12) — chỉ hiển thị field cần cho quyết định "có đáng ghé qua
-// không", KHÔNG phải panel chi tiết đầy đủ (đó là F09/FM-17, chưa thuộc FM-06).
+// không". Panel chi tiết đầy đủ (lịch sử luminance/runtime, ảnh khảo sát) là FM-27, mở qua
+// onOpenDetail.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoleQuickViewBottomSheet(
     pole: PoleMarker,
     onDismiss: () -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val isDark = isSystemInDarkTheme()
@@ -77,8 +79,7 @@ fun PoleQuickViewBottomSheet(
 
             Spacer(Modifier.height(Spacing.lg))
 
-            // Placeholder — panel chi tiết đầy đủ là F09/FM-17, chưa thuộc FM-06.
-            TextButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = onOpenDetail, modifier = Modifier.fillMaxWidth()) {
                 Text("Mở chi tiết")
             }
 

@@ -29,11 +29,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
@@ -47,9 +50,20 @@ import com.luxmap.feature.map.data.PoleDetailFrame
 import com.luxmap.feature.map.data.PoleLuminancePoint
 import com.luxmap.feature.map.data.PoleRuntimePoint
 
+// Nav-graph entry point — collects PoleDetailViewModel's state and delegates to the stateless
+// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview.
+@Composable
+fun PoleDetailRoute(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: PoleDetailViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    PoleDetailScreen(uiState = uiState, onBack = onBack, modifier = modifier)
+}
+
 // FM-27 — chi tiết cột đèn mở từ bản đồ (mở rộng từ PoleQuickViewBottomSheet), tách khỏi
-// FM-17 vì không cần Work Order gán trước. Bước này chỉ dựng UI tĩnh theo đủ 4 trạng thái
-// bắt buộc — chưa nối ViewModel/navigation thật (xem PoleDetailUiState).
+// FM-17 vì không cần Work Order gán trước.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoleDetailScreen(
