@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,6 +9,14 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ktlint)
 }
+
+// Read from local.properties (gitignored) instead of hardcoding in source — a leaked key
+// in Kotlin source is committed to git history forever, local.properties never is.
+val localProperties =
+    Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
 
 android {
     namespace = "com.luxmap"
@@ -26,6 +36,11 @@ android {
         // profile: 5294). Testing on a real device (LAN): change this to the backend machine's
         // LAN IP for that test, then change it back.
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5294/\"")
+
+        // Empty when not set in local.properties — MapLibreConfig.kt falls back to the
+        // OpenFreeMap style in that case, so a missing key never breaks the build.
+        val mapTilerApiKey = localProperties.getProperty("MAPTILER_API_KEY", "")
+        buildConfigField("String", "MAPTILER_API_KEY", "\"$mapTilerApiKey\"")
     }
 
     buildTypes {

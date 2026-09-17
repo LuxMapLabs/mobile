@@ -55,6 +55,7 @@ class FakeMapRepository
                         RoadSegmentLine(
                             segmentId = segment.properties.segmentId,
                             name = segment.properties.segmentName,
+                            hasActiveSegmentFault = segment.properties.hasActiveSegmentFault,
                             coordinates =
                                 poleCoordinatesBySegment[segment.properties.segmentId]
                                     ?: segment.geometry.coordinates.map { (lng, lat) -> lng to lat },
