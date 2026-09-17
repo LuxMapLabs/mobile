@@ -1,8 +1,13 @@
 package com.luxmap.feature.map.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -36,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -50,10 +56,17 @@ import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.PoleMarker
+import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.OnCameraTrackingChangedListener
+import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -85,6 +98,14 @@ private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
+private const val LOCATE_CAMERA_TRANSITION_MS = 750L
+private const val LOCATION_TIMEOUT_MS = 10_000L
+private const val LOCATION_POLL_INTERVAL_MS = 500L
+
+// Request both — coarse alone is still enough to show a location dot, just with a wider
+// accuracy circle (see the FAB permission check below).
+private val LOCATION_PERMISSIONS =
+    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 // Camera zoom cap while on the satellite basemap — see the comment where
 // map.setMaxZoomPreference() is called for why (rural satellite imagery gets blurry past its
@@ -125,23 +146,55 @@ fun MapScreen(
     // lets the user switch to vector when a sharper view is needed (see VECTOR_STYLE_URL in
     // MapLibreConfig.kt).
     var isSatelliteBasemap by remember { mutableStateOf(true) }
-    var locateTarget by remember { mutableStateOf<LatLng?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
-
-    val locationPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                viewModel.onLocateMeClicked()
-            } else {
-                showLocationPermissionDenied = true
-            }
+    var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
+    var showCoarseLocationNotice by remember { mutableStateOf(false) }
+    var showLocationTimeout by remember { mutableStateOf(false) }
+    var isLocating by remember { mutableStateOf(false) }
+    var isFollowingUser by remember { mutableStateOf(false) }
+    var hasLocationPermission by
+        remember {
+            mutableStateOf(
+                LOCATION_PERMISSIONS.any {
+                    ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                },
+            )
         }
 
-    // One-shot: each tap on the locate button flies the camera exactly once, not replayed on
-    // recompose.
-    LaunchedEffect(Unit) {
-        viewModel.locateMeEvent.collect { latLng -> locateTarget = latLng }
+    // Switches the camera into TRACKING mode — does not request permission itself, callers
+    // (FAB click, permission-granted callback, timeout retry) must already know it's granted.
+    val beginTracking: () -> Unit = {
+        showLocationTimeout = false
+        isLocating = true
+        maplibreMap?.locationComponent?.setCameraMode(
+            CameraMode.TRACKING,
+            LOCATE_CAMERA_TRANSITION_MS,
+            LOCATE_ME_ZOOM,
+            null,
+            null,
+            null,
+        )
     }
+
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
+            val fineGranted = results[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            val coarseGranted = results[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            when {
+                fineGranted || coarseGranted -> {
+                    hasLocationPermission = true
+                    showCoarseLocationNotice = !fineGranted && coarseGranted
+                    beginTracking()
+                }
+                // Once the OS stops offering a rationale for a denied permission, the user
+                // picked "don't ask again" (or is on a second denial) — a 3rd system prompt
+                // won't show, only Settings can grant it from here on.
+                (context as? Activity)?.let { activity ->
+                    LOCATION_PERMISSIONS.none { ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
+                } == true -> showLocationPermissionSettingsHint = true
+                else -> showLocationPermissionDenied = true
+            }
+        }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -188,6 +241,17 @@ fun MapScreen(
             },
         )
 
+        // Turns on the blue dot once both the style and permission are ready — fires again
+        // (harmlessly, enableLocationComponent no-ops if already activated) whenever either
+        // becomes available later, e.g. permission granted after the style already loaded.
+        LaunchedEffect(maplibreMap, hasLocationPermission) {
+            val map = maplibreMap ?: return@LaunchedEffect
+            val style = map.style ?: return@LaunchedEffect
+            if (hasLocationPermission) {
+                enableLocationComponent(context, map, style)
+            }
+        }
+
         // React to state — do not rely on AndroidView's `update` running again (see the comment
         // where maplibreMap is declared above).
         LaunchedEffect(maplibreMap, uiState) {
@@ -202,10 +266,40 @@ fun MapScreen(
             applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
         }
 
-        LaunchedEffect(locateTarget) {
-            val target = locateTarget ?: return@LaunchedEffect
-            maplibreMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, LOCATE_ME_ZOOM))
-            locateTarget = null
+        // Fires whenever camera mode changes — including automatically, when the user's own
+        // drag/pinch gesture breaks tracking (built into LocationCameraController, no manual
+        // gesture detection needed here).
+        DisposableEffect(maplibreMap) {
+            val locationComponent = maplibreMap?.locationComponent
+            val listener =
+                object : OnCameraTrackingChangedListener {
+                    override fun onCameraTrackingDismissed() {
+                        isFollowingUser = false
+                    }
+
+                    override fun onCameraTrackingChanged(currentMode: Int) {
+                        isFollowingUser = currentMode == CameraMode.TRACKING
+                    }
+                }
+            locationComponent?.addOnCameraTrackingChangedListener(listener)
+            onDispose { locationComponent?.removeOnCameraTrackingChangedListener(listener) }
+        }
+
+        // No-fix timeout: poll instead of hooking into transition callbacks, since
+        // lastKnownLocation reflects every engine update regardless of camera mode. Polling
+        // stops as soon as a fix shows up or isLocating is cleared some other way.
+        LaunchedEffect(isLocating) {
+            if (!isLocating) return@LaunchedEffect
+            val deadline = System.currentTimeMillis() + LOCATION_TIMEOUT_MS
+            while (System.currentTimeMillis() < deadline) {
+                if (maplibreMap?.locationComponent?.lastKnownLocation != null) {
+                    isLocating = false
+                    return@LaunchedEffect
+                }
+                delay(LOCATION_POLL_INTERVAL_MS)
+            }
+            isLocating = false
+            showLocationTimeout = true
         }
 
         // Satellite <-> vector basemap toggle (F12) — the free satellite imagery is only sharp
@@ -221,6 +315,12 @@ fun MapScreen(
                 val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                 map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
                     setupMapLayers(context, style, uiState, showFixtures, showRoadSegments, showPoleLabels)
+                    // setStyle() drops the LocationComponent along with the rest of the old
+                    // style — re-enable it here or the blue dot disappears after toggling
+                    // basemap (see the NOTE on enableLocationComponent).
+                    if (hasLocationPermission) {
+                        enableLocationComponent(context, map, style)
+                    }
                 }
             },
             modifier =
@@ -279,13 +379,16 @@ fun MapScreen(
         FloatingActionButton(
             onClick = {
                 showLocationPermissionDenied = false
+                showLocationPermissionSettingsHint = false
                 val granted =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-                        PackageManager.PERMISSION_GRANTED
+                    LOCATION_PERMISSIONS.any {
+                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                    }
                 if (granted) {
-                    viewModel.onLocateMeClicked()
+                    hasLocationPermission = true
+                    beginTracking()
                 } else {
-                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                    locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
                 }
             },
             modifier =
@@ -303,8 +406,35 @@ fun MapScreen(
             is MapUiState.Success -> Unit
         }
 
-        if (showLocationPermissionDenied) {
+        if (showCoarseLocationNotice) {
+            MessageOverlay(
+                text = "Độ chính xác vị trí có thể thấp. Bật Vị trí chính xác trong Cài đặt để có kết quả tốt hơn.",
+                actionLabel = "Bỏ qua",
+                onAction = { showCoarseLocationNotice = false },
+            )
+        }
+
+        if (showLocationPermissionSettingsHint) {
+            MessageOverlay(
+                text = "Chưa cấp quyền vị trí. Mở Cài đặt ứng dụng để cấp quyền.",
+                actionLabel = "Mở cài đặt",
+                onAction = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(Uri.fromParts("package", context.packageName, null)),
+                    )
+                },
+            )
+        } else if (showLocationPermissionDenied) {
             MessageOverlay(text = "Chưa cấp quyền vị trí")
+        }
+
+        if (showLocationTimeout) {
+            MessageOverlay(
+                text = "Không lấy được vị trí. Hãy bật GPS hoặc ra nơi thoáng, rồi thử lại.",
+                actionLabel = "Thử lại",
+                onAction = beginTracking,
+            )
         }
     }
 
@@ -347,6 +477,30 @@ private fun setupMapLayers(
     style.addLayer(buildIotBadgeLayer())
 
     applyLayerVisibility(style, showFixtures, showRoadSegments, showPoleLabels)
+}
+
+// Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
+// marker — draws the dot, accuracy ring and pulse itself, and keeps working across pan/zoom.
+// NOTE: a Style is only valid until the next map.setStyle() call — whoever adds another
+// setStyle() call later (e.g. a satellite/vector basemap toggle) must call this function
+// again in that same style-loaded callback, or the dot silently disappears after the switch.
+@SuppressLint("MissingPermission")
+private fun enableLocationComponent(
+    context: Context,
+    map: MapLibreMap,
+    style: Style,
+) {
+    if (map.locationComponent.isLocationComponentActivated) return
+    val options = LocationComponentOptions.builder(context).pulseEnabled(true).build()
+    val activationOptions =
+        LocationComponentActivationOptions
+            .builder(context, style)
+            .locationComponentOptions(options)
+            .useDefaultLocationEngine(true)
+            .build()
+    map.locationComponent.activateLocationComponent(activationOptions)
+    map.locationComponent.isLocationComponentEnabled = true
+    map.locationComponent.renderMode = RenderMode.NORMAL
 }
 
 // "Surveyed route" (F12) — colored by has_active_segment_fault to match how Web GIS shows grid
@@ -538,10 +692,12 @@ private fun BoxScope.LoadingOverlay() {
 }
 
 @Composable
-private fun BoxScope.MessageOverlay(text: String) {
-    Text(
-        text = text,
-        color = MaterialTheme.colorScheme.onSurface,
+private fun BoxScope.MessageOverlay(
+    text: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
         modifier =
             Modifier
                 .align(Alignment.TopCenter)
@@ -551,7 +707,16 @@ private fun BoxScope.MessageOverlay(text: String) {
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(Dimens.radiusMedium),
                 ).padding(Spacing.md),
-    )
+    ) {
+        Text(text = text, color = MaterialTheme.colorScheme.onSurface)
+        if (actionLabel != null && onAction != null) {
+            PrimaryButton(
+                text = actionLabel,
+                onClick = onAction,
+                modifier = Modifier.padding(top = Spacing.sm),
+            )
+        }
+    }
 }
 
 // MapView is a plain Android View, its lifecycle (onStart/onResume/...) must be forwarded
