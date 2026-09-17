@@ -31,34 +31,21 @@ class FakeMapRepository
 
         override fun observeRoadSegments(): Flow<List<RoadSegmentLine>> =
             flow {
-                val polesText =
-                    context.assets.open(MOCK_POLES_ASSET).bufferedReader().use { it.readText() }
-                val poles = json.decodeFromString<PoleFeatureCollectionDto>(polesText).features
-
                 val segmentsText =
                     context.assets.open(MOCK_ROAD_SEGMENTS_ASSET).bufferedReader().use { it.readText() }
                 val segments = json.decodeFromString<RoadSegmentFeatureCollectionDto>(segmentsText).features
 
-                // Fake-only: build each line by connecting poles that share segment_id, in the
-                // order they appear in mock-poles.geojson, so the line passes through the same
-                // markers shown on the map (matches how the route looks on Web). The real backend
-                // must keep returning RoadSegment geometry directly (GET /api/v1/segments) — do
-                // not copy this pole-based construction into RealMapRepository.
-                val poleCoordinatesBySegment =
-                    poles.groupBy({ it.properties.segmentId }) { pole ->
-                        val (lng, lat) = pole.geometry.coordinates
-                        lng to lat
-                    }
-
+                // Always use the LineString from mock-segments.geojson as the route geometry —
+                // do NOT connect pole points by segment_id. Poles are not always recorded in
+                // route order, so joining them can draw a zig-zag line instead of the real road
+                // shape. The backend (GET /api/v1/segments) returns this same geometry directly.
                 emit(
                     segments.map { segment ->
                         RoadSegmentLine(
                             segmentId = segment.properties.segmentId,
                             name = segment.properties.segmentName,
                             hasActiveSegmentFault = segment.properties.hasActiveSegmentFault,
-                            coordinates =
-                                poleCoordinatesBySegment[segment.properties.segmentId]
-                                    ?: segment.geometry.coordinates.map { (lng, lat) -> lng to lat },
+                            coordinates = segment.geometry.coordinates.map { (lng, lat) -> lng to lat },
                         )
                     },
                 )
