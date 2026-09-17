@@ -1,0 +1,9 @@
+package com.luxmap.feature.map.data
+
+import kotlinx.coroutines.flow.Flow
+
+// GET /api/v1/poles/{pole_id} (Contract v1.1 §2.2) — separate from MapRepository because it
+// loads one pole's full detail + history on demand, not the whole map dataset.
+interface PoleDetailRepository {
+    fun observePoleDetail(poleId: String): Flow<PoleDetail>
+}
