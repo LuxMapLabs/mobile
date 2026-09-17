@@ -452,9 +452,9 @@ fun MapScreen(
     }
 }
 
-private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.poles.orEmpty()
+private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.dataset?.poles.orEmpty()
 
-private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.roadSegments.orEmpty()
+private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
 
 // Add every F12 source/layer onto a freshly loaded Style — used both for the first load AND
 // every time the user taps the satellite/vector basemap toggle, because map.setStyle() replaces

@@ -21,34 +21,25 @@ class FakeMapRepository
     ) : MapRepository {
         private val json = Json { ignoreUnknownKeys = true }
 
-        override fun observePoles(): Flow<List<PoleMarker>> =
+        // Route geometry always comes from mock-segments.geojson's own LineString — do NOT
+        // connect pole points by segment_id. Poles are not always recorded in route order, so
+        // joining them can draw a zig-zag line instead of the real road shape. The backend
+        // (GET /api/v1/segments) returns this same geometry directly.
+        override fun observeGisMapDataset(): Flow<GisMapDataset> =
             flow {
-                val text =
+                val polesText =
                     context.assets.open(MOCK_POLES_ASSET).bufferedReader().use { it.readText() }
-                val collection = json.decodeFromString<PoleFeatureCollectionDto>(text)
-                emit(collection.features.map { it.toPoleMarker() })
-            }
+                val poles =
+                    json.decodeFromString<PoleFeatureCollectionDto>(polesText).features
+                        .map { it.toPoleMarker() }
 
-        override fun observeRoadSegments(): Flow<List<RoadSegmentLine>> =
-            flow {
                 val segmentsText =
                     context.assets.open(MOCK_ROAD_SEGMENTS_ASSET).bufferedReader().use { it.readText() }
-                val segments = json.decodeFromString<RoadSegmentFeatureCollectionDto>(segmentsText).features
+                val segments =
+                    json.decodeFromString<RoadSegmentFeatureCollectionDto>(segmentsText).features
+                        .map { it.toRoadSegmentLine() }
 
-                // Always use the LineString from mock-segments.geojson as the route geometry —
-                // do NOT connect pole points by segment_id. Poles are not always recorded in
-                // route order, so joining them can draw a zig-zag line instead of the real road
-                // shape. The backend (GET /api/v1/segments) returns this same geometry directly.
-                emit(
-                    segments.map { segment ->
-                        RoadSegmentLine(
-                            segmentId = segment.properties.segmentId,
-                            name = segment.properties.segmentName,
-                            hasActiveSegmentFault = segment.properties.hasActiveSegmentFault,
-                            coordinates = segment.geometry.coordinates.map { (lng, lat) -> lng to lat },
-                        )
-                    },
-                )
+                emit(GisMapDataset(poles = poles, segments = segments))
             }
 
         private companion object {

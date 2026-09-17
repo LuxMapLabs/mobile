@@ -1,17 +1,15 @@
 package com.luxmap.feature.map.ui
 
-import com.luxmap.feature.map.data.PoleMarker
-import com.luxmap.feature.map.data.RoadSegmentLine
+import com.luxmap.feature.map.data.GisMapDataset
 
 // Đủ 4 trạng thái bắt buộc theo CLAUDE.md (đang tải / có dữ liệu / rỗng / lỗi).
 sealed interface MapUiState {
     data object Loading : MapUiState
 
     data class Success(
-        val poles: List<PoleMarker>,
-        // Lớp "tuyến đã khảo sát" (F12) — lớp phụ, không tính vào điều kiện Empty
-        // (Empty chỉ dựa vào poles, xem MapViewModel).
-        val roadSegments: List<RoadSegmentLine> = emptyList(),
+        val dataset: GisMapDataset,
+        // Empty chỉ dựa vào dataset.poles, xem MapViewModel — segments không có route riêng nên
+        // không tính vào điều kiện Empty.
         val isStale: Boolean = false,
     ) : MapUiState
 
