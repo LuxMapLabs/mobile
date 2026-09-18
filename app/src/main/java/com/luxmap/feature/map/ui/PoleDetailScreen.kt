@@ -1,5 +1,7 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -20,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -138,6 +142,7 @@ private fun PoleDetailContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
         PoleHeaderSection(detail)
+        PriorityAlertCard(detail)
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
             OpenFaultsSection(detail.openFaults)
@@ -187,6 +192,65 @@ private fun String.toSourceChannelLabel(): String =
         "iot" -> "Cảm biến IoT"
         else -> this
     }
+
+// Design System v3.0.1: priority alert card, colored/worded by fixture status. Hidden for
+// NORMAL and UNKNOWN — nothing urgent to surface, so no card is emitted at all (not an empty
+// one), which also means PoleDetailContent's spacedBy() adds no extra gap for it.
+@Composable
+private fun PriorityAlertCard(detail: PoleDetail) {
+    val isDark = isSystemInDarkTheme()
+    val title: String
+    val body: String
+    when (detail.fixtureStatus) {
+        AssetCondition.DIM -> {
+            title = "Cần kiểm tra trong ca làm việc"
+            body = dimAlertBody(detail)
+        }
+        AssetCondition.OUT -> {
+            title = "Cần xử lý ngay — đèn đang tắt"
+            body = outAlertBody(detail)
+        }
+        AssetCondition.NORMAL, AssetCondition.UNKNOWN -> return
+    }
+    val colors = detail.fixtureStatus.badgeColors(isDark)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(colors.background, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, colors.text.copy(alpha = 0.35f), RoundedCornerShape(Dimens.radiusMedium))
+                .padding(Spacing.lg),
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = colors.text,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(text = title, style = MaterialTheme.typography.labelLarge, color = colors.text)
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(text = body, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+    }
+}
+
+// baseline_ratio of the latest luminance point — same value the trend chart's endpoint dot
+// shows — falls back to a percentage-free sentence when there is no history yet.
+private fun dimAlertBody(detail: PoleDetail): String {
+    val latestPercent = detail.luminanceHistory.lastOrNull()?.let { (it.baselineRatio * 100).toInt() }
+    return if (latestPercent != null) {
+        "Độ sáng còn $latestPercent% so với mức chuẩn. Đèn có dấu hiệu suy giảm quang thông."
+    } else {
+        "Đèn có dấu hiệu suy giảm quang thông so với mức chuẩn, cần kiểm tra."
+    }
+}
+
+private fun outAlertBody(detail: PoleDetail): String {
+    val since = DateFormatUtils.formatIsoInstant(detail.determinedAt)
+    return "Không phát sáng từ $since. Ảnh hưởng an toàn giao thông ban đêm."
+}
 
 @Composable
 private fun FixtureInfoSection(detail: PoleDetail) {
