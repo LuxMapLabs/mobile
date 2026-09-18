@@ -1,5 +1,6 @@
 package com.luxmap.core.theme
 
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // Primitive — giá trị màu gốc (mục 2.1 Design System v2.0)
@@ -22,6 +23,20 @@ val Dark800 = Color(0xFF1A1A1A)
 val Dark700 = Color(0xFF2A2A2A)
 val DarkText = Color(0xFFF5F5F5)
 val DarkMuted = Color(0xFFA0A0A0)
+
+// Extra primitives — section 3.1 of Global Design System v1.0, needed for the hero gradient
+// (F01 and other hero-style screens). Does not change the meaning of the existing tokens above.
+val Navy900 = Color(0xFF102443)
+val Blue600 = Color(0xFF2D6388)
+
+// Gradient — section 3.3 of Global Design System v1.0. Only for the single most prominent
+// hero area on a screen, never for badges or warning states (rule in the same section).
+val BrandHeroGradient =
+    Brush.verticalGradient(
+        0f to Navy900,
+        0.58f to Navy700,
+        1f to Blue600,
+    )
 
 // Semantic — theo theme (mục 2.2), dùng trong LuxMapColorScheme ở Theme.kt
 data class LuxMapSemanticColors(
