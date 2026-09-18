@@ -43,6 +43,10 @@ fun LuminanceTrendCard(
     onViewFullHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Trim once here so the chart and the caption always agree on the same window — the chart
+    // used to draw only the last 7 points while the caption read the full history, so a caption
+    // could say "trong 30 ngày" over a chart that only showed 7.
+    val points = detail.luminanceHistory.takeLast(MAX_TREND_POINTS)
     Column(
         modifier =
             modifier
@@ -53,10 +57,10 @@ fun LuminanceTrendCard(
     ) {
         Text(text = "Xu hướng độ sáng", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        LuminanceTrendChart(history = detail.luminanceHistory, status = detail.fixtureStatus)
+        LuminanceTrendChart(history = points, status = detail.fixtureStatus)
         Spacer(Modifier.height(Spacing.sm))
         Text(
-            text = trendCaption(detail.luminanceHistory),
+            text = trendCaption(points),
             style = MaterialTheme.typography.labelLarge,
         )
         TextButton(onClick = onViewFullHistory) {
@@ -82,8 +86,9 @@ private fun LuminanceTrendChart(
         return
     }
 
-    // Draw however many points there actually are — never assume exactly 7.
-    val points = history.takeLast(MAX_TREND_POINTS)
+    // Caller (LuminanceTrendCard) already trims to at most MAX_TREND_POINTS — draw exactly
+    // what's passed in, never assume exactly 7.
+    val points = history
     val values = points.map { it.baselineRatio * 100.0 }
     val latestPercent = values.last().toInt()
     val lineColor = status.trendColor()

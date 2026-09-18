@@ -1,6 +1,7 @@
 package com.luxmap.core.common
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -10,6 +11,7 @@ object DateFormatUtils {
     private val displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     private val isoDisplayFormatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy")
     private val isoDateOnlyFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    private val plainDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
     fun formatDisplay(dateTime: LocalDateTime): String = dateTime.format(displayFormatter)
 
@@ -31,6 +33,17 @@ object DateFormatUtils {
         if (iso.isNullOrBlank()) return "Chưa cập nhật"
         return try {
             Instant.parse(iso).atZone(ZoneId.systemDefault()).format(isoDateOnlyFormatter)
+        } catch (e: DateTimeParseException) {
+            "Chưa cập nhật"
+        }
+    }
+
+    // For plain date fields with no time/timezone component ("2028-01-04" — install_date,
+    // warranty_expiry) — parsing these with Instant.parse would throw, they need LocalDate.
+    fun formatPlainDate(date: String?): String {
+        if (date.isNullOrBlank()) return "Chưa cập nhật"
+        return try {
+            LocalDate.parse(date).format(plainDateFormatter)
         } catch (e: DateTimeParseException) {
             "Chưa cập nhật"
         }

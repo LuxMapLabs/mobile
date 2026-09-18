@@ -325,13 +325,13 @@ private fun ActionButtonsRow(
             secondaryLabel = "Xem trên bản đồ"
             onSecondaryClick = onViewOnMap
         }
-        AssetCondition.DIM -> {
+        AssetCondition.DIM, AssetCondition.UNKNOWN -> {
             primaryLabel = "Bắt đầu khảo sát"
             onPrimaryClick = onStartSurvey
             secondaryLabel = "Xem trên bản đồ"
             onSecondaryClick = onViewOnMap
         }
-        AssetCondition.NORMAL, AssetCondition.UNKNOWN -> {
+        AssetCondition.NORMAL -> {
             primaryLabel = "Bắt đầu khảo sát"
             onPrimaryClick = onStartSurvey
             secondaryLabel = "Báo sự cố"
@@ -379,9 +379,13 @@ private fun FixtureInfoSection(detail: PoleDetail) {
         InfoRow(
             icon = Icons.Filled.Wifi,
             label = "IoT",
-            value = if (detail.hasIotNode) detail.iotNodeStatus?.toIotStatusLabel() ?: "-" else "Không có",
+            value = if (detail.hasIotNode) detail.toIotValueLabel() else "Không có",
         )
-        InfoRow(icon = Icons.Filled.VerifiedUser, label = "Bảo hành", value = "Đến ${detail.warrantyExpiry}")
+        InfoRow(
+            icon = Icons.Filled.VerifiedUser,
+            label = "Bảo hành",
+            value = "Đến ${DateFormatUtils.formatPlainDate(detail.warrantyExpiry)}",
+        )
         InfoRow(
             icon = Icons.Filled.LocationOn,
             label = "Vị trí",
@@ -396,6 +400,15 @@ private fun String.toIotStatusLabel(): String =
         "offline" -> "Mất kết nối"
         else -> this
     }
+
+// "Online · báo 06:00, 20/08/2026" — status label + last_report_at. Uses the absolute
+// formatter (not a relative "X giờ trước") to avoid adding separate duration-math logic; the
+// mockup's "báo 2 giờ trước" wording is a nice-to-have, not required for this pass.
+private fun PoleDetail.toIotValueLabel(): String {
+    val statusLabel = iotNodeStatus?.toIotStatusLabel() ?: "-"
+    val lastReport = DateFormatUtils.formatIsoInstant(iotLastReportAt)
+    return "$statusLabel · báo $lastReport"
+}
 
 // Icon (left) + label (small, secondary) above value (bold) — matches the "Thông tin nhanh"
 // mockup, different from the label/value-on-one-line style used elsewhere on this screen.
@@ -630,6 +643,7 @@ private fun sampleDetailDim() =
         sourceChannel = "cv",
         hasIotNode = true,
         iotNodeStatus = "online",
+        iotLastReportAt = "2026-08-20T06:00:00Z",
         luminanceHistory =
             listOf(
                 PoleLuminancePoint("2026-08-13T20:00:00Z", 0.818, AssetCondition.NORMAL),
@@ -673,6 +687,7 @@ private fun sampleDetailNormal() =
         sourceChannel = "cv",
         hasIotNode = false,
         iotNodeStatus = null,
+        iotLastReportAt = null,
         luminanceHistory =
             listOf(
                 PoleLuminancePoint("2026-08-13T20:00:00Z", 0.971, AssetCondition.NORMAL),
@@ -709,6 +724,7 @@ private fun sampleDetailOut() =
         sourceChannel = "cv",
         hasIotNode = false,
         iotNodeStatus = null,
+        iotLastReportAt = null,
         luminanceHistory =
             listOf(
                 PoleLuminancePoint("2026-08-13T20:00:00Z", 0.87, AssetCondition.NORMAL),

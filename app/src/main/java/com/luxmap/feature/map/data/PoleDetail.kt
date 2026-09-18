@@ -1,5 +1,6 @@
 package com.luxmap.feature.map.data
 
+import com.luxmap.BuildConfig
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.feature.map.data.dto.PoleDetailDto
 import com.luxmap.feature.map.data.dto.PoleDetailFaultDto
@@ -27,6 +28,7 @@ data class PoleDetail(
     val sourceChannel: String,
     val hasIotNode: Boolean,
     val iotNodeStatus: String?,
+    val iotLastReportAt: String?,
     val luminanceHistory: List<PoleLuminancePoint>,
     val runtimeHistory: List<PoleRuntimePoint>,
     val openFaults: List<PoleDetailFault>,
@@ -75,6 +77,7 @@ fun PoleDetailDto.toPoleDetail(): PoleDetail =
         sourceChannel = currentStatus.sourceChannel,
         hasIotNode = iotNode != null,
         iotNodeStatus = iotNode?.nodeStatus,
+        iotLastReportAt = iotNode?.lastReportAt,
         luminanceHistory = luminanceHistory.map { it.toPoleLuminancePoint() },
         runtimeHistory = runtimeHistory.map { it.toPoleRuntimePoint() },
         openFaults = openFaults.map { it.toPoleDetailFault() },
@@ -95,7 +98,7 @@ private fun PoleDetailFaultDto.toPoleDetailFault() =
     PoleDetailFault(faultId = faultId, faultType = faultType, severity = severity, faultStatus = faultStatus)
 
 private fun PoleDetailFrameDto.toPoleDetailFrame() =
-    PoleDetailFrame(frameId = frameId, capturedAt = capturedAt, thumbnailUrl = thumbnailUrl)
+    PoleDetailFrame(frameId = frameId, capturedAt = capturedAt, thumbnailUrl = thumbnailUrl.toAbsoluteUrl())
 
 private fun String.toAssetCondition(): AssetCondition =
     when (this) {
@@ -104,3 +107,13 @@ private fun String.toAssetCondition(): AssetCondition =
         "out" -> AssetCondition.OUT
         else -> AssetCondition.UNKNOWN
     }
+
+// Backend returns thumbnail_url as a path relative to the API host ("/api/v1/frames/.../
+// thumbnail"), not a full URL — Coil needs an absolute one to actually load it. Left as-is if
+// it's already absolute, so this stays safe if the backend starts returning full URLs later.
+private fun String.toAbsoluteUrl(): String {
+    if (startsWith("http://") || startsWith("https://")) return this
+    val base = BuildConfig.API_BASE_URL.trimEnd('/')
+    val path = if (startsWith("/")) this else "/$this"
+    return base + path
+}
