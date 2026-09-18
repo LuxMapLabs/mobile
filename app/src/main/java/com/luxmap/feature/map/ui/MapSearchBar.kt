@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,11 +38,10 @@ fun MapSearchBar(
             placeholder = { Text("Tìm theo mã cột hoặc tên tuyến") },
             leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
-                // No dedicated "filter" icon exists in material-icons-core (same limit this file's
-                // sibling MapScreen.kt already notes for Icons.Filled.Remove) — List stands in for
-                // "map layers/filter", same substitution pattern already used in this codebase.
+                // Opens the "Hiển thị trên bản đồ" sheet — layer/status display options, not a
+                // search filter, so the icon reads as stacked map layers, not a filter/menu icon.
                 IconButton(onClick = onFilterClick) {
-                    Icon(imageVector = Icons.Filled.List, contentDescription = "Bộ lọc lớp bản đồ")
+                    Icon(imageVector = Icons.Filled.Layers, contentDescription = "Tùy chọn hiển thị bản đồ")
                 }
             },
             colors =

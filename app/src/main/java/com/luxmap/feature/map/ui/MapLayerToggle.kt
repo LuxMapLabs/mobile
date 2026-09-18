@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +57,7 @@ private fun LayerToggleRow(
     Row(
         modifier =
             Modifier
+                .fillMaxWidth()
                 .defaultMinSize(minHeight = Dimens.minTouchTarget)
                 .clickable { onCheckedChange(!checked) }
                 .padding(horizontal = Spacing.sm),
@@ -63,6 +65,6 @@ private fun LayerToggleRow(
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Spacer(modifier = Modifier.width(Spacing.xs))
-        Text(text = label, style = MaterialTheme.typography.bodySmall)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium)
     }
 }

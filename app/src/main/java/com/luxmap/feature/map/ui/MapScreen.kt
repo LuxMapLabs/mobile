@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -452,7 +455,11 @@ fun MapScreen(
                     needsAttentionActive = statusFilter == NEEDS_ATTENTION_STATUSES,
                     onNeedsAttentionClick = {
                         viewModel.setStatusFilter(
-                            if (statusFilter == NEEDS_ATTENTION_STATUSES) emptySet() else NEEDS_ATTENTION_STATUSES,
+                            if (statusFilter == NEEDS_ATTENTION_STATUSES) {
+                                AssetCondition.entries.toSet()
+                            } else {
+                                NEEDS_ATTENTION_STATUSES
+                            },
                         )
                     },
                 )
@@ -546,18 +553,31 @@ fun MapScreen(
                     onDismissRequest = { showLayerFilterSheet = false },
                     sheetState = rememberModalBottomSheetState(),
                 ) {
-                    Column {
+                    // Layer/display management, not a search filter (F12) — wording and layout
+                    // reflect that: a title, then two labeled groups separated by a light divider.
+                    // Plain Column (no LazyColumn/fillMaxHeight) so the sheet stays as short as its
+                    // content, it never forces itself to nearly full screen height.
+                    Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+                        Text(text = "Hiển thị trên bản đồ", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(Spacing.md))
+                        Text(text = "Lớp bản đồ", style = MaterialTheme.typography.labelLarge)
                         MapLayerToggle(
                             showFixtures = showFixtures,
                             onShowFixturesChange = { showFixtures = it },
                             showRoadSegments = showRoadSegments,
                             onShowRoadSegmentsChange = { showRoadSegments = it },
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            modifier = Modifier.padding(vertical = Spacing.xs),
                         )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = Spacing.sm),
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        Text(text = "Hiển thị trạng thái cột", style = MaterialTheme.typography.labelLarge)
                         MapStatusFilterRow(
                             selectedStatuses = statusFilter,
                             onToggle = { condition -> viewModel.setStatusFilter(statusFilter.toggled(condition)) },
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            enabled = showFixtures,
+                            modifier = Modifier.padding(vertical = Spacing.sm),
                         )
                     }
                 }

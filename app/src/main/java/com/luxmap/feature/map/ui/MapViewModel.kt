@@ -33,9 +33,11 @@ class MapViewModel
         val isOnline: StateFlow<Boolean> =
             connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
 
-        // Status filter (FM-36: "Lọc theo trạng thái đèn") — empty set means no filter, show
-        // every pole. Read by the layer-filter bottom sheet and by the KPI "cần xử lý" chip.
-        private val _statusFilter = MutableStateFlow<Set<AssetCondition>>(emptySet())
+        // Status filter (FM-36: "Hiển thị trạng thái cột") — the set of statuses currently shown
+        // on the map. Defaults to all 4 so every status chip starts selected and every pole is
+        // visible; unchecking a chip removes that status from the set and hides its markers. Read
+        // by the "Hiển thị trên bản đồ" bottom sheet and by the KPI "cần xử lý" chip.
+        private val _statusFilter = MutableStateFlow(AssetCondition.entries.toSet())
         val statusFilter: StateFlow<Set<AssetCondition>> = _statusFilter.asStateFlow()
 
         init {
@@ -103,5 +105,8 @@ private fun GisMapDataset.matching(query: String): MapSearchResults =
             },
     )
 
+// No "empty means show all" special case needed: the caller always starts from the full status
+// set (see _statusFilter above), so an empty filter here legitimately means every status chip got
+// unchecked and every marker should hide.
 private fun GisMapDataset.filterByStatus(filter: Set<AssetCondition>): GisMapDataset =
-    if (filter.isEmpty()) this else copy(poles = poles.filter { it.fixtureStatus in filter })
+    copy(poles = poles.filter { it.fixtureStatus in filter })
