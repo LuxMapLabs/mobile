@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -114,6 +115,12 @@ private const val SELECTED_HALO_RADIUS = 20f
 // Badges/labels only worth showing once zoomed in enough to read them (F12/FM-37 LOD rule) —
 // below this the map is zoomed out far enough that individual badges would just be clutter.
 private const val BADGE_MIN_ZOOM = 13f
+
+// Extra bottom clearance so the legend never overlaps MapLibre's own attribution/logo control,
+// which the map draws at the same bottom-start corner (F12/FM-37: "chừa vùng đáy trái cho
+// attribution"). This is an estimate of the attribution row's height, not a measured value — it
+// still needs a visual check on a real device/emulator.
+private val LEGEND_BOTTOM_SAFE_PADDING = 32.dp
 
 // "Surveyed route" layer (F12) — drawn below the pole markers, so add this layer first in
 // z-order.
@@ -432,7 +439,7 @@ fun MapScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(Spacing.lg),
+                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = LEGEND_BOTTOM_SAFE_PADDING),
             )
 
             // Right-side control stack (F12) — exactly 4 floating controls, declutters what used to
