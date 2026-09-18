@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -20,17 +19,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +42,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
@@ -49,9 +54,14 @@ import com.luxmap.feature.map.data.PoleDetailFault
 import com.luxmap.feature.map.data.PoleDetailFrame
 import com.luxmap.feature.map.data.PoleLuminancePoint
 import com.luxmap.feature.map.data.PoleRuntimePoint
+import kotlinx.coroutines.launch
 
 // Nav-graph entry point — collects PoleDetailViewModel's state and delegates to the stateless
-// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview.
+// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview. Also owns the
+// SnackbarHostState: actions that have no destination screen yet (menu, CTA, "xem lịch sử đầy
+// đủ"...) call showNotImplemented instead of doing nothing — the callback params on
+// PoleDetailScreen stay public so a caller can override any one of them once its target screen
+// exists, without touching this wiring.
 @Composable
 fun PoleDetailRoute(
     onBack: () -> Unit,
@@ -59,7 +69,18 @@ fun PoleDetailRoute(
     viewModel: PoleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    PoleDetailScreen(uiState = uiState, onBack = onBack, modifier = modifier)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val showNotImplemented: () -> Unit = {
+        scope.launch { snackbarHostState.showSnackbar("Chức năng đang được hoàn thiện") }
+    }
+    PoleDetailScreen(
+        uiState = uiState,
+        onBack = onBack,
+        onOpenMenu = showNotImplemented,
+        snackbarHostState = snackbarHostState,
+        modifier = modifier,
+    )
 }
 
 // FM-27 — chi tiết cột đèn mở từ bản đồ (mở rộng từ PoleQuickViewBottomSheet), tách khỏi
@@ -70,15 +91,23 @@ fun PoleDetailScreen(
     uiState: PoleDetailUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenMenu: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Chi tiết cột đèn") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onOpenMenu) {
+                        Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Thêm")
                     }
                 },
             )
@@ -127,7 +156,9 @@ private fun PoleDetailContent(
 private fun PoleHeaderSection(detail: PoleDetail) {
     val isDark = isSystemInDarkTheme()
     Column {
-        Text(text = detail.poleId, style = MaterialTheme.typography.titleLarge)
+        // Design System v3.0.1: pole code is the biggest, boldest text on the screen — field
+        // crew must recognize which pole this is in under 2 seconds.
+        Text(text = detail.poleId, style = MaterialTheme.typography.displayLarge)
         Spacer(Modifier.height(Spacing.xs))
         Text(
             text = detail.segmentName,
@@ -135,19 +166,27 @@ private fun PoleHeaderSection(detail: PoleDetail) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Spacing.sm))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusBadge(text = detail.fixtureStatus.label(), colors = detail.fixtureStatus.badgeColors(isDark))
-            Spacer(Modifier.width(Spacing.sm))
-            // status_confidence — how sure the CV/IoT channel is about this status, shown as
-            // metadata next to the badge, not as its own colored indicator.
-            Text(
-                text = "Độ tin cậy ${(detail.statusConfidence * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        StatusBadge(
+            text = detail.fixtureStatus.label().uppercase(),
+            colors = detail.fixtureStatus.badgeColors(isDark),
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        val updatedAt = DateFormatUtils.formatIsoInstant(detail.determinedAt)
+        val sourceLabel = detail.sourceChannel.toSourceChannelLabel()
+        Text(
+            text = "Cập nhật $updatedAt · Phát hiện từ $sourceLabel",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
+
+private fun String.toSourceChannelLabel(): String =
+    when (this) {
+        "cv" -> "AI/CV"
+        "iot" -> "Cảm biến IoT"
+        else -> this
+    }
 
 @Composable
 private fun FixtureInfoSection(detail: PoleDetail) {
