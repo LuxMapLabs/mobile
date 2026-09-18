@@ -101,6 +101,7 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 // "Surveyed route" layer (F12) — drawn below the pole markers, so add this layer first in
 // z-order.
 private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
+private const val ROAD_SEGMENTS_GLOW_LINE_LAYER_ID = "road-segments-glow-line-layer"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
@@ -604,7 +605,9 @@ private fun setupMapLayers(
 
     val segmentSource = GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
     style.addSource(segmentSource)
-    // Add before the pole layer so the route draws below, markers on top.
+    // Add before the pole layer so the route draws below, markers on top. Glow first so the
+    // solid core sits on top of it, same order as the pole glow/dot pair below.
+    style.addLayer(buildRoadSegmentsGlowLineLayer())
     style.addLayer(buildRoadSegmentsLineLayer())
 
     val source = GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions())
@@ -644,22 +647,33 @@ private fun enableLocationComponent(
     map.locationComponent.renderMode = RenderMode.NORMAL
 }
 
-// "Surveyed route" (F12) — colored by has_active_segment_fault to match how Web GIS shows grid
-// faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
+// "Surveyed route" (F12/FM-37) — colored by has_active_segment_fault to match how Web GIS shows
+// grid faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
 // tap — that is still Web GIS scope, mobile only needs the color as a visual warning for the
-// field crew.
+// field crew. Drawn as glow (wide, blurred, translucent) + core (narrow, solid) — same 2-layer
+// idea as the pole glow/dot pair, so routes read with the same visual language as markers.
+private fun routeLineColorExpression(): Expression =
+    Expression.switchCase(
+        Expression.get("has_active_segment_fault"),
+        Expression.color(routeColorArgb(hasActiveSegmentFault = true)),
+        Expression.color(routeColorArgb(hasActiveSegmentFault = false)),
+    )
+
+private fun buildRoadSegmentsGlowLineLayer(): LineLayer =
+    LineLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.lineColor(routeLineColorExpression()),
+            PropertyFactory.lineWidth(8f),
+            PropertyFactory.lineBlur(4f),
+            PropertyFactory.lineOpacity(0.35f),
+        )
+
 private fun buildRoadSegmentsLineLayer(): LineLayer =
     LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
         .withProperties(
-            PropertyFactory.lineColor(
-                Expression.switchCase(
-                    Expression.get("has_active_segment_fault"),
-                    Expression.color(routeColorArgb(hasActiveSegmentFault = true)),
-                    Expression.color(routeColorArgb(hasActiveSegmentFault = false)),
-                ),
-            ),
-            PropertyFactory.lineWidth(2f),
-            PropertyFactory.lineOpacity(0.7f),
+            PropertyFactory.lineColor(routeLineColorExpression()),
+            PropertyFactory.lineWidth(3f),
+            PropertyFactory.lineOpacity(0.9f),
         )
 
 // Re-apply visibility every time a toggle changes or AndroidView's update runs again — much
@@ -677,6 +691,7 @@ private fun applyLayerVisibility(
     style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
     style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
 }
 
