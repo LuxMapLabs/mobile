@@ -99,10 +99,9 @@ fun PoleDetailRoute(
         uiState = uiState,
         onBack = onBack,
         onOpenMenu = showNotImplemented,
-        onStartSurvey = showNotImplemented,
+        onOpenRouteToSurvey = showNotImplemented,
         onCreateWorkOrder = showNotImplemented,
-        onViewOnMap = showNotImplemented,
-        onReportFault = showNotImplemented,
+        onViewLocation = showNotImplemented,
         onViewFullHistory = showNotImplemented,
         onOpenFault = { showNotImplemented() },
         onViewAllFrames = showNotImplemented,
@@ -120,10 +119,9 @@ fun PoleDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenMenu: () -> Unit = {},
-    onStartSurvey: () -> Unit = {},
+    onOpenRouteToSurvey: () -> Unit = {},
     onCreateWorkOrder: () -> Unit = {},
-    onViewOnMap: () -> Unit = {},
-    onReportFault: () -> Unit = {},
+    onViewLocation: () -> Unit = {},
     onViewFullHistory: () -> Unit = {},
     onOpenFault: (faultId: String) -> Unit = {},
     onViewAllFrames: () -> Unit = {},
@@ -154,10 +152,9 @@ fun PoleDetailScreen(
                 is PoleDetailUiState.Success ->
                     PoleDetailContent(
                         detail = uiState.detail,
-                        onStartSurvey = onStartSurvey,
+                        onOpenRouteToSurvey = onOpenRouteToSurvey,
                         onCreateWorkOrder = onCreateWorkOrder,
-                        onViewOnMap = onViewOnMap,
-                        onReportFault = onReportFault,
+                        onViewLocation = onViewLocation,
                         onViewFullHistory = onViewFullHistory,
                         onOpenFault = onOpenFault,
                         onViewAllFrames = onViewAllFrames,
@@ -172,10 +169,9 @@ fun PoleDetailScreen(
 @Composable
 private fun PoleDetailContent(
     detail: PoleDetail,
-    onStartSurvey: () -> Unit,
+    onOpenRouteToSurvey: () -> Unit,
     onCreateWorkOrder: () -> Unit,
-    onViewOnMap: () -> Unit,
-    onReportFault: () -> Unit,
+    onViewLocation: () -> Unit,
     onViewFullHistory: () -> Unit,
     onOpenFault: (faultId: String) -> Unit,
     onViewAllFrames: () -> Unit,
@@ -193,10 +189,9 @@ private fun PoleDetailContent(
         PriorityAlertCard(detail)
         ActionButtonsRow(
             detail = detail,
-            onStartSurvey = onStartSurvey,
+            onOpenRouteToSurvey = onOpenRouteToSurvey,
             onCreateWorkOrder = onCreateWorkOrder,
-            onViewOnMap = onViewOnMap,
-            onReportFault = onReportFault,
+            onViewLocation = onViewLocation,
         )
         LuminanceTrendCard(detail = detail, onViewFullHistory = onViewFullHistory)
         FixtureInfoSection(detail)
@@ -304,54 +299,54 @@ private fun outAlertBody(detail: PoleDetail): String {
     return "Không phát sáng từ $since. Ảnh hưởng an toàn giao thông ban đêm."
 }
 
-// Primary CTA label/action follows fixture status; secondary is "Xem trên bản đồ" except for
-// NORMAL/UNKNOWN, where "Báo sự cố" is more useful than a map link once nothing looks wrong.
+// FM-27 chỉ hiển thị dữ liệu/kết quả AI của cột — không có hành động khảo sát trực tiếp
+// (không có "Bắt đầu khảo sát"/"Báo sự cố" ở đây). CTA chỉ đưa người dùng sang màn khác:
+// mở tuyến để lên kế hoạch khảo sát lại (F03), tạo lệnh sửa chữa, hoặc xem vị trí cột.
+// NORMAL không có gì bất thường nên chỉ có 1 nút xem vị trí, không có CTA hành động.
 @Composable
 private fun ActionButtonsRow(
     detail: PoleDetail,
-    onStartSurvey: () -> Unit,
+    onOpenRouteToSurvey: () -> Unit,
     onCreateWorkOrder: () -> Unit,
-    onViewOnMap: () -> Unit,
-    onReportFault: () -> Unit,
+    onViewLocation: () -> Unit,
 ) {
-    val primaryLabel: String
-    val onPrimaryClick: () -> Unit
-    val secondaryLabel: String
-    val onSecondaryClick: () -> Unit
-    when (detail.fixtureStatus) {
-        AssetCondition.OUT -> {
-            primaryLabel = "Tạo lệnh sửa chữa"
-            onPrimaryClick = onCreateWorkOrder
-            secondaryLabel = "Xem trên bản đồ"
-            onSecondaryClick = onViewOnMap
-        }
-        AssetCondition.DIM, AssetCondition.UNKNOWN -> {
-            primaryLabel = "Bắt đầu khảo sát"
-            onPrimaryClick = onStartSurvey
-            secondaryLabel = "Xem trên bản đồ"
-            onSecondaryClick = onViewOnMap
-        }
-        AssetCondition.NORMAL -> {
-            primaryLabel = "Bắt đầu khảo sát"
-            onPrimaryClick = onStartSurvey
-            secondaryLabel = "Báo sự cố"
-            onSecondaryClick = onReportFault
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        when (detail.fixtureStatus) {
+            AssetCondition.OUT -> {
+                PrimaryButton(
+                    text = "Tạo lệnh sửa chữa",
+                    onClick = onCreateWorkOrder,
+                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
+                )
+                SecondaryOutlinedButton(text = "Mở tuyến để khảo sát lại", onClick = onOpenRouteToSurvey)
+            }
+            AssetCondition.DIM, AssetCondition.UNKNOWN -> {
+                PrimaryButton(
+                    text = "Mở tuyến để khảo sát lại",
+                    onClick = onOpenRouteToSurvey,
+                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
+                )
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+            }
+            AssetCondition.NORMAL -> {
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+            }
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        PrimaryButton(
-            text = primaryLabel,
-            onClick = onPrimaryClick,
-            modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
-        )
-        OutlinedButton(
-            onClick = onSecondaryClick,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Dimens.radiusMedium),
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-        ) {
-            Text(text = secondaryLabel, color = MaterialTheme.colorScheme.primary)
-        }
+}
+
+@Composable
+private fun SecondaryOutlinedButton(
+    text: String,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+        shape = RoundedCornerShape(Dimens.radiusMedium),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+    ) {
+        Text(text = text, color = MaterialTheme.colorScheme.primary)
     }
 }
 
