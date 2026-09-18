@@ -9,6 +9,7 @@ import java.time.format.DateTimeParseException
 object DateFormatUtils {
     private val displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     private val isoDisplayFormatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy")
+    private val isoDateOnlyFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
     fun formatDisplay(dateTime: LocalDateTime): String = dateTime.format(displayFormatter)
 
@@ -20,6 +21,16 @@ object DateFormatUtils {
         if (iso.isNullOrBlank()) return "Chưa cập nhật"
         return try {
             Instant.parse(iso).atZone(ZoneId.systemDefault()).format(isoDisplayFormatter)
+        } catch (e: DateTimeParseException) {
+            "Chưa cập nhật"
+        }
+    }
+
+    // Same safety as formatIsoInstant, date only — for compact labels like a photo overlay.
+    fun formatIsoDateOnly(iso: String?): String {
+        if (iso.isNullOrBlank()) return "Chưa cập nhật"
+        return try {
+            Instant.parse(iso).atZone(ZoneId.systemDefault()).format(isoDateOnlyFormatter)
         } catch (e: DateTimeParseException) {
             "Chưa cập nhật"
         }

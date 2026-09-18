@@ -3,6 +3,7 @@ package com.luxmap.feature.map.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Power
@@ -51,7 +54,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -99,6 +104,8 @@ fun PoleDetailRoute(
         onViewOnMap = showNotImplemented,
         onReportFault = showNotImplemented,
         onViewFullHistory = showNotImplemented,
+        onOpenFault = { showNotImplemented() },
+        onViewAllFrames = showNotImplemented,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -118,6 +125,8 @@ fun PoleDetailScreen(
     onViewOnMap: () -> Unit = {},
     onReportFault: () -> Unit = {},
     onViewFullHistory: () -> Unit = {},
+    onOpenFault: (faultId: String) -> Unit = {},
+    onViewAllFrames: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -150,6 +159,8 @@ fun PoleDetailScreen(
                         onViewOnMap = onViewOnMap,
                         onReportFault = onReportFault,
                         onViewFullHistory = onViewFullHistory,
+                        onOpenFault = onOpenFault,
+                        onViewAllFrames = onViewAllFrames,
                     )
                 is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
                 is PoleDetailUiState.Error -> MessageState(text = uiState.message)
@@ -166,6 +177,8 @@ private fun PoleDetailContent(
     onViewOnMap: () -> Unit,
     onReportFault: () -> Unit,
     onViewFullHistory: () -> Unit,
+    onOpenFault: (faultId: String) -> Unit,
+    onViewAllFrames: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -188,11 +201,11 @@ private fun PoleDetailContent(
         LuminanceTrendCard(detail = detail, onViewFullHistory = onViewFullHistory)
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
-            OpenFaultsSection(detail.openFaults)
+            OpenFaultsSection(faults = detail.openFaults, onOpenFault = onOpenFault)
         }
-        if (detail.recentFrames.isNotEmpty()) {
-            RecentFramesSection(detail.recentFrames)
-        }
+        // Always shown, even when empty — a small empty state instead of skipping the
+        // section entirely (Design System v3.0.1: "không để khoảng trống lớn").
+        RecentFramesSection(frames = detail.recentFrames, onViewAllFrames = onViewAllFrames)
     }
 }
 
@@ -414,43 +427,166 @@ private fun InfoRow(
     }
 }
 
+// Design System v3.0.1: each fault is its own tappable card (icon + translated title +
+// translated "severity · status" + chevron), title carries the count. Translation functions
+// have an `else -> this` fallback since the full backend enum isn't known yet.
 @Composable
-private fun OpenFaultsSection(faults: List<PoleDetailFault>) {
+private fun OpenFaultsSection(
+    faults: List<PoleDetailFault>,
+    onOpenFault: (faultId: String) -> Unit,
+) {
     Column {
-        Text(text = "Sự cố đang mở", style = MaterialTheme.typography.titleMedium)
+        Text(text = "Sự cố đang mở (${faults.size})", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        faults.forEach { fault ->
-            Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
-                Text(text = fault.faultType, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "${fault.severity} · ${fault.faultStatus}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            faults.forEach { fault ->
+                FaultCard(fault = fault, onClick = { onOpenFault(fault.faultId) })
             }
         }
     }
 }
 
 @Composable
-private fun RecentFramesSection(frames: List<PoleDetailFrame>) {
+private fun FaultCard(
+    fault: PoleDetailFault,
+    onClick: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    // Reuse OUT's badge colors for the icon circle — a fault card is always in the "something's
+    // wrong" tone regardless of the pole's overall fixture_status.
+    val colors = AssetCondition.OUT.badgeColors(isDark)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .clickable(onClick = onClick)
+                .padding(Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(FAULT_ICON_SIZE).background(colors.background, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = colors.text,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = fault.faultType.toFaultTypeLabel(), style = MaterialTheme.typography.labelLarge)
+            val severityLabel = fault.severity.toSeverityLabel()
+            val statusLabel = fault.faultStatus.toFaultStatusLabel()
+            Text(
+                text = "$severityLabel · $statusLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = "Mở chi tiết sự cố",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun String.toFaultTypeLabel(): String =
+    when (this) {
+        "runtime_decline" -> "Suy giảm thời gian chiếu sáng"
+        "no_light_output" -> "Mất tín hiệu ánh sáng"
+        else -> this
+    }
+
+private fun String.toSeverityLabel(): String =
+    when (this) {
+        "low" -> "Mức thấp"
+        "medium" -> "Mức trung bình"
+        "high" -> "Mức cao"
+        else -> this
+    }
+
+private fun String.toFaultStatusLabel(): String =
+    when (this) {
+        "detected" -> "Đã phát hiện"
+        "confirmed" -> "Đã xác nhận"
+        "resolved" -> "Đã xử lý"
+        else -> this
+    }
+
+// Always rendered, even with 0 frames — shows a small empty state instead of the section
+// disappearing entirely (Design System v3.0.1: "không để khoảng trống lớn").
+@Composable
+private fun RecentFramesSection(
+    frames: List<PoleDetailFrame>,
+    onViewAllFrames: () -> Unit,
+) {
     Column {
         Text(text = "Ảnh khảo sát gần đây", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            items(frames) { frame ->
-                // Not tappable yet — whether tapping should open a full-size image needs
-                // BE-20's real thumbnail_url behavior confirmed first (see FM-27 note).
-                AsyncImage(
-                    model = frame.thumbnailUrl,
-                    contentDescription = "Ảnh khảo sát ${frame.capturedAt}",
-                    modifier =
-                        Modifier
-                            .size(FRAME_THUMBNAIL_SIZE)
-                            .clip(RoundedCornerShape(Dimens.radiusSmall)),
-                )
+        if (frames.isEmpty()) {
+            Text(
+                text = "Chưa có ảnh khảo sát",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items(frames) { frame -> FrameThumbnail(frame) }
+                item { ViewMoreFramesTile(onClick = onViewAllFrames) }
             }
         }
+    }
+}
+
+@Composable
+private fun FrameThumbnail(frame: PoleDetailFrame) {
+    Box(modifier = Modifier.size(FRAME_THUMBNAIL_SIZE).clip(RoundedCornerShape(Dimens.radiusSmall))) {
+        // Not tappable yet — whether tapping should open a full-size image needs BE-20's real
+        // thumbnail_url behavior confirmed first (see FM-27 note).
+        AsyncImage(
+            model = frame.thumbnailUrl,
+            contentDescription = "Ảnh khảo sát ${frame.capturedAt}",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(FrameDateOverlayColor)
+                    .padding(horizontal = Spacing.xs, vertical = 4.dp),
+        ) {
+            Text(
+                text = DateFormatUtils.formatIsoDateOnly(frame.capturedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ViewMoreFramesTile(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .size(FRAME_THUMBNAIL_SIZE)
+                .clip(RoundedCornerShape(Dimens.radiusSmall))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Xem thêm",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -470,6 +606,8 @@ private fun BoxScope.MessageState(text: String) {
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
 private val PRIMARY_CTA_HEIGHT = 52.dp
+private val FAULT_ICON_SIZE = 36.dp
+private val FrameDateOverlayColor = Color.Black.copy(alpha = 0.55f)
 
 private fun sampleDetail() =
     PoleDetail(
