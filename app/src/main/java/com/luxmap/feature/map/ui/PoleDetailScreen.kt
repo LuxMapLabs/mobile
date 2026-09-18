@@ -609,11 +609,14 @@ private val PRIMARY_CTA_HEIGHT = 52.dp
 private val FAULT_ICON_SIZE = 36.dp
 private val FrameDateOverlayColor = Color.Black.copy(alpha = 0.55f)
 
-private fun sampleDetail() =
+// 3 variants match the 3 real mock-pole-detail-POLE-*.json files 1:1 (same poleId, values,
+// history) so these previews show exactly what the app renders for those poles on-device.
+
+private fun sampleDetailDim() =
     PoleDetail(
         poleId = "POLE-0047",
         segmentId = "SEG-002",
-        segmentName = "Tuyến B - đường liên xã",
+        segmentName = "Tuyến B - Nguyễn Văn Ni",
         lat = 10.964558,
         lng = 106.495788,
         fixtureType = "solar_all_in_one",
@@ -629,6 +632,11 @@ private fun sampleDetail() =
         iotNodeStatus = "online",
         luminanceHistory =
             listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.818, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.814, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.812, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 0.762, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.729, AssetCondition.DIM),
                 PoleLuminancePoint("2026-08-18T20:00:00Z", 0.706, AssetCondition.DIM),
                 PoleLuminancePoint("2026-08-19T20:00:00Z", 0.733, AssetCondition.DIM),
             ),
@@ -647,16 +655,100 @@ private fun sampleDetail() =
             ),
     )
 
+private fun sampleDetailNormal() =
+    PoleDetail(
+        poleId = "POLE-0001",
+        segmentId = "SEG-001",
+        segmentName = "Tuyến A - Tỉnh Lộ 8",
+        lat = 10.970187,
+        lng = 106.489639,
+        fixtureType = "led_road_lamp",
+        powerSource = "grid",
+        lampWatt = 100,
+        installDate = "2022-03-24",
+        warrantyExpiry = "2024-03-24",
+        fixtureStatus = AssetCondition.NORMAL,
+        statusConfidence = 0.92,
+        determinedAt = "2026-08-19T12:00:00Z",
+        sourceChannel = "cv",
+        hasIotNode = false,
+        iotNodeStatus = null,
+        luminanceHistory =
+            listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.971, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.988, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.953, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 1.005, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.979, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-18T20:00:00Z", 0.991, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-19T20:00:00Z", 0.994, AssetCondition.NORMAL),
+            ),
+        runtimeHistory = emptyList(),
+        openFaults = emptyList(),
+        recentFrames =
+            listOf(
+                PoleDetailFrame("FRM-88301", "2026-08-19T12:00:00Z", "/api/v1/frames/FRM-88301/thumbnail"),
+            ),
+    )
+
+private fun sampleDetailOut() =
+    PoleDetail(
+        poleId = "POLE-0014",
+        segmentId = "SEG-001",
+        segmentName = "Tuyến A - Tỉnh Lộ 8",
+        lat = 10.972274,
+        lng = 106.493301,
+        fixtureType = "led_road_lamp",
+        powerSource = "grid",
+        lampWatt = 100,
+        installDate = "2021-11-18",
+        warrantyExpiry = "2024-11-18",
+        fixtureStatus = AssetCondition.OUT,
+        statusConfidence = 0.88,
+        determinedAt = "2026-08-19T20:00:00Z",
+        sourceChannel = "cv",
+        hasIotNode = false,
+        iotNodeStatus = null,
+        luminanceHistory =
+            listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.87, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.81, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.74, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 0.55, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.31, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-18T20:00:00Z", 0.08, AssetCondition.OUT),
+                PoleLuminancePoint("2026-08-19T20:00:00Z", 0.0, AssetCondition.OUT),
+            ),
+        runtimeHistory = emptyList(),
+        openFaults =
+            listOf(
+                PoleDetailFault("FAULT-0031", "no_light_output", "high", "detected"),
+            ),
+        recentFrames = emptyList(),
+    )
+
 @Preview(showBackground = true)
 @Composable
 private fun PoleDetailScreenLoadingPreview() {
     PoleDetailScreen(uiState = PoleDetailUiState.Loading, onBack = {})
 }
 
-@Preview(showBackground = true, heightDp = 1200)
+@Preview(name = "Success - Dim", showBackground = true, heightDp = 1400)
 @Composable
-private fun PoleDetailScreenSuccessPreview() {
-    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetail()), onBack = {})
+private fun PoleDetailScreenDimPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailDim()), onBack = {})
+}
+
+@Preview(name = "Success - Normal", showBackground = true, heightDp = 1200)
+@Composable
+private fun PoleDetailScreenNormalPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailNormal()), onBack = {})
+}
+
+@Preview(name = "Success - Out", showBackground = true, heightDp = 1300)
+@Composable
+private fun PoleDetailScreenOutPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailOut()), onBack = {})
 }
 
 @Preview(showBackground = true)
