@@ -179,7 +179,6 @@ fun MapScreen(
     val uiState by viewModel.uiState.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchTarget by viewModel.searchTarget.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
@@ -419,8 +418,6 @@ fun MapScreen(
                 MapSearchBar(
                     query = searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
-                    activeTarget = searchTarget,
-                    onTargetChange = viewModel::setSearchTarget,
                     onFilterClick = { showLayerFilterSheet = true },
                 )
                 if (searchQuery.isNotBlank()) {

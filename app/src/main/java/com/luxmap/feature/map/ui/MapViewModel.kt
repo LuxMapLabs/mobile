@@ -68,16 +68,13 @@ class MapViewModel
         private val _searchQuery = MutableStateFlow("")
         val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-        private val _searchTarget = MutableStateFlow(MapSearchTarget.POLE)
-        val searchTarget: StateFlow<MapSearchTarget> = _searchTarget.asStateFlow()
-
         val searchResults: StateFlow<MapSearchResults> =
-            combine(uiState, _searchQuery, _searchTarget) { state, query, target ->
+            combine(uiState, _searchQuery) { state, query ->
                 val dataset = (state as? MapUiState.Success)?.dataset
                 if (dataset == null || query.isBlank()) {
                     MapSearchResults()
                 } else {
-                    dataset.matching(query, target)
+                    dataset.matching(query)
                 }
             }.stateIn(
                 viewModelScope,
@@ -89,32 +86,22 @@ class MapViewModel
             _searchQuery.value = query
         }
 
-        fun setSearchTarget(target: MapSearchTarget) {
-            _searchTarget.value = target
-        }
-
         private companion object {
             const val STOP_TIMEOUT_MS = 5_000L
         }
     }
 
-private fun GisMapDataset.matching(
-    query: String,
-    target: MapSearchTarget,
-): MapSearchResults =
-    when (target) {
-        MapSearchTarget.POLE ->
-            MapSearchResults(poles = poles.filter { it.poleId.contains(query, ignoreCase = true) })
-        MapSearchTarget.ROUTE ->
-            MapSearchResults(
-                segments =
-                    segments.filter {
-                        it.name.contains(query, ignoreCase = true) || it.segmentId.contains(query, ignoreCase = true)
-                    },
-            )
-        // Not wired yet — see FM-35 note, "atlas" is not a confirmed field/endpoint.
-        MapSearchTarget.ATLAS -> MapSearchResults()
-    }
+// One search box covers both pole and route (FM-36 — dropped the old per-type tab): always
+// compute both matches, poles and segments are not mutually exclusive results. Display order
+// (poles before segments) is handled by MapSearchResultsList, not here.
+private fun GisMapDataset.matching(query: String): MapSearchResults =
+    MapSearchResults(
+        poles = poles.filter { it.poleId.contains(query, ignoreCase = true) },
+        segments =
+            segments.filter {
+                it.name.contains(query, ignoreCase = true) || it.segmentId.contains(query, ignoreCase = true)
+            },
+    )
 
 private fun GisMapDataset.filterByStatus(filter: Set<AssetCondition>): GisMapDataset =
     if (filter.isEmpty()) this else copy(poles = poles.filter { it.fixtureStatus in filter })
