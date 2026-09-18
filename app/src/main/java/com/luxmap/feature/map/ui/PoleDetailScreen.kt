@@ -90,6 +90,7 @@ fun PoleDetailRoute(
         onCreateWorkOrder = showNotImplemented,
         onViewOnMap = showNotImplemented,
         onReportFault = showNotImplemented,
+        onViewFullHistory = showNotImplemented,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -108,6 +109,7 @@ fun PoleDetailScreen(
     onCreateWorkOrder: () -> Unit = {},
     onViewOnMap: () -> Unit = {},
     onReportFault: () -> Unit = {},
+    onViewFullHistory: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -139,6 +141,7 @@ fun PoleDetailScreen(
                         onCreateWorkOrder = onCreateWorkOrder,
                         onViewOnMap = onViewOnMap,
                         onReportFault = onReportFault,
+                        onViewFullHistory = onViewFullHistory,
                     )
                 is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
                 is PoleDetailUiState.Error -> MessageState(text = uiState.message)
@@ -154,6 +157,7 @@ private fun PoleDetailContent(
     onCreateWorkOrder: () -> Unit,
     onViewOnMap: () -> Unit,
     onReportFault: () -> Unit,
+    onViewFullHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -173,13 +177,10 @@ private fun PoleDetailContent(
             onViewOnMap = onViewOnMap,
             onReportFault = onReportFault,
         )
+        LuminanceTrendCard(detail = detail, onViewFullHistory = onViewFullHistory)
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
             OpenFaultsSection(detail.openFaults)
-        }
-        LuminanceHistorySection(detail.luminanceHistory)
-        if (detail.runtimeHistory.isNotEmpty()) {
-            RuntimeHistorySection(detail.runtimeHistory)
         }
         if (detail.recentFrames.isNotEmpty()) {
             RecentFramesSection(detail.recentFrames)
@@ -389,41 +390,6 @@ private fun OpenFaultsSection(faults: List<PoleDetailFault>) {
     }
 }
 
-// Placeholder list, not a chart yet — charting approach (custom Canvas vs. a new library) is
-// still open, decide when this section gets wired to real rendering.
-@Composable
-private fun LuminanceHistorySection(history: List<PoleLuminancePoint>) {
-    Column {
-        Text(text = "Lịch sử độ sáng", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Spacing.sm))
-        if (history.isEmpty()) {
-            Text(
-                text = "Chưa có dữ liệu",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            history.takeLast(MAX_HISTORY_ROWS).reversed().forEach { point ->
-                InfoRow(
-                    label = point.observedAt,
-                    value = "${(point.baselineRatio * 100).toInt()}% (${point.classifiedAs.label()})",
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RuntimeHistorySection(history: List<PoleRuntimePoint>) {
-    Column {
-        Text(text = "Lịch sử thời gian chiếu sáng", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Spacing.sm))
-        history.takeLast(MAX_HISTORY_ROWS).reversed().forEach { point ->
-            InfoRow(label = point.nightOf, value = "${point.runtimeHours}h")
-        }
-    }
-}
-
 @Composable
 private fun RecentFramesSection(frames: List<PoleDetailFrame>) {
     Column {
@@ -461,7 +427,6 @@ private fun BoxScope.MessageState(text: String) {
 }
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
-private const val MAX_HISTORY_ROWS = 10
 private val PRIMARY_CTA_HEIGHT = 52.dp
 
 private fun sampleDetail() =
