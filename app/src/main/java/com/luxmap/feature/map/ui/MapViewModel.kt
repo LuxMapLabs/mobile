@@ -2,6 +2,7 @@ package com.luxmap.feature.map.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.feature.map.data.GisMapDataset
 import com.luxmap.feature.map.data.MapRepository
@@ -21,9 +22,16 @@ class MapViewModel
     @Inject
     constructor(
         repository: MapRepository,
+        connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
         val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
+
+        // Offline basemap banner (F12/FM-38) — starts true (assume online) so the banner doesn't
+        // flash on screen before the first connectivity callback fires. Pole/route data comes
+        // from `repository` above regardless of this, so it keeps rendering while offline.
+        val isOnline: StateFlow<Boolean> =
+            connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
 
         // Status filter (FM-36: "Lọc theo trạng thái đèn") — empty set means no filter, show
         // every pole. Read by the layer-filter bottom sheet and by the KPI "cần xử lý" chip.
@@ -73,7 +81,7 @@ class MapViewModel
                 }
             }.stateIn(
                 viewModelScope,
-                SharingStarted.WhileSubscribed(SEARCH_RESULTS_STOP_TIMEOUT_MS),
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
                 MapSearchResults(),
             )
 
@@ -86,7 +94,7 @@ class MapViewModel
         }
 
         private companion object {
-            const val SEARCH_RESULTS_STOP_TIMEOUT_MS = 5_000L
+            const val STOP_TIMEOUT_MS = 5_000L
         }
     }
 

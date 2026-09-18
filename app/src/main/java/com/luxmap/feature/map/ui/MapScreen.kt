@@ -177,6 +177,7 @@ fun MapScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchTarget by viewModel.searchTarget.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     // Reference to the real map, set exactly once when ready — the LaunchedEffects below read
     // state (uiState/showFixtures/...) on every change and apply it directly to the map through
@@ -559,6 +560,13 @@ fun MapScreen(
                         )
                     }
                 }
+            }
+
+            // F12/FM-38 — device has no network, only the basemap tiles can't load. Pole/route
+            // data keeps rendering as usual (uiState below is independent of this), so this is
+            // just a heads-up, not an error state.
+            if (!isOnline) {
+                MessageOverlay(text = "Không tải được nền bản đồ · Dữ liệu cột vẫn khả dụng")
             }
 
             when (uiState) {
