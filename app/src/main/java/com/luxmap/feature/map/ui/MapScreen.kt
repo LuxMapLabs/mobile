@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -56,6 +57,7 @@ import com.luxmap.core.map.MAP_STYLE_URL
 import com.luxmap.core.map.POI_BADGE_ICON_ID
 import com.luxmap.core.map.VECTOR_STYLE_URL
 import com.luxmap.core.map.markerColorArgb
+import com.luxmap.core.map.markerIconId
 import com.luxmap.core.map.registerMarkerBadgeIcons
 import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
@@ -92,15 +94,38 @@ private const val MOCK_AREA_ZOOM = 15.0
 
 private const val POLES_SOURCE_ID = "poles-source"
 private const val POLES_GLOW_CIRCLE_LAYER_ID = "poles-glow-circle-layer"
+
+// Kept as "circle" in the id string even though FM-37 turned this into a SymbolLayer — renaming
+// the id would be a pointless churn, it is just a style source/layer identifier string, not a
+// type name.
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
+private const val POLES_SELECTED_HALO_LAYER_ID = "poles-selected-halo-layer"
 private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
 private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 
+// No real pole_id is ever empty (see mock-poles.geojson / Contract v1.1) — used as the selected
+// halo layer's filter value when nothing is selected, so it matches zero features.
+private const val NO_SELECTION_SENTINEL = ""
+private const val MARKER_ICON_SIZE = 0.5f
+private const val MARKER_ICON_SIZE_SELECTED = 0.75f
+private const val SELECTED_HALO_RADIUS = 20f
+
+// Badges/labels only worth showing once zoomed in enough to read them (F12/FM-37 LOD rule) —
+// below this the map is zoomed out far enough that individual badges would just be clutter.
+private const val BADGE_MIN_ZOOM = 13f
+
+// Extra bottom clearance so the legend never overlaps MapLibre's own attribution/logo control,
+// which the map draws at the same bottom-start corner (F12/FM-37: "chừa vùng đáy trái cho
+// attribution"). This is an estimate of the attribution row's height, not a measured value — it
+// still needs a visual check on a real device/emulator.
+private val LEGEND_BOTTOM_SAFE_PADDING = 32.dp
+
 // "Surveyed route" layer (F12) — drawn below the pole markers, so add this layer first in
 // z-order.
 private const val ROAD_SEGMENTS_SOURCE_ID = "road-segments-source"
+private const val ROAD_SEGMENTS_GLOW_LINE_LAYER_ID = "road-segments-glow-line-layer"
 private const val ROAD_SEGMENTS_LINE_LAYER_ID = "road-segments-line-layer"
 
 private const val LOCATE_ME_ZOOM = 17.0
@@ -308,6 +333,13 @@ fun MapScreen(
             applyLayerVisibility(style, showFixtures, showRoadSegments)
         }
 
+        // Selected marker gets a bigger icon + halo ring (F12/FM-37) — re-styles the existing
+        // layers in place, does not touch the GeoJSON or rebuild the style.
+        LaunchedEffect(maplibreMap, selectedPole) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            updateSelectedPoleStyle(style, selectedPole?.poleId)
+        }
+
         // Fires whenever camera mode changes — including automatically, when the user's own
         // drag/pinch gesture breaks tracking (built into LocationCameraController, no manual
         // gesture detection needed here).
@@ -407,7 +439,7 @@ fun MapScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(Spacing.lg),
+                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = LEGEND_BOTTOM_SAFE_PADDING),
             )
 
             // Right-side control stack (F12) — exactly 4 floating controls, declutters what used to
@@ -604,16 +636,20 @@ private fun setupMapLayers(
 
     val segmentSource = GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
     style.addSource(segmentSource)
-    // Add before the pole layer so the route draws below, markers on top.
+    // Add before the pole layer so the route draws below, markers on top. Glow first so the
+    // solid core sits on top of it, same order as the pole glow/dot pair below.
+    style.addLayer(buildRoadSegmentsGlowLineLayer())
     style.addLayer(buildRoadSegmentsLineLayer())
 
     val source = GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions())
     style.addSource(source)
     style.addLayer(buildClusterCircleLayer())
     style.addLayer(buildClusterCountLayer())
-    // Add glow before the main dot so the dot sits on top of the glow.
+    // Halo below the glow (biggest radius at the bottom), glow below the icon — same idea as a
+    // physical stack, each layer visible only where the one above it doesn't cover it.
+    style.addLayer(buildPoleSelectedHaloLayer())
     style.addLayer(buildPoleGlowCircleLayer())
-    style.addLayer(buildPoleCircleLayer())
+    style.addLayer(buildPoleIconLayer())
     style.addLayer(buildPoiBadgeLayer())
     style.addLayer(buildIotBadgeLayer())
 
@@ -644,22 +680,33 @@ private fun enableLocationComponent(
     map.locationComponent.renderMode = RenderMode.NORMAL
 }
 
-// "Surveyed route" (F12) — colored by has_active_segment_fault to match how Web GIS shows grid
-// faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
+// "Surveyed route" (F12/FM-37) — colored by has_active_segment_fault to match how Web GIS shows
+// grid faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
 // tap — that is still Web GIS scope, mobile only needs the color as a visual warning for the
-// field crew.
+// field crew. Drawn as glow (wide, blurred, translucent) + core (narrow, solid) — same 2-layer
+// idea as the pole glow/dot pair, so routes read with the same visual language as markers.
+private fun routeLineColorExpression(): Expression =
+    Expression.switchCase(
+        Expression.get("has_active_segment_fault"),
+        Expression.color(routeColorArgb(hasActiveSegmentFault = true)),
+        Expression.color(routeColorArgb(hasActiveSegmentFault = false)),
+    )
+
+private fun buildRoadSegmentsGlowLineLayer(): LineLayer =
+    LineLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.lineColor(routeLineColorExpression()),
+            PropertyFactory.lineWidth(8f),
+            PropertyFactory.lineBlur(4f),
+            PropertyFactory.lineOpacity(0.35f),
+        )
+
 private fun buildRoadSegmentsLineLayer(): LineLayer =
     LineLayer(ROAD_SEGMENTS_LINE_LAYER_ID, ROAD_SEGMENTS_SOURCE_ID)
         .withProperties(
-            PropertyFactory.lineColor(
-                Expression.switchCase(
-                    Expression.get("has_active_segment_fault"),
-                    Expression.color(routeColorArgb(hasActiveSegmentFault = true)),
-                    Expression.color(routeColorArgb(hasActiveSegmentFault = false)),
-                ),
-            ),
-            PropertyFactory.lineWidth(2f),
-            PropertyFactory.lineOpacity(0.7f),
+            PropertyFactory.lineColor(routeLineColorExpression()),
+            PropertyFactory.lineWidth(3f),
+            PropertyFactory.lineOpacity(0.9f),
         )
 
 // Re-apply visibility every time a toggle changes or AndroidView's update runs again — much
@@ -671,12 +718,14 @@ private fun applyLayerVisibility(
 ) {
     val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
     val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
+    style.getLayer(POLES_SELECTED_HALO_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_GLOW_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_POI_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
     style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
 }
 
@@ -700,15 +749,39 @@ private fun buildPoleGlowCircleLayer(): CircleLayer =
             ),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
 
-// Only draw a marker for features NOT grouped into a cluster (point_count only exists on
-// clusters).
-private fun buildPoleCircleLayer(): CircleLayer =
-    CircleLayer(POLES_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
+// Marker shape per fixture_status (F12/FM-37, Design System 3.4) — SymbolLayer + the 4
+// ic_marker_*.xml icons registered in registerMarkerBadgeIcons(), replacing the old flat-color
+// CircleLayer dot. Icon size doubles as the "selected" state (see updateSelectedPoleStyle) via a
+// separate match on pole_id, re-applied whenever the selection changes.
+private fun buildPoleIconLayer(): SymbolLayer =
+    SymbolLayer(POLES_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
-            PropertyFactory.circleRadius(7f),
-            PropertyFactory.circleStrokeWidth(1.5f),
-            PropertyFactory.circleStrokeColor("#FFFFFF"),
-            PropertyFactory.circleColor(
+            PropertyFactory.iconImage(
+                Expression.match(
+                    Expression.get("fixture_status"),
+                    Expression.literal(AssetCondition.UNKNOWN.markerIconId()),
+                    Expression.stop("normal", Expression.literal(AssetCondition.NORMAL.markerIconId())),
+                    Expression.stop("dim", Expression.literal(AssetCondition.DIM.markerIconId())),
+                    Expression.stop("out", Expression.literal(AssetCondition.OUT.markerIconId())),
+                ),
+            ),
+            PropertyFactory.iconSize(selectedIconSizeExpression(NO_SELECTION_SENTINEL)),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
+
+// Ring drawn only around the currently selected pole (F12/FM-37: "marker được chọn lớn hơn và có
+// halo") — filtered to a single pole_id, re-applied whenever the selection changes (see
+// updateSelectedPoleStyle). Starts filtered to NO_SELECTION_SENTINEL so it draws nothing before
+// anything is selected.
+private fun buildPoleSelectedHaloLayer(): CircleLayer =
+    CircleLayer(POLES_SELECTED_HALO_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.circleRadius(SELECTED_HALO_RADIUS),
+            PropertyFactory.circleColor("#FFFFFFFF"),
+            PropertyFactory.circleOpacity(0.25f),
+            PropertyFactory.circleStrokeWidth(2f),
+            PropertyFactory.circleStrokeColor(
                 Expression.match(
                     Expression.get("fixture_status"),
                     Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
@@ -717,7 +790,30 @@ private fun buildPoleCircleLayer(): CircleLayer =
                     Expression.stop("out", Expression.color(AssetCondition.OUT.markerColorArgb())),
                 ),
             ),
-        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
+        ).apply { setFilter(selectedPoleFilter(NO_SELECTION_SENTINEL)) }
+
+private fun selectedPoleFilter(selectedPoleId: String): Expression =
+    Expression.eq(Expression.get("pole_id"), Expression.literal(selectedPoleId))
+
+private fun selectedIconSizeExpression(selectedPoleId: String): Expression =
+    Expression.match(
+        Expression.get("pole_id"),
+        Expression.literal(MARKER_ICON_SIZE),
+        Expression.stop(selectedPoleId, Expression.literal(MARKER_ICON_SIZE_SELECTED)),
+    )
+
+// Re-applied every time `selectedPole` changes (LaunchedEffect in MapScreen) — a Style's layers
+// are mutable in place, no need to rebuild the whole style like the basemap toggle does.
+private fun updateSelectedPoleStyle(
+    style: Style,
+    selectedPoleId: String?,
+) {
+    val id = selectedPoleId ?: NO_SELECTION_SENTINEL
+    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.iconSize(selectedIconSizeExpression(id)))
+    // setFilter() is declared per-layer-subclass, not on the base Layer type style.getLayer()
+    // returns — cast is needed even though we know which concrete type was added under this id.
+    (style.getLayer(POLES_SELECTED_HALO_LAYER_ID) as? CircleLayer)?.setFilter(selectedPoleFilter(id))
+}
 
 // "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
 // badge goes bottom-right so a pole that is both near a POI and has an IoT node doesn't overlap
@@ -737,6 +833,8 @@ private fun buildPoiBadgeLayer(): SymbolLayer =
                     Expression.eq(Expression.get("near_sensitive_poi"), Expression.literal(true)),
                 ),
             )
+            // FM-37 LOD rule: badges only worth showing once zoomed in enough to read them.
+            minZoom = BADGE_MIN_ZOOM
         }
 
 private fun buildIotBadgeLayer(): SymbolLayer =
@@ -754,6 +852,7 @@ private fun buildIotBadgeLayer(): SymbolLayer =
                     Expression.eq(Expression.get("has_iot_node"), Expression.literal(true)),
                 ),
             )
+            minZoom = BADGE_MIN_ZOOM
         }
 
 // clusterProperties: mapExpression computes a numeric severity (0..3) from each point's

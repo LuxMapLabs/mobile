@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Marker shape for fixture_status=normal (F12/FM-37, Design System 3.4: circle+check).
+         Registered as a fixed-color icon per status (same pattern as ic_poi_badge/ic_iot_badge)
+         and picked via Expression.match on fixture_status, not tinted at render time. -->
+    <path
+        android:fillColor="#FF5FC4B0"
+        android:pathData="M12,2 C17.5228,2 22,6.4772 22,12 C22,17.5228 17.5228,22 12,22 C6.4772,22 2,17.5228 2,12 C2,6.4772 6.4772,2 12,2 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.75,15.15 L6.6,12 L5.55,13.05 L9.75,17.25 L18.75,8.25 L17.7,7.2 Z" />
+</vector>

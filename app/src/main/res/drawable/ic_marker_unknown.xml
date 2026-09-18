@@ -1,0 +1,29 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Marker shape for fixture_status=unknown/unmapped (F12/FM-37, Design System 3.4: dashed
+         ring + question mark). Ring built from 8 short filled arc segments (band between radius
+         10 and 7.5) instead of a real dash pattern, since Android vector paths have no
+         stroke-dasharray attribute. -->
+    <path
+        android:fillColor="#FF64748B"
+        android:pathData="M21.763,9.836 L21.763,14.164 L19.322,13.623 L19.322,10.377 Z
+                           M20.434,17.373 L17.373,20.434 L16.030,18.326 L18.326,16.030 Z
+                           M14.164,21.763 L9.836,21.763 L10.377,19.322 L13.623,19.322 Z
+                           M6.627,20.434 L3.566,17.373 L5.674,16.030 L7.970,18.326 Z
+                           M2.237,14.164 L2.237,9.836 L4.678,10.377 L4.678,13.623 Z
+                           M3.566,6.627 L6.627,3.566 L7.970,5.674 L5.674,7.970 Z
+                           M9.836,2.237 L14.164,2.237 L13.623,4.678 L10.377,4.678 Z
+                           M17.373,3.566 L20.434,6.627 L18.326,7.970 L16.030,5.674 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.2,9.3 C10.2,7.6 11.5,6.4 13,6.7 C14.3,7 15,8.1 14.6,9.3
+                           C14.3,10.2 13.5,10.6 12.8,11.1 C12.3,11.5 12,12 12,12.8
+                           L10.8,12.8 C10.8,11.6 11.3,10.9 12.1,10.3 C12.6,9.9 13.1,9.6 13.3,9
+                           C13.5,8.3 13.1,7.7 12.4,7.6 C11.7,7.5 11.2,8 11.2,9 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M11.4,14.2 L12.6,14.2 L12.6,15.4 L11.4,15.4 Z" />
+</vector>

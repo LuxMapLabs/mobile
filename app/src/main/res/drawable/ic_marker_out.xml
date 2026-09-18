@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Marker shape for fixture_status=out (F12/FM-37, Design System 3.4: diamond+X). -->
+    <path
+        android:fillColor="#FFD64545"
+        android:pathData="M12,2 L22,12 L12,22 L2,12 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.36,8.64 L8.64,7.36 L16.64,15.36 L15.36,16.64 Z M15.36,7.36 L16.64,8.64 L8.64,16.64 L7.36,15.36 Z" />
+</vector>
