@@ -128,6 +128,7 @@ private const val CLUSTER_RADIUS = 50
 
 @Composable
 fun MapScreen(
+    onOpenPoleDetail: (poleId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = hiltViewModel(),
 ) {
@@ -444,7 +445,14 @@ fun MapScreen(
     }
 
     selectedPole?.let { pole ->
-        PoleQuickViewBottomSheet(pole = pole, onDismiss = { selectedPole = null })
+        PoleQuickViewBottomSheet(
+            pole = pole,
+            onDismiss = { selectedPole = null },
+            onOpenDetail = {
+                selectedPole = null
+                onOpenPoleDetail(pole.poleId)
+            },
+        )
     }
 }
 

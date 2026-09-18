@@ -15,6 +15,12 @@ sealed interface Routes {
         override val route = "map"
     }
 
+    data object PoleDetail : Routes {
+        override val route = "map/pole/{poleId}"
+
+        fun createRoute(poleId: String) = "map/pole/$poleId"
+    }
+
     data object ReportSubmit : Routes {
         override val route = "report/submit"
     }
