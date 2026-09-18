@@ -26,10 +26,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -116,16 +118,13 @@ private val LOCATION_PERMISSIONS =
 private const val SATELLITE_MAX_ZOOM = 18.5
 private const val VECTOR_MAX_ZOOM = 20.0
 
-// Standard Material3 FloatingActionButton size — used to space the zoom +/- button cluster
-// right above the locate-me button, so they don't overlap.
-private val STANDARD_FAB_SIZE = 56.dp
-
 // clusterProperties computes the "highest severity in the cluster" (Design System section
 // 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
 private const val CLUSTER_MAX_ZOOM = 14
 private const val CLUSTER_RADIUS = 50
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     onOpenPoleDetail: (poleId: String) -> Unit,
@@ -154,6 +153,11 @@ fun MapScreen(
     var showLocationTimeout by remember { mutableStateOf(false) }
     var isLocating by remember { mutableStateOf(false) }
     var isFollowingUser by remember { mutableStateOf(false) }
+    // Search bar state (F12/FM-36) — not wired to actual pole/route matching yet, that lands in a
+    // later step once the status filter behind the layer sheet below also exists.
+    var searchQuery by remember { mutableStateOf("") }
+    var searchTarget by remember { mutableStateOf(MapSearchTarget.POLE) }
+    var showLayerFilterSheet by remember { mutableStateOf(false) }
     var hasLocationPermission by
         remember {
             mutableStateOf(
@@ -309,35 +313,30 @@ fun MapScreen(
         // overlay controls must not — wrap them in their own inset-aware Box so a FAB never ends
         // up under the status bar or the gesture navigation bar.
         Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            // Satellite <-> vector basemap toggle (F12) — the free satellite imagery is only sharp
-            // in urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
-            // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
-            // because the source imagery just doesn't have that resolution — this button lets the
-            // field crew switch to the vector basemap (drawn with lines, always sharp) when needed.
-            FloatingActionButton(
-                onClick = {
-                    isSatelliteBasemap = !isSatelliteBasemap
-                    val map = maplibreMap ?: return@FloatingActionButton
-                    map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
-                    val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
-                    map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
-                        setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
-                        // setStyle() drops the LocationComponent along with the rest of the old
-                        // style — re-enable it here or the blue dot disappears after toggling
-                        // basemap (see the NOTE on enableLocationComponent).
-                        if (hasLocationPermission) {
-                            enableLocationComponent(context, map, style)
-                        }
-                    }
-                },
+            // Top area (F12/FM-36) — single search bar + KPI summary, replaces the old separate
+            // basemap-toggle FAB and layer-toggle card that used to sit at TopStart/TopEnd.
+            Column(
                 modifier =
                     Modifier
-                        .align(Alignment.TopStart)
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
                         .padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Text(
-                    text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
-                    style = MaterialTheme.typography.labelMedium,
+                MapSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    activeTarget = searchTarget,
+                    onTargetChange = { searchTarget = it },
+                    onFilterClick = { showLayerFilterSheet = true },
+                )
+                MapKpiChipRow(
+                    poleCount = uiState.polesOrEmpty().size,
+                    needsAttentionCount =
+                        uiState.polesOrEmpty().count {
+                            it.fixtureStatus == AssetCondition.DIM || it.fixtureStatus == AssetCondition.OUT
+                        },
+                    routeCount = uiState.roadSegmentsOrEmpty().size,
                 )
             }
 
@@ -348,28 +347,52 @@ fun MapScreen(
                         .padding(Spacing.lg),
             )
 
-            MapLayerToggle(
-                showFixtures = showFixtures,
-                onShowFixturesChange = { showFixtures = it },
-                showRoadSegments = showRoadSegments,
-                onShowRoadSegmentsChange = { showRoadSegments = it },
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(Spacing.lg),
-            )
-
-            // Zoom +/- buttons (F12) — MapLibre Native has no built-in widget like maplibre-gl JS's
-            // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum touch
-            // target from the Design System) that call CameraUpdateFactory.zoomIn()/zoomOut()
-            // directly. Pinch-to-zoom still works as usual, this is just an extra option.
+            // Right-side control stack (F12) — exactly 4 floating controls, declutters what used to
+            // be 4 separate pieces scattered across all 4 corners: basemap, zoom in, zoom out,
+            // locate, top to bottom. One shared Column + spacedBy() instead of each button computing
+            // its own manual padding to avoid overlapping its neighbor.
             Column(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(bottom = Spacing.lg + STANDARD_FAB_SIZE + Spacing.sm, end = Spacing.lg),
+                        .padding(Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                horizontalAlignment = Alignment.End,
             ) {
+                // Satellite <-> vector basemap toggle — the free satellite imagery is only sharp in
+                // urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
+                // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
+                // because the source imagery just doesn't have that resolution — this button lets
+                // the field crew switch to the vector basemap (drawn with lines, always sharp) when
+                // needed.
+                FloatingActionButton(
+                    onClick = {
+                        isSatelliteBasemap = !isSatelliteBasemap
+                        val map = maplibreMap ?: return@FloatingActionButton
+                        map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
+                        val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
+                        map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
+                            setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
+                            // setStyle() drops the LocationComponent along with the rest of the old
+                            // style — re-enable it here or the blue dot disappears after toggling
+                            // basemap (see the NOTE on enableLocationComponent).
+                            if (hasLocationPermission) {
+                                enableLocationComponent(context, map, style)
+                            }
+                        }
+                    },
+                ) {
+                    Text(
+                        text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+
+                // Zoom +/- buttons — MapLibre Native has no built-in widget like maplibre-gl JS's
+                // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum
+                // touch target from the Design System) that call
+                // CameraUpdateFactory.zoomIn()/zoomOut() directly. Pinch-to-zoom still works as
+                // usual, this is just an extra option.
                 FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomIn()) }) {
                     Icon(imageVector = Icons.Filled.Add, contentDescription = "Phóng to")
                 }
@@ -379,29 +402,40 @@ fun MapScreen(
                     // a new library.
                     Text(text = "−", style = MaterialTheme.typography.headlineSmall)
                 }
+
+                FloatingActionButton(
+                    onClick = {
+                        showLocationPermissionDenied = false
+                        showLocationPermissionSettingsHint = false
+                        val granted =
+                            LOCATION_PERMISSIONS.any {
+                                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                            }
+                        if (granted) {
+                            hasLocationPermission = true
+                            beginTracking()
+                        } else {
+                            locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                        }
+                    },
+                ) {
+                    Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+                }
             }
 
-            FloatingActionButton(
-                onClick = {
-                    showLocationPermissionDenied = false
-                    showLocationPermissionSettingsHint = false
-                    val granted =
-                        LOCATION_PERMISSIONS.any {
-                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                        }
-                    if (granted) {
-                        hasLocationPermission = true
-                        beginTracking()
-                    } else {
-                        locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
-                    }
-                },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(Spacing.lg),
-            ) {
-                Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+            if (showLayerFilterSheet) {
+                ModalBottomSheet(
+                    onDismissRequest = { showLayerFilterSheet = false },
+                    sheetState = rememberModalBottomSheetState(),
+                ) {
+                    MapLayerToggle(
+                        showFixtures = showFixtures,
+                        onShowFixturesChange = { showFixtures = it },
+                        showRoadSegments = showRoadSegments,
+                        onShowRoadSegmentsChange = { showRoadSegments = it },
+                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                    )
+                }
             }
 
             when (uiState) {
