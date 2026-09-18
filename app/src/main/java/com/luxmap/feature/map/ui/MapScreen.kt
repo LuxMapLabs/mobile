@@ -109,8 +109,12 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 // No real pole_id is ever empty (see mock-poles.geojson / Contract v1.1) — used as the selected
 // halo layer's filter value when nothing is selected, so it matches zero features.
 private const val NO_SELECTION_SENTINEL = ""
-private const val MARKER_ICON_SIZE = 0.5f
-private const val MARKER_ICON_SIZE_SELECTED = 0.75f
+
+// Marker icons are 24dp source vectors (see ic_marker_*.xml), so size 1.0f renders at their full
+// 24dp and 1.3f at ~31dp for the selected pole — bumped up from the original 0.5f/0.75f, which
+// made the icon detail (checkmark/x shape) too small to read on a real device.
+private const val MARKER_ICON_SIZE = 1.0f
+private const val MARKER_ICON_SIZE_SELECTED = 1.3f
 private const val SELECTED_HALO_RADIUS = 20f
 
 // Badges/labels only worth showing once zoomed in enough to read them (F12/FM-37 LOD rule) —
@@ -766,7 +770,9 @@ private fun buildPoleGlowCircleLayer(): CircleLayer =
         .withProperties(
             PropertyFactory.circleRadius(14f),
             PropertyFactory.circleBlur(1f),
-            PropertyFactory.circleOpacity(0.35f),
+            // Lowered from 0.35f so the status icon reads as the focal point, not the glow behind
+            // it, now that the icon itself is bigger (see MARKER_ICON_SIZE).
+            PropertyFactory.circleOpacity(0.22f),
             PropertyFactory.circleColor(
                 Expression.match(
                     Expression.get("fixture_status"),
@@ -846,13 +852,17 @@ private fun updateSelectedPoleStyle(
 
 // "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
 // badge goes bottom-right so a pole that is both near a POI and has an IoT node doesn't overlap
-// badges.
+// badges. Badge icons are 24dp source vectors too, same as the marker, so 0.7f here against
+// MARKER_ICON_SIZE = 1.0f keeps the badge at ~70% of the marker's size — big enough to actually
+// read on a real device, still clearly smaller/secondary to the status icon. Offset scaled up to
+// match, so the bigger badge still sits tucked at the marker's corner instead of drifting toward
+// its center.
 private fun buildPoiBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(POI_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.5f),
-            PropertyFactory.iconOffset(arrayOf(6f, -6f)),
+            PropertyFactory.iconSize(0.7f),
+            PropertyFactory.iconOffset(arrayOf(9f, -9f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -870,8 +880,8 @@ private fun buildIotBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_IOT_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.5f),
-            PropertyFactory.iconOffset(arrayOf(6f, 6f)),
+            PropertyFactory.iconSize(0.7f),
+            PropertyFactory.iconOffset(arrayOf(9f, 9f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
