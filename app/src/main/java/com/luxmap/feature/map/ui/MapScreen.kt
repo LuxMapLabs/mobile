@@ -87,6 +87,7 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Point
 
 // Center coordinate and bbox of mock-poles.geojson (HCMC-area mock, 3 segments).
 private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
@@ -276,6 +277,26 @@ fun MapScreen(
                                 }
                             if (tappedPole != null) {
                                 selectedPole = tappedPole
+                                return@addOnMapClickListener true
+                            }
+
+                            val tappedCluster =
+                                map.queryRenderedFeatures(screenPoint, CLUSTER_CIRCLE_LAYER_ID).firstOrNull()
+                            if (tappedCluster != null) {
+                                val clusterSource = map.style?.getSource(POLES_SOURCE_ID) as? GeoJsonSource
+                                val expansionZoom = clusterSource?.getClusterExpansionZoom(tappedCluster)
+                                val clusterCenter =
+                                    (tappedCluster.geometry() as? Point)?.let {
+                                        LatLng(
+                                            it.latitude(),
+                                            it.longitude(),
+                                        )
+                                    }
+                                if (expansionZoom != null && clusterCenter != null) {
+                                    map.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(clusterCenter, expansionZoom.toDouble()),
+                                    )
+                                }
                                 return@addOnMapClickListener true
                             }
 
