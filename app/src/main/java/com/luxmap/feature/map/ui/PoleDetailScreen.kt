@@ -1,5 +1,6 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,6 +55,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleDetailFault
@@ -82,6 +86,10 @@ fun PoleDetailRoute(
         uiState = uiState,
         onBack = onBack,
         onOpenMenu = showNotImplemented,
+        onStartSurvey = showNotImplemented,
+        onCreateWorkOrder = showNotImplemented,
+        onViewOnMap = showNotImplemented,
+        onReportFault = showNotImplemented,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
@@ -96,6 +104,10 @@ fun PoleDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenMenu: () -> Unit = {},
+    onStartSurvey: () -> Unit = {},
+    onCreateWorkOrder: () -> Unit = {},
+    onViewOnMap: () -> Unit = {},
+    onReportFault: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
@@ -120,7 +132,14 @@ fun PoleDetailScreen(
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
                 is PoleDetailUiState.Loading -> LoadingState()
-                is PoleDetailUiState.Success -> PoleDetailContent(detail = uiState.detail)
+                is PoleDetailUiState.Success ->
+                    PoleDetailContent(
+                        detail = uiState.detail,
+                        onStartSurvey = onStartSurvey,
+                        onCreateWorkOrder = onCreateWorkOrder,
+                        onViewOnMap = onViewOnMap,
+                        onReportFault = onReportFault,
+                    )
                 is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
                 is PoleDetailUiState.Error -> MessageState(text = uiState.message)
             }
@@ -131,6 +150,10 @@ fun PoleDetailScreen(
 @Composable
 private fun PoleDetailContent(
     detail: PoleDetail,
+    onStartSurvey: () -> Unit,
+    onCreateWorkOrder: () -> Unit,
+    onViewOnMap: () -> Unit,
+    onReportFault: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -143,6 +166,13 @@ private fun PoleDetailContent(
     ) {
         PoleHeaderSection(detail)
         PriorityAlertCard(detail)
+        ActionButtonsRow(
+            detail = detail,
+            onStartSurvey = onStartSurvey,
+            onCreateWorkOrder = onCreateWorkOrder,
+            onViewOnMap = onViewOnMap,
+            onReportFault = onReportFault,
+        )
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
             OpenFaultsSection(detail.openFaults)
@@ -250,6 +280,57 @@ private fun dimAlertBody(detail: PoleDetail): String {
 private fun outAlertBody(detail: PoleDetail): String {
     val since = DateFormatUtils.formatIsoInstant(detail.determinedAt)
     return "Không phát sáng từ $since. Ảnh hưởng an toàn giao thông ban đêm."
+}
+
+// Primary CTA label/action follows fixture status; secondary is "Xem trên bản đồ" except for
+// NORMAL/UNKNOWN, where "Báo sự cố" is more useful than a map link once nothing looks wrong.
+@Composable
+private fun ActionButtonsRow(
+    detail: PoleDetail,
+    onStartSurvey: () -> Unit,
+    onCreateWorkOrder: () -> Unit,
+    onViewOnMap: () -> Unit,
+    onReportFault: () -> Unit,
+) {
+    val primaryLabel: String
+    val onPrimaryClick: () -> Unit
+    val secondaryLabel: String
+    val onSecondaryClick: () -> Unit
+    when (detail.fixtureStatus) {
+        AssetCondition.OUT -> {
+            primaryLabel = "Tạo lệnh sửa chữa"
+            onPrimaryClick = onCreateWorkOrder
+            secondaryLabel = "Xem trên bản đồ"
+            onSecondaryClick = onViewOnMap
+        }
+        AssetCondition.DIM -> {
+            primaryLabel = "Bắt đầu khảo sát"
+            onPrimaryClick = onStartSurvey
+            secondaryLabel = "Xem trên bản đồ"
+            onSecondaryClick = onViewOnMap
+        }
+        AssetCondition.NORMAL, AssetCondition.UNKNOWN -> {
+            primaryLabel = "Bắt đầu khảo sát"
+            onPrimaryClick = onStartSurvey
+            secondaryLabel = "Báo sự cố"
+            onSecondaryClick = onReportFault
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        PrimaryButton(
+            text = primaryLabel,
+            onClick = onPrimaryClick,
+            modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
+        )
+        OutlinedButton(
+            onClick = onSecondaryClick,
+            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Dimens.radiusMedium),
+            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+        ) {
+            Text(text = secondaryLabel, color = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
 
 @Composable
@@ -381,6 +462,7 @@ private fun BoxScope.MessageState(text: String) {
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
 private const val MAX_HISTORY_ROWS = 10
+private val PRIMARY_CTA_HEIGHT = 52.dp
 
 private fun sampleDetail() =
     PoleDetail(
