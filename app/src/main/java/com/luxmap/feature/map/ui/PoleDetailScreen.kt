@@ -24,8 +24,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -63,6 +70,7 @@ import com.luxmap.feature.map.data.PoleDetailFrame
 import com.luxmap.feature.map.data.PoleLuminancePoint
 import com.luxmap.feature.map.data.PoleRuntimePoint
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 // Nav-graph entry point — collects PoleDetailViewModel's state and delegates to the stateless
 // PoleDetailScreen below, which stays easy to drive with fixed data in @Preview. Also owns the
@@ -334,41 +342,75 @@ private fun ActionButtonsRow(
     }
 }
 
+// Design System v3.0.1 "Thông tin nhanh" — exactly these 5 rows (no fixture_type/"Loại đèn"
+// row, unlike the previous version). Card container matches LuminanceTrendCard's style
+// (surface + outline border) for consistency between the two cards on this screen.
 @Composable
 private fun FixtureInfoSection(detail: PoleDetail) {
-    Column {
-        Text(text = "Thông số kỹ thuật", style = MaterialTheme.typography.titleMedium)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .padding(Spacing.lg),
+    ) {
+        Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        InfoRow(label = "Loại đèn", value = detail.fixtureType)
+        InfoRow(icon = Icons.Filled.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
         InfoRow(
+            icon = if (detail.powerSource == "solar") Icons.Filled.WbSunny else Icons.Filled.Power,
             label = "Nguồn điện",
             value = if (detail.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
         )
-        InfoRow(label = "Công suất", value = "${detail.lampWatt}W")
-        InfoRow(label = "Ngày lắp đặt", value = detail.installDate)
-        InfoRow(label = "Hết bảo hành", value = detail.warrantyExpiry)
         InfoRow(
-            label = "Node IoT",
-            value = if (detail.hasIotNode) detail.iotNodeStatus ?: "-" else "Không có",
+            icon = Icons.Filled.Wifi,
+            label = "IoT",
+            value = if (detail.hasIotNode) detail.iotNodeStatus?.toIotStatusLabel() ?: "-" else "Không có",
+        )
+        InfoRow(icon = Icons.Filled.VerifiedUser, label = "Bảo hành", value = "Đến ${detail.warrantyExpiry}")
+        InfoRow(
+            icon = Icons.Filled.LocationOn,
+            label = "Vị trí",
+            value = "%.4f, %.4f".format(Locale.US, detail.lat, detail.lng),
         )
     }
 }
 
+private fun String.toIotStatusLabel(): String =
+    when (this) {
+        "online" -> "Online"
+        "offline" -> "Mất kết nối"
+        else -> this
+    }
+
+// Icon (left) + label (small, secondary) above value (bold) — matches the "Thông tin nhanh"
+// mockup, different from the label/value-on-one-line style used elsewhere on this screen.
 @Composable
 private fun InfoRow(
+    icon: ImageVector,
     label: String,
     value: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
         )
-        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(Spacing.sm))
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = value, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
