@@ -1,0 +1,95 @@
+{
+ "pole_id": "POLE-0001",
+ "segment_id": "SEG-001",
+ "segment_name": "Tuyến A - Tỉnh Lộ 8",
+ "commune_id": "COM-001",
+ "location": {
+  "lat": 10.970187,
+  "lng": 106.489639
+ },
+ "fixture": {
+  "fixture_type": "led_road_lamp",
+  "power_source": "grid",
+  "lamp_watt": 100,
+  "install_date": "2022-03-24",
+  "warranty_expiry": "2024-03-24",
+  "supplier": "SUP-001"
+ },
+ "current_status": {
+  "fixture_status": "normal",
+  "status_confidence": 0.92,
+  "determined_at": "2026-08-19T12:00:00Z",
+  "source_channel": "cv"
+ },
+ "iot_node": null,
+ "luminance_baseline": {
+  "baseline_value": 1.0,
+  "baseline_window_nights": 14,
+  "dim_threshold_ratio": 0.8,
+  "out_threshold_ratio": 0.15,
+  "computed_at": "2026-08-19T12:00:00Z"
+ },
+ "luminance_history": [
+  {
+   "observed_at": "2026-08-13T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-13-01",
+   "normalized_luminance": 0.971,
+   "baseline_ratio": 0.971,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-14T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-14-01",
+   "normalized_luminance": 0.988,
+   "baseline_ratio": 0.988,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-15T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-15-01",
+   "normalized_luminance": 0.953,
+   "baseline_ratio": 0.953,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-16T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-16-01",
+   "normalized_luminance": 1.005,
+   "baseline_ratio": 1.005,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-17T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-17-01",
+   "normalized_luminance": 0.979,
+   "baseline_ratio": 0.979,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-18T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-18-01",
+   "normalized_luminance": 0.991,
+   "baseline_ratio": 0.991,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-19T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-19-01",
+   "normalized_luminance": 0.994,
+   "baseline_ratio": 0.994,
+   "classified_as": "normal"
+  }
+ ],
+ "runtime_history": [],
+ "open_faults": [],
+ "recent_frames": [
+  {
+   "frame_id": "FRM-88301",
+   "sweep_id": "SWEEP-2026-08-19-01",
+   "captured_at": "2026-08-19T12:00:00Z",
+   "thumbnail_url": "/api/v1/frames/FRM-88301/thumbnail",
+   "distance_m": 18.2,
+   "heading_deg": 10.0
+  }
+ ]
+}

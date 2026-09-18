@@ -1,0 +1,94 @@
+{
+ "pole_id": "POLE-0014",
+ "segment_id": "SEG-001",
+ "segment_name": "Tuyến A - Tỉnh Lộ 8",
+ "commune_id": "COM-001",
+ "location": {
+  "lat": 10.972274,
+  "lng": 106.493301
+ },
+ "fixture": {
+  "fixture_type": "led_road_lamp",
+  "power_source": "grid",
+  "lamp_watt": 100,
+  "install_date": "2021-11-18",
+  "warranty_expiry": "2024-11-18",
+  "supplier": "SUP-002"
+ },
+ "current_status": {
+  "fixture_status": "out",
+  "status_confidence": 0.88,
+  "determined_at": "2026-08-19T20:00:00Z",
+  "source_channel": "cv"
+ },
+ "iot_node": null,
+ "luminance_baseline": {
+  "baseline_value": 1.0,
+  "baseline_window_nights": 14,
+  "dim_threshold_ratio": 0.8,
+  "out_threshold_ratio": 0.15,
+  "computed_at": "2026-08-19T12:00:00Z"
+ },
+ "luminance_history": [
+  {
+   "observed_at": "2026-08-13T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-13-01",
+   "normalized_luminance": 0.87,
+   "baseline_ratio": 0.87,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-14T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-14-01",
+   "normalized_luminance": 0.81,
+   "baseline_ratio": 0.81,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-15T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-15-01",
+   "normalized_luminance": 0.74,
+   "baseline_ratio": 0.74,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-16T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-16-01",
+   "normalized_luminance": 0.55,
+   "baseline_ratio": 0.55,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-17T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-17-01",
+   "normalized_luminance": 0.31,
+   "baseline_ratio": 0.31,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-18T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-18-01",
+   "normalized_luminance": 0.08,
+   "baseline_ratio": 0.08,
+   "classified_as": "out"
+  },
+  {
+   "observed_at": "2026-08-19T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-19-01",
+   "normalized_luminance": 0.0,
+   "baseline_ratio": 0.0,
+   "classified_as": "out"
+  }
+ ],
+ "runtime_history": [],
+ "open_faults": [
+  {
+   "fault_id": "FAULT-0031",
+   "fault_type": "no_light_output",
+   "severity": "high",
+   "fault_status": "detected",
+   "priority_score": 88.2
+  }
+ ],
+ "recent_frames": []
+}
