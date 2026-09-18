@@ -118,6 +118,10 @@ private val LOCATION_PERMISSIONS =
 private const val SATELLITE_MAX_ZOOM = 18.5
 private const val VECTOR_MAX_ZOOM = 20.0
 
+// What the KPI "cần xử lý" chip filters to (FM-36) — poles that need a field visit, tapping the
+// chip again restores the empty set (no filter).
+private val NEEDS_ATTENTION_STATUSES = setOf(AssetCondition.DIM, AssetCondition.OUT)
+
 // clusterProperties computes the "highest severity in the cluster" (Design System section
 // 6.10): out=3, dim=2, normal=1, unknown=0 — this property only exists on cluster features.
 private const val CLUSTER_MAX_SEVERITY_PROPERTY = "max_severity"
@@ -133,6 +137,7 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val statusFilter by viewModel.statusFilter.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     // Reference to the real map, set exactly once when ready — the LaunchedEffects below read
     // state (uiState/showFixtures/...) on every change and apply it directly to the map through
@@ -153,8 +158,8 @@ fun MapScreen(
     var showLocationTimeout by remember { mutableStateOf(false) }
     var isLocating by remember { mutableStateOf(false) }
     var isFollowingUser by remember { mutableStateOf(false) }
-    // Search bar state (F12/FM-36) — not wired to actual pole/route matching yet, that lands in a
-    // later step once the status filter behind the layer sheet below also exists.
+    // Search bar state (F12/FM-36) — not wired to actual pole/route matching yet, that is a
+    // later step; the status filter (statusFilter above) is already wired end to end.
     var searchQuery by remember { mutableStateOf("") }
     var searchTarget by remember { mutableStateOf(MapSearchTarget.POLE) }
     var showLayerFilterSheet by remember { mutableStateOf(false) }
@@ -331,12 +336,18 @@ fun MapScreen(
                     onFilterClick = { showLayerFilterSheet = true },
                 )
                 MapKpiChipRow(
-                    poleCount = uiState.polesOrEmpty().size,
+                    poleCount = uiState.allPolesOrEmpty().size,
                     needsAttentionCount =
-                        uiState.polesOrEmpty().count {
+                        uiState.allPolesOrEmpty().count {
                             it.fixtureStatus == AssetCondition.DIM || it.fixtureStatus == AssetCondition.OUT
                         },
-                    routeCount = uiState.roadSegmentsOrEmpty().size,
+                    routeCount = uiState.allRoadSegmentsOrEmpty().size,
+                    needsAttentionActive = statusFilter == NEEDS_ATTENTION_STATUSES,
+                    onNeedsAttentionClick = {
+                        viewModel.setStatusFilter(
+                            if (statusFilter == NEEDS_ATTENTION_STATUSES) emptySet() else NEEDS_ATTENTION_STATUSES,
+                        )
+                    },
                 )
             }
 
@@ -428,13 +439,20 @@ fun MapScreen(
                     onDismissRequest = { showLayerFilterSheet = false },
                     sheetState = rememberModalBottomSheetState(),
                 ) {
-                    MapLayerToggle(
-                        showFixtures = showFixtures,
-                        onShowFixturesChange = { showFixtures = it },
-                        showRoadSegments = showRoadSegments,
-                        onShowRoadSegmentsChange = { showRoadSegments = it },
-                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                    )
+                    Column {
+                        MapLayerToggle(
+                            showFixtures = showFixtures,
+                            onShowFixturesChange = { showFixtures = it },
+                            showRoadSegments = showRoadSegments,
+                            onShowRoadSegmentsChange = { showRoadSegments = it },
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                        )
+                        MapStatusFilterRow(
+                            selectedStatuses = statusFilter,
+                            onToggle = { condition -> viewModel.setStatusFilter(statusFilter.toggled(condition)) },
+                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                        )
+                    }
                 }
             }
 
@@ -490,9 +508,21 @@ fun MapScreen(
     }
 }
 
-private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.dataset?.poles.orEmpty()
+// What the map actually renders and hit-tests against — the FILTERED subset (FM-36: "Map chỉ
+// nhận danh sách đã lọc"). Use allPolesOrEmpty() below for counts that must ignore the filter
+// (the KPI chip row).
+private fun MapUiState.polesOrEmpty() = (this as? MapUiState.Success)?.filteredDataset?.poles.orEmpty()
 
-private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
+private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.filteredDataset?.segments.orEmpty()
+
+// Full, unfiltered dataset — the KPI chip row always shows the true total/needs-attention count
+// regardless of which status filter is currently active on the map.
+private fun MapUiState.allPolesOrEmpty() = (this as? MapUiState.Success)?.dataset?.poles.orEmpty()
+
+private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
+
+private fun Set<AssetCondition>.toggled(condition: AssetCondition): Set<AssetCondition> =
+    if (condition in this) this - condition else this + condition
 
 // Add every F12 source/layer onto a freshly loaded Style — used both for the first load AND
 // every time the user taps the satellite/vector basemap toggle, because map.setStyle() replaces
