@@ -112,6 +112,10 @@ private const val LOCATION_POLL_INTERVAL_MS = 500L
 // screen edge or hidden under the search bar / control stack (F12/FM-36).
 private const val SEGMENT_FIT_CAMERA_PADDING = 120
 
+// Zoom level when jumping to a pole picked from search results (F12/FM-36) — close enough to
+// clearly single it out, same idea as LOCATE_ME_ZOOM above.
+private const val SEARCH_RESULT_POLE_ZOOM = 18.0
+
 // Request both — coarse alone is still enough to show a location dot, just with a wider
 // accuracy circle (see the FAB permission check below).
 private val LOCATION_PERMISSIONS =
@@ -144,6 +148,9 @@ fun MapScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchTarget by viewModel.searchTarget.collectAsState()
+    val searchResults by viewModel.searchResults.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     // Reference to the real map, set exactly once when ready — the LaunchedEffects below read
     // state (uiState/showFixtures/...) on every change and apply it directly to the map through
@@ -165,10 +172,6 @@ fun MapScreen(
     var showLocationTimeout by remember { mutableStateOf(false) }
     var isLocating by remember { mutableStateOf(false) }
     var isFollowingUser by remember { mutableStateOf(false) }
-    // Search bar state (F12/FM-36) — not wired to actual pole/route matching yet, that is a
-    // later step; the status filter (statusFilter above) is already wired end to end.
-    var searchQuery by remember { mutableStateOf("") }
-    var searchTarget by remember { mutableStateOf(MapSearchTarget.POLE) }
     var showLayerFilterSheet by remember { mutableStateOf(false) }
     var hasLocationPermission by
         remember {
@@ -357,11 +360,33 @@ fun MapScreen(
             ) {
                 MapSearchBar(
                     query = searchQuery,
-                    onQueryChange = { searchQuery = it },
+                    onQueryChange = viewModel::setSearchQuery,
                     activeTarget = searchTarget,
-                    onTargetChange = { searchTarget = it },
+                    onTargetChange = viewModel::setSearchTarget,
                     onFilterClick = { showLayerFilterSheet = true },
                 )
+                if (searchQuery.isNotBlank()) {
+                    MapSearchResultsList(
+                        results = searchResults,
+                        onPoleClick = { pole ->
+                            selectedPole = pole
+                            maplibreMap?.animateCamera(
+                                CameraUpdateFactory.newLatLngZoom(LatLng(pole.lat, pole.lng), SEARCH_RESULT_POLE_ZOOM),
+                            )
+                            viewModel.setSearchQuery("")
+                        },
+                        onSegmentClick = { segment ->
+                            selectedSegment = segment
+                            maplibreMap?.animateCamera(
+                                CameraUpdateFactory.newLatLngBounds(
+                                    segment.toLatLngBounds(),
+                                    SEGMENT_FIT_CAMERA_PADDING,
+                                ),
+                            )
+                            viewModel.setSearchQuery("")
+                        },
+                    )
+                }
                 MapKpiChipRow(
                     poleCount = uiState.allPolesOrEmpty().size,
                     needsAttentionCount =

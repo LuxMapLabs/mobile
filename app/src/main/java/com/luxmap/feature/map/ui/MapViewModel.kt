@@ -7,10 +7,12 @@ import com.luxmap.feature.map.data.GisMapDataset
 import com.luxmap.feature.map.data.MapRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -52,6 +54,58 @@ class MapViewModel
         fun setStatusFilter(filter: Set<AssetCondition>) {
             _statusFilter.value = filter
         }
+
+        // Search (FM-36) — matches against the full dataset (see MapSearchResults) so a hidden,
+        // filtered-out pole/route can still be found and jumped to.
+        private val _searchQuery = MutableStateFlow("")
+        val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+        private val _searchTarget = MutableStateFlow(MapSearchTarget.POLE)
+        val searchTarget: StateFlow<MapSearchTarget> = _searchTarget.asStateFlow()
+
+        val searchResults: StateFlow<MapSearchResults> =
+            combine(uiState, _searchQuery, _searchTarget) { state, query, target ->
+                val dataset = (state as? MapUiState.Success)?.dataset
+                if (dataset == null || query.isBlank()) {
+                    MapSearchResults()
+                } else {
+                    dataset.matching(query, target)
+                }
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(SEARCH_RESULTS_STOP_TIMEOUT_MS),
+                MapSearchResults(),
+            )
+
+        fun setSearchQuery(query: String) {
+            _searchQuery.value = query
+        }
+
+        fun setSearchTarget(target: MapSearchTarget) {
+            _searchTarget.value = target
+        }
+
+        private companion object {
+            const val SEARCH_RESULTS_STOP_TIMEOUT_MS = 5_000L
+        }
+    }
+
+private fun GisMapDataset.matching(
+    query: String,
+    target: MapSearchTarget,
+): MapSearchResults =
+    when (target) {
+        MapSearchTarget.POLE ->
+            MapSearchResults(poles = poles.filter { it.poleId.contains(query, ignoreCase = true) })
+        MapSearchTarget.ROUTE ->
+            MapSearchResults(
+                segments =
+                    segments.filter {
+                        it.name.contains(query, ignoreCase = true) || it.segmentId.contains(query, ignoreCase = true)
+                    },
+            )
+        // Not wired yet — see FM-35 note, "atlas" is not a confirmed field/endpoint.
+        MapSearchTarget.ATLAS -> MapSearchResults()
     }
 
 private fun GisMapDataset.filterByStatus(filter: Set<AssetCondition>): GisMapDataset =
