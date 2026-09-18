@@ -63,10 +63,12 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.PoleMarker
+import com.luxmap.feature.map.data.RoadSegmentLine
 import kotlinx.coroutines.delay
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.OnCameraTrackingChangedListener
@@ -105,6 +107,10 @@ private const val LOCATE_ME_ZOOM = 17.0
 private const val LOCATE_CAMERA_TRANSITION_MS = 750L
 private const val LOCATION_TIMEOUT_MS = 10_000L
 private const val LOCATION_POLL_INTERVAL_MS = 500L
+
+// Padding (px) around a tapped/searched route's bounds so it doesn't end up flush against the
+// screen edge or hidden under the search bar / control stack (F12/FM-36).
+private const val SEGMENT_FIT_CAMERA_PADDING = 120
 
 // Request both — coarse alone is still enough to show a location dot, just with a wider
 // accuracy circle (see the FAB permission check below).
@@ -146,6 +152,7 @@ fun MapScreen(
     // `update` in practice only runs once — setting things directly in it won't react later.
     var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
+    var selectedSegment by remember { mutableStateOf<RoadSegmentLine?>(null) }
     var showFixtures by remember { mutableStateOf(true) }
     var showRoadSegments by remember { mutableStateOf(true) }
     // Vector (OpenFreeMap) is the default for field operation — always sharp, no API key needed.
@@ -228,7 +235,7 @@ fun MapScreen(
                             // LaunchedEffects reacting to state don't run before the layers exist.
                             maplibreMap = map
                         }
-                        map.addOnMapClickListener { latLng ->
+                        map.addOnMapClickListener addOnMapClickListener@{ latLng ->
                             val screenPoint = map.projection.toScreenLocation(latLng)
                             val tappedPoleId =
                                 map
@@ -241,10 +248,30 @@ fun MapScreen(
                                 }
                             if (tappedPole != null) {
                                 selectedPole = tappedPole
-                                true
-                            } else {
-                                false
+                                return@addOnMapClickListener true
                             }
+
+                            val tappedSegmentId =
+                                map
+                                    .queryRenderedFeatures(screenPoint, ROAD_SEGMENTS_LINE_LAYER_ID)
+                                    .firstOrNull()
+                                    ?.getStringProperty("segment_id")
+                            val tappedSegment =
+                                tappedSegmentId?.let { id ->
+                                    uiState.roadSegmentsOrEmpty().firstOrNull { it.segmentId == id }
+                                }
+                            if (tappedSegment != null) {
+                                selectedSegment = tappedSegment
+                                map.animateCamera(
+                                    CameraUpdateFactory.newLatLngBounds(
+                                        tappedSegment.toLatLngBounds(),
+                                        SEGMENT_FIT_CAMERA_PADDING,
+                                    ),
+                                )
+                                return@addOnMapClickListener true
+                            }
+
+                            false
                         }
                     } else {
                         maplibreMap = map
@@ -506,6 +533,14 @@ fun MapScreen(
             },
         )
     }
+
+    selectedSegment?.let { segment ->
+        RoadSegmentQuickViewBottomSheet(
+            segment = segment,
+            visiblePoleCount = uiState.polesOrEmpty().count { it.segmentId == segment.segmentId },
+            onDismiss = { selectedSegment = null },
+        )
+    }
 }
 
 // What the map actually renders and hit-tests against — the FILTERED subset (FM-36: "Map chỉ
@@ -523,6 +558,12 @@ private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?
 
 private fun Set<AssetCondition>.toggled(condition: AssetCondition): Set<AssetCondition> =
     if (condition in this) this - condition else this + condition
+
+private fun RoadSegmentLine.toLatLngBounds(): LatLngBounds {
+    val builder = LatLngBounds.Builder()
+    coordinates.forEach { (lng, lat) -> builder.include(LatLng(lat, lng)) }
+    return builder.build()
+}
 
 // Add every F12 source/layer onto a freshly loaded Style — used both for the first load AND
 // every time the user taps the satellite/vector basemap toggle, because map.setStyle() replaces
