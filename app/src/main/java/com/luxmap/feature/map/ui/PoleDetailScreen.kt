@@ -1,5 +1,9 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +11,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,42 +21,68 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleDetailFault
 import com.luxmap.feature.map.data.PoleDetailFrame
 import com.luxmap.feature.map.data.PoleLuminancePoint
 import com.luxmap.feature.map.data.PoleRuntimePoint
+import kotlinx.coroutines.launch
+import java.util.Locale
 
 // Nav-graph entry point — collects PoleDetailViewModel's state and delegates to the stateless
-// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview.
+// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview. Also owns the
+// SnackbarHostState: actions that have no destination screen yet (menu, CTA, "xem lịch sử đầy
+// đủ"...) call showNotImplemented instead of doing nothing — the callback params on
+// PoleDetailScreen stay public so a caller can override any one of them once its target screen
+// exists, without touching this wiring.
 @Composable
 fun PoleDetailRoute(
     onBack: () -> Unit,
@@ -59,7 +90,24 @@ fun PoleDetailRoute(
     viewModel: PoleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    PoleDetailScreen(uiState = uiState, onBack = onBack, modifier = modifier)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val showNotImplemented: () -> Unit = {
+        scope.launch { snackbarHostState.showSnackbar("Chức năng đang được hoàn thiện") }
+    }
+    PoleDetailScreen(
+        uiState = uiState,
+        onBack = onBack,
+        onOpenMenu = showNotImplemented,
+        onOpenRouteToSurvey = showNotImplemented,
+        onCreateWorkOrder = showNotImplemented,
+        onViewLocation = showNotImplemented,
+        onViewFullHistory = showNotImplemented,
+        onOpenFault = { showNotImplemented() },
+        onViewAllFrames = showNotImplemented,
+        snackbarHostState = snackbarHostState,
+        modifier = modifier,
+    )
 }
 
 // FM-27 — chi tiết cột đèn mở từ bản đồ (mở rộng từ PoleQuickViewBottomSheet), tách khỏi
@@ -70,9 +118,18 @@ fun PoleDetailScreen(
     uiState: PoleDetailUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenMenu: () -> Unit = {},
+    onOpenRouteToSurvey: () -> Unit = {},
+    onCreateWorkOrder: () -> Unit = {},
+    onViewLocation: () -> Unit = {},
+    onViewFullHistory: () -> Unit = {},
+    onOpenFault: (faultId: String) -> Unit = {},
+    onViewAllFrames: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Chi tiết cột đèn") },
@@ -81,13 +138,27 @@ fun PoleDetailScreen(
                         Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
                     }
                 },
+                actions = {
+                    IconButton(onClick = onOpenMenu) {
+                        Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Thêm")
+                    }
+                },
             )
         },
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
                 is PoleDetailUiState.Loading -> LoadingState()
-                is PoleDetailUiState.Success -> PoleDetailContent(detail = uiState.detail)
+                is PoleDetailUiState.Success ->
+                    PoleDetailContent(
+                        detail = uiState.detail,
+                        onOpenRouteToSurvey = onOpenRouteToSurvey,
+                        onCreateWorkOrder = onCreateWorkOrder,
+                        onViewLocation = onViewLocation,
+                        onViewFullHistory = onViewFullHistory,
+                        onOpenFault = onOpenFault,
+                        onViewAllFrames = onViewAllFrames,
+                    )
                 is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
                 is PoleDetailUiState.Error -> MessageState(text = uiState.message)
             }
@@ -98,6 +169,12 @@ fun PoleDetailScreen(
 @Composable
 private fun PoleDetailContent(
     detail: PoleDetail,
+    onOpenRouteToSurvey: () -> Unit,
+    onCreateWorkOrder: () -> Unit,
+    onViewLocation: () -> Unit,
+    onViewFullHistory: () -> Unit,
+    onOpenFault: (faultId: String) -> Unit,
+    onViewAllFrames: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -109,17 +186,21 @@ private fun PoleDetailContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
         PoleHeaderSection(detail)
+        PriorityAlertCard(detail)
+        ActionButtonsRow(
+            detail = detail,
+            onOpenRouteToSurvey = onOpenRouteToSurvey,
+            onCreateWorkOrder = onCreateWorkOrder,
+            onViewLocation = onViewLocation,
+        )
+        LuminanceTrendCard(detail = detail, onViewFullHistory = onViewFullHistory)
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
-            OpenFaultsSection(detail.openFaults)
+            OpenFaultsSection(faults = detail.openFaults, onOpenFault = onOpenFault)
         }
-        LuminanceHistorySection(detail.luminanceHistory)
-        if (detail.runtimeHistory.isNotEmpty()) {
-            RuntimeHistorySection(detail.runtimeHistory)
-        }
-        if (detail.recentFrames.isNotEmpty()) {
-            RecentFramesSection(detail.recentFrames)
-        }
+        // Always shown, even when empty — a small empty state instead of skipping the
+        // section entirely (Design System v3.0.1: "không để khoảng trống lớn").
+        RecentFramesSection(frames = detail.recentFrames, onViewAllFrames = onViewAllFrames)
     }
 }
 
@@ -127,7 +208,9 @@ private fun PoleDetailContent(
 private fun PoleHeaderSection(detail: PoleDetail) {
     val isDark = isSystemInDarkTheme()
     Column {
-        Text(text = detail.poleId, style = MaterialTheme.typography.titleLarge)
+        // Design System v3.0.1: pole code is the biggest, boldest text on the screen — field
+        // crew must recognize which pole this is in under 2 seconds.
+        Text(text = detail.poleId, style = MaterialTheme.typography.displayLarge)
         Spacer(Modifier.height(Spacing.xs))
         Text(
             text = detail.segmentName,
@@ -135,130 +218,383 @@ private fun PoleHeaderSection(detail: PoleDetail) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(Spacing.sm))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusBadge(text = detail.fixtureStatus.label(), colors = detail.fixtureStatus.badgeColors(isDark))
-            Spacer(Modifier.width(Spacing.sm))
-            // status_confidence — how sure the CV/IoT channel is about this status, shown as
-            // metadata next to the badge, not as its own colored indicator.
-            Text(
-                text = "Độ tin cậy ${(detail.statusConfidence * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        StatusBadge(
+            text = detail.fixtureStatus.label().uppercase(),
+            colors = detail.fixtureStatus.badgeColors(isDark),
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        val updatedAt = DateFormatUtils.formatIsoInstant(detail.determinedAt)
+        val sourceLabel = detail.sourceChannel.toSourceChannelLabel()
+        Text(
+            text = "Cập nhật $updatedAt · Phát hiện từ $sourceLabel",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun String.toSourceChannelLabel(): String =
+    when (this) {
+        "cv" -> "AI/CV"
+        "iot" -> "Cảm biến IoT"
+        else -> this
+    }
+
+// Design System v3.0.1: priority alert card, colored/worded by fixture status. Hidden for
+// NORMAL and UNKNOWN — nothing urgent to surface, so no card is emitted at all (not an empty
+// one), which also means PoleDetailContent's spacedBy() adds no extra gap for it.
+@Composable
+private fun PriorityAlertCard(detail: PoleDetail) {
+    val isDark = isSystemInDarkTheme()
+    val title: String
+    val body: String
+    when (detail.fixtureStatus) {
+        AssetCondition.DIM -> {
+            title = "Cần kiểm tra trong ca làm việc"
+            body = dimAlertBody(detail)
+        }
+        AssetCondition.OUT -> {
+            title = "Cần xử lý ngay — đèn đang tắt"
+            body = outAlertBody(detail)
+        }
+        AssetCondition.NORMAL, AssetCondition.UNKNOWN -> return
+    }
+    val colors = detail.fixtureStatus.badgeColors(isDark)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(colors.background, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, colors.text.copy(alpha = 0.35f), RoundedCornerShape(Dimens.radiusMedium))
+                .padding(Spacing.lg),
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = colors.text,
+                modifier = Modifier.size(24.dp),
             )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(text = title, style = MaterialTheme.typography.labelLarge, color = colors.text)
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(text = body, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+    }
+}
+
+// baseline_ratio of the latest luminance point — same value the trend chart's endpoint dot
+// shows — falls back to a percentage-free sentence when there is no history yet.
+private fun dimAlertBody(detail: PoleDetail): String {
+    val latestPercent = detail.luminanceHistory.lastOrNull()?.let { (it.baselineRatio * 100).toInt() }
+    return if (latestPercent != null) {
+        "Độ sáng còn $latestPercent% so với mức chuẩn. Đèn có dấu hiệu suy giảm quang thông."
+    } else {
+        "Đèn có dấu hiệu suy giảm quang thông so với mức chuẩn, cần kiểm tra."
+    }
+}
+
+private fun outAlertBody(detail: PoleDetail): String {
+    val since = DateFormatUtils.formatIsoInstant(detail.determinedAt)
+    return "Không phát sáng từ $since. Ảnh hưởng an toàn giao thông ban đêm."
+}
+
+// FM-27 chỉ hiển thị dữ liệu/kết quả AI của cột — không có hành động khảo sát trực tiếp
+// (không có "Bắt đầu khảo sát"/"Báo sự cố" ở đây). CTA chỉ đưa người dùng sang màn khác:
+// mở tuyến để lên kế hoạch khảo sát lại (F03), tạo lệnh sửa chữa, hoặc xem vị trí cột.
+// NORMAL không có gì bất thường nên chỉ có 1 nút xem vị trí, không có CTA hành động.
+@Composable
+private fun ActionButtonsRow(
+    detail: PoleDetail,
+    onOpenRouteToSurvey: () -> Unit,
+    onCreateWorkOrder: () -> Unit,
+    onViewLocation: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        when (detail.fixtureStatus) {
+            AssetCondition.OUT -> {
+                PrimaryButton(
+                    text = "Tạo lệnh sửa chữa",
+                    onClick = onCreateWorkOrder,
+                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
+                )
+                SecondaryOutlinedButton(text = "Mở tuyến để khảo sát lại", onClick = onOpenRouteToSurvey)
+            }
+            AssetCondition.DIM, AssetCondition.UNKNOWN -> {
+                PrimaryButton(
+                    text = "Mở tuyến để khảo sát lại",
+                    onClick = onOpenRouteToSurvey,
+                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
+                )
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+            }
+            AssetCondition.NORMAL -> {
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+            }
         }
     }
 }
 
 @Composable
+private fun SecondaryOutlinedButton(
+    text: String,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+        shape = RoundedCornerShape(Dimens.radiusMedium),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+    ) {
+        Text(text = text, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
+// Design System v3.0.1 "Thông tin nhanh" — exactly these 5 rows (no fixture_type/"Loại đèn"
+// row, unlike the previous version). Card container matches LuminanceTrendCard's style
+// (surface + outline border) for consistency between the two cards on this screen.
+@Composable
 private fun FixtureInfoSection(detail: PoleDetail) {
-    Column {
-        Text(text = "Thông số kỹ thuật", style = MaterialTheme.typography.titleMedium)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .padding(Spacing.lg),
+    ) {
+        Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        InfoRow(label = "Loại đèn", value = detail.fixtureType)
+        InfoRow(icon = Icons.Filled.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
         InfoRow(
+            icon = if (detail.powerSource == "solar") Icons.Filled.WbSunny else Icons.Filled.Power,
             label = "Nguồn điện",
             value = if (detail.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
         )
-        InfoRow(label = "Công suất", value = "${detail.lampWatt}W")
-        InfoRow(label = "Ngày lắp đặt", value = detail.installDate)
-        InfoRow(label = "Hết bảo hành", value = detail.warrantyExpiry)
         InfoRow(
-            label = "Node IoT",
-            value = if (detail.hasIotNode) detail.iotNodeStatus ?: "-" else "Không có",
+            icon = Icons.Filled.Wifi,
+            label = "IoT",
+            value = if (detail.hasIotNode) detail.toIotValueLabel() else "Không có",
+        )
+        InfoRow(
+            icon = Icons.Filled.VerifiedUser,
+            label = "Bảo hành",
+            value = "Đến ${DateFormatUtils.formatPlainDate(detail.warrantyExpiry)}",
+        )
+        InfoRow(
+            icon = Icons.Filled.LocationOn,
+            label = "Vị trí",
+            value = "%.4f, %.4f".format(Locale.US, detail.lat, detail.lng),
         )
     }
 }
 
+private fun String.toIotStatusLabel(): String =
+    when (this) {
+        "online" -> "Online"
+        "offline" -> "Mất kết nối"
+        else -> this
+    }
+
+// "Online · báo 06:00, 20/08/2026" — status label + last_report_at. Uses the absolute
+// formatter (not a relative "X giờ trước") to avoid adding separate duration-math logic; the
+// mockup's "báo 2 giờ trước" wording is a nice-to-have, not required for this pass.
+private fun PoleDetail.toIotValueLabel(): String {
+    val statusLabel = iotNodeStatus?.toIotStatusLabel() ?: "-"
+    val lastReport = DateFormatUtils.formatIsoInstant(iotLastReportAt)
+    return "$statusLabel · báo $lastReport"
+}
+
+// Icon (left) + label (small, secondary) above value (bold) — matches the "Thông tin nhanh"
+// mockup, different from the label/value-on-one-line style used elsewhere on this screen.
 @Composable
 private fun InfoRow(
+    icon: ImageVector,
     label: String,
     value: String,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
         )
-        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.width(Spacing.sm))
+        Column {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = value, style = MaterialTheme.typography.labelLarge)
+        }
     }
 }
 
+// Design System v3.0.1: each fault is its own tappable card (icon + translated title +
+// translated "severity · status" + chevron), title carries the count. Translation functions
+// have an `else -> this` fallback since the full backend enum isn't known yet.
 @Composable
-private fun OpenFaultsSection(faults: List<PoleDetailFault>) {
+private fun OpenFaultsSection(
+    faults: List<PoleDetailFault>,
+    onOpenFault: (faultId: String) -> Unit,
+) {
     Column {
-        Text(text = "Sự cố đang mở", style = MaterialTheme.typography.titleMedium)
+        Text(text = "Sự cố đang mở (${faults.size})", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        faults.forEach { fault ->
-            Column(modifier = Modifier.padding(vertical = Spacing.xs)) {
-                Text(text = fault.faultType, style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "${fault.severity} · ${fault.faultStatus}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            faults.forEach { fault ->
+                FaultCard(fault = fault, onClick = { onOpenFault(fault.faultId) })
             }
         }
     }
 }
 
-// Placeholder list, not a chart yet — charting approach (custom Canvas vs. a new library) is
-// still open, decide when this section gets wired to real rendering.
 @Composable
-private fun LuminanceHistorySection(history: List<PoleLuminancePoint>) {
-    Column {
-        Text(text = "Lịch sử độ sáng", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Spacing.sm))
-        if (history.isEmpty()) {
+private fun FaultCard(
+    fault: PoleDetailFault,
+    onClick: () -> Unit,
+) {
+    val isDark = isSystemInDarkTheme()
+    // Reuse OUT's badge colors for the icon circle — a fault card is always in the "something's
+    // wrong" tone regardless of the pole's overall fixture_status.
+    val colors = AssetCondition.OUT.badgeColors(isDark)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .clickable(onClick = onClick)
+                .padding(Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(FAULT_ICON_SIZE).background(colors.background, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                tint = colors.text,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(Spacing.sm))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = fault.faultType.toFaultTypeLabel(), style = MaterialTheme.typography.labelLarge)
+            val severityLabel = fault.severity.toSeverityLabel()
+            val statusLabel = fault.faultStatus.toFaultStatusLabel()
             Text(
-                text = "Chưa có dữ liệu",
+                text = "$severityLabel · $statusLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = "Mở chi tiết sự cố",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun String.toFaultTypeLabel(): String =
+    when (this) {
+        "runtime_decline" -> "Suy giảm thời gian chiếu sáng"
+        "no_light_output" -> "Mất tín hiệu ánh sáng"
+        else -> this
+    }
+
+private fun String.toSeverityLabel(): String =
+    when (this) {
+        "low" -> "Mức thấp"
+        "medium" -> "Mức trung bình"
+        "high" -> "Mức cao"
+        else -> this
+    }
+
+private fun String.toFaultStatusLabel(): String =
+    when (this) {
+        "detected" -> "Đã phát hiện"
+        "confirmed" -> "Đã xác nhận"
+        "resolved" -> "Đã xử lý"
+        else -> this
+    }
+
+// Always rendered, even with 0 frames — shows a small empty state instead of the section
+// disappearing entirely (Design System v3.0.1: "không để khoảng trống lớn").
+@Composable
+private fun RecentFramesSection(
+    frames: List<PoleDetailFrame>,
+    onViewAllFrames: () -> Unit,
+) {
+    Column {
+        Text(text = "Ảnh khảo sát gần đây", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(Spacing.sm))
+        if (frames.isEmpty()) {
+            Text(
+                text = "Chưa có ảnh khảo sát",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            history.takeLast(MAX_HISTORY_ROWS).reversed().forEach { point ->
-                InfoRow(
-                    label = point.observedAt,
-                    value = "${(point.baselineRatio * 100).toInt()}% (${point.classifiedAs.label()})",
-                )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items(frames) { frame -> FrameThumbnail(frame) }
+                item { ViewMoreFramesTile(onClick = onViewAllFrames) }
             }
         }
     }
 }
 
 @Composable
-private fun RuntimeHistorySection(history: List<PoleRuntimePoint>) {
-    Column {
-        Text(text = "Lịch sử thời gian chiếu sáng", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Spacing.sm))
-        history.takeLast(MAX_HISTORY_ROWS).reversed().forEach { point ->
-            InfoRow(label = point.nightOf, value = "${point.runtimeHours}h")
+private fun FrameThumbnail(frame: PoleDetailFrame) {
+    Box(modifier = Modifier.size(FRAME_THUMBNAIL_SIZE).clip(RoundedCornerShape(Dimens.radiusSmall))) {
+        // Not tappable yet — whether tapping should open a full-size image needs BE-20's real
+        // thumbnail_url behavior confirmed first (see FM-27 note).
+        AsyncImage(
+            model = frame.thumbnailUrl,
+            contentDescription = "Ảnh khảo sát ${frame.capturedAt}",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(FrameDateOverlayColor)
+                    .padding(horizontal = Spacing.xs, vertical = 4.dp),
+        ) {
+            Text(
+                text = DateFormatUtils.formatIsoDateOnly(frame.capturedAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+            )
         }
     }
 }
 
 @Composable
-private fun RecentFramesSection(frames: List<PoleDetailFrame>) {
-    Column {
-        Text(text = "Ảnh khảo sát gần đây", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(Spacing.sm))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            items(frames) { frame ->
-                // Not tappable yet — whether tapping should open a full-size image needs
-                // BE-20's real thumbnail_url behavior confirmed first (see FM-27 note).
-                AsyncImage(
-                    model = frame.thumbnailUrl,
-                    contentDescription = "Ảnh khảo sát ${frame.capturedAt}",
-                    modifier =
-                        Modifier
-                            .size(FRAME_THUMBNAIL_SIZE)
-                            .clip(RoundedCornerShape(Dimens.radiusSmall)),
-                )
-            }
-        }
+private fun ViewMoreFramesTile(onClick: () -> Unit) {
+    Box(
+        modifier =
+            Modifier
+                .size(FRAME_THUMBNAIL_SIZE)
+                .clip(RoundedCornerShape(Dimens.radiusSmall))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "Xem thêm",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -277,13 +613,20 @@ private fun BoxScope.MessageState(text: String) {
 }
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
-private const val MAX_HISTORY_ROWS = 10
+private val PRIMARY_CTA_HEIGHT = 52.dp
+private val FAULT_ICON_SIZE = 36.dp
+private val FrameDateOverlayColor = Color.Black.copy(alpha = 0.55f)
 
-private fun sampleDetail() =
+// 3 variants match the 3 real mock-pole-detail-POLE-*.json files 1:1 (same poleId, values,
+// history) so these previews show exactly what the app renders for those poles on-device.
+
+private fun sampleDetailDim() =
     PoleDetail(
         poleId = "POLE-0047",
         segmentId = "SEG-002",
-        segmentName = "Tuyến B - đường liên xã",
+        segmentName = "Tuyến B - Nguyễn Văn Ni",
+        lat = 10.964558,
+        lng = 106.495788,
         fixtureType = "solar_all_in_one",
         powerSource = "solar",
         lampWatt = 60,
@@ -292,10 +635,17 @@ private fun sampleDetail() =
         fixtureStatus = AssetCondition.DIM,
         statusConfidence = 0.81,
         determinedAt = "2026-08-19T12:00:00Z",
+        sourceChannel = "cv",
         hasIotNode = true,
         iotNodeStatus = "online",
+        iotLastReportAt = "2026-08-20T06:00:00Z",
         luminanceHistory =
             listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.818, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.814, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.812, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 0.762, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.729, AssetCondition.DIM),
                 PoleLuminancePoint("2026-08-18T20:00:00Z", 0.706, AssetCondition.DIM),
                 PoleLuminancePoint("2026-08-19T20:00:00Z", 0.733, AssetCondition.DIM),
             ),
@@ -314,16 +664,102 @@ private fun sampleDetail() =
             ),
     )
 
+private fun sampleDetailNormal() =
+    PoleDetail(
+        poleId = "POLE-0001",
+        segmentId = "SEG-001",
+        segmentName = "Tuyến A - Tỉnh Lộ 8",
+        lat = 10.970187,
+        lng = 106.489639,
+        fixtureType = "led_road_lamp",
+        powerSource = "grid",
+        lampWatt = 100,
+        installDate = "2022-03-24",
+        warrantyExpiry = "2024-03-24",
+        fixtureStatus = AssetCondition.NORMAL,
+        statusConfidence = 0.92,
+        determinedAt = "2026-08-19T12:00:00Z",
+        sourceChannel = "cv",
+        hasIotNode = false,
+        iotNodeStatus = null,
+        iotLastReportAt = null,
+        luminanceHistory =
+            listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.971, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.988, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.953, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 1.005, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.979, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-18T20:00:00Z", 0.991, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-19T20:00:00Z", 0.994, AssetCondition.NORMAL),
+            ),
+        runtimeHistory = emptyList(),
+        openFaults = emptyList(),
+        recentFrames =
+            listOf(
+                PoleDetailFrame("FRM-88301", "2026-08-19T12:00:00Z", "/api/v1/frames/FRM-88301/thumbnail"),
+            ),
+    )
+
+private fun sampleDetailOut() =
+    PoleDetail(
+        poleId = "POLE-0014",
+        segmentId = "SEG-001",
+        segmentName = "Tuyến A - Tỉnh Lộ 8",
+        lat = 10.972274,
+        lng = 106.493301,
+        fixtureType = "led_road_lamp",
+        powerSource = "grid",
+        lampWatt = 100,
+        installDate = "2021-11-18",
+        warrantyExpiry = "2024-11-18",
+        fixtureStatus = AssetCondition.OUT,
+        statusConfidence = 0.88,
+        determinedAt = "2026-08-19T20:00:00Z",
+        sourceChannel = "cv",
+        hasIotNode = false,
+        iotNodeStatus = null,
+        iotLastReportAt = null,
+        luminanceHistory =
+            listOf(
+                PoleLuminancePoint("2026-08-13T20:00:00Z", 0.87, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-14T20:00:00Z", 0.81, AssetCondition.NORMAL),
+                PoleLuminancePoint("2026-08-15T20:00:00Z", 0.74, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-16T20:00:00Z", 0.55, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-17T20:00:00Z", 0.31, AssetCondition.DIM),
+                PoleLuminancePoint("2026-08-18T20:00:00Z", 0.08, AssetCondition.OUT),
+                PoleLuminancePoint("2026-08-19T20:00:00Z", 0.0, AssetCondition.OUT),
+            ),
+        runtimeHistory = emptyList(),
+        openFaults =
+            listOf(
+                PoleDetailFault("FAULT-0031", "no_light_output", "high", "detected"),
+            ),
+        recentFrames = emptyList(),
+    )
+
 @Preview(showBackground = true)
 @Composable
 private fun PoleDetailScreenLoadingPreview() {
     PoleDetailScreen(uiState = PoleDetailUiState.Loading, onBack = {})
 }
 
-@Preview(showBackground = true, heightDp = 1200)
+@Preview(name = "Success - Dim", showBackground = true, heightDp = 1400)
 @Composable
-private fun PoleDetailScreenSuccessPreview() {
-    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetail()), onBack = {})
+private fun PoleDetailScreenDimPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailDim()), onBack = {})
+}
+
+@Preview(name = "Success - Normal", showBackground = true, heightDp = 1200)
+@Composable
+private fun PoleDetailScreenNormalPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailNormal()), onBack = {})
+}
+
+@Preview(name = "Success - Out", showBackground = true, heightDp = 1300)
+@Composable
+private fun PoleDetailScreenOutPreview() {
+    PoleDetailScreen(uiState = PoleDetailUiState.Success(detail = sampleDetailOut()), onBack = {})
 }
 
 @Preview(showBackground = true)

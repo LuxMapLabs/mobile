@@ -1,5 +1,6 @@
 package com.luxmap.feature.map.data
 
+import com.luxmap.BuildConfig
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.feature.map.data.dto.PoleDetailDto
 import com.luxmap.feature.map.data.dto.PoleDetailFaultDto
@@ -14,6 +15,8 @@ data class PoleDetail(
     val poleId: String,
     val segmentId: String,
     val segmentName: String,
+    val lat: Double,
+    val lng: Double,
     val fixtureType: String,
     val powerSource: String,
     val lampWatt: Int,
@@ -22,8 +25,10 @@ data class PoleDetail(
     val fixtureStatus: AssetCondition,
     val statusConfidence: Double,
     val determinedAt: String,
+    val sourceChannel: String,
     val hasIotNode: Boolean,
     val iotNodeStatus: String?,
+    val iotLastReportAt: String?,
     val luminanceHistory: List<PoleLuminancePoint>,
     val runtimeHistory: List<PoleRuntimePoint>,
     val openFaults: List<PoleDetailFault>,
@@ -59,6 +64,8 @@ fun PoleDetailDto.toPoleDetail(): PoleDetail =
         poleId = poleId,
         segmentId = segmentId,
         segmentName = segmentName,
+        lat = location.lat,
+        lng = location.lng,
         fixtureType = fixture.fixtureType,
         powerSource = fixture.powerSource,
         lampWatt = fixture.lampWatt,
@@ -67,8 +74,10 @@ fun PoleDetailDto.toPoleDetail(): PoleDetail =
         fixtureStatus = currentStatus.fixtureStatus.toAssetCondition(),
         statusConfidence = currentStatus.statusConfidence,
         determinedAt = currentStatus.determinedAt,
+        sourceChannel = currentStatus.sourceChannel,
         hasIotNode = iotNode != null,
         iotNodeStatus = iotNode?.nodeStatus,
+        iotLastReportAt = iotNode?.lastReportAt,
         luminanceHistory = luminanceHistory.map { it.toPoleLuminancePoint() },
         runtimeHistory = runtimeHistory.map { it.toPoleRuntimePoint() },
         openFaults = openFaults.map { it.toPoleDetailFault() },
@@ -89,7 +98,7 @@ private fun PoleDetailFaultDto.toPoleDetailFault() =
     PoleDetailFault(faultId = faultId, faultType = faultType, severity = severity, faultStatus = faultStatus)
 
 private fun PoleDetailFrameDto.toPoleDetailFrame() =
-    PoleDetailFrame(frameId = frameId, capturedAt = capturedAt, thumbnailUrl = thumbnailUrl)
+    PoleDetailFrame(frameId = frameId, capturedAt = capturedAt, thumbnailUrl = thumbnailUrl.toAbsoluteUrl())
 
 private fun String.toAssetCondition(): AssetCondition =
     when (this) {
@@ -98,3 +107,13 @@ private fun String.toAssetCondition(): AssetCondition =
         "out" -> AssetCondition.OUT
         else -> AssetCondition.UNKNOWN
     }
+
+// Backend returns thumbnail_url as a path relative to the API host ("/api/v1/frames/.../
+// thumbnail"), not a full URL — Coil needs an absolute one to actually load it. Left as-is if
+// it's already absolute, so this stays safe if the backend starts returning full URLs later.
+private fun String.toAbsoluteUrl(): String {
+    if (startsWith("http://") || startsWith("https://")) return this
+    val base = BuildConfig.API_BASE_URL.trimEnd('/')
+    val path = if (startsWith("/")) this else "/$this"
+    return base + path
+}

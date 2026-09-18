@@ -31,7 +31,12 @@ class PoleDetailViewModel
                     .catch { e ->
                         _uiState.value = PoleDetailUiState.Error(e.message ?: "Không tải được dữ liệu cột đèn")
                     }.collect { detail ->
-                        _uiState.value = PoleDetailUiState.Success(detail = detail)
+                        _uiState.value =
+                            if (detail == null) {
+                                PoleDetailUiState.Empty
+                            } else {
+                                PoleDetailUiState.Success(detail = detail)
+                            }
                     }
             }
         }
