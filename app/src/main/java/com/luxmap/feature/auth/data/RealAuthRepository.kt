@@ -25,9 +25,6 @@ class RealAuthRepository
             password: String,
             rememberMe: Boolean,
         ): Result<Unit> {
-            if (identifier.isBlank() || password.isBlank()) {
-                return Result.failure(IllegalArgumentException("Vui lòng nhập đầy đủ thông tin"))
-            }
             return runCatching { authApi.login(LoginRequestDto(identifier, password)) }
                 .fold(
                     onSuccess = { tokens ->
@@ -40,7 +37,7 @@ class RealAuthRepository
                         )
                         Result.success(Unit)
                     },
-                    onFailure = { error -> Result.failure(IllegalStateException(messageFor(error))) },
+                    onFailure = { error -> Result.failure(failureFor(error)) },
                 )
         }
 
@@ -61,18 +58,23 @@ class RealAuthRepository
 
         override fun observeUsername(): Flow<String?> = tokenStore.observeUsername()
 
-        private fun messageFor(error: Throwable): String =
+        private fun failureFor(error: Throwable): LoginFailedException =
             when (error) {
-                is HttpException -> messageForHttpError(error)
-                is IOException -> NETWORK_ERROR_MESSAGE
-                else -> GENERIC_ERROR_MESSAGE
+                is HttpException -> failureForHttpError(error)
+                is IOException -> LoginFailedException(LoginFailureReason.Network, NETWORK_ERROR_MESSAGE)
+                else -> LoginFailedException(LoginFailureReason.Unknown, GENERIC_ERROR_MESSAGE)
             }
 
-        private fun messageForHttpError(error: HttpException): String =
+        private fun failureForHttpError(error: HttpException): LoginFailedException =
             when (errorCodeFrom(error)) {
-                "INVALID_CREDENTIALS" -> "Sai tên đăng nhập hoặc mật khẩu."
-                "ACCOUNT_LOCKED" -> "Tài khoản đang bị khoá. Liên hệ quản trị viên."
-                else -> GENERIC_ERROR_MESSAGE
+                "INVALID_CREDENTIALS" ->
+                    LoginFailedException(LoginFailureReason.InvalidCredentials, "Sai tên đăng nhập hoặc mật khẩu.")
+                "ACCOUNT_LOCKED" ->
+                    LoginFailedException(
+                        LoginFailureReason.AccountLocked,
+                        "Tài khoản đang bị khoá. Liên hệ quản trị viên.",
+                    )
+                else -> LoginFailedException(LoginFailureReason.Unknown, GENERIC_ERROR_MESSAGE)
             }
 
         private fun errorCodeFrom(error: HttpException): String? =

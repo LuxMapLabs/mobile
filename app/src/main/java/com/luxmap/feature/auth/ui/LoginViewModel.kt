@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.auth.data.AuthRepository
+import com.luxmap.feature.auth.data.LoginFailedException
+import com.luxmap.feature.auth.data.LoginFailureReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,10 +62,17 @@ class LoginViewModel
 
         fun onIdentifierChange(value: String) {
             identifier = value
+            clearError()
         }
 
         fun onPasswordChange(value: String) {
             password = value
+            clearError()
+        }
+
+        // Once the user starts to fix the form the old error is out of date, so remove it.
+        private fun clearError() {
+            if (_uiState.value is LoginUiState.Error) _uiState.value = LoginUiState.Idle
         }
 
         fun onTogglePasswordVisibility() {
@@ -75,16 +84,38 @@ class LoginViewModel
         }
 
         fun onLoginClick() {
+            // Empty fields are checked here, before any request, so no network call is made.
+            val formError = validateForm()
+            if (formError != null) {
+                _uiState.value = formError
+                return
+            }
             viewModelScope.launch {
                 _uiState.value = LoginUiState.LoggingIn
                 authRepository
                     .login(identifier, password, rememberMe)
                     .onSuccess { runPrefetchAndSucceed() }
                     .onFailure { e ->
-                        _uiState.value = LoginUiState.Error(e.message ?: "Đăng nhập thất bại")
+                        _uiState.value =
+                            LoginUiState.Error(
+                                reason = (e as? LoginFailedException)?.reason ?: LoginFailureReason.Unknown,
+                                message = e.message ?: LOGIN_FAILED_MESSAGE,
+                            )
                     }
             }
         }
+
+        private fun validateForm(): LoginUiState.Error? =
+            when {
+                identifier.isBlank() ->
+                    LoginUiState.Error(
+                        LoginFailureReason.MissingIdentifier,
+                        "Vui lòng nhập mã nhân viên hoặc số điện thoại.",
+                    )
+                password.isBlank() ->
+                    LoginUiState.Error(LoginFailureReason.MissingPassword, "Vui lòng nhập mật khẩu.")
+                else -> null
+            }
 
         private suspend fun runPrefetchAndSucceed() {
             _uiState.value = LoginUiState.Prefetching
@@ -95,5 +126,6 @@ class LoginViewModel
         private companion object {
             const val PREFETCH_DELAY_MS = 800L
             const val STOP_TIMEOUT_MS = 5_000L
+            const val LOGIN_FAILED_MESSAGE = "Đăng nhập thất bại. Vui lòng thử lại."
         }
     }
