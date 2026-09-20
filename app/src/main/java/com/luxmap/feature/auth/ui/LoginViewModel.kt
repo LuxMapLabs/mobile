@@ -5,13 +5,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.auth.data.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,9 +23,16 @@ class LoginViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
         val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+        // Drives the offline notice on Login (separate from LoginUiState — same precedent as
+        // MapViewModel.isOnline: connectivity is not one of the form/prefetch states). Starts
+        // true ("assume online") so the notice never flashes before the first callback fires.
+        val isOnline: StateFlow<Boolean> =
+            connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
 
         var identifier by mutableStateOf("")
             private set
@@ -75,5 +85,6 @@ class LoginViewModel
 
         private companion object {
             const val PREFETCH_DELAY_MS = 800L
+            const val STOP_TIMEOUT_MS = 5_000L
         }
     }

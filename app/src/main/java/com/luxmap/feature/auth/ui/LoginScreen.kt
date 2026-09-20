@@ -19,11 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -59,6 +59,7 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
 
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
@@ -184,6 +185,11 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(Spacing.lg))
 
+            if (!isOnline) {
+                OfflineWarningNote()
+                Spacer(Modifier.height(Spacing.md))
+            }
+
             val errorState = uiState as? LoginUiState.Error
             if (errorState != null) {
                 Text(
@@ -223,9 +229,6 @@ fun LoginScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.lg))
-
-            OfflineFirstLoginNote()
             Spacer(Modifier.height(Spacing.lg))
 
             Row(
@@ -280,35 +283,35 @@ private fun FieldLabel(text: String) {
     Spacer(Modifier.height(Spacing.xs))
 }
 
-// Body copy here is instructional (not just metadata), so it uses body scale (16sp) per
-// CLAUDE.md's rule that Caption (14sp) is only for secondary metadata, never for guidance.
+// Only shown when the device has no network (see LoginScreen's isOnline check) — first login
+// needs a real API call, so this is the one precondition worth calling out, placed right above
+// the login button instead of always-on at the bottom of the screen. Body copy uses body scale
+// (16sp) per CLAUDE.md's rule that Caption (14sp) is only for secondary metadata, not guidance.
 @Composable
-private fun OfflineFirstLoginNote() {
+private fun OfflineWarningNote() {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusLarge))
                 .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Filled.Info,
+            imageVector = Icons.Filled.WifiOff,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.width(Spacing.sm))
         Column {
             Text(
-                text = "Đăng nhập lần đầu cần có mạng",
+                text = "Cần kết nối Internet để đăng nhập lần đầu.",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.height(Spacing.xs))
             Text(
-                text =
-                    "Kết nối mạng để xác thực và đồng bộ dữ liệu. Sau khi đồng bộ, bạn có thể " +
-                        "tiếp tục với dữ liệu đã lưu khi mất mạng.",
+                text = "Kiểm tra kết nối rồi thử lại.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
