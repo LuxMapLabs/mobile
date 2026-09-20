@@ -43,6 +43,11 @@ class LoginViewModel
         var isPasswordVisible by mutableStateOf(false)
             private set
 
+        // On by default: field crews often work with no network, so keeping the session is the
+        // safer choice. Not part of LoginUiState — it is a form field, like identifier/password.
+        var rememberMe by mutableStateOf(true)
+            private set
+
         init {
             viewModelScope.launch {
                 // Phiên offline hợp lệ (F01, mục P9): đã đăng nhập trước đó, mở lại app vào
@@ -63,6 +68,10 @@ class LoginViewModel
 
         fun onTogglePasswordVisibility() {
             isPasswordVisible = !isPasswordVisible
+        }
+
+        fun onRememberMeChange(value: Boolean) {
+            rememberMe = value
         }
 
         fun onLoginClick() {
