@@ -1,5 +1,8 @@
 package com.luxmap.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -40,6 +43,14 @@ private val bottomNavItems =
         BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Filled.Person),
     )
 
+// Fade-through between screens: the old screen fades out fast, then the new one fades in. Short
+// on purpose — the default of NavHost is a 700 ms fade with both screens drawn at once, which
+// feels slow and is heavy when one of them is the map. No slide, because the 4 tabs are equal.
+private const val FADE_OUT_MS = 90
+private const val FADE_IN_MS = 210
+private val screenEnter = fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS, delayMillis = FADE_OUT_MS))
+private val screenExit = fadeOut(animationSpec = tween(durationMillis = FADE_OUT_MS))
+
 // Khung NavHost tối thiểu — nối các composable màn hình thật khi
 // từng feature (auth, home, ...) được implement theo mã FM-XX tương ứng.
 @Composable
@@ -73,10 +84,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onItemSelected = { item ->
                         // Map is the root of the main area (Login is removed from the back stack
                         // after sign-in), so each tab keeps its own state when you come back.
-                        navController.navigate(item.route) {
-                            popUpTo(Routes.Map.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        if (item.route != currentRoute) {
+                            navController.navigate(item.route) {
+                                popUpTo(Routes.Map.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     },
                 )
@@ -87,6 +100,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             navController = navController,
             startDestination = Routes.Login.route,
             modifier = Modifier.padding(innerPadding),
+            enterTransition = { screenEnter },
+            exitTransition = { screenExit },
+            popEnterTransition = { screenEnter },
+            popExitTransition = { screenExit },
         ) {
             composable(Routes.Login.route) {
                 LoginScreen(

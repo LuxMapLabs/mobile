@@ -8,6 +8,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 
 data class BottomNavItem(
     val route: String,
@@ -31,7 +32,7 @@ fun BottomNavBar(
                 selected = currentRoute == item.route,
                 onClick = { onItemSelected(item) },
                 icon = { Icon(imageVector = item.icon, contentDescription = null) },
-                label = { Text(item.label) },
+                label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 colors =
                     NavigationBarItemDefaults.colors(
                         selectedIconColor = MaterialTheme.colorScheme.primary,
