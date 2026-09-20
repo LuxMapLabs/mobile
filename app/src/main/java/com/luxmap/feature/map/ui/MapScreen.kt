@@ -1005,15 +1005,27 @@ private fun rememberMapViewWithLifecycle(): MapView {
 
     DisposableEffect(lifecycleOwner, mapView) {
         val lifecycle = lifecycleOwner.lifecycle
-        val observer = mapView.lifecycleObserver()
+        var destroyed = false
+        val observer = mapView.lifecycleObserver(onDestroyed = { destroyed = true })
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycle.removeObserver(observer)
+            // The screen can leave composition (for example when the user switches to another
+            // tab) while the back stack entry is still alive. The observer is removed before it
+            // gets ON_DESTROY, so without this the MapView would never be destroyed and its
+            // native resources would leak on every visit. Stop it in the right order first.
+            if (!destroyed) {
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onPause()
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStop()
+                mapView.onDestroy()
+            }
+        }
     }
 
     return mapView
 }
 
-private fun MapView.lifecycleObserver(): LifecycleEventObserver =
+private fun MapView.lifecycleObserver(onDestroyed: () -> Unit): LifecycleEventObserver =
     LifecycleEventObserver { _, event ->
         when (event) {
             Lifecycle.Event.ON_CREATE -> onCreate(null)
@@ -1021,7 +1033,10 @@ private fun MapView.lifecycleObserver(): LifecycleEventObserver =
             Lifecycle.Event.ON_RESUME -> onResume()
             Lifecycle.Event.ON_PAUSE -> onPause()
             Lifecycle.Event.ON_STOP -> onStop()
-            Lifecycle.Event.ON_DESTROY -> onDestroy()
+            Lifecycle.Event.ON_DESTROY -> {
+                onDestroy()
+                onDestroyed()
+            }
             else -> Unit
         }
     }
