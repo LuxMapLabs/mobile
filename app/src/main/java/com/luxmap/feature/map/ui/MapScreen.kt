@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -193,12 +194,17 @@ fun MapScreen(
     var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
     var selectedSegment by remember { mutableStateOf<RoadSegmentLine?>(null) }
-    var showFixtures by remember { mutableStateOf(true) }
-    var showRoadSegments by remember { mutableStateOf(true) }
+    // These four use rememberSaveable so they survive a tab switch: the MapView is created again
+    // each time the user comes back to the map tab, and without this the view would reset to the
+    // default camera and layer settings.
+    var showFixtures by rememberSaveable { mutableStateOf(true) }
+    var showRoadSegments by rememberSaveable { mutableStateOf(true) }
     // Vector (OpenFreeMap) is the default for field operation — always sharp, no API key needed.
     // The basemap toggle lets the user switch to satellite (MapTiler Hybrid) when they need to
     // compare against real-world imagery (see MAP_STYLE_URL/VECTOR_STYLE_URL in MapLibreConfig.kt).
-    var isSatelliteBasemap by remember { mutableStateOf(false) }
+    var isSatelliteBasemap by rememberSaveable { mutableStateOf(false) }
+    // Last camera as [latitude, longitude, zoom, bearing]; null until the map has been moved once.
+    var savedCamera by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
@@ -258,11 +264,27 @@ fun MapScreen(
                 view.getMapAsync { map ->
                     if (map.style == null) {
                         map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
+                        val camera = savedCamera
                         map.cameraPosition =
-                            CameraPosition.Builder()
-                                .target(MOCK_AREA_CENTER)
-                                .zoom(MOCK_AREA_ZOOM)
-                                .build()
+                            if (camera != null) {
+                                CameraPosition.Builder()
+                                    .target(LatLng(camera[0], camera[1]))
+                                    .zoom(camera[2])
+                                    .bearing(camera[3])
+                                    .build()
+                            } else {
+                                CameraPosition.Builder()
+                                    .target(MOCK_AREA_CENTER)
+                                    .zoom(MOCK_AREA_ZOOM)
+                                    .build()
+                            }
+                        map.addOnCameraIdleListener {
+                            val position = map.cameraPosition
+                            position.target?.let { target ->
+                                savedCamera =
+                                    doubleArrayOf(target.latitude, target.longitude, position.zoom, position.bearing)
+                            }
+                        }
                         val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                         map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
                             setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
