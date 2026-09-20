@@ -63,7 +63,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.ErrorBanner
+import com.luxmap.core.ui.components.InlineErrorText
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.auth.data.LoginFailureReason
 
 // F01 Đăng nhập — chỉ 1 vai trò (Tổ khảo sát/sửa chữa), không có màn chọn vai trò (CLAUDE.md/A2).
 // Layout theo Figma F01_Login_v2_4 (hero navy gradient + sheet bo góc trên). Icon/logo thật
@@ -78,16 +81,22 @@ fun LoginScreen(
     val isOnline by viewModel.isOnline.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val identifierFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
+    val errorPlacement = (uiState as? LoginUiState.Error)?.let { errorPlacementFor(it, isOnline) }
 
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
             onLoginSuccess()
         }
-        // After a failed login put the cursor back in the password field, so the user can type
-        // again right away.
-        if (uiState is LoginUiState.Error) {
-            passwordFocusRequester.requestFocus()
+        // Put the cursor in the field that needs fixing, so the user can type again right away.
+        // Errors shown in the banner do not move the focus.
+        when ((uiState as? LoginUiState.Error)?.reason) {
+            LoginFailureReason.MissingIdentifier -> identifierFocusRequester.requestFocus()
+            LoginFailureReason.MissingPassword,
+            LoginFailureReason.InvalidCredentials,
+            -> passwordFocusRequester.requestFocus()
+            else -> Unit
         }
     }
 
@@ -194,7 +203,9 @@ fun LoginScreen(
                         imeAction = ImeAction.Next,
                     ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                modifier = Modifier.fillMaxWidth(),
+                isError = errorPlacement?.identifierInvalid == true,
+                supportingText = errorPlacement?.identifierMessage?.let { { InlineErrorText(it) } },
+                modifier = Modifier.fillMaxWidth().focusRequester(identifierFocusRequester),
             )
             Spacer(Modifier.height(Spacing.lg))
 
@@ -222,6 +233,8 @@ fun LoginScreen(
                             if (!isSubmitting) viewModel.onLoginClick()
                         },
                     ),
+                isError = errorPlacement?.passwordInvalid == true,
+                supportingText = errorPlacement?.passwordMessage?.let { { InlineErrorText(it) } },
                 visualTransformation =
                     if (viewModel.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -250,13 +263,8 @@ fun LoginScreen(
                 Spacer(Modifier.height(Spacing.md))
             }
 
-            val errorState = uiState as? LoginUiState.Error
-            if (errorState != null) {
-                Text(
-                    text = errorState.message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            errorPlacement?.bannerMessage?.let { message ->
+                ErrorBanner(message)
                 Spacer(Modifier.height(Spacing.md))
             }
 
@@ -373,6 +381,36 @@ private fun RememberMeRow(
         )
     }
 }
+
+// Where one login error is shown. Errors of a field go with that field, the others go to the
+// banner above the button.
+private data class ErrorPlacement(
+    val identifierMessage: String? = null,
+    val passwordMessage: String? = null,
+    val identifierInvalid: Boolean = false,
+    val passwordInvalid: Boolean = false,
+    val bannerMessage: String? = null,
+)
+
+private fun errorPlacementFor(
+    error: LoginUiState.Error,
+    isOnline: Boolean,
+): ErrorPlacement =
+    when (error.reason) {
+        LoginFailureReason.MissingIdentifier ->
+            ErrorPlacement(identifierMessage = error.message, identifierInvalid = true)
+        LoginFailureReason.MissingPassword ->
+            ErrorPlacement(passwordMessage = error.message, passwordInvalid = true)
+        // The server has one code for a wrong username and a wrong password, so both fields are
+        // marked and the message is shown under the password field.
+        LoginFailureReason.InvalidCredentials ->
+            ErrorPlacement(passwordMessage = error.message, identifierInvalid = true, passwordInvalid = true)
+        // When the device is offline, OfflineWarningNote already says it, so do not repeat it.
+        LoginFailureReason.Network -> ErrorPlacement(bannerMessage = error.message.takeIf { isOnline })
+        LoginFailureReason.AccountLocked,
+        LoginFailureReason.Unknown,
+        -> ErrorPlacement(bannerMessage = error.message)
+    }
 
 // Only shown when the device has no network (see LoginScreen's isOnline check) — first login
 // needs a real API call, so this is the one precondition worth calling out, placed right above
