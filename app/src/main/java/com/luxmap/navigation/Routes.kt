@@ -11,6 +11,10 @@ sealed interface Routes {
         override val route = "home"
     }
 
+    data object Survey : Routes {
+        override val route = "survey"
+    }
+
     data object Map : Routes {
         override val route = "map"
     }
