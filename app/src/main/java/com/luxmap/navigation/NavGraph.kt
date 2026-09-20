@@ -24,6 +24,7 @@ import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
+import com.luxmap.feature.profile.ui.ProfileScreen
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -93,7 +94,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Profile.route) {
-                PlaceholderScreen(title = "Cá nhân")
+                // Fixed values for now — the next step reads the real username and runs logout
+                // through ProfileViewModel.
+                ProfileScreen(username = "crew", isLoggingOut = false, onConfirmLogout = {})
             }
             composable(
                 route = Routes.PoleDetail.route,
