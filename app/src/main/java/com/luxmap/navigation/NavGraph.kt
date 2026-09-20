@@ -1,5 +1,8 @@
 package com.luxmap.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -46,10 +50,25 @@ private val bottomNavItems =
 // Fade-through between screens: the old screen fades out fast, then the new one fades in. Short
 // on purpose — the default of NavHost is a 700 ms fade with both screens drawn at once, which
 // feels slow and is heavy when one of them is the map. No slide, because the 4 tabs are equal.
+//
+// The map screen never fades. Its MapView draws on its own GL surface, which ignores the fade
+// alpha, so a fade made the buttons on top of the map fade out over an empty area. Instead the
+// map appears and disappears at once, and the other screen fades in without a delay when the
+// map has just gone.
 private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210
-private val screenEnter = fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS, delayMillis = FADE_OUT_MS))
-private val screenExit = fadeOut(animationSpec = tween(durationMillis = FADE_OUT_MS))
+
+private fun NavBackStackEntry.isMap() = destination.route == Routes.Map.route
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.screenEnter(): EnterTransition =
+    when {
+        targetState.isMap() -> EnterTransition.None
+        initialState.isMap() -> fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS))
+        else -> fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS, delayMillis = FADE_OUT_MS))
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.screenExit(): ExitTransition =
+    if (initialState.isMap()) ExitTransition.None else fadeOut(animationSpec = tween(durationMillis = FADE_OUT_MS))
 
 // Khung NavHost tối thiểu — nối các composable màn hình thật khi
 // từng feature (auth, home, ...) được implement theo mã FM-XX tương ứng.
@@ -100,10 +119,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             navController = navController,
             startDestination = Routes.Login.route,
             modifier = Modifier.padding(innerPadding),
-            enterTransition = { screenEnter },
-            exitTransition = { screenExit },
-            popEnterTransition = { screenEnter },
-            popExitTransition = { screenExit },
+            enterTransition = { screenEnter() },
+            exitTransition = { screenExit() },
+            popEnterTransition = { screenEnter() },
+            popExitTransition = { screenExit() },
         ) {
             composable(Routes.Login.route) {
                 LoginScreen(
