@@ -176,7 +176,7 @@ fun LoginScreen(
             }
             Spacer(Modifier.height(Spacing.lg))
 
-            Text(text = "Đăng nhập tác nghiệp", style = MaterialTheme.typography.titleLarge)
+            Text(text = "Đăng nhập làm việc", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = "Sử dụng tài khoản nhân viên đã được cấp.",
