@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,10 +37,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -183,7 +190,16 @@ fun LoginScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.sm))
+
+            // Temporary local state — step 2 moves it into LoginViewModel.
+            var rememberMe by rememberSaveable { mutableStateOf(true) }
+            RememberMeRow(
+                checked = rememberMe,
+                onCheckedChange = { rememberMe = it },
+                enabled = !isSubmitting,
+            )
+            Spacer(Modifier.height(Spacing.md))
 
             if (!isOnline) {
                 OfflineWarningNote()
@@ -281,6 +297,37 @@ private fun FieldLabel(text: String) {
         fontWeight = FontWeight.SemiBold,
     )
     Spacer(Modifier.height(Spacing.xs))
+}
+
+// The whole row is the touch target (min 48dp), not just the small checkbox square. Label uses
+// body scale (16sp) because it explains a choice, and Caption is only for secondary metadata.
+@Composable
+private fun RememberMeRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = Dimens.minTouchTarget)
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onCheckedChange,
+                ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = "Duy trì đăng nhập trên thiết bị này",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 // Only shown when the device has no network (see LoginScreen's isOnline check) — first login
