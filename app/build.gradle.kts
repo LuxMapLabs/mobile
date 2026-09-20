@@ -31,11 +31,12 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
-        // matching the http port luxmap_backend listens on (see launchSettings.json — "http"
-        // profile: 5294). Testing on a real device (LAN): change this to the backend machine's
-        // LAN IP for that test, then change it back.
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:5294/\"")
+        // Default 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
+        // and 5141 is the http port luxmap_backend listens on (see launchSettings.json). To use
+        // another address (for example a real device on LAN), set API_BASE_URL in
+        // local.properties. The URL must end with "/".
+        val apiBaseUrl = localProperties.getProperty("API_BASE_URL", "http://10.0.2.2:5141/")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
 
         // Empty when not set in local.properties — MapLibreConfig.kt falls back to the
         // OpenFreeMap style in that case, so a missing key never breaks the build.
