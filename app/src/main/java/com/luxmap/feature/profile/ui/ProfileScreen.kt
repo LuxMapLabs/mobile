@@ -48,6 +48,9 @@ fun ProfileScreen(
         modifier =
             modifier
                 .fillMaxSize()
+                // Opaque background so nothing behind this screen (for example the map) can show
+                // through.
+                .background(MaterialTheme.colorScheme.background)
                 .statusBarsPadding()
                 .padding(Spacing.xl),
     ) {

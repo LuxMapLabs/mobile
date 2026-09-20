@@ -51,24 +51,27 @@ private val bottomNavItems =
 // on purpose — the default of NavHost is a 700 ms fade with both screens drawn at once, which
 // feels slow and is heavy when one of them is the map. No slide, because the 4 tabs are equal.
 //
-// The map screen never fades. Its MapView draws on its own GL surface, which ignores the fade
-// alpha, so a fade made the buttons on top of the map fade out over an empty area. Instead the
-// map appears and disappears at once, and the other screen fades in without a delay when the
-// map has just gone.
+// Any change that involves the map screen is instant, with no fade at all. The map draws on its
+// own GL surface, which ignores the fade alpha. NavHost also keeps the old screen drawn until the
+// whole transition ends, so if the new screen faded in, the old map (and the buttons on top of
+// it) would show through for that time. Fades are only used between the other screens.
 private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210
 
 private fun NavBackStackEntry.isMap() = destination.route == Routes.Map.route
 
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.involvesMap(): Boolean =
+    initialState.isMap() || targetState.isMap()
+
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.screenEnter(): EnterTransition =
-    when {
-        targetState.isMap() -> EnterTransition.None
-        initialState.isMap() -> fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS))
-        else -> fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS, delayMillis = FADE_OUT_MS))
+    if (involvesMap()) {
+        EnterTransition.None
+    } else {
+        fadeIn(animationSpec = tween(durationMillis = FADE_IN_MS, delayMillis = FADE_OUT_MS))
     }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.screenExit(): ExitTransition =
-    if (initialState.isMap()) ExitTransition.None else fadeOut(animationSpec = tween(durationMillis = FADE_OUT_MS))
+    if (involvesMap()) ExitTransition.None else fadeOut(animationSpec = tween(durationMillis = FADE_OUT_MS))
 
 // Khung NavHost tối thiểu — nối các composable màn hình thật khi
 // từng feature (auth, home, ...) được implement theo mã FM-XX tương ứng.

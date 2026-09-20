@@ -1,5 +1,6 @@
 package com.luxmap.core.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +21,8 @@ fun PlaceholderScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(Spacing.xl),
+        // Opaque background so nothing behind this screen (for example the map) can show through.
+        modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(Spacing.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
