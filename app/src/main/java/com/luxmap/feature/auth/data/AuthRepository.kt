@@ -19,4 +19,7 @@ interface AuthRepository {
     suspend fun endSessionIfNotRemembered()
 
     fun observeIsLoggedIn(): Flow<Boolean>
+
+    // The name used to sign in (null if the session was saved before the app kept it).
+    fun observeUsername(): Flow<String?>
 }

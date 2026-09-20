@@ -36,6 +36,7 @@ class RealAuthRepository
                             tokens.refresh_token,
                             tokens.expires_in,
                             rememberMe,
+                            identifier,
                         )
                         Result.success(Unit)
                     },
@@ -57,6 +58,8 @@ class RealAuthRepository
         override suspend fun endSessionIfNotRemembered() = tokenStore.clearIfNotRemembered()
 
         override fun observeIsLoggedIn(): Flow<Boolean> = tokenStore.observeIsLoggedIn()
+
+        override fun observeUsername(): Flow<String?> = tokenStore.observeUsername()
 
         private fun messageFor(error: Throwable): String =
             when (error) {

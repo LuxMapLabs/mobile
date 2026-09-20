@@ -38,13 +38,18 @@ class TokenStore
         fun observeIsLoggedIn(): Flow<Boolean> =
             context.sessionDataStore.data.map { prefs -> prefs[REFRESH_TOKEN_KEY] != null }
 
-        // rememberMe = null means "keep the current choice". Login passes the user's choice; the
+        // The name used to sign in, shown on the Profile screen. It is not secret, so it is stored
+        // as plain text. Null for sessions saved before this was added.
+        fun observeUsername(): Flow<String?> = context.sessionDataStore.data.map { prefs -> prefs[USERNAME_KEY] }
+
+        // rememberMe and username: null means "keep the current value". Login passes both; the
         // token refresh (TokenAuthenticator) passes nothing, so a refresh never changes it.
         suspend fun saveSession(
             accessToken: String,
             refreshToken: String,
             expiresInSeconds: Int,
             rememberMe: Boolean? = null,
+            username: String? = null,
         ) {
             val expiresAt = (System.currentTimeMillis() / MILLIS_PER_SECOND) + expiresInSeconds
             context.sessionDataStore.edit { prefs ->
@@ -52,6 +57,7 @@ class TokenStore
                 prefs[REFRESH_TOKEN_KEY] = cipher.encrypt(refreshToken)
                 prefs[EXPIRES_AT_KEY] = expiresAt
                 if (rememberMe != null) prefs[REMEMBER_ME_KEY] = rememberMe
+                if (username != null) prefs[USERNAME_KEY] = username
             }
         }
 
@@ -74,6 +80,7 @@ class TokenStore
                 prefs.remove(REFRESH_TOKEN_KEY)
                 prefs.remove(EXPIRES_AT_KEY)
                 prefs.remove(REMEMBER_ME_KEY)
+                prefs.remove(USERNAME_KEY)
             }
         }
 
@@ -89,6 +96,7 @@ class TokenStore
             val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
             val EXPIRES_AT_KEY = longPreferencesKey("expires_at")
             val REMEMBER_ME_KEY = booleanPreferencesKey("remember_me")
+            val USERNAME_KEY = stringPreferencesKey("username")
             const val MILLIS_PER_SECOND = 1000L
         }
     }
