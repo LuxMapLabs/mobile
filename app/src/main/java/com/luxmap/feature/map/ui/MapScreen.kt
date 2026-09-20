@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -87,6 +90,7 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Point
 
 // Center coordinate and bbox of mock-poles.geojson (HCMC-area mock, 3 segments).
 private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
@@ -108,8 +112,12 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 // No real pole_id is ever empty (see mock-poles.geojson / Contract v1.1) — used as the selected
 // halo layer's filter value when nothing is selected, so it matches zero features.
 private const val NO_SELECTION_SENTINEL = ""
-private const val MARKER_ICON_SIZE = 0.5f
-private const val MARKER_ICON_SIZE_SELECTED = 0.75f
+
+// Marker icons are 24dp source vectors (see ic_marker_*.xml), so size 1.0f renders at their full
+// 24dp and 1.3f at ~31dp for the selected pole — bumped up from the original 0.5f/0.75f, which
+// made the icon detail (checkmark/x shape) too small to read on a real device.
+private const val MARKER_ICON_SIZE = 1.0f
+private const val MARKER_ICON_SIZE_SELECTED = 1.3f
 private const val SELECTED_HALO_RADIUS = 20f
 
 // Badges/labels only worth showing once zoomed in enough to read them (F12/FM-37 LOD rule) —
@@ -174,8 +182,8 @@ fun MapScreen(
     val uiState by viewModel.uiState.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val searchTarget by viewModel.searchTarget.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val mapView = rememberMapViewWithLifecycle()
     // Reference to the real map, set exactly once when ready — the LaunchedEffects below read
     // state (uiState/showFixtures/...) on every change and apply it directly to the map through
@@ -276,6 +284,26 @@ fun MapScreen(
                                 }
                             if (tappedPole != null) {
                                 selectedPole = tappedPole
+                                return@addOnMapClickListener true
+                            }
+
+                            val tappedCluster =
+                                map.queryRenderedFeatures(screenPoint, CLUSTER_CIRCLE_LAYER_ID).firstOrNull()
+                            if (tappedCluster != null) {
+                                val clusterSource = map.style?.getSource(POLES_SOURCE_ID) as? GeoJsonSource
+                                val expansionZoom = clusterSource?.getClusterExpansionZoom(tappedCluster)
+                                val clusterCenter =
+                                    (tappedCluster.geometry() as? Point)?.let {
+                                        LatLng(
+                                            it.latitude(),
+                                            it.longitude(),
+                                        )
+                                    }
+                                if (expansionZoom != null && clusterCenter != null) {
+                                    map.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(clusterCenter, expansionZoom.toDouble()),
+                                    )
+                                }
                                 return@addOnMapClickListener true
                             }
 
@@ -393,8 +421,6 @@ fun MapScreen(
                 MapSearchBar(
                     query = searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
-                    activeTarget = searchTarget,
-                    onTargetChange = viewModel::setSearchTarget,
                     onFilterClick = { showLayerFilterSheet = true },
                 )
                 if (searchQuery.isNotBlank()) {
@@ -429,7 +455,11 @@ fun MapScreen(
                     needsAttentionActive = statusFilter == NEEDS_ATTENTION_STATUSES,
                     onNeedsAttentionClick = {
                         viewModel.setStatusFilter(
-                            if (statusFilter == NEEDS_ATTENTION_STATUSES) emptySet() else NEEDS_ATTENTION_STATUSES,
+                            if (statusFilter == NEEDS_ATTENTION_STATUSES) {
+                                AssetCondition.entries.toSet()
+                            } else {
+                                NEEDS_ATTENTION_STATUSES
+                            },
                         )
                     },
                 )
@@ -523,21 +553,41 @@ fun MapScreen(
                     onDismissRequest = { showLayerFilterSheet = false },
                     sheetState = rememberModalBottomSheetState(),
                 ) {
-                    Column {
+                    // Layer/display management, not a search filter (F12) — wording and layout
+                    // reflect that: a title, then two labeled groups separated by a light divider.
+                    // Plain Column (no LazyColumn/fillMaxHeight) so the sheet stays as short as its
+                    // content, it never forces itself to nearly full screen height.
+                    Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+                        Text(text = "Hiển thị trên bản đồ", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(Spacing.md))
+                        Text(text = "Lớp bản đồ", style = MaterialTheme.typography.labelLarge)
                         MapLayerToggle(
                             showFixtures = showFixtures,
                             onShowFixturesChange = { showFixtures = it },
                             showRoadSegments = showRoadSegments,
                             onShowRoadSegmentsChange = { showRoadSegments = it },
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            modifier = Modifier.padding(vertical = Spacing.xs),
                         )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = Spacing.sm),
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        Text(text = "Hiển thị trạng thái cột", style = MaterialTheme.typography.labelLarge)
                         MapStatusFilterRow(
                             selectedStatuses = statusFilter,
                             onToggle = { condition -> viewModel.setStatusFilter(statusFilter.toggled(condition)) },
-                            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            enabled = showFixtures,
+                            modifier = Modifier.padding(vertical = Spacing.sm),
                         )
                     }
                 }
+            }
+
+            // F12/FM-38 — device has no network, only the basemap tiles can't load. Pole/route
+            // data keeps rendering as usual (uiState below is independent of this), so this is
+            // just a heads-up, not an error state.
+            if (!isOnline) {
+                MessageOverlay(text = "Không tải được nền bản đồ · Dữ liệu cột vẫn khả dụng")
             }
 
             when (uiState) {
@@ -737,7 +787,9 @@ private fun buildPoleGlowCircleLayer(): CircleLayer =
         .withProperties(
             PropertyFactory.circleRadius(14f),
             PropertyFactory.circleBlur(1f),
-            PropertyFactory.circleOpacity(0.35f),
+            // Lowered from 0.35f so the status icon reads as the focal point, not the glow behind
+            // it, now that the icon itself is bigger (see MARKER_ICON_SIZE).
+            PropertyFactory.circleOpacity(0.22f),
             PropertyFactory.circleColor(
                 Expression.match(
                     Expression.get("fixture_status"),
@@ -817,13 +869,17 @@ private fun updateSelectedPoleStyle(
 
 // "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
 // badge goes bottom-right so a pole that is both near a POI and has an IoT node doesn't overlap
-// badges.
+// badges. Badge icons are 24dp source vectors too, same as the marker, so 0.7f here against
+// MARKER_ICON_SIZE = 1.0f keeps the badge at ~70% of the marker's size — big enough to actually
+// read on a real device, still clearly smaller/secondary to the status icon. Offset scaled up to
+// match, so the bigger badge still sits tucked at the marker's corner instead of drifting toward
+// its center.
 private fun buildPoiBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(POI_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.5f),
-            PropertyFactory.iconOffset(arrayOf(6f, -6f)),
+            PropertyFactory.iconSize(0.7f),
+            PropertyFactory.iconOffset(arrayOf(9f, -9f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -841,8 +897,8 @@ private fun buildIotBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_IOT_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.5f),
-            PropertyFactory.iconOffset(arrayOf(6f, 6f)),
+            PropertyFactory.iconSize(0.7f),
+            PropertyFactory.iconOffset(arrayOf(9f, 9f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
