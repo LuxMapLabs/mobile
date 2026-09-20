@@ -23,6 +23,7 @@ class RealAuthRepository
         override suspend fun login(
             identifier: String,
             password: String,
+            rememberMe: Boolean,
         ): Result<Unit> {
             if (identifier.isBlank() || password.isBlank()) {
                 return Result.failure(IllegalArgumentException("Vui lòng nhập đầy đủ thông tin"))
@@ -30,7 +31,12 @@ class RealAuthRepository
             return runCatching { authApi.login(LoginRequestDto(identifier, password)) }
                 .fold(
                     onSuccess = { tokens ->
-                        tokenStore.saveSession(tokens.access_token, tokens.refresh_token, tokens.expires_in)
+                        tokenStore.saveSession(
+                            tokens.access_token,
+                            tokens.refresh_token,
+                            tokens.expires_in,
+                            rememberMe,
+                        )
                         Result.success(Unit)
                     },
                     onFailure = { error -> Result.failure(IllegalStateException(messageFor(error))) },

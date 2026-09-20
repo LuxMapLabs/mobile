@@ -78,7 +78,7 @@ class LoginViewModel
             viewModelScope.launch {
                 _uiState.value = LoginUiState.LoggingIn
                 authRepository
-                    .login(identifier, password)
+                    .login(identifier, password, rememberMe)
                     .onSuccess { runPrefetchAndSucceed() }
                     .onFailure { e ->
                         _uiState.value = LoginUiState.Error(e.message ?: "Đăng nhập thất bại")

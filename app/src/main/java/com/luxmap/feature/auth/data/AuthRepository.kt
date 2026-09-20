@@ -6,6 +6,7 @@ interface AuthRepository {
     suspend fun login(
         identifier: String,
         password: String,
+        rememberMe: Boolean,
     ): Result<Unit>
 
     // Best-effort: always clears the local session even if the logout API call fails

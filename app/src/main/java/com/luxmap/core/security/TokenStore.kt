@@ -3,6 +3,7 @@ package com.luxmap.core.security
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -37,17 +38,28 @@ class TokenStore
         fun observeIsLoggedIn(): Flow<Boolean> =
             context.sessionDataStore.data.map { prefs -> prefs[REFRESH_TOKEN_KEY] != null }
 
+        // rememberMe = null means "keep the current choice". Login passes the user's choice; the
+        // token refresh (TokenAuthenticator) passes nothing, so a refresh never changes it.
         suspend fun saveSession(
             accessToken: String,
             refreshToken: String,
             expiresInSeconds: Int,
+            rememberMe: Boolean? = null,
         ) {
             val expiresAt = (System.currentTimeMillis() / MILLIS_PER_SECOND) + expiresInSeconds
             context.sessionDataStore.edit { prefs ->
                 prefs[ACCESS_TOKEN_KEY] = cipher.encrypt(accessToken)
                 prefs[REFRESH_TOKEN_KEY] = cipher.encrypt(refreshToken)
                 prefs[EXPIRES_AT_KEY] = expiresAt
+                if (rememberMe != null) prefs[REMEMBER_ME_KEY] = rememberMe
             }
+        }
+
+        // Called once when the app is launched fresh. A missing flag counts as "remembered", so
+        // sessions saved before this option existed are not logged out by the update.
+        suspend fun clearIfNotRemembered() {
+            val remembered = context.sessionDataStore.data.first()[REMEMBER_ME_KEY] ?: true
+            if (!remembered) clear()
         }
 
         suspend fun currentTokens(): SessionTokens? = toSessionTokens(context.sessionDataStore.data.first())
@@ -61,6 +73,7 @@ class TokenStore
                 prefs.remove(ACCESS_TOKEN_KEY)
                 prefs.remove(REFRESH_TOKEN_KEY)
                 prefs.remove(EXPIRES_AT_KEY)
+                prefs.remove(REMEMBER_ME_KEY)
             }
         }
 
@@ -75,6 +88,7 @@ class TokenStore
             val ACCESS_TOKEN_KEY = stringPreferencesKey("access_token")
             val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
             val EXPIRES_AT_KEY = longPreferencesKey("expires_at")
+            val REMEMBER_ME_KEY = booleanPreferencesKey("remember_me")
             const val MILLIS_PER_SECOND = 1000L
         }
     }
