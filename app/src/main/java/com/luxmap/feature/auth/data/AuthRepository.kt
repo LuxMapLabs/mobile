@@ -14,5 +14,9 @@ interface AuthRepository {
     // no repository changes needed.
     suspend fun logout(): Result<Unit>
 
+    // Called when the app is launched fresh: ends the session if the user did not choose
+    // "Duy trì đăng nhập trên thiết bị này". Local only, no API call (the app may be offline).
+    suspend fun endSessionIfNotRemembered()
+
     fun observeIsLoggedIn(): Flow<Boolean>
 }
