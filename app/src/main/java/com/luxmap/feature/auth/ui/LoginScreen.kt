@@ -6,24 +6,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -34,11 +40,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +63,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.ErrorBanner
+import com.luxmap.core.ui.components.InlineErrorText
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.auth.data.LoginFailureReason
 
 // F01 Đăng nhập — chỉ 1 vai trò (Tổ khảo sát/sửa chữa), không có màn chọn vai trò (CLAUDE.md/A2).
 // Layout theo Figma F01_Login_v2_4 (hero navy gradient + sheet bo góc trên). Icon/logo thật
@@ -59,10 +78,25 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val identifierFocusRequester = remember { FocusRequester() }
+    val passwordFocusRequester = remember { FocusRequester() }
+    val errorPlacement = (uiState as? LoginUiState.Error)?.let { errorPlacementFor(it, isOnline) }
 
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
             onLoginSuccess()
+        }
+        // Put the cursor in the field that needs fixing, so the user can type again right away.
+        // Errors shown in the banner do not move the focus.
+        when ((uiState as? LoginUiState.Error)?.reason) {
+            LoginFailureReason.MissingIdentifier -> identifierFocusRequester.requestFocus()
+            LoginFailureReason.MissingPassword,
+            LoginFailureReason.InvalidCredentials,
+            -> passwordFocusRequester.requestFocus()
+            else -> Unit
         }
     }
 
@@ -126,6 +160,9 @@ fun LoginScreen(
                     )
                     // Background bleeds under the gesture navigation bar, content stops above it.
                     .navigationBarsPadding()
+                    // The app draws edge to edge, so the window does not shrink when the keyboard
+                    // opens. Without this the keyboard would cover the password field and button.
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(Spacing.xl),
         ) {
@@ -139,7 +176,7 @@ fun LoginScreen(
             }
             Spacer(Modifier.height(Spacing.lg))
 
-            Text(text = "Đăng nhập tác nghiệp", style = MaterialTheme.typography.titleLarge)
+            Text(text = "Đăng nhập làm việc", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = "Sử dụng tài khoản nhân viên đã được cấp.",
@@ -156,7 +193,19 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
+                // Next moves to the password field. The code (for example NV-0125) must not be
+                // changed by auto-correct or auto-capitalization.
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Next,
+                    ),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                isError = errorPlacement?.identifierInvalid == true,
+                supportingText = errorPlacement?.identifierMessage?.let { { InlineErrorText(it) } },
+                modifier = Modifier.fillMaxWidth().focusRequester(identifierFocusRequester),
             )
             Spacer(Modifier.height(Spacing.lg))
 
@@ -168,6 +217,24 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
+                // Done hides the keyboard and signs in. The isSubmitting check stops a second
+                // request when the user taps Done twice quickly.
+                keyboardOptions =
+                    KeyboardOptions(
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                keyboardActions =
+                    KeyboardActions(
+                        onDone = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus()
+                            if (!isSubmitting) viewModel.onLoginClick()
+                        },
+                    ),
+                isError = errorPlacement?.passwordInvalid == true,
+                supportingText = errorPlacement?.passwordMessage?.let { { InlineErrorText(it) } },
                 visualTransformation =
                     if (viewModel.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -180,17 +247,24 @@ fun LoginScreen(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
             )
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(Spacing.sm))
 
-            val errorState = uiState as? LoginUiState.Error
-            if (errorState != null) {
-                Text(
-                    text = errorState.message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            RememberMeRow(
+                checked = viewModel.rememberMe,
+                onCheckedChange = viewModel::onRememberMeChange,
+                enabled = !isSubmitting,
+            )
+            Spacer(Modifier.height(Spacing.md))
+
+            if (!isOnline) {
+                OfflineWarningNote()
+                Spacer(Modifier.height(Spacing.md))
+            }
+
+            errorPlacement?.bannerMessage?.let { message ->
+                ErrorBanner(message)
                 Spacer(Modifier.height(Spacing.md))
             }
 
@@ -223,9 +297,6 @@ fun LoginScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.lg))
-
-            OfflineFirstLoginNote()
             Spacer(Modifier.height(Spacing.lg))
 
             Row(
@@ -280,35 +351,96 @@ private fun FieldLabel(text: String) {
     Spacer(Modifier.height(Spacing.xs))
 }
 
-// Body copy here is instructional (not just metadata), so it uses body scale (16sp) per
-// CLAUDE.md's rule that Caption (14sp) is only for secondary metadata, never for guidance.
+// The whole row is the touch target (min 48dp), not just the small checkbox square. Label uses
+// body scale (16sp) because it explains a choice, and Caption is only for secondary metadata.
 @Composable
-private fun OfflineFirstLoginNote() {
+private fun RememberMeRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = Dimens.minTouchTarget)
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = onCheckedChange,
+                ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
+        Spacer(Modifier.width(Spacing.sm))
+        Text(
+            text = "Duy trì đăng nhập trên thiết bị này",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+// Where one login error is shown. Errors of a field go with that field, the others go to the
+// banner above the button.
+private data class ErrorPlacement(
+    val identifierMessage: String? = null,
+    val passwordMessage: String? = null,
+    val identifierInvalid: Boolean = false,
+    val passwordInvalid: Boolean = false,
+    val bannerMessage: String? = null,
+)
+
+private fun errorPlacementFor(
+    error: LoginUiState.Error,
+    isOnline: Boolean,
+): ErrorPlacement =
+    when (error.reason) {
+        LoginFailureReason.MissingIdentifier ->
+            ErrorPlacement(identifierMessage = error.message, identifierInvalid = true)
+        LoginFailureReason.MissingPassword ->
+            ErrorPlacement(passwordMessage = error.message, passwordInvalid = true)
+        // The server has one code for a wrong username and a wrong password, so both fields are
+        // marked and the message is shown under the password field.
+        LoginFailureReason.InvalidCredentials ->
+            ErrorPlacement(passwordMessage = error.message, identifierInvalid = true, passwordInvalid = true)
+        // When the device is offline, OfflineWarningNote already says it, so do not repeat it.
+        LoginFailureReason.Network -> ErrorPlacement(bannerMessage = error.message.takeIf { isOnline })
+        LoginFailureReason.AccountLocked,
+        LoginFailureReason.Unknown,
+        -> ErrorPlacement(bannerMessage = error.message)
+    }
+
+// Only shown when the device has no network (see LoginScreen's isOnline check) — first login
+// needs a real API call, so this is the one precondition worth calling out, placed right above
+// the login button instead of always-on at the bottom of the screen. Body copy uses body scale
+// (16sp) per CLAUDE.md's rule that Caption (14sp) is only for secondary metadata, not guidance.
+@Composable
+private fun OfflineWarningNote() {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusLarge))
                 .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Filled.Info,
+            imageVector = Icons.Filled.WifiOff,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.width(Spacing.sm))
         Column {
             Text(
-                text = "Đăng nhập lần đầu cần có mạng",
+                text = "Cần kết nối Internet để đăng nhập lần đầu.",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.height(Spacing.xs))
             Text(
-                text =
-                    "Kết nối mạng để xác thực và đồng bộ dữ liệu. Sau khi đồng bộ, bạn có thể " +
-                        "tiếp tục với dữ liệu đã lưu khi mất mạng.",
+                text = "Kiểm tra kết nối rồi thử lại.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

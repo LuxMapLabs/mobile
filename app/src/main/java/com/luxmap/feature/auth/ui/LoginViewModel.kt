@@ -5,13 +5,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.auth.data.AuthRepository
+import com.luxmap.feature.auth.data.LoginFailedException
+import com.luxmap.feature.auth.data.LoginFailureReason
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,9 +25,16 @@ class LoginViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
         val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+        // Drives the offline notice on Login (separate from LoginUiState — same precedent as
+        // MapViewModel.isOnline: connectivity is not one of the form/prefetch states). Starts
+        // true ("assume online") so the notice never flashes before the first callback fires.
+        val isOnline: StateFlow<Boolean> =
+            connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
 
         var identifier by mutableStateOf("")
             private set
@@ -31,6 +43,11 @@ class LoginViewModel
             private set
 
         var isPasswordVisible by mutableStateOf(false)
+            private set
+
+        // On by default: field crews often work with no network, so keeping the session is the
+        // safer choice. Not part of LoginUiState — it is a form field, like identifier/password.
+        var rememberMe by mutableStateOf(true)
             private set
 
         init {
@@ -45,27 +62,60 @@ class LoginViewModel
 
         fun onIdentifierChange(value: String) {
             identifier = value
+            clearError()
         }
 
         fun onPasswordChange(value: String) {
             password = value
+            clearError()
+        }
+
+        // Once the user starts to fix the form the old error is out of date, so remove it.
+        private fun clearError() {
+            if (_uiState.value is LoginUiState.Error) _uiState.value = LoginUiState.Idle
         }
 
         fun onTogglePasswordVisibility() {
             isPasswordVisible = !isPasswordVisible
         }
 
+        fun onRememberMeChange(value: Boolean) {
+            rememberMe = value
+        }
+
         fun onLoginClick() {
+            // Empty fields are checked here, before any request, so no network call is made.
+            val formError = validateForm()
+            if (formError != null) {
+                _uiState.value = formError
+                return
+            }
             viewModelScope.launch {
                 _uiState.value = LoginUiState.LoggingIn
                 authRepository
-                    .login(identifier, password)
+                    .login(identifier, password, rememberMe)
                     .onSuccess { runPrefetchAndSucceed() }
                     .onFailure { e ->
-                        _uiState.value = LoginUiState.Error(e.message ?: "Đăng nhập thất bại")
+                        _uiState.value =
+                            LoginUiState.Error(
+                                reason = (e as? LoginFailedException)?.reason ?: LoginFailureReason.Unknown,
+                                message = e.message ?: LOGIN_FAILED_MESSAGE,
+                            )
                     }
             }
         }
+
+        private fun validateForm(): LoginUiState.Error? =
+            when {
+                identifier.isBlank() ->
+                    LoginUiState.Error(
+                        LoginFailureReason.MissingIdentifier,
+                        "Vui lòng nhập mã nhân viên hoặc số điện thoại.",
+                    )
+                password.isBlank() ->
+                    LoginUiState.Error(LoginFailureReason.MissingPassword, "Vui lòng nhập mật khẩu.")
+                else -> null
+            }
 
         private suspend fun runPrefetchAndSucceed() {
             _uiState.value = LoginUiState.Prefetching
@@ -75,5 +125,7 @@ class LoginViewModel
 
         private companion object {
             const val PREFETCH_DELAY_MS = 800L
+            const val STOP_TIMEOUT_MS = 5_000L
+            const val LOGIN_FAILED_MESSAGE = "Đăng nhập thất bại. Vui lòng thử lại."
         }
     }
