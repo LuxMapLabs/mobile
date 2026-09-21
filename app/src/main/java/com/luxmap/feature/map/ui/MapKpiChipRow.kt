@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 
@@ -50,11 +51,15 @@ private fun KpiChip(
 ) {
     val backgroundColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val shape = RoundedCornerShape(Dimens.radiusPill)
     Box(
         modifier =
             Modifier
                 .defaultMinSize(minHeight = Dimens.minTouchTarget)
-                .background(backgroundColor, RoundedCornerShape(Dimens.radiusPill))
+                // Clip before clickable, or the press ripple is drawn as a gray rectangle
+                // that sticks out past the rounded corners.
+                .clip(shape)
+                .background(backgroundColor, shape)
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .padding(horizontal = Spacing.md, vertical = Spacing.xs),
         contentAlignment = Alignment.Center,
