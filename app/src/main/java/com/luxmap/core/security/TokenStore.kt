@@ -64,9 +64,11 @@ class TokenStore
 
         // Called once when the app is launched fresh. A missing flag counts as "remembered", so
         // sessions saved before this option existed are not logged out by the update.
+        // A kept session is also decrypted once here. If it cannot be read, currentTokens() clears
+        // it, so the app opens on Login instead of showing a session that does not work.
         suspend fun clearIfNotRemembered() {
             val remembered = context.sessionDataStore.data.first()[REMEMBER_ME_KEY] ?: true
-            if (!remembered) clear()
+            if (remembered) currentTokens() else clear()
         }
 
         // If the tokens cannot be decrypted (for example the Keystore key is gone after a restore
