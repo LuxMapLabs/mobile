@@ -2,6 +2,7 @@ package com.luxmap.core.network
 
 import com.luxmap.core.security.TokenStore
 import com.luxmap.feature.auth.data.RefreshRequestDto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
 import okhttp3.Request
@@ -51,6 +52,12 @@ class TokenAuthenticator
                         return if (e.code() in REJECTED_CODES) forceLogoutAndFail() else null
                     } catch (_: IOException) {
                         // No network: keep the session so the crew is not logged out in the field.
+                        return null
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Unexpected reply (for example a body that cannot be parsed). We do not
+                        // know if the token is bad, so keep the session and fail this request.
                         return null
                     }
 
