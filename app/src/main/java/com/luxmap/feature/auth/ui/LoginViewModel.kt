@@ -30,11 +30,12 @@ class LoginViewModel
         private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
         val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-        // Drives the offline notice on Login (separate from LoginUiState — same precedent as
-        // MapViewModel.isOnline: connectivity is not one of the form/prefetch states). Starts
-        // true ("assume online") so the notice never flashes before the first callback fires.
-        val isOnline: StateFlow<Boolean> =
-            connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), true)
+        // Used by onLoginClick to skip the request when the device is offline (separate from
+        // LoginUiState — connectivity is not one of the form/prefetch states). Starts true ("assume
+        // online"). Eagerly, not WhileSubscribed: no screen reads this flow, only onLoginClick reads
+        // .value, so with WhileSubscribed it would never update and stay true.
+        private val isOnline: StateFlow<Boolean> =
+            connectivityObserver.isOnline.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
         var identifier by mutableStateOf("")
             private set
@@ -90,6 +91,13 @@ class LoginViewModel
                 _uiState.value = formError
                 return
             }
+            // isOnline starts as true, so false here means the device really reported no network.
+            // Answer at once instead of waiting for the request to fail. If the state is wrong and
+            // the network is back, the user can tap the button again.
+            if (!isOnline.value) {
+                _uiState.value = LoginUiState.Error(LoginFailureReason.Network, OFFLINE_MESSAGE)
+                return
+            }
             viewModelScope.launch {
                 _uiState.value = LoginUiState.LoggingIn
                 authRepository
@@ -125,7 +133,7 @@ class LoginViewModel
 
         private companion object {
             const val PREFETCH_DELAY_MS = 800L
-            const val STOP_TIMEOUT_MS = 5_000L
             const val LOGIN_FAILED_MESSAGE = "Đăng nhập thất bại. Vui lòng thử lại."
+            const val OFFLINE_MESSAGE = "Kết nối thất bại. Vui lòng kiểm tra lại."
         }
     }
