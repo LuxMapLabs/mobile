@@ -11,21 +11,25 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,8 +51,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
@@ -56,6 +64,9 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.google.android.gms.location.CurrentLocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.luxmap.core.map.IOT_BADGE_ICON_ID
 import com.luxmap.core.map.MAP_STYLE_URL
 import com.luxmap.core.map.POI_BADGE_ICON_ID
@@ -125,11 +136,9 @@ private const val SELECTED_HALO_RADIUS = 20f
 // below this the map is zoomed out far enough that individual badges would just be clutter.
 private const val BADGE_MIN_ZOOM = 13f
 
-// Extra bottom clearance so the legend never overlaps MapLibre's own attribution/logo control,
-// which the map draws at the same bottom-start corner (F12/FM-37: "chừa vùng đáy trái cho
-// attribution"). This is an estimate of the attribution row's height, not a measured value — it
-// still needs a visual check on a real device/emulator.
-private val LEGEND_BOTTOM_SAFE_PADDING = 32.dp
+// Same gap from the bottom edge for the legend and the right-side buttons, so they line up.
+// The MapLibre logo and attribution are hidden, so no extra space is needed for them.
+private val MAP_CONTROLS_BOTTOM_PADDING = Spacing.md
 
 // "Surveyed route" layer (F12) — drawn below the pole markers, so add this layer first in
 // z-order.
@@ -141,6 +150,10 @@ private const val LOCATE_ME_ZOOM = 17.0
 private const val LOCATE_CAMERA_TRANSITION_MS = 750L
 private const val LOCATION_TIMEOUT_MS = 10_000L
 private const val LOCATION_POLL_INTERVAL_MS = 500L
+
+// Quick location for the blue dot: accept a cached location up to 60s old, wait at most 8s.
+private const val QUICK_FIX_MAX_AGE_MS = 60_000L
+private const val QUICK_FIX_TIMEOUT_MS = 8_000L
 
 // Padding (px) around a tapped/searched route's bounds so it doesn't end up flush against the
 // screen edge or hidden under the search bar / control stack (F12/FM-36).
@@ -180,6 +193,8 @@ fun MapScreen(
     viewModel: MapViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val uiState by viewModel.uiState.collectAsState()
     val statusFilter by viewModel.statusFilter.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -234,6 +249,7 @@ fun MapScreen(
             null,
             null,
         )
+        maplibreMap?.let { showQuickLocationFix(context, it) }
     }
 
     val locationPermissionLauncher =
@@ -258,11 +274,32 @@ fun MapScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    // The map is a plain Android View, so Compose does not know about taps on
+                    // it. Watch the touch (Initial pass, without consuming it) and drop the
+                    // search bar focus, so its highlight and the keyboard go away.
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                    },
             factory = { mapView },
             update = { view ->
                 view.getMapAsync { map ->
                     if (map.style == null) {
+                        // Hide the MapLibre logo and the attribution button. The tile providers
+                        // (MapTiler, OpenStreetMap) ask for credit in their terms, so show it
+                        // somewhere else in the app (for example the Profile screen).
+                        map.uiSettings.isLogoEnabled = false
+                        map.uiSettings.isAttributionEnabled = false
+                        // The map only shows poles and routes, so keep it facing north. With
+                        // rotation off the compass is not needed.
+                        map.uiSettings.isRotateGesturesEnabled = false
+                        map.uiSettings.isCompassEnabled = false
                         map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
                         val camera = savedCamera
                         map.cameraPosition =
@@ -428,8 +465,18 @@ fun MapScreen(
 
         // Map itself stays edge-to-edge (drawn under the status/navigation bars above), but the
         // overlay controls must not — wrap them in their own inset-aware Box so a FAB never ends
-        // up under the status bar or the gesture navigation bar.
-        Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+        // up under the status bar. The bottom inset is skipped because the map already sits above
+        // the app's bottom navigation bar (Scaffold adds it), so adding it again would push the
+        // controls too high. The keyboard inset is skipped too, so the bottom buttons stay in
+        // place when the search keyboard opens (the search bar is at the top, so it is not hidden).
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    ),
+        ) {
             // Top area (F12/FM-36) — single search bar + KPI summary, replaces the old separate
             // basemap-toggle FAB and layer-toggle card that used to sit at TopStart/TopEnd.
             Column(
@@ -491,7 +538,7 @@ fun MapScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
-                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = LEGEND_BOTTOM_SAFE_PADDING),
+                        .padding(start = Spacing.lg, end = Spacing.lg, bottom = MAP_CONTROLS_BOTTOM_PADDING),
             )
 
             // Right-side control stack (F12) — exactly 4 floating controls, declutters what used to
@@ -502,7 +549,12 @@ fun MapScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(Spacing.lg),
+                        .padding(
+                            start = Spacing.lg,
+                            top = Spacing.lg,
+                            end = Spacing.lg,
+                            bottom = MAP_CONTROLS_BOTTOM_PADDING,
+                        ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 horizontalAlignment = Alignment.End,
             ) {
@@ -535,21 +587,6 @@ fun MapScreen(
                     )
                 }
 
-                // Zoom +/- buttons — MapLibre Native has no built-in widget like maplibre-gl JS's
-                // NavigationControl on the web, so add 2 plain FABs (56dp, meets the 48dp minimum
-                // touch target from the Design System) that call
-                // CameraUpdateFactory.zoomIn()/zoomOut() directly. Pinch-to-zoom still works as
-                // usual, this is just an extra option.
-                FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomIn()) }) {
-                    Icon(imageVector = Icons.Filled.Add, contentDescription = "Phóng to")
-                }
-                FloatingActionButton(onClick = { maplibreMap?.animateCamera(CameraUpdateFactory.zoomOut()) }) {
-                    // Icons.Filled.Remove is not in material-icons-core (only in the extended
-                    // package, not in our dependencies) — use the "−" character instead of adding
-                    // a new library.
-                    Text(text = "−", style = MaterialTheme.typography.headlineSmall)
-                }
-
                 FloatingActionButton(
                     onClick = {
                         showLocationPermissionDenied = false
@@ -566,7 +603,17 @@ fun MapScreen(
                         }
                     },
                 ) {
-                    Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+                    if (isLocating) {
+                        // Shown until the first location arrives, so the user knows the app is
+                        // still working after the tap.
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
+                    }
                 }
             }
 
@@ -750,6 +797,36 @@ private fun enableLocationComponent(
     map.locationComponent.activateLocationComponent(activationOptions)
     map.locationComponent.isLocationComponentEnabled = true
     map.locationComponent.renderMode = RenderMode.NORMAL
+}
+
+// A cold GPS can take a long time to give its first location, and the blue dot only shows once a
+// location exists. So ask for a fast, less exact location (Wi-Fi/cell, about 1-2 seconds) and show
+// the dot with it. The GPS location replaces it as soon as it arrives.
+@SuppressLint("MissingPermission")
+private fun showQuickLocationFix(
+    context: Context,
+    map: MapLibreMap,
+) {
+    val request =
+        CurrentLocationRequest
+            .Builder()
+            .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
+            .setMaxUpdateAgeMillis(QUICK_FIX_MAX_AGE_MS)
+            .setDurationMillis(QUICK_FIX_TIMEOUT_MS)
+            .build()
+    LocationServices
+        .getFusedLocationProviderClient(context)
+        .getCurrentLocation(request, null)
+        .addOnSuccessListener { location ->
+            // Skip if GPS already gave a location, it is more exact than this one.
+            // runCatching: the map may be destroyed (tab switch) before this callback runs.
+            runCatching {
+                val component = map.locationComponent
+                if (location != null && component.isLocationComponentActivated && component.lastKnownLocation == null) {
+                    component.forceLocationUpdate(location)
+                }
+            }
+        }
 }
 
 // "Surveyed route" (F12/FM-37) — colored by has_active_segment_fault to match how Web GIS shows

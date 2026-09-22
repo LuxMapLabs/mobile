@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.luxmap.R
@@ -50,17 +51,24 @@ private val LEGEND_ICON_SIZE = 20.dp
 fun MapLegend(modifier: Modifier = Modifier) {
     var expanded by remember { mutableStateOf(false) }
 
+    val shape = RoundedCornerShape(Dimens.radiusMedium)
     Column(
         modifier =
             modifier
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .padding(horizontal = Spacing.sm),
+                // Clip so the press ripple follows the rounded corners instead of showing a
+                // gray rectangle around the card.
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surface, shape),
     ) {
+        // The side padding sits inside the clickable row (not on the card), so the ripple fills
+        // the whole button and is clipped to the same rounded shape.
         Row(
             modifier =
                 Modifier
                     .defaultMinSize(minHeight = Dimens.minTouchTarget)
-                    .clickable { expanded = !expanded },
+                    .clip(shape)
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text = "Chú giải", style = MaterialTheme.typography.labelLarge)
@@ -71,7 +79,7 @@ fun MapLegend(modifier: Modifier = Modifier) {
         }
 
         if (expanded) {
-            Column(modifier = Modifier.padding(bottom = Spacing.sm)) {
+            Column(modifier = Modifier.padding(start = Spacing.sm, end = Spacing.sm, bottom = Spacing.sm)) {
                 LEGEND_ORDER.forEach { condition ->
                     Row(
                         modifier = Modifier.defaultMinSize(minHeight = LEGEND_ICON_SIZE),

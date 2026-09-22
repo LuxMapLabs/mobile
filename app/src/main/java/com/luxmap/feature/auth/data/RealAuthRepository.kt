@@ -85,7 +85,7 @@ class RealAuthRepository
 
         private companion object {
             val errorJson = Json { ignoreUnknownKeys = true }
-            const val NETWORK_ERROR_MESSAGE = "Không thể kết nối máy chủ. Kiểm tra mạng."
+            const val NETWORK_ERROR_MESSAGE = "Kết nối thất bại. Vui lòng kiểm tra lại."
             const val GENERIC_ERROR_MESSAGE = "Đăng nhập thất bại. Vui lòng thử lại."
         }
     }

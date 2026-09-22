@@ -1,5 +1,10 @@
 package com.luxmap.feature.auth.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,7 +33,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,12 +83,11 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val isOnline by viewModel.isOnline.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val identifierFocusRequester = remember { FocusRequester() }
     val passwordFocusRequester = remember { FocusRequester() }
-    val errorPlacement = (uiState as? LoginUiState.Error)?.let { errorPlacementFor(it, isOnline) }
+    val errorPlacement = (uiState as? LoginUiState.Error)?.let { errorPlacementFor(it) }
 
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
@@ -258,14 +262,21 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(Spacing.md))
 
-            if (!isOnline) {
-                OfflineWarningNote()
-                Spacer(Modifier.height(Spacing.md))
-            }
-
-            errorPlacement?.bannerMessage?.let { message ->
-                ErrorBanner(message)
-                Spacer(Modifier.height(Spacing.md))
+            // Animate the banner in and out. If it appears at once, the button and everything
+            // below it jump down by the banner height. lastBannerMessage keeps the text while
+            // the banner fades out (bannerMessage is already null at that moment).
+            val bannerMessage = errorPlacement?.bannerMessage
+            val lastBannerMessage = remember { mutableStateOf("") }
+            if (bannerMessage != null) lastBannerMessage.value = bannerMessage
+            AnimatedVisibility(
+                visible = bannerMessage != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column {
+                    ErrorBanner(lastBannerMessage.value)
+                    Spacer(Modifier.height(Spacing.md))
+                }
             }
 
             PrimaryButton(
@@ -392,10 +403,7 @@ private data class ErrorPlacement(
     val bannerMessage: String? = null,
 )
 
-private fun errorPlacementFor(
-    error: LoginUiState.Error,
-    isOnline: Boolean,
-): ErrorPlacement =
+private fun errorPlacementFor(error: LoginUiState.Error): ErrorPlacement =
     when (error.reason) {
         LoginFailureReason.MissingIdentifier ->
             ErrorPlacement(identifierMessage = error.message, identifierInvalid = true)
@@ -405,45 +413,8 @@ private fun errorPlacementFor(
         // marked and the message is shown under the password field.
         LoginFailureReason.InvalidCredentials ->
             ErrorPlacement(passwordMessage = error.message, identifierInvalid = true, passwordInvalid = true)
-        // When the device is offline, OfflineWarningNote already says it, so do not repeat it.
-        LoginFailureReason.Network -> ErrorPlacement(bannerMessage = error.message.takeIf { isOnline })
         LoginFailureReason.AccountLocked,
+        LoginFailureReason.Network,
         LoginFailureReason.Unknown,
         -> ErrorPlacement(bannerMessage = error.message)
     }
-
-// Only shown when the device has no network (see LoginScreen's isOnline check) — first login
-// needs a real API call, so this is the one precondition worth calling out, placed right above
-// the login button instead of always-on at the bottom of the screen. Body copy uses body scale
-// (16sp) per CLAUDE.md's rule that Caption (14sp) is only for secondary metadata, not guidance.
-@Composable
-private fun OfflineWarningNote() {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusLarge))
-                .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.WifiOff,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Column {
-            Text(
-                text = "Cần kết nối Internet để đăng nhập lần đầu.",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                text = "Kiểm tra kết nối rồi thử lại.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
