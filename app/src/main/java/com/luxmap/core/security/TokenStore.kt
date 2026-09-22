@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
+import java.security.GeneralSecurityException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,12 +64,26 @@ class TokenStore
 
         // Called once when the app is launched fresh. A missing flag counts as "remembered", so
         // sessions saved before this option existed are not logged out by the update.
+        // A kept session is also decrypted once here. If it cannot be read, currentTokens() clears
+        // it, so the app opens on Login instead of showing a session that does not work.
         suspend fun clearIfNotRemembered() {
             val remembered = context.sessionDataStore.data.first()[REMEMBER_ME_KEY] ?: true
-            if (!remembered) clear()
+            if (remembered) currentTokens() else clear()
         }
 
-        suspend fun currentTokens(): SessionTokens? = toSessionTokens(context.sessionDataStore.data.first())
+        // If the tokens cannot be decrypted (for example the Keystore key is gone after a restore
+        // or a lock screen reset), the saved session is useless. Clear it so the app goes back to
+        // Login instead of crashing.
+        suspend fun currentTokens(): SessionTokens? =
+            try {
+                toSessionTokens(context.sessionDataStore.data.first())
+            } catch (_: GeneralSecurityException) {
+                clear()
+                null
+            } catch (_: IllegalArgumentException) {
+                clear()
+                null
+            }
 
         // Used by TokenAuthenticator (okhttp3.Authenticator) — a synchronous API that runs on
         // an OkHttp background thread, not the main thread, so runBlocking is fine here.

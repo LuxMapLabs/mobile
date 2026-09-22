@@ -17,9 +17,17 @@ object ApiClient {
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonConverterFactory = json.asConverterFactory("application/json".toMediaType())
 
+    // Never log bodies or headers: login and refresh bodies hold the password and tokens, and the
+    // Authorization header holds the access token. Release logs nothing; debug logs only the
+    // request line and status code.
     private val loggingInterceptor =
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level =
+                if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.BASIC
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
         }
 
     // "Plain" client — no Authorization header, no Authenticator. AuthApi (login/refresh/
