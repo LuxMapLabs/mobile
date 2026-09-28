@@ -16,13 +16,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// bindService() in startSession() is async, so the connection can still be landing by the time
+// the user taps "Dừng quay" right away. A real recording lasts minutes, so a bind that still
+// hasn't landed after this long means something is actually wrong, not just a race.
+private const val BIND_WAIT_TIMEOUT_MS = 5_000L
 
 // Thin seam over SurveyCaptureService (Task 17d) so CaptureViewModel takes an interface, not a
 // Context or a live Service — keeping it constructor-mockable like every other ViewModel in this
@@ -46,7 +54,11 @@ class RealSurveyCaptureController
     constructor(
         @ApplicationContext private val context: Context,
     ) : SurveyCaptureController {
-        private var boundService: SurveyCaptureService? = null
+        // A StateFlow (not a plain var) so stopSession() can suspend until a bind that is still in
+        // flight lands, instead of reading a possibly-still-null value right away (that used to
+        // report a false "Đóng gói thất bại" for a session that actually packaged fine, and skipped
+        // unbindService() on that early-return path, leaking the ServiceConnection registration).
+        private val boundService = MutableStateFlow<SurveyCaptureService?>(null)
         private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         private var gpsForwardingJob: Job? = null
 
@@ -60,7 +72,7 @@ class RealSurveyCaptureController
                     binder: IBinder?,
                 ) {
                     val service = (binder as SurveyCaptureService.LocalBinder).service()
-                    boundService = service
+                    boundService.value = service
                     // Forward the service's live GPS signal state into this controller's own
                     // StateFlow, since binder connections can drop/rebind but the ViewModel holds
                     // one stable StateFlow reference for the whole screen's lifetime.
@@ -72,7 +84,7 @@ class RealSurveyCaptureController
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
-                    boundService = null
+                    boundService.value = null
                     gpsForwardingJob?.cancel()
                 }
             }
@@ -96,10 +108,15 @@ class RealSurveyCaptureController
             val stopIntent =
                 Intent(context, SurveyCaptureService::class.java).setAction(SurveyCaptureService.ACTION_STOP)
             context.startService(stopIntent)
-            val service = boundService ?: return flowOf(PackageResult.Failure("Service not bound"))
-            return service.packagingResult
-                .filterNotNull()
-                .take(1)
-                .onCompletion { context.unbindService(connection) }
+            return flow {
+                // Wait for the bind from startSession() to land instead of reading boundService
+                // right away — see the field's own comment for why.
+                val service = withTimeoutOrNull(BIND_WAIT_TIMEOUT_MS) { boundService.filterNotNull().first() }
+                if (service == null) {
+                    emit(PackageResult.Failure("Service not bound"))
+                    return@flow
+                }
+                emitAll(service.packagingResult.filterNotNull().take(1))
+            }.onCompletion { context.unbindService(connection) }
         }
     }

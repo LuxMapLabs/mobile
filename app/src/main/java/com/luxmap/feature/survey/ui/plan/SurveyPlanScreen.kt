@@ -1,6 +1,9 @@
 package com.luxmap.feature.survey.ui.plan
 
 import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -16,18 +19,51 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 
-// The only 2 permissions the F03 readiness checklist can fix in-app (camera + fine location, see
+// Camera + fine location are the 2 permissions the F03 readiness checklist can fix in-app (see
 // SurveyReadinessInputProvider). Exposure-lock support, storage and battery are device state, not
 // something a permission prompt can change.
-private val CAPTURE_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+//
+// BLUETOOTH_SCAN/BLUETOOTH_CONNECT are added on API 31+ only: connectGatt() (LuxSensorBleClient,
+// called from CaptureViewModel right after this screen hands off to F04) needs them at runtime on
+// Android 12+, where they are dangerous permissions - the manifest already declares them with no
+// maxSdkVersion. Below API 31, BLUETOOTH/BLUETOOTH_ADMIN cover this through the manifest alone, no
+// runtime request needed (and the 31+ constants should not be requested pre-31).
+private val CAPTURE_PERMISSIONS: Array<String> =
+    buildList {
+        add(Manifest.permission.CAMERA)
+        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            add(Manifest.permission.BLUETOOTH_SCAN)
+            add(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+    }.toTypedArray()
+
+// BLUETOOTH_SCAN/BLUETOOTH_CONNECT are not part of SurveyReadinessResult (that model is
+// WP2/WP5/Tasks 3/11/12 territory, out of scope for this fix), so this screen tracks them
+// separately, only to decide whether "Cấp quyền" still needs to show - CaptureViewModel calls
+// LuxSensorBleClient.connect() right after this screen hands off, and connectGatt() needs these on
+// API 31+ or it throws a SecurityException.
+private fun hasBlePermissions(context: Context): Boolean =
+    Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+        (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) ==
+                PackageManager.PERMISSION_GRANTED &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
+        )
 
 @Composable
 fun SurveyPlanScreen(
@@ -35,6 +71,8 @@ fun SurveyPlanScreen(
     viewModel: SurveyPlanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var hasBlePermissions by remember { mutableStateOf(hasBlePermissions(context)) }
 
     when (val state = uiState) {
         is SurveyPlanUiState.Loading ->
@@ -49,6 +87,7 @@ fun SurveyPlanScreen(
             // SurveyReadinessInputProvider.gather()).
             val permissionLauncher =
                 rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                    hasBlePermissions = hasBlePermissions(context)
                     state.selectedSurveySweepId?.let { viewModel.onRouteSelected(it) }
                 }
             LazyColumn(
@@ -60,6 +99,7 @@ fun SurveyPlanScreen(
                         route = route,
                         isSelected = route.surveySweepId == state.selectedSurveySweepId,
                         readiness = if (route.surveySweepId == state.selectedSurveySweepId) state.readiness else null,
+                        hasBlePermissions = hasBlePermissions,
                         onClick = { viewModel.onRouteSelected(route.surveySweepId) },
                         onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
                         onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
@@ -85,6 +125,7 @@ private fun SurveyRouteCard(
     route: AssignedSurveyRoute,
     isSelected: Boolean,
     readiness: SurveyReadinessResult?,
+    hasBlePermissions: Boolean,
     onClick: () -> Unit,
     onEnterCaptureMode: () -> Unit,
     onRequestPermissions: () -> Unit,
@@ -100,13 +141,22 @@ private fun SurveyRouteCard(
             Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
         } else {
             ReadinessChecklist(readiness)
-            // Camera and GPS permission are the only checklist items this screen can fix without
-            // leaving the app (spec gap: there was no in-app way to grant them before, so a user
-            // who never granted them could never reach F04 at all).
-            if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable) {
+            // Camera, GPS, and (on API 31+) Bluetooth scan/connect are the permissions this screen
+            // can fix without leaving the app (spec gap: there was no in-app way to grant them
+            // before, so a user who never granted them could never reach F04 at all). Bluetooth is
+            // not part of the readiness checklist model itself (out of scope for this fix), so it
+            // is checked separately here, only to decide whether this button still needs to show.
+            if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable || !hasBlePermissions) {
                 PrimaryButton(text = "Cấp quyền", onClick = onRequestPermissions)
             }
-            PrimaryButton(text = "Vào chế độ khảo sát", onClick = onEnterCaptureMode, enabled = readiness.isReady)
+            // hasBlePermissions is also required here (not just readiness.isReady), not only shown
+            // as a hint through the button above - otherwise a user could enter F04 without it and
+            // hit a SecurityException from connectGatt() on API 31+.
+            PrimaryButton(
+                text = "Vào chế độ khảo sát",
+                onClick = onEnterCaptureMode,
+                enabled = readiness.isReady && hasBlePermissions,
+            )
         }
     }
 }
