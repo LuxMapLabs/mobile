@@ -50,28 +50,43 @@ class LuxSensorBleClient
         private val _samples = MutableSharedFlow<LuxSample>(extraBufferCapacity = 64)
         val samples: SharedFlow<LuxSample> = _samples.asSharedFlow()
 
+        // connect()/disconnect() can run on the caller's thread (Task 17d: SurveyCaptureService,
+        // likely main thread) at the same time onConnectionStateChange runs on a Binder callback
+        // thread and auto-reconnects. Without a lock, disconnect() could read a stale gatt and
+        // close the wrong object while a concurrent auto-reconnect keeps a fresh connection alive
+        // unmanaged. Same pattern as NdjsonLogWriter's lock: every read/write of gatt,
+        // lastDeviceAddress and userInitiatedDisconnect goes through this one lock, so the
+        // check-then-act sequence (check userInitiatedDisconnect, then connect()) is atomic, not
+        // just individually volatile fields. synchronized is a Java monitor and is reentrant per
+        // thread, so connect() calling itself from inside a synchronized block (the auto-reconnect
+        // branch below) does not deadlock.
+        private val lock = Any()
         private var gatt: BluetoothGatt? = null
         private var lastDeviceAddress: String? = null
         private var userInitiatedDisconnect = false
 
         fun connect(deviceAddress: String) {
-            userInitiatedDisconnect = false
-            lastDeviceAddress = deviceAddress
-            _connectionState.value = BleConnectionState.Connecting
-            // BluetoothAdapter.getDefaultAdapter() is deprecated since API 31 and can return null.
-            // BluetoothManager.adapter is the supported replacement and is always available here
-            // (BluetoothManager is a plain system service, not a new library dependency).
-            val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
-            val device = bluetoothManager.adapter.getRemoteDevice(deviceAddress)
-            gatt = device.connectGatt(context, false, gattCallback)
+            synchronized(lock) {
+                userInitiatedDisconnect = false
+                lastDeviceAddress = deviceAddress
+                _connectionState.value = BleConnectionState.Connecting
+                // BluetoothAdapter.getDefaultAdapter() is deprecated since API 31 and can return null.
+                // BluetoothManager.adapter is the supported replacement and is always available here
+                // (BluetoothManager is a plain system service, not a new library dependency).
+                val bluetoothManager = context.getSystemService(BluetoothManager::class.java)
+                val device = bluetoothManager.adapter.getRemoteDevice(deviceAddress)
+                gatt = device.connectGatt(context, false, gattCallback)
+            }
         }
 
         fun disconnect() {
-            userInitiatedDisconnect = true
-            gatt?.disconnect()
-            gatt?.close()
-            gatt = null
-            _connectionState.value = BleConnectionState.Disconnected
+            synchronized(lock) {
+                userInitiatedDisconnect = true
+                gatt?.disconnect()
+                gatt?.close()
+                gatt = null
+                _connectionState.value = BleConnectionState.Disconnected
+            }
         }
 
         private val gattCallback =
@@ -85,16 +100,18 @@ class LuxSensorBleClient
                         connectedGatt.discoverServices()
                     } else {
                         _connectionState.value = BleConnectionState.Disconnected
-                        if (!userInitiatedDisconnect) {
-                            // Close the old GATT client before reconnecting. connectGatt() always
-                            // registers a new GATT client with the OS, and the platform has a small
-                            // hard cap on how many can be open at once (historically ~30). Without
-                            // this close(), repeated auto-reconnects (e.g. the sensor module losing
-                            // power over and over in the field) would leak one client slot per
-                            // reconnect and eventually make every further connect() attempt fail.
-                            connectedGatt.close()
-                            // Auto-reconnect (spec §11 — a session must not stop on a BLE drop).
-                            lastDeviceAddress?.let { connect(it) }
+                        synchronized(lock) {
+                            if (!userInitiatedDisconnect) {
+                                // Close the old GATT client before reconnecting. connectGatt() always
+                                // registers a new GATT client with the OS, and the platform has a small
+                                // hard cap on how many can be open at once (historically ~30). Without
+                                // this close(), repeated auto-reconnects (e.g. the sensor module losing
+                                // power over and over in the field) would leak one client slot per
+                                // reconnect and eventually make every further connect() attempt fail.
+                                connectedGatt.close()
+                                // Auto-reconnect (spec §11 — a session must not stop on a BLE drop).
+                                lastDeviceAddress?.let { connect(it) }
+                            }
                         }
                     }
                 }
