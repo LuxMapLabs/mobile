@@ -25,6 +25,12 @@ class NdjsonLogWriter(
     // isDaemon = true so the timer does not prevent the app from exiting
     private val flushTimer = Timer(true)
 
+    // Timer.cancel() does not interrupt a TimerTask that already started running -- without this
+    // flag, a flush already in flight when close() runs can still acquire the lock afterward and
+    // call flush() on an already-closed writer, throwing an uncaught IOException on the Timer
+    // thread (which crashes the process on Android). Only read/written under `lock`.
+    private var closed = false
+
     init {
         synchronized(lock) {
             writer.write("""{"schema_version":"v0","file_role":"$fileRole"}""")
@@ -33,7 +39,10 @@ class NdjsonLogWriter(
         }
         flushTimer.scheduleAtFixedRate(
             object : TimerTask() {
-                override fun run() = synchronized(lock) { writer.flush() }
+                override fun run() =
+                    synchronized(lock) {
+                        if (!closed) writer.flush()
+                    }
             },
             flushIntervalMs,
             flushIntervalMs,
@@ -50,6 +59,7 @@ class NdjsonLogWriter(
     fun close() {
         flushTimer.cancel()
         synchronized(lock) {
+            closed = true
             writer.flush()
             writer.close()
         }
