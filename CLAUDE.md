@@ -76,7 +76,7 @@ Hai điểm tác động trực tiếp tới mô hình dữ liệu và kiến tr
 - **Firebase Cloud Messaging** — push notification
 - **Android Keystore** — bảo vệ token và dữ liệu xác thực nhạy cảm
 - ktlint cho format code
-- Testing: JUnit + MockK (unit), MockK-Android (`io.mockk:mockk-android`, chỉ dùng trong `androidTest` — bản `mockk` thường không mock được final class/Camera2 type trên runtime Android thật, đã xác nhận với chủ dự án 2026-09-28 khi làm FM-08 Task 3 `ExposureLockController`), Turbine (Flow/StateFlow), MockWebServer (API), Room Testing (migration/transaction/queue), Compose UI Test (luồng UI chính)
+- Testing: JUnit + MockK (unit), MockK-Android (`io.mockk:mockk-android`, chỉ dùng trong `androidTest` — bản `mockk` thường không mock được final class/Camera2 type trên runtime Android thật, đã xác nhận với chủ dự án 2026-09-28 khi làm FM-08 Task 3 `ExposureLockController`), `androidx.test:core` (hạ tầng nền tảng AndroidX Test cho `ApplicationProvider`/Context trong `androidTest`, cùng họ với `androidx.test.ext:junit`/`espresso-core` đã có sẵn — đã xác nhận với chủ dự án 2026-09-28 khi làm FM-08 Task 9 Room DAO test, cần cho mọi instrumented test dùng Room in-memory database), Turbine (Flow/StateFlow — dùng được cả ở `test` lẫn `androidTest`), MockWebServer (API), Room Testing (migration/transaction/queue), Compose UI Test (luồng UI chính)
 
 ### Công nghệ chủ động không dùng ở giai đoạn hiện tại
 
