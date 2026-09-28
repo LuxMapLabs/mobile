@@ -51,6 +51,12 @@ class NdjsonLogWriter(
 
     fun appendLine(json: String) {
         synchronized(lock) {
+            // A producer can still call this after close(). Fused Location cannot un-post a
+            // LocationCallback that is already queued on the main looper, so that callback can fire
+            // after the service closed this writer -- and it runs on the main thread, outside any
+            // coroutine scope, so an IOException("Stream closed") from here would crash the app.
+            // Drop the line instead: the same reason the periodic flush above checks `closed`.
+            if (closed) return
             writer.write(json)
             writer.newLine()
         }
