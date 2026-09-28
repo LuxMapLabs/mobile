@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
+import android.util.Log
 import android.view.Surface
 import com.luxmap.core.camera.ExposureLockController
 import com.luxmap.core.camera.FrameTimestampLogger
@@ -24,6 +25,7 @@ import com.luxmap.core.camera.VideoSegmentResult
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +37,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -98,6 +101,11 @@ class VideoCaptureSession
         // only to spot a queue head that is far too old to belong to the current frame.
         private var ptsToSensorOffsetUs: Long? = null
 
+        // How many frames in a row the staleness guard has dropped something. A guard that fires
+        // on every frame means the anchor itself is probably wrong, not the queue — see
+        // takeSensorTimestampFor().
+        private var consecutiveGuardDrops = 0
+
         // Cached from the ONE-TIME INFO_OUTPUT_FORMAT_CHANGED event. MediaCodec fires it once per
         // encoder lifetime, not once per segment, but every new segment's MediaMuxer still needs
         // it for addTrack() — the spike hit exactly this bug on its first rotation.
@@ -105,6 +113,15 @@ class VideoCaptureSession
 
         private var drainJob: Job? = null
         private val firstSegmentReady = CompletableDeferred<Unit>()
+
+        // The drain loop runs in the caller's scope, so an exception there would otherwise cancel
+        // that scope with nothing left to read. Kept here so Task 17d's service can tell the user
+        // the recording is broken instead of the failure vanishing. Callers must check it.
+        @Volatile
+        private var drainFailure: Throwable? = null
+
+        val failure: Throwable?
+            get() = drainFailure
 
         suspend fun start(
             scope: CoroutineScope,
@@ -115,7 +132,23 @@ class VideoCaptureSession
         ) {
             this.sessionId = sessionId
             this.sessionDir = sessionDir
+            try {
+                startCapture(scope, profile, segmentDurationMs)
+            } catch (failed: Throwable) {
+                // One failed attempt must not leave the camera device open: every later attempt
+                // would then fail with CAMERA_IN_USE for the rest of the process's life.
+                Log.e(TAG, "Failed to start capture session; releasing camera", failed)
+                cancelDrainJob()
+                releaseCaptureResources()
+                throw failed
+            }
+        }
 
+        private suspend fun startCapture(
+            scope: CoroutineScope,
+            profile: LockedCameraProfile,
+            segmentDurationMs: Long,
+        ) {
             val thread = HandlerThread("luxmap-camera").apply { start() }
             cameraThread = thread
             val handler = Handler(thread.looper)
@@ -152,11 +185,11 @@ class VideoCaptureSession
 
             // Segment 0 is opened by the drain loop, not here (see openFirstSegment). start()
             // still only returns once that happened, so callers keep the guarantee that an open
-            // local_survey_video_segment row exists as soon as start() returns.
+            // local_survey_video_segment row exists as soon as start() returns. start() releases
+            // everything if this throws.
             try {
                 withTimeout(FIRST_SEGMENT_TIMEOUT_MS) { firstSegmentReady.await() }
             } catch (timeout: TimeoutCancellationException) {
-                releaseAfterFailedStart()
                 throw IllegalStateException("Encoder produced no output within $FIRST_SEGMENT_TIMEOUT_MS ms", timeout)
             }
         }
@@ -185,7 +218,24 @@ class VideoCaptureSession
                 }
             }
 
+        // Any failure in here (MediaMuxer, a full disk from appendLine, Room) would otherwise
+        // escape scope.launch and cancel the caller's scope with no error left to read. Keep it,
+        // so stop() and Task 17d can see what went wrong.
         private suspend fun drainEncoderOutput() {
+            try {
+                drainUntilEndOfStream()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failed: Throwable) {
+                drainFailure = failed
+                Log.e(TAG, "Encoder drain loop failed; the recording is broken from this point", failed)
+                // Unblock a start() still waiting for segment 0 instead of making it wait out the
+                // whole timeout.
+                firstSegmentReady.completeExceptionally(failed)
+            }
+        }
+
+        private suspend fun drainUntilEndOfStream() {
             val bufferInfo = MediaCodec.BufferInfo()
             while (currentCoroutineContext().isActive) {
                 val outputIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
@@ -195,12 +245,17 @@ class VideoCaptureSession
                 }
                 if (outputIndex < 0) continue
 
+                // stop() signals end of input and then waits for this flag, so the frames still
+                // held inside the encoder are muxed instead of being thrown away with the job.
+                val isEndOfStream = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
                 val isCodecConfig = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                 if (isCodecConfig || bufferInfo.size == 0) {
                     // SPS/PPS header, already inside the MediaFormat given to MediaMuxer.addTrack().
                     // Muxing it as a sample corrupts the track, and counting it as a frame would
-                    // steal one SENSOR_TIMESTAMP from the real first frame.
+                    // steal one SENSOR_TIMESTAMP from the real first frame. The end-of-stream
+                    // buffer is usually empty too, so it lands here.
                     mediaCodec.releaseOutputBuffer(outputIndex, false)
+                    if (isEndOfStream) return
                     continue
                 }
 
@@ -216,6 +271,11 @@ class VideoCaptureSession
                 currentMuxerPort?.setPendingSample(outputBuffer, bufferInfo)
                 val closedSegment =
                     recorder.onEncodedFrame(isKeyFrame, bufferInfo.presentationTimeUs, sensorTimestampNs)
+
+                // The frame that triggers a rotation is written to the NEW segment, so bump the
+                // index before logging it: the server uses this `segment` field plus video_pts_us
+                // to find the frame in the right file, and it must name the file it really is in.
+                if (closedSegment != null) currentSegmentIndex = closedSegment.segmentIndex + 1
 
                 val entry =
                     frameTimestampLogger.buildEntry(
@@ -233,10 +293,11 @@ class VideoCaptureSession
 
                 if (closedSegment != null) {
                     persistClosedSegment(closedSegment)
-                    currentSegmentIndex = closedSegment.segmentIndex + 1
                     val path = File(sessionDir, "segment_$currentSegmentIndex.mp4").absolutePath
                     persistNewSegment(currentSegmentIndex, path)
                 }
+
+                if (isEndOfStream) return
             }
         }
 
@@ -264,18 +325,41 @@ class VideoCaptureSession
         private fun takeSensorTimestampFor(presentationTimeUs: Long): Long =
             synchronized(timestampLock) {
                 val offsetUs = ptsToSensorOffsetUs
+                var dropped = 0
                 if (offsetUs != null) {
                     val oldestAcceptableUs = presentationTimeUs + offsetUs - MAX_PAIRING_SKEW_US
                     while (pendingSensorTimestamps.size > 1 &&
                         pendingSensorTimestamps.first() / 1000 < oldestAcceptableUs
                     ) {
                         pendingSensorTimestamps.removeFirst()
+                        dropped++
                     }
                 }
-                val paired =
-                    pendingSensorTimestamps.removeFirstOrNull()
-                        ?: return@synchronized (presentationTimeUs + (offsetUs ?: 0L)) * 1000
-                if (offsetUs == null) ptsToSensorOffsetUs = paired / 1000 - presentationTimeUs
+                consecutiveGuardDrops = if (dropped > 0) consecutiveGuardDrops + 1 else 0
+                if (dropped > 0) {
+                    Log.w(
+                        TAG,
+                        "Timestamp guard dropped $dropped stale entries at pts=$presentationTimeUs " +
+                            "(offset=${offsetUs}us, $consecutiveGuardDrops frames in a row)",
+                    )
+                }
+
+                val paired = pendingSensorTimestamps.removeFirstOrNull()
+                if (paired == null) {
+                    Log.w(TAG, "No queued SENSOR_TIMESTAMP for pts=$presentationTimeUs; using offset=${offsetUs}us")
+                    return@synchronized (presentationTimeUs + (offsetUs ?: 0L)) * 1000
+                }
+                if (offsetUs == null) {
+                    ptsToSensorOffsetUs = paired / 1000 - presentationTimeUs
+                    Log.i(TAG, "Learned pts->sensor offset: ${ptsToSensorOffsetUs}us")
+                } else if (consecutiveGuardDrops >= MAX_CONSECUTIVE_GUARD_DROPS) {
+                    // Dropping on every frame for this long means the anchor is wrong, not the
+                    // queue. Re-learn it here; without this the guard would mis-pair forever with
+                    // no way back, because the anchor is normally learned only once.
+                    ptsToSensorOffsetUs = paired / 1000 - presentationTimeUs
+                    consecutiveGuardDrops = 0
+                    Log.w(TAG, "Re-anchored pts->sensor offset to ${ptsToSensorOffsetUs}us (was ${offsetUs}us)")
+                }
                 paired
             }
 
@@ -284,42 +368,55 @@ class VideoCaptureSession
         // review feedback — not the requested LockedCameraProfile, which may not be exactly what
         // the sensor settled on.
         suspend fun stop(): FinalizedVideoCapture {
-            drainJob?.cancelAndJoin()
-            captureSession.stopRepeating()
-            mediaCodec.signalEndOfInputStream()
-            val finalSegment = recorder.stop()
-            persistClosedSegment(finalSegment)
-            frameTimestampWriter.close()
-            mediaCodec.stop()
-            mediaCodec.release()
-            captureSession.close()
-            cameraDevice.close()
-            quitCameraThread()
+            try {
+                // Stop the camera, tell the encoder no more input is coming, then let the drain
+                // loop finish on its own so the frames still inside the encoder are muxed. Ending
+                // the job first would simply throw them away.
+                runCatching { captureSession.stopRepeating() }
+                runCatching { mediaCodec.signalEndOfInputStream() }
+                awaitDrainTail()
 
-            val result = requireNotNull(lastCaptureResult) { "No CaptureResult observed before stop()" }
-            val actualProfile =
-                LockedCameraProfile(
-                    isoSensitivity = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0,
-                    exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L,
-                    frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
-                )
-            return FinalizedVideoCapture(finalSegment, actualProfile, Build.MANUFACTURER, Build.MODEL, cameraId)
+                val finalSegment = recorder.stop()
+                persistClosedSegment(finalSegment)
+
+                val result = requireNotNull(lastCaptureResult) { "No CaptureResult observed before stop()" }
+                val actualProfile =
+                    LockedCameraProfile(
+                        isoSensitivity = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0,
+                        exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L,
+                        frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
+                    )
+                return FinalizedVideoCapture(finalSegment, actualProfile, Build.MANUFACTURER, Build.MODEL, cameraId)
+            } finally {
+                // Runs even when a step above throws, so the camera and the NDJSON tail are never
+                // left behind by a failing stop().
+                releaseCaptureResources()
+            }
         }
 
-        // A failed start() must not leave the camera open, or the device stays locked for every
-        // later attempt. Each step is guarded because we do not know how far start() got.
-        private suspend fun releaseAfterFailedStart() {
-            drainJob?.cancelAndJoin()
-            runCatching { captureSession.stopRepeating() }
-            runCatching { captureSession.close() }
+        // Bounded so a stuck encoder cannot hang shutdown forever; after the timeout we give up on
+        // the tail frames rather than never returning from stop().
+        private suspend fun awaitDrainTail() {
+            val job = drainJob ?: return
+            val finished = withTimeoutOrNull(DRAIN_TAIL_TIMEOUT_MS) { job.join() }
+            if (finished == null) {
+                Log.w(TAG, "Encoder did not report end of stream within $DRAIN_TAIL_TIMEOUT_MS ms; dropping tail")
+                job.cancelAndJoin()
+            }
+        }
+
+        private suspend fun cancelDrainJob() {
+            runCatching { drainJob?.cancelAndJoin() }
+        }
+
+        // Every step is guarded on its own: one failing release must not skip the rest, and some
+        // of these fields are lateinit, so a failure early in start() leaves them unset.
+        private fun releaseCaptureResources() {
+            runCatching { frameTimestampWriter.close() }
             runCatching { mediaCodec.stop() }
             runCatching { mediaCodec.release() }
+            runCatching { captureSession.close() }
             runCatching { cameraDevice.close() }
-            runCatching { frameTimestampWriter.close() }
-            quitCameraThread()
-        }
-
-        private fun quitCameraThread() {
             cameraThread?.quitSafely()
             cameraThread = null
             cameraHandler = null
@@ -413,6 +510,7 @@ class VideoCaptureSession
 
         // Finalized against the Task 2 spike's findings — do not change these without re-running it.
         private companion object {
+            const val TAG = "VideoCaptureSession"
             const val DEQUEUE_TIMEOUT_US = 10_000L
             const val VIDEO_WIDTH = 1920
             const val VIDEO_HEIGHT = 1080
@@ -428,5 +526,12 @@ class VideoCaptureSession
             // learned offset that is a frame or two off, only on the kind of gross desync the spike
             // measured after a repeating-request swap (tens of seconds).
             const val MAX_PAIRING_SKEW_US = 250_000L
+
+            // ~1 second at 30 fps. A real desync is corrected within a frame or two, so the guard
+            // still firing after this long points at the anchor, not at the queue.
+            const val MAX_CONSECUTIVE_GUARD_DROPS = 30
+
+            // Long enough for the encoder to flush a couple of seconds of buffered frames.
+            const val DRAIN_TAIL_TIMEOUT_MS = 5_000L
         }
     }
