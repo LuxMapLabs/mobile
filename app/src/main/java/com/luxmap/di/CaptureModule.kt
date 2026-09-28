@@ -1,5 +1,7 @@
 package com.luxmap.di
 
+import com.luxmap.feature.survey.capture.RealSurveyCaptureController
+import com.luxmap.feature.survey.capture.SurveyCaptureController
 import com.luxmap.feature.survey.domain.RealSurveyReadinessInputProvider
 import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
 import dagger.Binds
@@ -15,4 +17,7 @@ import dagger.hilt.components.SingletonComponent
 abstract class CaptureModule {
     @Binds
     abstract fun bindSurveyReadinessInputProvider(impl: RealSurveyReadinessInputProvider): SurveyReadinessInputProvider
+
+    @Binds
+    abstract fun bindSurveyCaptureController(impl: RealSurveyCaptureController): SurveyCaptureController
 }
