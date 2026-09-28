@@ -153,7 +153,7 @@ git commit -m "docs(fm-survey): reconcile CLAUDE.md with C8.5 naming authority a
 **Interfaces:**
 - Produces: the Room Gradle dependencies (runtime, ktx, ksp compiler, testing), available for Task 9 to use.
 
-**Correction found while executing this plan (Round-1 blocker, real):** the original version of this task also created an empty `AppDatabase` (`@Database(entities = [], ...)`) and its `DatabaseModule`. Room's KSP processor rejects an empty `entities` list at compile time (`@Database annotation must specify list of entities`) — reproduced directly, not a implementer misdiagnosis. `AppDatabase.kt` and `DatabaseModule.kt` cannot exist until there is at least one real `@Entity`, so their creation moves to Task 9 (the first task with entities to put in it). This task now only wires the Gradle dependencies and the drift log — no Room-annotated Kotlin code yet.
+**Correction found while executing this plan (Round-1 blocker, real):** the original version of this task also created an empty `AppDatabase` (`@Database(entities = [], ...)`) and its `DatabaseModule`. Room's KSP processor rejects an empty `entities` list at compile time (`@Database annotation must specify list of entities`) — reproduced directly, not an implementer misdiagnosis. `AppDatabase.kt` and `DatabaseModule.kt` cannot exist until there is at least one real `@Entity`, so their creation moves to Task 9 (the first task with entities to put in it). This task now only wires the Gradle dependencies and the drift log — no Room-annotated Kotlin code yet.
 
 - [ ] **Step 1: Check whether `docs/contract-drift.md` already exists**
 
