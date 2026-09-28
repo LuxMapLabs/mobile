@@ -30,7 +30,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
-import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -38,6 +37,7 @@ import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
+import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -141,7 +141,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 HomeRoute()
             }
             composable(Routes.Survey.route) {
-                PlaceholderScreen(title = "Khảo sát")
+                SurveyPlanScreen(
+                    // Routes.SurveyCapture doesn't exist yet — Task 18 adds the real destination and creates
+                    // it. Until then this is a documented no-op, not a silent gap: the button is disabled
+                    // whenever readiness.isReady is false, and this screen is the only entry point to F04.
+                    onEnterCaptureMode = { },
+                )
             }
             composable(Routes.Map.route) {
                 MapScreen(
