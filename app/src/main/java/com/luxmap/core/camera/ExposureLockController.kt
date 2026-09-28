@@ -5,7 +5,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import javax.inject.Inject
 
-// Held across a whole recording session (spec: "áp dụng và giữ suốt phiên quay"), not just one shot.
+// Held across a whole recording session (spec requires keeping the lock for the whole capture), not just one shot.
 data class LockedCameraProfile(
     val isoSensitivity: Int,
     val exposureTimeNs: Long,
