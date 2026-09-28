@@ -149,6 +149,15 @@ fun SyncStatus.badgeColors(): BadgeColors =
 // Component — badge ưu tiên Work Order (mục 2.5), một màu chữ trên nền surface, không có nền riêng
 enum class WorkOrderPriority { LOW, NORMAL, HIGH, URGENT }
 
+// Nhãn đúng chữ trong CLAUDE.md "Badge ưu tiên Work Order" — dùng chung cho mọi nơi hiển thị priority.
+fun WorkOrderPriority.label(): String =
+    when (this) {
+        WorkOrderPriority.LOW -> "Thấp"
+        WorkOrderPriority.NORMAL -> "Bình thường"
+        WorkOrderPriority.HIGH -> "Cao"
+        WorkOrderPriority.URGENT -> "Khẩn"
+    }
+
 fun WorkOrderPriority.color(): Color =
     when (this) {
         WorkOrderPriority.LOW -> Gray500

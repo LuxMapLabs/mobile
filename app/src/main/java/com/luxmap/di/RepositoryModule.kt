@@ -2,6 +2,8 @@ package com.luxmap.di
 
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.auth.data.RealAuthRepository
+import com.luxmap.feature.home.data.FakeHomeRepository
+import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.map.data.FakeMapRepository
 import com.luxmap.feature.map.data.FakePoleDetailRepository
 import com.luxmap.feature.map.data.MapRepository
@@ -25,4 +27,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindAuthRepository(impl: RealAuthRepository): AuthRepository
+
+    @Binds
+    abstract fun bindHomeRepository(impl: FakeHomeRepository): HomeRepository
 }

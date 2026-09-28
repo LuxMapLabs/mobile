@@ -33,6 +33,7 @@ import com.luxmap.core.ui.components.BottomNavItem
 import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
+import com.luxmap.feature.home.ui.HomeRoute
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
@@ -137,7 +138,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Home.route) {
-                PlaceholderScreen(title = "Việc hôm nay")
+                HomeRoute()
             }
             composable(Routes.Survey.route) {
                 PlaceholderScreen(title = "Khảo sát")

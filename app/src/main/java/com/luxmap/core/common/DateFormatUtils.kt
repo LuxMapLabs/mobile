@@ -28,6 +28,14 @@ object DateFormatUtils {
         }
     }
 
+    // For a value the app already holds as Instant (for example lastSyncedAt, set by a
+    // ViewModel when it fetches data — not parsed from a server field), so there is no string
+    // to fail parsing on.
+    fun formatInstant(instant: Instant?): String {
+        if (instant == null) return "Chưa cập nhật"
+        return instant.atZone(ZoneId.systemDefault()).format(isoDisplayFormatter)
+    }
+
     // Same safety as formatIsoInstant, date only — for compact labels like a photo overlay.
     fun formatIsoDateOnly(iso: String?): String {
         if (iso.isNullOrBlank()) return "Chưa cập nhật"
