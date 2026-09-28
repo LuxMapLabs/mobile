@@ -21,10 +21,11 @@ class HeadingSensorTest {
 
     @Test
     fun headingIsNormalizedToTheZeroToThreeSixtyDegreeRange() {
-        // A rotation vector representing a small negative-azimuth rotation around the Z axis
-        // (sin(-5 deg / 2), 0, 0 style) should not surface as a negative heading.
-        val sample = sensor.headingFromRotationVector(floatArrayOf(0f, 0f, -0.0436f), eventElapsedRealtimeNs = 0L)
+        // For a pure-yaw rotation vector, azimuth comes out with the opposite sign of the vector's
+        // own z component -- a positive z here yields a small NEGATIVE raw azimuth (about -5 degrees),
+        // which is the case that actually exercises the (azimuthDeg + 360f) % 360f wraparound.
+        val sample = sensor.headingFromRotationVector(floatArrayOf(0f, 0f, 0.0436f), eventElapsedRealtimeNs = 0L)
 
-        assert(sample.headingDeg in 0.0f..360.0f)
+        assertEquals(355.0f, sample.headingDeg, 0.5f)
     }
 }
