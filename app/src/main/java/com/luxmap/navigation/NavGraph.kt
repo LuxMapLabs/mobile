@@ -30,6 +30,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
+import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -37,6 +38,7 @@ import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
+import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 
 // The 4 tabs of the main area, in the order given by spec section A5.
@@ -142,11 +144,33 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
             composable(Routes.Survey.route) {
                 SurveyPlanScreen(
-                    // Routes.SurveyCapture doesn't exist yet — Task 18 adds the real destination and creates
-                    // it. Until then this is a documented no-op, not a silent gap: the button is disabled
-                    // whenever readiness.isReady is false, and this screen is the only entry point to F04.
-                    onEnterCaptureMode = { },
+                    onEnterCaptureMode = { surveySweepId ->
+                        navController.navigate(Routes.SurveyCapture.createRoute(surveySweepId))
+                    },
                 )
+            }
+            composable(
+                route = Routes.SurveyCapture.route,
+                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
+                CaptureScreen(
+                    surveySweepId = surveySweepId,
+                    onSessionPackaged = { sessionId ->
+                        navController.navigate(Routes.SurveySubmit.createRoute(sessionId)) {
+                            popUpTo(Routes.Survey.route)
+                        }
+                    },
+                )
+            }
+            composable(
+                route = Routes.SurveySubmit.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) {
+                // F06 (Task 19/20) is not built yet — this is a documented placeholder, same pattern
+                // Task 12 used for the Survey tab before its own screen existed. Do not build the
+                // real F06 screen here.
+                PlaceholderScreen(title = "Nộp đợt khảo sát")
             }
             composable(Routes.Map.route) {
                 MapScreen(

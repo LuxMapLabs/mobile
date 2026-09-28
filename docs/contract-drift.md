@@ -17,3 +17,5 @@ only for traceability, not because they are pending.
 | Upload endpoint for a session package | none — `UploadRepository` has no real implementation yet | Blocked on Backend | WP2/WP5 |
 | Server-side field names for a session package | none | Blocked on Backend | WP2/WP5 |
 | NOISE_REDUCTION_MODE / EDGE_MODE for video capture | left at camera default (neither forced OFF) | Pending WP4 decision — see ExposureLockController | WP4 |
+| BLE lux device address for F04's "Bắt đầu quay" | hardcoded `KNOWN_LUX_DEVICE_ADDRESS` constant in `CaptureScreen` | Real product gap, not a naming placeholder — `LuxDeviceScanner` (Task 17c) exists but has no scan/pairing UI wired into this screen yet | WP6 |
+| GPS-lost warning wiring in `RealSurveyCaptureController` | `gpsSignalState` is only forwarded from the bound service after `startSession()` binds; a bind that fails or drops right after start leaves the ViewModel's warning flag stuck at its last value | Real product gap, not a naming placeholder — no reconnect/rebind logic yet | WP6 |

@@ -1,5 +1,8 @@
 package com.luxmap.feature.survey.ui.plan
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +24,11 @@ import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 
+// The only 2 permissions the F03 readiness checklist can fix in-app (camera + fine location, see
+// SurveyReadinessInputProvider). Exposure-lock support, storage and battery are device state, not
+// something a permission prompt can change.
+private val CAPTURE_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+
 @Composable
 fun SurveyPlanScreen(
     onEnterCaptureMode: (surveySweepId: String) -> Unit,
@@ -34,7 +42,15 @@ fun SurveyPlanScreen(
                 CircularProgressIndicator()
             }
 
-        is SurveyPlanUiState.Success ->
+        is SurveyPlanUiState.Success -> {
+            // Re-check readiness after the permission prompt closes, no matter the result, so the
+            // checklist shows the real state right away instead of needing the user to leave and
+            // come back to this screen (onRouteSelected already re-runs
+            // SurveyReadinessInputProvider.gather()).
+            val permissionLauncher =
+                rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                    state.selectedSurveySweepId?.let { viewModel.onRouteSelected(it) }
+                }
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -46,9 +62,11 @@ fun SurveyPlanScreen(
                         readiness = if (route.surveySweepId == state.selectedSurveySweepId) state.readiness else null,
                         onClick = { viewModel.onRouteSelected(route.surveySweepId) },
                         onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
+                        onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
                     )
                 }
             }
+        }
 
         is SurveyPlanUiState.Empty ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -69,6 +87,7 @@ private fun SurveyRouteCard(
     readiness: SurveyReadinessResult?,
     onClick: () -> Unit,
     onEnterCaptureMode: () -> Unit,
+    onRequestPermissions: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(Spacing.md)) {
         Text(route.surveySweepId, style = MaterialTheme.typography.titleMedium)
@@ -81,6 +100,12 @@ private fun SurveyRouteCard(
             Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
         } else {
             ReadinessChecklist(readiness)
+            // Camera and GPS permission are the only checklist items this screen can fix without
+            // leaving the app (spec gap: there was no in-app way to grant them before, so a user
+            // who never granted them could never reach F04 at all).
+            if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable) {
+                PrimaryButton(text = "Cấp quyền", onClick = onRequestPermissions)
+            }
             PrimaryButton(text = "Vào chế độ khảo sát", onClick = onEnterCaptureMode, enabled = readiness.isReady)
         }
     }
