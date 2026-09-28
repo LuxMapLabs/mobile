@@ -8,6 +8,8 @@ import com.luxmap.feature.map.data.FakeMapRepository
 import com.luxmap.feature.map.data.FakePoleDetailRepository
 import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleDetailRepository
+import com.luxmap.feature.survey.data.FakeSurveyRepository
+import com.luxmap.feature.survey.data.SurveyRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -30,4 +32,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindHomeRepository(impl: FakeHomeRepository): HomeRepository
+
+    @Binds
+    abstract fun bindSurveyRepository(impl: FakeSurveyRepository): SurveyRepository
 }
