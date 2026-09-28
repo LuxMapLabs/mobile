@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 
@@ -76,12 +76,12 @@ private fun SurveyRouteCard(
         Text("Ngày dự kiến: ${route.plannedDate}", style = MaterialTheme.typography.bodyMedium)
         Text("${route.roadSegments.size} đoạn đường", style = MaterialTheme.typography.bodySmall)
         if (!isSelected) {
-            Button(onClick = onClick) { Text("Kiểm tra sẵn sàng") }
+            PrimaryButton(text = "Kiểm tra sẵn sàng", onClick = onClick)
         } else if (readiness == null) {
             Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
         } else {
             ReadinessChecklist(readiness)
-            Button(onClick = onEnterCaptureMode, enabled = readiness.isReady) { Text("Vào chế độ khảo sát") }
+            PrimaryButton(text = "Vào chế độ khảo sát", onClick = onEnterCaptureMode, enabled = readiness.isReady)
         }
     }
 }
