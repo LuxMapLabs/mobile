@@ -21,9 +21,11 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
@@ -60,9 +62,27 @@ class SurveyCaptureService : Service() {
             SupervisorJob() +
                 CoroutineExceptionHandler { _, error ->
                     Log.e(TAG, "Uncaught failure in the capture service scope", error)
+                    // A dead collector means its log file stopped growing (for example appendLine
+                    // hitting a full disk). Only logging that would let the stop path package a
+                    // truncated file and report Success, so remember it and let the stop path
+                    // report a broken session.
+                    markBroken("A capture stream failed during the session: ${error.message}")
                 },
         )
     private val jobs = mutableListOf<Job>()
+
+    // Set as soon as anything makes this session's data incomplete: a camera that never started, a
+    // mid-session encoder/muxer failure, or a collector that died. Read at stop time so a truncated
+    // recording is never reported as a healthy package. @Volatile because it is written from the
+    // exception handler's thread and read from the stop coroutine.
+    @Volatile
+    private var brokenReason: String? = null
+
+    // Guards a second ACTION_STOP (a double tap): re-running the stop sequence would close already
+    // closed writers and start a second packaging run over the same files, which cleanIfNdjson
+    // rewrites in place.
+    @Volatile
+    private var isStopping = false
 
     // Kept apart from `jobs`: starting the camera must never be cancelled halfway, it is waited
     // for instead (see stopSessionInternal).
@@ -204,108 +224,183 @@ class SurveyCaptureService : Service() {
                             ),
                         segmentDurationMs = SEGMENT_TARGET_DURATION_MS,
                     )
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
                 } catch (error: Throwable) {
                     // Camera or encoder setup can still fail in the field after the readiness
                     // checklist passed (another app holding the camera, an encoder that cannot be
                     // allocated). VideoCaptureSession.start() rethrows those after releasing the
                     // camera, and an uncaught throw here would kill the app in the middle of a
-                    // night survey. Mark the session as broken instead: without video it can never
-                    // produce a valid package, and package_failed is the state Task 15/16 already
-                    // use for exactly that.
+                    // night survey.
+                    //
+                    // A CancellationException here means one of two very different things.
+                    // openCamera's onDisconnected cancels its own continuation with no cause when
+                    // another app takes the camera over - a real capture failure, and this
+                    // coroutine is still active when it arrives. If serviceScope itself was
+                    // cancelled (onDestroy), this coroutine is no longer active and the
+                    // cancellation must keep propagating instead of being turned into a result.
+                    if (error is CancellationException && !currentCoroutineContext().isActive) throw error
                     Log.e(TAG, "Video capture failed to start; this session has no video", error)
-                    markPackageFailed()
+                    failSession("Video capture failed to start: ${error.message}")
                 }
             }
     }
 
     private fun stopSessionInternal() {
-        serviceScope.launch {
-            jobs.forEach { it.cancel() }
-            jobs.clear()
-            luxClient.disconnect()
-            locationHeadingRecorder.stop()
-            luxWriter.close()
-            gpsWriter.close()
-            headingWriter.close()
-
-            // VideoCaptureSession is single-use and keeps its camera/encoder/muxer in lateinit
-            // fields, so stop() must never run while start() is still setting them up. A quick
-            // "start, then stop" (a double tap, or the wrong route picked) does exactly that,
-            // because start() takes until its first encoded frame. Wait for it to finish or fail
-            // first — do not cancel it, a half-opened camera would stay open.
-            videoStartJob?.join()
-            videoStartJob = null
-
-            val finalized =
-                try {
-                    videoCaptureSession.stop()
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (error: Throwable) {
-                    // start() failed earlier, or stop() itself could not finish. Keep going so the
-                    // logs already on disk are still packaged (and the failure is reported) instead
-                    // of losing the whole session to a crash.
-                    Log.e(TAG, "Failed to stop the video capture; capture_config.json is not written", error)
-                    null
-                }
-
-            val captureConfigFile = File(sessionDir, "capture_config.json")
-            if (finalized != null) {
-                captureConfigFile.writeText(
-                    CaptureConfigWriter.toJson(
-                        CaptureConfig(
-                            utcAnchorIso = utcAnchorIso,
-                            elapsedAnchorNs = startedAtElapsedNs,
-                            resolution = "${VIDEO_WIDTH}x$VIDEO_HEIGHT",
-                            fps = VIDEO_FPS,
-                            isoSensitivity = finalized.actualProfile.isoSensitivity,
-                            shutterNs = finalized.actualProfile.exposureTimeNs,
-                            frameDurationNs = finalized.actualProfile.frameDurationNs,
-                            codec = "video/avc",
-                            bitrateBps = VIDEO_BITRATE_BPS,
-                            keyframeIntervalS = VIDEO_KEYFRAME_INTERVAL_S,
-                            segmentDurationS = (SEGMENT_TARGET_DURATION_MS / 1000).toInt(),
-                            cameraManufacturer = finalized.cameraManufacturer,
-                            cameraModel = finalized.cameraModel,
-                            cameraId = finalized.cameraId,
-                            appVersion = BuildConfig.VERSION_NAME,
-                            // real value comes from Bước 0's device pick, wired in Task 18
-                            luxModuleId = "LUX-001",
-                            // pending firmware contract (Task 17c / docs/contract-drift.md)
-                            luxModuleFirmware = "unknown",
-                        ),
-                    ),
-                )
-            }
-
-            val session = sessionDao.sessionById(currentSessionId)
-            val endedAtUtc = Instant.now()
-            val durationSeconds = (SystemClock.elapsedRealtimeNanos() - startedAtElapsedNs) / 1_000_000_000L
-            if (session != null) {
-                sessionDao.updateSession(
-                    session.copy(
-                        // Only a session that is still recording moves to stopped: a failed video
-                        // start already marked it package_failed, and "stopped" would hide that.
-                        recordingState =
-                            if (session.recordingState == STATE_RECORDING) STATE_STOPPED else session.recordingState,
-                        endedAtUtc = endedAtUtc,
-                        durationSeconds = durationSeconds,
-                        captureConfigFilePath = captureConfigFile.absolutePath,
-                        updatedAt = Instant.now(),
-                    ),
-                )
-            }
-
-            val result = packager.invoke(currentSessionId)
-            // Same handling as crash recovery (Task 16): a session whose package could not be
-            // written must not sit at "stopped" as if it were fine.
-            if (result is PackageResult.Failure) markPackageFailed()
-            _packagingResult.value = result
+        if (!::sessionDir.isInitialized) {
+            // ACTION_STOP with no ACTION_START before it: nothing was opened, so there is nothing
+            // to close. Take the service down instead of touching the lateinit fields.
+            Log.w(TAG, "ACTION_STOP arrived with no session started; stopping the service")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
+            return
         }
+        if (isStopping) {
+            Log.w(TAG, "ACTION_STOP arrived while the session is already stopping; ignoring it")
+            return
+        }
+        isStopping = true
+
+        serviceScope.launch {
+            var videoStopped = false
+            try {
+                jobs.forEach { it.cancel() }
+                jobs.clear()
+                luxClient.disconnect()
+                locationHeadingRecorder.stop()
+                luxWriter.close()
+                gpsWriter.close()
+                headingWriter.close()
+
+                // VideoCaptureSession is single-use and keeps its camera/encoder/muxer in lateinit
+                // fields, so stop() must never run while start() is still setting them up. A quick
+                // "start, then stop" (a double tap, or the wrong route picked) does exactly that,
+                // because start() takes until its first encoded frame. Wait for it to finish or
+                // fail first — do not cancel it, a half-opened camera would stay open.
+                videoStartJob?.join()
+                videoStartJob = null
+
+                val finalized = stopVideoCapture()
+                videoStopped = true
+                writeSessionResult(finalized)
+            } finally {
+                // The stop path must always end the same way, even when a step above throws: a full
+                // disk can throw from close(), from writeText, from the DAO or from the packager's
+                // own checksum/manifest writes. Without this the camera would keep running, the
+                // service would stay in the foreground and a caller bound to packagingResult would
+                // wait forever. Same shape as VideoCaptureSession.stop()'s own finally block.
+                if (!videoStopped) runCatching { videoCaptureSession.stop() }
+                if (_packagingResult.value == null) {
+                    _packagingResult.value = PackageResult.Failure("Stopping the session failed; see the log")
+                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+        }
+    }
+
+    private suspend fun stopVideoCapture(): FinalizedVideoCapture? {
+        val finalized =
+            try {
+                videoCaptureSession.stop()
+            } catch (error: Throwable) {
+                if (error is CancellationException && !currentCoroutineContext().isActive) throw error
+                // start() failed earlier, or stop() itself could not finish. Keep going so the logs
+                // already on disk are still packaged (and the failure is reported) instead of losing
+                // the whole session to a crash.
+                Log.e(TAG, "Failed to stop the video capture; capture_config.json is not written", error)
+                markBroken("Failed to stop the video capture: ${error.message}")
+                null
+            }
+        // Task 17a keeps a mid-session drain failure (a full disk, a MediaMuxer or Room error) in
+        // `failure` and says callers must check it: stop() still returns a normal-looking result,
+        // but the video and the frame timestamp log stopped growing at that point.
+        videoCaptureSession.failure?.let { failure ->
+            markBroken("The video recording broke during the session: ${failure.message}")
+        }
+        return finalized
+    }
+
+    private suspend fun writeSessionResult(finalized: FinalizedVideoCapture?) {
+        val captureConfigFile = File(sessionDir, "capture_config.json")
+        if (finalized != null) {
+            captureConfigFile.writeText(
+                CaptureConfigWriter.toJson(
+                    CaptureConfig(
+                        utcAnchorIso = utcAnchorIso,
+                        elapsedAnchorNs = startedAtElapsedNs,
+                        resolution = "${VIDEO_WIDTH}x$VIDEO_HEIGHT",
+                        fps = VIDEO_FPS,
+                        isoSensitivity = finalized.actualProfile.isoSensitivity,
+                        shutterNs = finalized.actualProfile.exposureTimeNs,
+                        frameDurationNs = finalized.actualProfile.frameDurationNs,
+                        codec = "video/avc",
+                        bitrateBps = VIDEO_BITRATE_BPS,
+                        keyframeIntervalS = VIDEO_KEYFRAME_INTERVAL_S,
+                        segmentDurationS = (SEGMENT_TARGET_DURATION_MS / 1000).toInt(),
+                        cameraManufacturer = finalized.cameraManufacturer,
+                        cameraModel = finalized.cameraModel,
+                        cameraId = finalized.cameraId,
+                        appVersion = BuildConfig.VERSION_NAME,
+                        // real value comes from Bước 0's device pick, wired in Task 18
+                        luxModuleId = "LUX-001",
+                        // pending firmware contract (Task 17c / docs/contract-drift.md)
+                        luxModuleFirmware = "unknown",
+                    ),
+                ),
+            )
+        }
+
+        val session = sessionDao.sessionById(currentSessionId)
+        val endedAtUtc = Instant.now()
+        val durationSeconds = (SystemClock.elapsedRealtimeNanos() - startedAtElapsedNs) / 1_000_000_000L
+        if (session != null) {
+            sessionDao.updateSession(
+                session.copy(
+                    // Only a session that is still recording moves to stopped: a failed video
+                    // start already marked it package_failed, and "stopped" would hide that.
+                    recordingState =
+                        if (session.recordingState == STATE_RECORDING) STATE_STOPPED else session.recordingState,
+                    endedAtUtc = endedAtUtc,
+                    durationSeconds = durationSeconds,
+                    captureConfigFilePath = captureConfigFile.absolutePath,
+                    updatedAt = Instant.now(),
+                ),
+            )
+        }
+
+        // The package is still written when the recording broke: the files that did make it to disk
+        // are worth keeping and looking at. What must not happen is reporting it as healthy.
+        val packaged = packager.invoke(currentSessionId)
+        val broken = brokenReason
+        _packagingResult.value =
+            when {
+                broken != null -> {
+                    Log.w(TAG, "Session $currentSessionId is incomplete: $broken")
+                    markPackageFailed()
+                    PackageResult.Failure(broken)
+                }
+                // Same handling as crash recovery (Task 16): a session whose package could not be
+                // written must not sit at "stopped" as if it were fine.
+                packaged is PackageResult.Failure -> {
+                    markPackageFailed()
+                    packaged
+                }
+                else -> packaged
+            }
+    }
+
+    // Remembers that this session's data is incomplete. Called from the coroutine exception handler
+    // too, so it must not suspend or touch the DAO.
+    private fun markBroken(reason: String) {
+        if (brokenReason == null) brokenReason = reason
+    }
+
+    // Marks the session broken AND tells a bound caller (Task 18) right away, for a failure that
+    // happens while recording is still running - otherwise the UI would sit on the Recording screen
+    // with nothing being recorded.
+    private suspend fun failSession(reason: String) {
+        markBroken(reason)
+        markPackageFailed()
+        _packagingResult.value = PackageResult.Failure(reason)
     }
 
     private suspend fun markPackageFailed() {
