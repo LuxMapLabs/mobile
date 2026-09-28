@@ -18,8 +18,9 @@
 - `schema_version` is a **header line** (`{"schema_version":"v0","file_role":"..."}`) on every `.ndjson` file, and a **JSON field** (not a header line) on `manifest.json` and `capture_config.json` (spec §8).
 - `.ndjson` files are **flushed to disk every ~1 second**; readers must tolerate a truncated last line (spec §12).
 - If `SENSOR_INFO_TIMESTAMP_SOURCE != REALTIME`, F03 **hard-blocks** entry to F04 — temporary policy, comment it as such (spec §10).
-- If the BLE lux sensor disconnects mid-session: **do not stop the session** — keep recording video/GPS/heading, set `ble_gap_detected = true`, warn with color+text+vibration (spec §11).
-- No new third-party library beyond what `CLAUDE.md`'s "Ngăn xếp công nghệ" already lists — BLE and video encoding use only framework APIs.
+- If the BLE lux sensor disconnects mid-session: **do not stop the session** — keep recording video/GPS/heading, set `ble_gap_detected = true` **only on a Connected→Disconnected transition** (never on the connection `StateFlow`'s initial value), warn with color+text+vibration, and auto-reconnect (spec §11).
+- Exposure lock sets `CONTROL_AE_MODE_OFF` with `SENSOR_SENSITIVITY`/`SENSOR_EXPOSURE_TIME`/`SENSOR_FRAME_DURATION` all explicit; **AWB is locked via `CONTROL_AWB_LOCK` once converged**, never driven to `CONTROL_AWB_MODE_OFF` without also supplying `COLOR_CORRECTION_GAINS`; `NOISE_REDUCTION_MODE`/`EDGE_MODE` are left at the camera default pending a WP4 decision (see `docs/contract-drift.md`).
+- No new third-party library beyond what `CLAUDE.md`'s "Ngăn xếp công nghệ" already lists — BLE and video encoding use only framework APIs; Room DAO tests that need real SQLite run as instrumented tests (`app/src/androidTest`) rather than pulling in Robolectric.
 - Every commit stays ≤400 changed lines per `CLAUDE.md`; split a task's steps across multiple commits when a single step would exceed that.
 - Run `./gradlew ktlintCheck` before considering any task done; fix formatting before moving on.
 - F05, F07, and F08–F10 are explicitly **out of scope** — do not add code, enums, or screens for them.
@@ -53,7 +54,8 @@ app/src/main/java/com/luxmap/core/camera/SegmentedVideoRecorder.kt   (create)
 app/src/main/java/com/luxmap/core/location/SurveyTrackRecorder.kt    (create)
 app/src/main/java/com/luxmap/core/location/HeadingSensor.kt          (create)
 app/src/main/java/com/luxmap/core/ble/LuxPacketCodec.kt              (create)
-app/src/main/java/com/luxmap/core/ble/LuxSensorBleClient.kt          (create)
+app/src/main/java/com/luxmap/core/ble/LuxSensorBleClient.kt          (create — Task 8 skeleton, rewritten by Task 17c)
+app/src/main/java/com/luxmap/core/ble/LuxDeviceScanner.kt            (create — Task 17c)
 
 app/src/main/java/com/luxmap/feature/survey/data/entity/LocalSurveyPlanEntity.kt        (create)
 app/src/main/java/com/luxmap/feature/survey/data/entity/LocalRoadSegmentEntity.kt       (create)
@@ -61,6 +63,7 @@ app/src/main/java/com/luxmap/feature/survey/data/dao/SurveyPlanDao.kt           
 app/src/main/java/com/luxmap/feature/survey/data/SurveyRepository.kt                    (create)
 app/src/main/java/com/luxmap/feature/survey/data/FakeSurveyRepository.kt                (create)
 app/src/main/java/com/luxmap/feature/survey/domain/usecase/CheckSurveyReadinessUseCase.kt (create)
+app/src/main/java/com/luxmap/feature/survey/domain/SurveyReadinessInputProvider.kt      (create — Task 12)
 app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanUiState.kt                (create)
 app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModel.kt              (create)
 app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanScreen.kt                 (create)
@@ -72,9 +75,12 @@ app/src/main/java/com/luxmap/feature/survey/capture/NdjsonLogWriter.kt          
 app/src/main/java/com/luxmap/feature/survey/capture/NdjsonLogReader.kt                    (create)
 app/src/main/java/com/luxmap/feature/survey/capture/PackageSurveySessionUseCase.kt         (create)
 app/src/main/java/com/luxmap/feature/survey/capture/SurveySessionRecoveryUseCase.kt        (create)
-app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt                 (create)
-app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt                (create)
-app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureController.kt             (create)
+app/src/main/java/com/luxmap/feature/survey/capture/RealMuxerPort.kt                       (create — Task 17a)
+app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt                 (create — Task 17a)
+app/src/main/java/com/luxmap/feature/survey/capture/LocationHeadingRecorder.kt             (create — Task 17b)
+app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt                 (create — Task 17d)
+app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt                (create — Task 17d)
+app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureController.kt             (create — Task 18)
 app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureUiState.kt                  (create)
 app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureViewModel.kt                (create)
 app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt                   (create)
@@ -86,9 +92,10 @@ app/src/main/java/com/luxmap/feature/survey/ui/submit/SubmitViewModel.kt  (creat
 app/src/main/java/com/luxmap/feature/survey/ui/submit/SubmitScreen.kt     (create)
 
 app/src/main/java/com/luxmap/di/RepositoryModule.kt   (modify — bind new repositories)
-app/src/main/java/com/luxmap/di/CaptureModule.kt      (create — bind SurveyCaptureController)
+app/src/main/java/com/luxmap/di/CaptureModule.kt      (create in Task 12 for SurveyReadinessInputProvider, modified in Task 18 to add SurveyCaptureController)
 app/src/main/java/com/luxmap/navigation/NavGraph.kt   (modify — add F03/F04/F06 routes)
 app/src/main/java/com/luxmap/navigation/Routes.kt     (modify — add route constants)
+app/src/main/java/com/luxmap/LuxMapApp.kt             (modify — Task 16, wire crash recovery)
 
 docs/contract-drift.md   (create if absent)
 CLAUDE.md                (modify — Task 0, see below)
@@ -335,52 +342,80 @@ git commit -m "docs(fm-survey): record video pipeline spike findings"
 
 **Files:**
 - Create: `app/src/main/java/com/luxmap/core/camera/ExposureLockController.kt`
-- Test: `app/src/test/java/com/luxmap/core/camera/ExposureLockControllerTest.kt`
+- Test: `app/src/androidTest/java/com/luxmap/core/camera/ExposureLockControllerTest.kt`
+- Modify: `docs/contract-drift.md`
 
 **Interfaces:**
-- Produces: `data class LockedCameraProfile(val isoSensitivity: Int, val exposureTimeNs: Long, val focusDistanceDiopters: Float = 0f)`; `class ExposureLockController { fun lockedRequestKeys(profile: LockedCameraProfile): Map<CaptureRequest.Key<*>, Any>; fun applyTo(builder: CaptureRequest.Builder, profile: LockedCameraProfile); fun isTimestampSourceRealtime(characteristics: CameraCharacteristics): Boolean }`.
+- Produces: `data class LockedCameraProfile(val isoSensitivity: Int, val exposureTimeNs: Long, val frameDurationNs: Long, val focusDistanceDiopters: Float = 0f)`; `class ExposureLockController { fun lockedRequestKeys(profile: LockedCameraProfile): Map<CaptureRequest.Key<*>, Any>; fun applyTo(builder: CaptureRequest.Builder, profile: LockedCameraProfile); fun isTimestampSourceRealtime(characteristics: CameraCharacteristics): Boolean; fun lockAwbIfConverged(builder: CaptureRequest.Builder, latestResult: CaptureResult): Boolean }`.
 
-The key-value map is kept as a pure function (`lockedRequestKeys`) so it is unit-testable without mocking Android's `CaptureRequest.Builder`; `applyTo` is a thin one-line-per-key wrapper, verified for real by the Task 2 spike and the real-device checklist (spec §16), not by this unit test.
+`CaptureRequest.Key` constants (`CaptureRequest.CONTROL_AE_MODE`, etc.) are real object instances backed by the Android platform, not plain compile-time constants — on a plain JVM unit test (`app/src/test`) referencing them either returns `null` or throws under the stub `android.jar`, with no reliable way to assert real values without Robolectric (not on the approved test stack). This test therefore runs as an **instrumented test** (`app/src/androidTest`, on an emulator/device) instead.
 
-- [ ] **Step 1: Write the failing test**
+Two corrections from the original review of this task:
+- **AWB is not forced `OFF` blind.** `CONTROL_AWB_MODE_OFF` requires the app to also supply `COLOR_CORRECTION_GAINS`/`COLOR_CORRECTION_TRANSFORM`, which this class does not compute. Instead, `lockedRequestKeys` leaves AWB in `CONTROL_AWB_MODE_AUTO` (the Camera2 default) and `lockAwbIfConverged` locks it via `CONTROL_AWB_LOCK = true` once the running session's `CaptureResult.CONTROL_AWB_STATE` reports `CONVERGED` — the standard "let it settle, then lock" idiom.
+- **`SENSOR_FRAME_DURATION` must be set whenever `CONTROL_AE_MODE_OFF` is set**, or the frame rate becomes undefined — added to `LockedCameraProfile` and `lockedRequestKeys`.
+- **`NOISE_REDUCTION_MODE`/`EDGE_MODE` are deliberately NOT forced `OFF` here** — whether disabling in-camera noise reduction/edge enhancement helps or hurts the CV pipeline is a WP4 (CV-Analytics) call, not a mobile-side default to unilaterally bake in. Tracked in `docs/contract-drift.md` (Step 1 below) instead of decided here.
+
+- [ ] **Step 1: Record the pending WP4 decision in `docs/contract-drift.md`**
+
+Add a row to the table in `docs/contract-drift.md` (created in Task 1):
+
+```markdown
+| NOISE_REDUCTION_MODE / EDGE_MODE for video capture | left at camera default (neither forced OFF) | Pending WP4 decision — see ExposureLockController | WP4 |
+```
+
+- [ ] **Step 2: Write the failing test**
 
 ```kotlin
-// app/src/test/java/com/luxmap/core/camera/ExposureLockControllerTest.kt
+// app/src/androidTest/java/com/luxmap/core/camera/ExposureLockControllerTest.kt
 package com.luxmap.core.camera
 
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
 
+@RunWith(AndroidJUnit4::class)
 class ExposureLockControllerTest {
     private val controller = ExposureLockController()
 
     @Test
-    fun `locked request keys disable auto exposure, focus, white balance and stabilization`() {
-        val profile = LockedCameraProfile(isoSensitivity = 800, exposureTimeNs = 20_000_000L)
+    fun lockedRequestKeysFixIsoExposureFrameDurationAndDisableAfAndStabilization() {
+        val profile = LockedCameraProfile(isoSensitivity = 800, exposureTimeNs = 20_000_000L, frameDurationNs = 33_333_333L)
 
         val keys = controller.lockedRequestKeys(profile)
 
         assertEquals(CaptureRequest.CONTROL_AE_MODE_OFF, keys[CaptureRequest.CONTROL_AE_MODE])
         assertEquals(CaptureRequest.CONTROL_AF_MODE_OFF, keys[CaptureRequest.CONTROL_AF_MODE])
-        assertEquals(CaptureRequest.CONTROL_AWB_MODE_OFF, keys[CaptureRequest.CONTROL_AWB_MODE])
         assertEquals(800, keys[CaptureRequest.SENSOR_SENSITIVITY])
         assertEquals(20_000_000L, keys[CaptureRequest.SENSOR_EXPOSURE_TIME])
+        assertEquals(33_333_333L, keys[CaptureRequest.SENSOR_FRAME_DURATION])
         assertEquals(
             CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF,
             keys[CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE],
         )
-        assertEquals(CaptureRequest.NOISE_REDUCTION_MODE_OFF, keys[CaptureRequest.NOISE_REDUCTION_MODE])
-        assertEquals(CaptureRequest.EDGE_MODE_OFF, keys[CaptureRequest.EDGE_MODE])
     }
 
     @Test
-    fun `timestamp source realtime returns true only when characteristic equals REALTIME`() {
+    fun lockedRequestKeysDoNotForceNoiseReductionOrEdgeMode() {
+        val profile = LockedCameraProfile(isoSensitivity = 800, exposureTimeNs = 20_000_000L, frameDurationNs = 33_333_333L)
+
+        val keys = controller.lockedRequestKeys(profile)
+
+        assertNull(keys[CaptureRequest.NOISE_REDUCTION_MODE])
+        assertNull(keys[CaptureRequest.EDGE_MODE])
+    }
+
+    @Test
+    fun timestampSourceRealtimeReturnsTrueOnlyWhenCharacteristicEqualsRealtime() {
         val realtimeCharacteristics = mockk<CameraCharacteristics>()
         every { realtimeCharacteristics.get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE) } returns
             CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME
@@ -391,15 +426,28 @@ class ExposureLockControllerTest {
         assertTrue(controller.isTimestampSourceRealtime(realtimeCharacteristics))
         assertFalse(controller.isTimestampSourceRealtime(unknownCharacteristics))
     }
+
+    @Test
+    fun lockAwbIfConvergedLocksOnlyOnceAwbStateIsConverged() {
+        val builder = mockk<CaptureRequest.Builder>(relaxed = true)
+        val notConverged = mockk<CaptureResult>()
+        every { notConverged.get(CaptureResult.CONTROL_AWB_STATE) } returns CaptureResult.CONTROL_AWB_STATE_SEARCHING
+        val converged = mockk<CaptureResult>()
+        every { converged.get(CaptureResult.CONTROL_AWB_STATE) } returns CaptureResult.CONTROL_AWB_STATE_CONVERGED
+
+        assertFalse(controller.lockAwbIfConverged(builder, notConverged))
+        assertTrue(controller.lockAwbIfConverged(builder, converged))
+        verify { builder.set(CaptureRequest.CONTROL_AWB_LOCK, true) }
+    }
 }
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [ ] **Step 3: Run to verify it fails**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.camera.ExposureLockControllerTest"`
+Run: `./gradlew :app:connectedDebugAndroidTest --tests "com.luxmap.core.camera.ExposureLockControllerTest"` (needs a connected emulator or device)
 Expected: FAIL — `ExposureLockController` does not exist yet.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 4: Implement**
 
 ```kotlin
 // app/src/main/java/com/luxmap/core/camera/ExposureLockController.kt
@@ -407,12 +455,15 @@ package com.luxmap.core.camera
 
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
 import javax.inject.Inject
 
 // Held across a whole recording session (spec: "áp dụng và giữ suốt phiên quay"), not just one shot.
 data class LockedCameraProfile(
     val isoSensitivity: Int,
     val exposureTimeNs: Long,
+    // Required whenever CONTROL_AE_MODE_OFF is set — otherwise the frame rate is undefined.
+    val frameDurationNs: Long,
     val focusDistanceDiopters: Float = 0f,
 )
 
@@ -421,17 +472,17 @@ class ExposureLockController
     constructor() {
         // Pure map so this is testable without a real CaptureRequest.Builder — applyTo() below
         // does the actual mutation and is only meaningfully verified on a real device (spike, spec §16).
+        // AWB and NOISE_REDUCTION_MODE/EDGE_MODE are intentionally absent — see lockAwbIfConverged
+        // and docs/contract-drift.md.
         fun lockedRequestKeys(profile: LockedCameraProfile): Map<CaptureRequest.Key<*>, Any> =
             mapOf(
                 CaptureRequest.CONTROL_AE_MODE to CaptureRequest.CONTROL_AE_MODE_OFF,
                 CaptureRequest.CONTROL_AF_MODE to CaptureRequest.CONTROL_AF_MODE_OFF,
-                CaptureRequest.CONTROL_AWB_MODE to CaptureRequest.CONTROL_AWB_MODE_OFF,
                 CaptureRequest.SENSOR_SENSITIVITY to profile.isoSensitivity,
                 CaptureRequest.SENSOR_EXPOSURE_TIME to profile.exposureTimeNs,
+                CaptureRequest.SENSOR_FRAME_DURATION to profile.frameDurationNs,
                 CaptureRequest.LENS_FOCUS_DISTANCE to profile.focusDistanceDiopters,
                 CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE to CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF,
-                CaptureRequest.NOISE_REDUCTION_MODE to CaptureRequest.NOISE_REDUCTION_MODE_OFF,
-                CaptureRequest.EDGE_MODE to CaptureRequest.EDGE_MODE_OFF,
             )
 
         fun applyTo(
@@ -447,20 +498,34 @@ class ExposureLockController
         fun isTimestampSourceRealtime(characteristics: CameraCharacteristics): Boolean =
             characteristics.get(CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE) ==
                 CameraCharacteristics.SENSOR_INFO_TIMESTAMP_SOURCE_REALTIME
+
+        // Called on every CaptureResult from the repeating request until it returns true; the
+        // caller (Task 17a) then stops calling it and keeps reusing the now-locked builder.
+        fun lockAwbIfConverged(
+            builder: CaptureRequest.Builder,
+            latestResult: CaptureResult,
+        ): Boolean {
+            if (latestResult.get(CaptureResult.CONTROL_AWB_STATE) != CaptureResult.CONTROL_AWB_STATE_CONVERGED) {
+                return false
+            }
+            builder.set(CaptureRequest.CONTROL_AWB_LOCK, true)
+            return true
+        }
     }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [ ] **Step 5: Run to verify it passes**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.camera.ExposureLockControllerTest"`
+Run: `./gradlew :app:connectedDebugAndroidTest --tests "com.luxmap.core.camera.ExposureLockControllerTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/com/luxmap/core/camera/ExposureLockController.kt \
-  app/src/test/java/com/luxmap/core/camera/ExposureLockControllerTest.kt
-git commit -m "feat(fm-survey): add ExposureLockController for session-long exposure lock"
+  app/src/androidTest/java/com/luxmap/core/camera/ExposureLockControllerTest.kt \
+  docs/contract-drift.md
+git commit -m "feat(fm-survey): add ExposureLockController with awb-lock-on-convergence"
 ```
 
 ---
@@ -606,7 +671,7 @@ git commit -m "feat(fm-survey): add segment rotation policy and frame timestamp 
 
 **Interfaces:**
 - Consumes: `SegmentRotationPolicy.shouldRotate`.
-- Produces: `data class VideoSegmentResult(val segmentIndex: Int, val filePath: String, val sizeBytes: Long)`; `interface SegmentedVideoRecorder { fun startSegment(segmentIndex: Int, outputFilePath: String); fun onEncodedFrame(isKeyFrame: Boolean, presentationTimeUs: Long, sensorTimestampNs: Long): VideoSegmentResult?; fun stop(): VideoSegmentResult }`. `onEncodedFrame` returns a non-null `VideoSegmentResult` exactly when a rotation just closed a segment, so the caller (Task 17's service) knows to open the next `local_survey_video_segment` row.
+- Produces: `data class VideoSegmentResult(val segmentIndex: Int, val filePath: String, val sizeBytes: Long)`; `interface SegmentedVideoRecorder { fun startSegment(segmentIndex: Int, outputFilePath: String); fun onEncodedFrame(isKeyFrame: Boolean, presentationTimeUs: Long, sensorTimestampNs: Long): VideoSegmentResult?; fun stop(): VideoSegmentResult }`. `onEncodedFrame` returns a non-null `VideoSegmentResult` exactly when a rotation just closed a segment, so the caller (Task 17a's `VideoCaptureSession`) knows to open the next `local_survey_video_segment` row.
 
 Real `MediaCodec`/`MediaMuxer` I/O is not unit-testable without a device or Robolectric (neither is on this project's test stack) — this task unit-tests the **bookkeeping logic** (when to rotate, what gets reported, how a write failure surfaces) against a fake encoder/muxer pair, and leaves the real encoder wiring to be verified by the Task 2 spike and the real-device checklist (spec §16).
 
@@ -781,10 +846,10 @@ git commit -m "feat(fm-survey): add SegmentedVideoRecorder with rotation and wri
 - Test: `app/src/test/java/com/luxmap/core/location/SurveyTrackRecorderTest.kt`
 
 **Interfaces:**
-- Produces: `data class TrackPoint(val elapsedRealtimeNs: Long, val lat: Double, val lng: Double, val accuracyM: Float, val gpsBearingDeg: Float?, val speedMps: Float?)`; `sealed interface GpsSignalState { data object Ok : GpsSignalState; data object Lost : GpsSignalState }`; `class SurveyTrackRecorder(private val signalLostThresholdMs: Long = 10_000L) { fun onLocationUpdate(location: android.location.Location): TrackPoint; fun onTick(nowElapsedRealtimeNs: Long): GpsSignalState }`.
+- Produces: `data class TrackPoint(val elapsedRealtimeNs: Long, val lat: Double, val lng: Double, val accuracyM: Float, val gpsBearingDeg: Float?, val speedMps: Float?)`; `sealed interface GpsSignalState { data object Ok : GpsSignalState; data object Lost : GpsSignalState }`; `class SurveyTrackRecorder @Inject constructor() { fun onLocationUpdate(location: android.location.Location): TrackPoint; fun onTick(nowElapsedRealtimeNs: Long): GpsSignalState }` — Hilt-injectable (no constructor parameters to bind), so `SurveyCaptureService` (Task 17b) can `@Inject` it directly. The 10s signal-lost threshold is a fixed internal constant, not a constructor parameter, precisely so the class stays trivially injectable.
 - Consumes (later, Task 14): `TrackPoint` is serialized by `NdjsonLogWriter`.
 
-`onTick` is how the caller (Task 17's service) polls, on its own timer, whether the last fix is older than the threshold — this is what pins the "GPS lost for an extended period" Review Focus item without needing a live location provider in the test.
+`onTick` is how the caller (Task 17b's `LocationHeadingRecorder`) polls, on its own timer, whether the last fix is older than the threshold — this is what pins the "GPS lost for an extended period" Review Focus item without needing a live location provider in the test.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -829,7 +894,7 @@ class SurveyTrackRecorderTest {
 
     @Test
     fun `reports GPS signal ok right after a fresh fix`() {
-        val recorder = SurveyTrackRecorder(signalLostThresholdMs = 10_000L)
+        val recorder = SurveyTrackRecorder()
         recorder.onLocationUpdate(fakeLocation(elapsedRealtimeNs = 0L))
 
         val state = recorder.onTick(nowElapsedRealtimeNs = 5_000_000_000L) // 5s later
@@ -839,7 +904,7 @@ class SurveyTrackRecorderTest {
 
     @Test
     fun `reports GPS signal lost once the last fix is older than the threshold`() {
-        val recorder = SurveyTrackRecorder(signalLostThresholdMs = 10_000L)
+        val recorder = SurveyTrackRecorder()
         recorder.onLocationUpdate(fakeLocation(elapsedRealtimeNs = 0L))
 
         val state = recorder.onTick(nowElapsedRealtimeNs = 15_000_000_000L) // 15s later
@@ -861,6 +926,7 @@ Expected: FAIL — class does not exist yet.
 package com.luxmap.core.location
 
 import android.location.Location
+import javax.inject.Inject
 
 // gpsBearingDeg/speedMps share the fix's own elapsedRealtimeNs (spec §8) — they come from the
 // same Location object, unlike heading_log.ndjson which is a fully independent sensor stream.
@@ -881,29 +947,30 @@ sealed interface GpsSignalState {
 
 // Separate from LocationTracker.kt (F12's one-shot "locate me") — this records a continuous track
 // for the duration of a survey session (spec §5).
-class SurveyTrackRecorder(
-    private val signalLostThresholdMs: Long = 10_000L,
-) {
-    private var lastFixElapsedRealtimeNs: Long? = null
+class SurveyTrackRecorder
+    @Inject
+    constructor() {
+        private val signalLostThresholdMs: Long = 10_000L
+        private var lastFixElapsedRealtimeNs: Long? = null
 
-    fun onLocationUpdate(location: Location): TrackPoint {
-        lastFixElapsedRealtimeNs = location.elapsedRealtimeNanos
-        return TrackPoint(
-            elapsedRealtimeNs = location.elapsedRealtimeNanos,
-            lat = location.latitude,
-            lng = location.longitude,
-            accuracyM = location.accuracy,
-            gpsBearingDeg = if (location.hasBearing()) location.bearing else null,
-            speedMps = location.speed,
-        )
-    }
+        fun onLocationUpdate(location: Location): TrackPoint {
+            lastFixElapsedRealtimeNs = location.elapsedRealtimeNanos
+            return TrackPoint(
+                elapsedRealtimeNs = location.elapsedRealtimeNanos,
+                lat = location.latitude,
+                lng = location.longitude,
+                accuracyM = location.accuracy,
+                gpsBearingDeg = if (location.hasBearing()) location.bearing else null,
+                speedMps = location.speed,
+            )
+        }
 
-    fun onTick(nowElapsedRealtimeNs: Long): GpsSignalState {
-        val lastFix = lastFixElapsedRealtimeNs ?: return GpsSignalState.Lost
-        val ageMs = (nowElapsedRealtimeNs - lastFix) / 1_000_000
-        return if (ageMs > signalLostThresholdMs) GpsSignalState.Lost else GpsSignalState.Ok
+        fun onTick(nowElapsedRealtimeNs: Long): GpsSignalState {
+            val lastFix = lastFixElapsedRealtimeNs ?: return GpsSignalState.Lost
+            val ageMs = (nowElapsedRealtimeNs - lastFix) / 1_000_000
+            return if (ageMs > signalLostThresholdMs) GpsSignalState.Lost else GpsSignalState.Ok
+        }
     }
-}
 ```
 
 - [ ] **Step 4: Run to verify it passes**
@@ -925,28 +992,31 @@ git commit -m "feat(fm-survey): add SurveyTrackRecorder with GPS-signal-lost det
 
 **Files:**
 - Create: `app/src/main/java/com/luxmap/core/location/HeadingSensor.kt`
-- Test: `app/src/test/java/com/luxmap/core/location/HeadingSensorTest.kt`
+- Test: `app/src/androidTest/java/com/luxmap/core/location/HeadingSensorTest.kt`
 
 **Interfaces:**
 - Produces: `data class HeadingSample(val elapsedRealtimeNs: Long, val headingDeg: Float)`; `class HeadingSensor { fun headingFromRotationVector(rotationVector: FloatArray, eventElapsedRealtimeNs: Long): HeadingSample }`.
-- Consumes (later, Task 14): `HeadingSample` is serialized by `NdjsonLogWriter`.
+- Consumes (later, Task 17b): `HeadingSample` is serialized by `NdjsonLogWriter`.
 
-The rotation-vector-to-degrees math is pure and is what's unit-tested; the actual `SensorManager` registration/callback plumbing is thin and verified on a real device.
+The rotation-vector-to-degrees math calls `SensorManager.getRotationMatrixFromVector`/`getOrientation`, which are native-backed platform methods that throw or return garbage under the plain JVM unit-test stub (same reasoning as Task 3) — this runs as an **instrumented test** instead of pulling in Robolectric.
 
 - [ ] **Step 1: Write the failing test**
 
 ```kotlin
-// app/src/test/java/com/luxmap/core/location/HeadingSensorTest.kt
+// app/src/androidTest/java/com/luxmap/core/location/HeadingSensorTest.kt
 package com.luxmap.core.location
 
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
 
+@RunWith(AndroidJUnit4::class)
 class HeadingSensorTest {
     private val sensor = HeadingSensor()
 
     @Test
-    fun `a rotation vector pointing due north yields a heading close to 0 degrees`() {
+    fun rotationVectorPointingDueNorthYieldsHeadingCloseToZeroDegrees() {
         // Identity-like rotation vector (no rotation applied) — SensorManager.getRotationMatrixFromVector
         // + getOrientation on [0,0,0] yields azimuth 0.
         val sample = sensor.headingFromRotationVector(floatArrayOf(0f, 0f, 0f), eventElapsedRealtimeNs = 42L)
@@ -956,7 +1026,7 @@ class HeadingSensorTest {
     }
 
     @Test
-    fun `heading is normalized to the 0 to 360 degree range`() {
+    fun headingIsNormalizedToTheZeroToThreeSixtyDegreeRange() {
         // A rotation vector representing a small negative-azimuth rotation around the Z axis
         // (sin(-5 deg / 2), 0, 0 style) should not surface as a negative heading.
         val sample = sensor.headingFromRotationVector(floatArrayOf(0f, 0f, -0.0436f), eventElapsedRealtimeNs = 0L)
@@ -968,7 +1038,7 @@ class HeadingSensorTest {
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.location.HeadingSensorTest"`
+Run: `./gradlew :app:connectedDebugAndroidTest --tests "com.luxmap.core.location.HeadingSensorTest"` (needs a connected emulator or device)
 Expected: FAIL — class does not exist yet.
 
 - [ ] **Step 3: Implement**
@@ -1007,14 +1077,14 @@ class HeadingSensor
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.location.HeadingSensorTest"`
+Run: `./gradlew :app:connectedDebugAndroidTest --tests "com.luxmap.core.location.HeadingSensorTest"`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/com/luxmap/core/location/HeadingSensor.kt \
-  app/src/test/java/com/luxmap/core/location/HeadingSensorTest.kt
+  app/src/androidTest/java/com/luxmap/core/location/HeadingSensorTest.kt
 git commit -m "feat(fm-survey): add HeadingSensor for continuous device orientation"
 ```
 
@@ -1028,11 +1098,11 @@ git commit -m "feat(fm-survey): add HeadingSensor for continuous device orientat
 - Test: `app/src/test/java/com/luxmap/core/ble/LuxPacketCodecTest.kt`
 
 **Interfaces:**
-- Produces: `data class LuxSample(val seq: Int, val moduleMs: Long, val phoneElapsedNs: Long, val lux: Float, val bootId: Int)`; `object LuxPacketCodec { fun decode(bytes: ByteArray, receivedAtElapsedRealtimeNs: Long): LuxSample; fun gapSize(previousSeq: Int, currentSeq: Int): Int }`; `sealed interface BleConnectionState { data object Disconnected : BleConnectionState; data object Connecting : BleConnectionState; data object Connected : BleConnectionState }`; `class LuxSensorBleClient` exposing `val connectionState: StateFlow<BleConnectionState>` and `fun observeSamples(deviceAddress: String): Flow<LuxSample>`.
+- Produces: `data class LuxSample(val seq: Int, val moduleMs: Long, val phoneElapsedNs: Long, val lux: Float, val bootId: Int)`; `object LuxPacketCodec { fun decode(bytes: ByteArray, receivedAtElapsedRealtimeNs: Long): LuxSample; fun gapSize(previous: LuxSample, current: LuxSample): Int }`; `sealed interface BleConnectionState { data object Disconnected : BleConnectionState; data object Connecting : BleConnectionState; data object Connected : BleConnectionState }`; `class LuxSensorBleClient` exposing `val connectionState: StateFlow<BleConnectionState>` and a first skeleton of `fun observeSamples(deviceAddress: String): Flow<LuxSample>`, which Task 17c rewrites into the real Bước 0 connect/notify flow.
 - Consumes (later, Task 14): `LuxSample` is serialized by `NdjsonLogWriter`.
-- Consumes (later, Task 17/18): `connectionState` drives `CaptureUiState`; `observeSamples(deviceAddress)` is called once a device address is known (from a BLE scan step out of this plan's unit-testable scope, resolved on a real device per spec §16).
+- Consumes (later, Task 17c/18): `connectionState` drives `CaptureUiState`; the real connect flow is built in Task 17c once a device address is known (from a BLE scan step, see Task 17c).
 
-Byte layout (uint16 `seq` little-endian, uint32 `module_ms` little-endian, float32 `lux` little-endian, uint8 `boot_id` appended) is the **proposed** contract from spec §9 — not confirmed with firmware. `gapSize` is what pins the seq-wraparound Review Focus item.
+Byte layout (uint16 `seq` little-endian, uint32 `module_ms` little-endian, float32 `lux` little-endian, uint8 `boot_id` appended) is the **proposed** contract from spec §9 — not confirmed with firmware. `gapSize` takes full `LuxSample`s (not bare seq ints) so it can also see `bootId` — a module reboot resets `seq`/`module_ms` toward 0, which must never be read as a huge packet-loss event.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1061,30 +1131,42 @@ class LuxPacketCodecTest {
             .put(bootId.toByte())
             .array()
 
+    private fun sample(
+        seq: Int,
+        bootId: Int = 1,
+    ) = LuxSample(seq = seq, moduleMs = 0L, phoneElapsedNs = 0L, lux = 0f, bootId = bootId)
+
     @Test
     fun `decodes a packet and stamps it with the phone's receive time`() {
         val bytes = packet(seq = 10, moduleMs = 5_000L, lux = 123.5f, bootId = 1)
 
-        val sample = LuxPacketCodec.decode(bytes, receivedAtElapsedRealtimeNs = 999L)
+        val decoded = LuxPacketCodec.decode(bytes, receivedAtElapsedRealtimeNs = 999L)
 
-        assertEquals(LuxSample(seq = 10, moduleMs = 5_000L, phoneElapsedNs = 999L, lux = 123.5f, bootId = 1), sample)
+        assertEquals(LuxSample(seq = 10, moduleMs = 5_000L, phoneElapsedNs = 999L, lux = 123.5f, bootId = 1), decoded)
     }
 
     @Test
     fun `gap size between two adjacent packets is zero`() {
-        assertEquals(0, LuxPacketCodec.gapSize(previousSeq = 10, currentSeq = 11))
+        assertEquals(0, LuxPacketCodec.gapSize(sample(seq = 10), sample(seq = 11)))
     }
 
     @Test
     fun `gap size counts missed packets in the ordinary non-wrapping case`() {
-        assertEquals(4, LuxPacketCodec.gapSize(previousSeq = 10, currentSeq = 15))
+        assertEquals(4, LuxPacketCodec.gapSize(sample(seq = 10), sample(seq = 15)))
     }
 
     @Test
     fun `gap size handles seq rolling over past 65535 without reporting a huge false gap`() {
         // previousSeq near the uint16 ceiling, currentSeq wrapped back to a small value just after it
-        assertEquals(0, LuxPacketCodec.gapSize(previousSeq = 65535, currentSeq = 0))
-        assertEquals(2, LuxPacketCodec.gapSize(previousSeq = 65534, currentSeq = 1))
+        assertEquals(0, LuxPacketCodec.gapSize(sample(seq = 65535), sample(seq = 0)))
+        assertEquals(2, LuxPacketCodec.gapSize(sample(seq = 65534), sample(seq = 1)))
+    }
+
+    @Test
+    fun `gap size is zero across a module reboot even though seq resets toward zero`() {
+        // bootId changes -> the module restarted; seq/module_ms going "backwards" is expected and
+        // must not be reported as a huge packet-loss event.
+        assertEquals(0, LuxPacketCodec.gapSize(sample(seq = 60_000, bootId = 1), sample(seq = 3, bootId = 2)))
     }
 }
 ```
@@ -1128,13 +1210,15 @@ object LuxPacketCodec {
         return LuxSample(seq, moduleMs, receivedAtElapsedRealtimeNs, lux, bootId)
     }
 
-    // Counts packets missed between two seq values, correctly handling the uint16 wraparound —
-    // a naive (currentSeq - previousSeq - 1) would report a false ~65000-packet gap at the rollover.
+    // Counts packets missed between two samples, correctly handling both the uint16 seq wraparound
+    // and a module reboot (bootId change) — a naive (currentSeq - previousSeq - 1) would report a
+    // false ~65000-packet gap at the rollover, and an even bigger false gap across a reboot.
     fun gapSize(
-        previousSeq: Int,
-        currentSeq: Int,
+        previous: LuxSample,
+        current: LuxSample,
     ): Int {
-        val forwardDistance = ((currentSeq - previousSeq) + SEQ_MODULO) % SEQ_MODULO
+        if (previous.bootId != current.bootId) return 0
+        val forwardDistance = ((current.seq - previous.seq) + SEQ_MODULO) % SEQ_MODULO
         return (forwardDistance - 1).coerceAtLeast(0)
     }
 }
@@ -1231,7 +1315,7 @@ class LuxSensorBleClient
 Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.ble.LuxPacketCodecTest"`
 Expected: PASS
 
-`LuxSensorBleClient` itself needs a real BLE peripheral and is verified on a real device with the ESP32+BH1750 module per spec §16 — no unit test is written for the `BluetoothGatt` plumbing.
+`LuxSensorBleClient` itself needs a real BLE peripheral and is verified on a real device with the ESP32+BH1750 module per spec §16 — no unit test is written for the `BluetoothGatt` plumbing. This is a first skeleton only: connect and sample-receiving are still one `observeSamples()` call — Task 17c rewrites this file to split them apart, add the CCCD write, auto-reconnect, and the dual `onCharacteristicChanged` overrides needed for devices on both sides of API 33.
 
 - [ ] **Step 5: Commit**
 
@@ -1302,7 +1386,7 @@ class SurveyPlanDaoTest {
     }
 
     @Test
-    fun `upserting a plan twice by its natural key does not create a duplicate row`() =
+    fun upsertingAPlanTwiceByItsNaturalKeyDoesNotCreateADuplicateRow() =
         runTest {
             val plan =
                 LocalSurveyPlanEntity(
@@ -1324,7 +1408,7 @@ class SurveyPlanDaoTest {
         }
 
     @Test
-    fun `road segments for a sweep are filtered by surveySweepId`() =
+    fun roadSegmentsForASweepAreFilteredBySurveySweepId() =
         runTest {
             dao.upsertRoadSegments(
                 listOf(
@@ -1730,9 +1814,11 @@ git commit -m "feat(fm-survey): add CheckSurveyReadinessUseCase with hard timest
 
 ---
 
-## Task 12: F03 UI — `SurveyPlanScreen`
+## Task 12: F03 UI — `SurveyPlanScreen` with the readiness checklist wired in
 
 **Files:**
+- Create: `app/src/main/java/com/luxmap/feature/survey/domain/SurveyReadinessInputProvider.kt`
+- Create: `app/src/main/java/com/luxmap/di/CaptureModule.kt` (Task 18 later adds `SurveyCaptureController`'s binding to this same file)
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanUiState.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModel.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanScreen.kt`
@@ -1741,10 +1827,449 @@ git commit -m "feat(fm-survey): add CheckSurveyReadinessUseCase with hard timest
 - Test: `app/src/test/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModelTest.kt`
 
 **Interfaces:**
-- Consumes: `SurveyRepository.observeAssignedRoutes()` (Task 10).
-- Produces: `sealed interface SurveyPlanUiState { Loading; data class Success(val routes: List<AssignedSurveyRoute>); Empty; data class Error(val message: String) }` — the 4 mandatory states per `CLAUDE.md`.
+- Consumes: `SurveyRepository.observeAssignedRoutes()` (Task 10); `CheckSurveyReadinessUseCase` (Task 11).
+- Produces: `interface SurveyReadinessInputProvider { suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput }` (the real Android-system-service gathering that Task 11 deliberately kept out of the pure decision function); `sealed interface SurveyPlanUiState { Loading; data class Success(val routes: List<AssignedSurveyRoute>, val selectedSurveySweepId: String? = null, val readiness: SurveyReadinessResult? = null); Empty; data class Error(val message: String) }` — the 4 mandatory states per `CLAUDE.md`, with the readiness result nested inside `Success` rather than as a 5th state.
 
-This task covers the route list and its 4 UI states; the readiness checklist result (Task 11) is surfaced once a route is selected, wired the same way `HomeViewModel` wires `HomeRepository` — the checklist UI itself follows the existing `WorkOrderCard`/`OfflineBanner` component patterns and is not re-derived here in full to keep this task bounded to the list + state machine. The map preview of the assigned route (spec's "chỉ xem") reuses `feature/map`'s existing `RoadSegmentGeoJsonRenderer` and is a fast-follow, not built in this task.
+**Correction from the original review of this task: the readiness checklist is wired into this screen now, not deferred as a fast-follow** — it is the one place that hard-blocks entry to F04 on `TIMESTAMP_SOURCE`, so a version of F03 without it does not actually enforce spec §10. The map preview of the assigned route (spec's "chỉ xem") still reuses `feature/map`'s existing `RoadSegmentGeoJsonRenderer` as a fast-follow — that part is a visual nice-to-have, not a safety gate, so it stays out of this task's scope.
+
+- [ ] **Step 1: Write the failing ViewModel test**
+
+```kotlin
+// app/src/test/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModelTest.kt
+package com.luxmap.feature.survey.ui.plan
+
+import app.cash.turbine.test
+import com.luxmap.feature.survey.data.AssignedRoadSegment
+import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.survey.data.SurveySweepStatus
+import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
+import com.luxmap.feature.survey.domain.usecase.CheckSurveyReadinessUseCase
+import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Before
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SurveyPlanViewModelTest {
+    private val dispatcher = StandardTestDispatcher()
+    private val route =
+        AssignedSurveyRoute(
+            surveySweepId = "SWEEP-1",
+            assignedByName = "Kỹ sư bảo trì A",
+            plannedDate = "2026-10-01",
+            status = SurveySweepStatus.PLANNED,
+            roadSegments = listOf(AssignedRoadSegment("RS-1", "Đường A", 500.0)),
+        )
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `emits Empty when there are no assigned routes`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(emptyList())
+            val viewModel =
+                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+
+            viewModel.uiState.test {
+                assertEquals(SurveyPlanUiState.Loading, awaitItem())
+                assertEquals(SurveyPlanUiState.Empty, awaitItem())
+            }
+        }
+
+    @Test
+    fun `emits Success with the assigned routes when there is at least one`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            val viewModel =
+                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+
+            viewModel.uiState.test {
+                assertEquals(SurveyPlanUiState.Loading, awaitItem())
+                val success = awaitItem() as SurveyPlanUiState.Success
+                assertEquals(listOf(route), success.routes)
+            }
+        }
+
+    @Test
+    fun `emits Error when the repository flow fails`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flow { throw IllegalStateException("offline") }
+            val viewModel =
+                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+
+            viewModel.uiState.test {
+                assertEquals(SurveyPlanUiState.Loading, awaitItem())
+                val error = awaitItem() as SurveyPlanUiState.Error
+                assertEquals("offline", error.message)
+            }
+        }
+
+    @Test
+    fun `selecting a route with a non-REALTIME timestamp source surfaces a not-ready readiness result`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            val readinessInputProvider = mockk<SurveyReadinessInputProvider>()
+            coEvery { readinessInputProvider.gather(route) } returns
+                SurveyReadinessInput(
+                    cameraPermissionGranted = true,
+                    exposureLockSupported = true,
+                    timestampSourceRealtime = false,
+                    gpsAvailable = true,
+                    freeStorageBytes = 2_000_000_000L,
+                    requiredStorageBytes = 1_000_000_000L,
+                    batteryPercent = 80,
+                )
+            val viewModel = SurveyPlanViewModel(repository, readinessInputProvider, CheckSurveyReadinessUseCase())
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success, no selection yet
+                viewModel.onRouteSelected("SWEEP-1")
+                val selected = awaitItem() as SurveyPlanUiState.Success // selectedSurveySweepId set, readiness null
+                assertEquals("SWEEP-1", selected.selectedSurveySweepId)
+                val withReadiness = awaitItem() as SurveyPlanUiState.Success
+                assertFalse(requireNotNull(withReadiness.readiness).isReady)
+                assertFalse(withReadiness.readiness!!.timestampSourceRealtime)
+            }
+        }
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.feature.survey.ui.plan.SurveyPlanViewModelTest"`
+Expected: FAIL — classes do not exist yet.
+
+- [ ] **Step 3: Implement**
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/domain/SurveyReadinessInputProvider.kt
+package com.luxmap.feature.survey.domain
+
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.hardware.camera2.CameraManager
+import android.os.BatteryManager
+import android.os.StatFs
+import androidx.core.content.ContextCompat
+import com.luxmap.core.camera.ExposureLockController
+import com.luxmap.core.location.LocationTracker
+import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+
+// Task 11 kept CheckSurveyReadinessUseCase a pure decision function on purpose — this is where the
+// actual CameraManager/StatFs/BatteryManager calls happen, verified on a real device (spec §16),
+// not unit tested here (there is nothing pure left to assert once real system services are involved).
+interface SurveyReadinessInputProvider {
+    suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput
+}
+
+class RealSurveyReadinessInputProvider
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val exposureLockController: ExposureLockController,
+        private val locationTracker: LocationTracker,
+    ) : SurveyReadinessInputProvider {
+        override suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput {
+            val cameraManager = context.getSystemService(CameraManager::class.java)
+            val cameraId = cameraManager.cameraIdList.firstOrNull()
+            val characteristics = cameraId?.let { cameraManager.getCameraCharacteristics(it) }
+            val timestampSourceRealtime =
+                characteristics?.let { exposureLockController.isTimestampSourceRealtime(it) } ?: false
+            val statFs = StatFs(context.filesDir.path)
+            val batteryManager = context.getSystemService(BatteryManager::class.java)
+
+            return SurveyReadinessInput(
+                cameraPermissionGranted =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED,
+                exposureLockSupported = characteristics != null,
+                timestampSourceRealtime = timestampSourceRealtime,
+                gpsAvailable = locationTracker.hasLocationPermission(),
+                freeStorageBytes = statFs.availableBytes,
+                requiredStorageBytes = estimateRequiredStorageBytes(route),
+                batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
+            )
+        }
+
+        // Rough estimate (average survey speed x an assumed bitrate) — refine both constants
+        // against the Task 2 spike's chosen defaults once real numbers exist.
+        private fun estimateRequiredStorageBytes(route: AssignedSurveyRoute): Long {
+            val totalLengthMeters = route.roadSegments.sumOf { it.lengthMeters ?: 0.0 }
+            val estimatedDurationSeconds = totalLengthMeters / AVERAGE_SPEED_METERS_PER_SECOND
+            return (estimatedDurationSeconds * ASSUMED_BITRATE_BYTES_PER_SECOND).toLong()
+        }
+
+        private companion object {
+            const val AVERAGE_SPEED_METERS_PER_SECOND = 8.3 // ~30 km/h
+            const val ASSUMED_BITRATE_BYTES_PER_SECOND = 1_000_000L // 8 Mbps placeholder pending Task 2
+        }
+    }
+```
+
+```kotlin
+// app/src/main/java/com/luxmap/di/CaptureModule.kt
+package com.luxmap.di
+
+import com.luxmap.feature.survey.domain.RealSurveyReadinessInputProvider
+import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
+import dagger.Binds
+import dagger.Module
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
+
+// Bindings for the survey capture feature that are not data Repositories (per CLAUDE.md,
+// RepositoryModule.kt is Fake/Real repository bindings only) — Task 18 adds
+// SurveyCaptureController's binding to this same file.
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class CaptureModule {
+    @Binds
+    abstract fun bindSurveyReadinessInputProvider(impl: RealSurveyReadinessInputProvider): SurveyReadinessInputProvider
+}
+```
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanUiState.kt
+package com.luxmap.feature.survey.ui.plan
+
+import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
+
+sealed interface SurveyPlanUiState {
+    data object Loading : SurveyPlanUiState
+
+    data class Success(
+        val routes: List<AssignedSurveyRoute>,
+        val selectedSurveySweepId: String? = null,
+        val readiness: SurveyReadinessResult? = null,
+    ) : SurveyPlanUiState
+
+    data object Empty : SurveyPlanUiState
+
+    data class Error(val message: String) : SurveyPlanUiState
+}
+```
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModel.kt
+package com.luxmap.feature.survey.ui.plan
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
+import com.luxmap.feature.survey.domain.usecase.CheckSurveyReadinessUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class SurveyPlanViewModel
+    @Inject
+    constructor(
+        private val repository: SurveyRepository,
+        private val readinessInputProvider: SurveyReadinessInputProvider,
+        private val checkSurveyReadinessUseCase: CheckSurveyReadinessUseCase,
+    ) : ViewModel() {
+        private val _uiState = MutableStateFlow<SurveyPlanUiState>(SurveyPlanUiState.Loading)
+        val uiState: StateFlow<SurveyPlanUiState> = _uiState.asStateFlow()
+
+        init {
+            viewModelScope.launch {
+                repository
+                    .observeAssignedRoutes()
+                    .catch { e ->
+                        _uiState.value = SurveyPlanUiState.Error(e.message ?: "Không tải được tuyến khảo sát")
+                    }.collect { routes ->
+                        _uiState.value =
+                            if (routes.isEmpty()) {
+                                SurveyPlanUiState.Empty
+                            } else {
+                                SurveyPlanUiState.Success(routes)
+                            }
+                    }
+            }
+        }
+
+        fun onRouteSelected(surveySweepId: String) {
+            val current = _uiState.value as? SurveyPlanUiState.Success ?: return
+            _uiState.value = current.copy(selectedSurveySweepId = surveySweepId, readiness = null)
+
+            viewModelScope.launch {
+                val route = current.routes.first { it.surveySweepId == surveySweepId }
+                val input = readinessInputProvider.gather(route)
+                val result = checkSurveyReadinessUseCase(input)
+
+                // Only apply the result if the user has not since picked a different route.
+                val latest = _uiState.value
+                if (latest is SurveyPlanUiState.Success && latest.selectedSurveySweepId == surveySweepId) {
+                    _uiState.value = latest.copy(readiness = result)
+                }
+            }
+        }
+    }
+```
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/ui/plan/SurveyPlanScreen.kt
+package com.luxmap.feature.survey.ui.plan
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.theme.Spacing
+import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
+
+@Composable
+fun SurveyPlanScreen(
+    onEnterCaptureMode: (surveySweepId: String) -> Unit,
+    viewModel: SurveyPlanViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    when (val state = uiState) {
+        is SurveyPlanUiState.Loading ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+
+        is SurveyPlanUiState.Success ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                items(state.routes) { route ->
+                    SurveyRouteCard(
+                        route = route,
+                        isSelected = route.surveySweepId == state.selectedSurveySweepId,
+                        readiness = if (route.surveySweepId == state.selectedSurveySweepId) state.readiness else null,
+                        onClick = { viewModel.onRouteSelected(route.surveySweepId) },
+                        onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
+                    )
+                }
+            }
+
+        is SurveyPlanUiState.Empty ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Chưa có tuyến khảo sát nào được giao", style = MaterialTheme.typography.bodyLarge)
+            }
+
+        is SurveyPlanUiState.Error ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(state.message, style = MaterialTheme.typography.bodyLarge)
+            }
+    }
+}
+
+@Composable
+private fun SurveyRouteCard(
+    route: AssignedSurveyRoute,
+    isSelected: Boolean,
+    readiness: SurveyReadinessResult?,
+    onClick: () -> Unit,
+    onEnterCaptureMode: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(Spacing.md)) {
+        Text(route.surveySweepId, style = MaterialTheme.typography.titleMedium)
+        Text("Giao bởi: ${route.assignedByName}", style = MaterialTheme.typography.bodyMedium)
+        Text("Ngày dự kiến: ${route.plannedDate}", style = MaterialTheme.typography.bodyMedium)
+        Text("${route.roadSegments.size} đoạn đường", style = MaterialTheme.typography.bodySmall)
+        if (!isSelected) {
+            Button(onClick = onClick) { Text("Kiểm tra sẵn sàng") }
+        } else if (readiness == null) {
+            Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
+        } else {
+            ReadinessChecklist(readiness)
+            Button(onClick = onEnterCaptureMode, enabled = readiness.isReady) { Text("Vào chế độ khảo sát") }
+        }
+    }
+}
+
+@Composable
+private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
+    Column {
+        ReadinessRow("Quyền camera", readiness.cameraPermissionGranted)
+        ReadinessRow("Khoá exposure hỗ trợ", readiness.exposureLockSupported)
+        ReadinessRow("Đồng hồ cảm biến REALTIME", readiness.timestampSourceRealtime)
+        ReadinessRow("GPS", readiness.gpsAvailable)
+        ReadinessRow("Đủ dung lượng trống", readiness.freeStorageBytes >= readiness.requiredStorageBytes)
+        ReadinessRow("Pin đủ (>= 20%)", readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT)
+        if (!readiness.timestampSourceRealtime) {
+            // Hard block, not just a warning (spec §10) — the label makes clear this is a device
+            // support issue, not a transient check that will pass on retry.
+            Text(
+                "Thiết bị này không được hỗ trợ khảo sát (đồng hồ cảm biến camera không đạt yêu cầu)",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReadinessRow(
+    label: String,
+    passed: Boolean,
+) {
+    Text(
+        text = "${if (passed) "✓" else "✗"} $label",
+        color = if (passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+    )
+}
+```
+
+Add a route constant to `Routes.kt` (e.g. `const val SURVEY_PLAN = "survey_plan"`) and a `composable(Routes.SURVEY_PLAN) { SurveyPlanScreen(onEnterCaptureMode = { surveySweepId -> navController.navigate(Routes.surveyCapture(surveySweepId)) }) }` entry to `NavGraph.kt`, following the existing pattern used for the home/map routes already in that file. `Routes.surveyCapture(surveySweepId)` and the receiving route are added in Task 18.
 
 - [ ] **Step 1: Write the failing ViewModel test**
 
@@ -1976,8 +2501,6 @@ private fun SurveyRouteCard(
 }
 ```
 
-Add a route constant to `Routes.kt` (e.g. `const val SURVEY_PLAN = "survey_plan"`) and a `composable(Routes.SURVEY_PLAN) { SurveyPlanScreen(onRouteSelected = { /* Task 18 wires this to Routes.SURVEY_CAPTURE */ }) }` entry to `NavGraph.kt`, following the existing pattern used for the home/map routes already in that file.
-
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.feature.survey.ui.plan.SurveyPlanViewModelTest"`
@@ -1986,11 +2509,13 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app/src/main/java/com/luxmap/feature/survey/ui/plan/ \
+git add app/src/main/java/com/luxmap/feature/survey/domain/SurveyReadinessInputProvider.kt \
+  app/src/main/java/com/luxmap/di/CaptureModule.kt \
+  app/src/main/java/com/luxmap/feature/survey/ui/plan/ \
   app/src/main/java/com/luxmap/navigation/Routes.kt \
   app/src/main/java/com/luxmap/navigation/NavGraph.kt \
   app/src/test/java/com/luxmap/feature/survey/ui/plan/SurveyPlanViewModelTest.kt
-git commit -m "feat(fm-survey): add F03 survey plan screen with 4 ui states"
+git commit -m "feat(fm-survey): add F03 survey plan screen with readiness checklist wired in"
 ```
 
 ---
@@ -2078,7 +2603,7 @@ class SurveySessionDaoTest {
     }
 
     @Test
-    fun `sessions in recording state finds a session left mid-recording`() =
+    fun sessionsInRecordingStateFindsASessionLeftMidRecording() =
         runTest {
             dao.insertSession(session("SESSION-1", recordingState = "recording"))
             dao.insertSession(session("SESSION-2", recordingState = "packaged"))
@@ -2090,7 +2615,7 @@ class SurveySessionDaoTest {
         }
 
     @Test
-    fun `unfinalized segment is found by a null endedAtElapsedNs`() =
+    fun unfinalizedSegmentIsFoundByANullEndedAtElapsedNs() =
         runTest {
             dao.insertSession(session("SESSION-1"))
             dao.insertSegment(
@@ -2113,7 +2638,7 @@ class SurveySessionDaoTest {
         }
 
     @Test
-    fun `no unfinalized segment once it has been closed`() =
+    fun noUnfinalizedSegmentOnceItHasBeenClosed() =
         runTest {
             dao.insertSession(session("SESSION-1"))
             dao.insertSegment(
@@ -2385,37 +2910,48 @@ import java.util.TimerTask
 // schema_version is a header LINE on .ndjson files, unlike manifest.json/capture_config.json
 // where it is a JSON field (spec §8). flushIntervalMs periodic flush (spec §12) bounds data loss
 // on a crash to at most that interval.
+//
+// The periodic flush runs on the Timer's own thread while appendLine() is called from a recorder's
+// thread/coroutine — BufferedWriter is not thread-safe, so every write AND every flush must take
+// the same lock, or a flush landing mid-write can persist a torn line. lock (not `this`) is used
+// explicitly so the intent is not hidden behind a bare @Synchronized on a class with a Timer field.
 class NdjsonLogWriter(
     file: File,
     fileRole: String,
     flushIntervalMs: Long = 1_000L,
 ) {
+    private val lock = Any()
     private val writer: BufferedWriter = BufferedWriter(FileWriter(file, true))
     private val flushTimer = Timer(/* isDaemon = */ true)
 
     init {
-        writer.write("""{"schema_version":"v0","file_role":"$fileRole"}""")
-        writer.newLine()
-        writer.flush()
+        synchronized(lock) {
+            writer.write("""{"schema_version":"v0","file_role":"$fileRole"}""")
+            writer.newLine()
+            writer.flush()
+        }
         flushTimer.scheduleAtFixedRate(
             object : TimerTask() {
-                override fun run() = writer.flush()
+                override fun run() = synchronized(lock) { writer.flush() }
             },
             flushIntervalMs,
             flushIntervalMs,
         )
     }
 
-    @Synchronized
     fun appendLine(json: String) {
-        writer.write(json)
-        writer.newLine()
+        synchronized(lock) {
+            writer.write(json)
+            writer.newLine()
+        }
     }
 
     fun close() {
         flushTimer.cancel()
-        writer.flush()
-        writer.close()
+        synchronized(lock) {
+            writer.flush()
+            writer.close()
+        }
     }
 }
 ```
@@ -2582,7 +3118,7 @@ sealed interface PackageResult {
 // Fails loudly rather than writing a manifest that references a file that is not actually there
 // (spec §14 Review Focus) — a missing file is a real data-loss event, not something to paper over.
 // Deliberate v0 simplification vs spec §8's example: the "device" block is not duplicated in
-// manifest.json since capture_config.json (Task 17) already carries it and both files are always
+// manifest.json since capture_config.json (Task 17d) already carries it and both files are always
 // packaged together — flagged here, not silently dropped, so a reviewer can override it later.
 class PackageSurveySessionUseCase
     @Inject
@@ -2687,11 +3223,16 @@ git commit -m "feat(fm-survey): add PackageSurveySessionUseCase with missing-fil
 
 **Files:**
 - Create: `app/src/main/java/com/luxmap/feature/survey/capture/SurveySessionRecoveryUseCase.kt`
+- Modify: `app/src/main/java/com/luxmap/LuxMapApp.kt`
 - Test: `app/src/test/java/com/luxmap/feature/survey/capture/SurveySessionRecoveryUseCaseTest.kt`
 
 **Interfaces:**
 - Consumes: `SurveySessionDao` (Task 13), `PackageSurveySessionUseCase` (Task 15).
-- Produces: `class SurveySessionRecoveryUseCase { suspend fun recoverAny() }` — call once at app start (e.g. from `LuxMapApp.onCreate` or the capture feature's entry point).
+- Produces: `class SurveySessionRecoveryUseCase { suspend fun recoverAny() }`, called from exactly one place: `LuxMapApp.onCreate()` — not from the capture feature's entry point, so it always runs once per process start regardless of which screen the user opens first.
+
+Two corrections from the original review of this task:
+- **Deletes the actual dangling video file, not just its DB row** — a segment left unfinalized by a crash is disk space and potentially corrupt data; leaving the file behind while deleting only the `local_survey_video_segment` row would silently leak storage.
+- **A packaging failure during recovery is not silently swallowed.** Since this runs at app startup with no UI attached, "surface an error to the user" means persisting a state a later screen can query and show — `recordingState` gets a new value, `"package_failed"`, distinct from `"stopped"`/`"packaged"`, when `packager.invoke()` returns `PackageResult.Failure`. Showing this in an actual UI (e.g. surfaced on F02's sync banner or a dedicated list) is a real product gap for a fast-follow, not built in this plan — flagged, not hidden.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2707,6 +3248,7 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.io.File
 import java.time.Instant
 
 class SurveySessionRecoveryUseCaseTest {
@@ -2735,18 +3277,20 @@ class SurveySessionRecoveryUseCaseTest {
         )
 
     @Test
-    fun `drops the unfinalized segment and marks the session stopped before packaging`() =
+    fun `drops the unfinalized segment's row and file, then marks the session stopped before packaging`() =
         runTest {
+            val danglingFile = File.createTempFile("segment_1", ".mp4")
             val dao = mockk<SurveySessionDao>(relaxed = true)
             coEvery { dao.sessionsInRecordingState() } returns listOf(stuckSession())
             coEvery { dao.unfinalizedSegmentFor("SESSION-1") } returns
-                LocalSurveyVideoSegmentEntity("SEG-1", "SESSION-1", 1, "/data/segment_1.mp4", 0L, null, null, null)
+                LocalSurveyVideoSegmentEntity("SEG-1", "SESSION-1", 1, danglingFile.absolutePath, 0L, null, null, null)
             val packager = mockk<PackageSurveySessionUseCase>()
             coEvery { packager.invoke("SESSION-1") } returns PackageResult.Success("/data/manifest.json")
 
             SurveySessionRecoveryUseCase(dao, packager).recoverAny()
 
             coVerify { dao.deleteSegment("SEG-1") }
+            assertFalseFileExists(danglingFile)
             coVerify { dao.updateSession(match { it.sessionId == "SESSION-1" && it.recordingState == "stopped" }) }
             coVerify { packager.invoke("SESSION-1") }
         }
@@ -2766,6 +3310,24 @@ class SurveySessionRecoveryUseCaseTest {
             coVerify { dao.updateSession(match { it.sessionId == "SESSION-1" && it.recordingState == "stopped" }) }
             coVerify { packager.invoke("SESSION-1") }
         }
+
+    @Test
+    fun `marks the session package_failed instead of packaged when packaging fails`() =
+        runTest {
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionsInRecordingState() } returns listOf(stuckSession())
+            coEvery { dao.unfinalizedSegmentFor("SESSION-1") } returns null
+            val packager = mockk<PackageSurveySessionUseCase>()
+            coEvery { packager.invoke("SESSION-1") } returns PackageResult.Failure("missing file")
+
+            SurveySessionRecoveryUseCase(dao, packager).recoverAny()
+
+            coVerify { dao.updateSession(match { it.sessionId == "SESSION-1" && it.recordingState == "package_failed" }) }
+        }
+
+    private fun assertFalseFileExists(file: File) {
+        org.junit.Assert.assertFalse(file.exists())
+    }
 }
 ```
 
@@ -2781,12 +3343,15 @@ Expected: FAIL — class does not exist yet.
 package com.luxmap.feature.survey.capture
 
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
+import java.io.File
 import java.time.Instant
 import javax.inject.Inject
 
-// Called once at app start (spec §12). A session stuck in "recording" means the app was killed
-// mid-session without going through the normal "Dừng quay" path — its last segment is unfinalized
-// and MediaMuxer likely never closed it cleanly, so it is dropped rather than trusted.
+// Called exactly once, from LuxMapApp.onCreate() (Step 4 below) — not from the capture feature's
+// own entry point, so recovery runs on every process start regardless of which screen opens first.
+// A session stuck in "recording" means the app was killed mid-session without going through the
+// normal "Dừng quay" path — its last segment is unfinalized and MediaMuxer likely never closed it
+// cleanly, so both its DB row and its file are dropped rather than trusted.
 class SurveySessionRecoveryUseCase
     @Inject
     constructor(
@@ -2798,44 +3363,801 @@ class SurveySessionRecoveryUseCase
                 // A session can be stuck with no segment at all if the app died before the first
                 // one ever opened — nothing to drop in that case, just move the session forward.
                 dao.unfinalizedSegmentFor(session.sessionId)?.let { unfinalized ->
+                    File(unfinalized.filePath).delete()
                     dao.deleteSegment(unfinalized.segmentId)
                 }
 
                 dao.updateSession(session.copy(recordingState = "stopped", updatedAt = Instant.now()))
-                packager.invoke(session.sessionId)
+
+                when (packager.invoke(session.sessionId)) {
+                    is PackageResult.Success -> Unit // PackageSurveySessionUseCase already set recordingState = "packaged"
+                    is PackageResult.Failure ->
+                        dao.updateSession(session.copy(recordingState = "package_failed", updatedAt = Instant.now()))
+                }
             }
         }
     }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [ ] **Step 4: Wire it into `LuxMapApp.onCreate()`**
+
+```kotlin
+// app/src/main/java/com/luxmap/LuxMapApp.kt
+package com.luxmap
+
+import android.app.Application
+import com.luxmap.core.map.initMapLibre
+import com.luxmap.feature.survey.capture.SurveySessionRecoveryUseCase
+import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltAndroidApp
+class LuxMapApp : Application() {
+    // Hilt injects fields declared directly on a @HiltAndroidApp Application before onCreate() runs.
+    @Inject lateinit var surveySessionRecoveryUseCase: SurveySessionRecoveryUseCase
+
+    override fun onCreate() {
+        super.onCreate()
+        initMapLibre(this)
+        CoroutineScope(Dispatchers.Default).launch { surveySessionRecoveryUseCase.recoverAny() }
+    }
+}
+```
+
+- [ ] **Step 5: Run to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.feature.survey.capture.SurveySessionRecoveryUseCaseTest"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/com/luxmap/feature/survey/capture/SurveySessionRecoveryUseCase.kt \
+  app/src/main/java/com/luxmap/LuxMapApp.kt \
   app/src/test/java/com/luxmap/feature/survey/capture/SurveySessionRecoveryUseCaseTest.kt
-git commit -m "feat(fm-survey): add crash recovery for sessions stuck in recording state"
+git commit -m "feat(fm-survey): add crash recovery, wired into app startup"
 ```
 
 ---
 
-## Task 17: `CaptureConfigWriter`, `SurveyCaptureService`, and manifest/permissions wiring
+## Task 17a: Real video pipeline — Camera2 session + `MediaCodec` + `RealMuxerPort`
+
+**Done when:** starting a session opens the camera, applies the locked profile via `ExposureLockController.applyTo`, locks AWB once converged, encodes through `MediaCodec` into `RealMuxerPort`-backed segments, writes one line per encoded frame to `frame_timestamp_log.ndjson`, and every segment open/close is reflected in `local_survey_video_segment` (a row is inserted with `endedAtElapsedNs = null` the moment a segment starts, and updated with the real end time/size the moment it closes).
 
 **Files:**
-- Create: `app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt`
-- Create: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt`
-- Modify: `app/src/main/AndroidManifest.xml`
-- Test: `app/src/test/java/com/luxmap/feature/survey/capture/CaptureConfigWriterTest.kt`
+- Create: `app/src/main/java/com/luxmap/feature/survey/capture/RealMuxerPort.kt`
+- Create: `app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt`
 
 **Interfaces:**
-- Consumes: `SegmentedVideoRecorder` (Task 5), `SurveyTrackRecorder`/`HeadingSensor` (Tasks 6–7), `LuxSensorBleClient` (Task 8), `SurveySessionDao`/`NdjsonLogWriter`/`NdjsonLogReader` (Tasks 13–14), `PackageSurveySessionUseCase` (Task 15).
-- Produces: `data class CaptureConfig(val utcAnchorIso: String, val elapsedAnchorNs: Long, val resolution: String, val fps: Int, val isoSensitivity: Int, val shutterNs: Long, val codec: String, val bitrateBps: Int, val keyframeIntervalS: Int, val segmentDurationS: Int, val cameraManufacturer: String, val cameraModel: String, val cameraId: String, val appVersion: String, val luxModuleId: String, val luxModuleFirmware: String)`; `object CaptureConfigWriter { fun toJson(config: CaptureConfig): String }`. A bound/started `Service` with `fun startSession(surveySweepId: String, luxDeviceAddress: String)` and `fun stopSession()` entry points that Task 18's `CaptureViewModel` calls.
+- Consumes: `MuxerPort`/`SegmentedVideoRecorder`/`SegmentRotationPolicy` (Task 5), `ExposureLockController`/`LockedCameraProfile` (Task 3), `FrameTimestampLogger` (Task 4), `NdjsonLogWriter` (Task 14), `SurveySessionDao`/`LocalSurveyVideoSegmentEntity` (Task 13).
+- Produces: `class RealMuxerPort(outputFilePath: String, outputFormat: MediaFormat) : MuxerPort { fun setPendingSample(buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) }`; `data class FinalizedVideoCapture(val lastSegment: VideoSegmentResult, val actualProfile: LockedCameraProfile, val cameraManufacturer: String, val cameraModel: String, val cameraId: String)`; `class VideoCaptureSession { suspend fun start(scope: CoroutineScope, sessionId: String, sessionDir: File, profile: LockedCameraProfile, segmentDurationMs: Long); suspend fun stop(): FinalizedVideoCapture }`.
+- Produces (used by Task 17d): `FinalizedVideoCapture.actualProfile` carries the **real applied** ISO/exposure/frame-duration read back from the last `CaptureResult` — Task 17d writes `capture_config.json` from this, not from the requested `LockedCameraProfile`.
 
-`CaptureConfigWriter.toJson` is a pure function (known inputs → JSON string) and is unit-tested here; the actual Camera2/`SensorManager`/`BluetoothGatt` object wiring inside `SurveyCaptureService` is not meaningfully unit-testable — it is verified through the Task 2 spike having already de-risked the pipeline, and through the real-device checklist in spec §16. The service itself has no test; that is intentional, not an oversight (documented here so a reviewer does not flag it as a gap). The exact numeric defaults (`resolution`, `fps`, `bitrateBps`, `keyframeIntervalS`, `segmentDurationS`, `isoSensitivity`, `shutterNs`) come from the Task 2 spike's findings file, not invented here.
+**No automated test** — same reasoning as the rest of this task's Camera2/`MediaCodec` glue (spec §16): a real camera and encoder cannot run under the JVM stub, Robolectric is not on the approved stack, and an instrumented test would only prove the pipeline runs on whatever emulator CI happens to use, not that it holds exposure/AWB correctly. Verified instead by the Task 2 spike having already de-risked the exact same pipeline, and by the real-device checklist in spec §16 (record ≥10 min, confirm no dropped/glitched frames at segment boundaries, confirm `capture_config.json`'s written values match what the device actually applied).
+
+`RealMuxerPort.writeSample(presentationTimeUs)` (the `MuxerPort` method Task 5's bookkeeping already calls) only carries a timestamp because that is all the **pure** rotation-decision unit test needed — the real encoded bytes for that exact call are staged via `setPendingSample()` immediately before invoking `SegmentedVideoRecorder.onEncodedFrame()` below. This keeps Task 5 unchanged while still muxing real data; it is a deliberate adapter, not an accidental mismatch.
+
+- [ ] **Step 1: `RealMuxerPort`**
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/capture/RealMuxerPort.kt
+package com.luxmap.feature.survey.capture
+
+import android.media.MediaCodec
+import android.media.MediaFormat
+import android.media.MediaMuxer
+import com.luxmap.core.camera.MuxerPort
+import java.io.File
+import java.nio.ByteBuffer
+
+class RealMuxerPort(
+    private val outputFilePath: String,
+    outputFormat: MediaFormat,
+) : MuxerPort {
+    private val muxer = MediaMuxer(outputFilePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private val trackIndex = muxer.addTrack(outputFormat)
+    private var started = false
+    private var pendingBuffer: ByteBuffer? = null
+    private var pendingBufferInfo: MediaCodec.BufferInfo? = null
+
+    fun setPendingSample(
+        buffer: ByteBuffer,
+        bufferInfo: MediaCodec.BufferInfo,
+    ) {
+        pendingBuffer = buffer
+        pendingBufferInfo = bufferInfo
+    }
+
+    override fun writeSample(presentationTimeUs: Long) {
+        if (!started) {
+            muxer.start()
+            started = true
+        }
+        val buffer = requireNotNull(pendingBuffer) { "setPendingSample() must be called before writeSample()" }
+        val info = requireNotNull(pendingBufferInfo) { "setPendingSample() must be called before writeSample()" }
+        muxer.writeSampleData(trackIndex, buffer, info)
+    }
+
+    override fun close(): Long {
+        if (started) muxer.stop()
+        muxer.release()
+        return File(outputFilePath).length()
+    }
+}
+```
+
+- [ ] **Step 2: `VideoCaptureSession`**
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt
+package com.luxmap.feature.survey.capture
+
+import android.content.Context
+import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
+import android.media.MediaCodec
+import android.media.MediaCodecInfo
+import android.media.MediaFormat
+import android.os.Build
+import android.os.SystemClock
+import android.view.Surface
+import com.luxmap.core.camera.ExposureLockController
+import com.luxmap.core.camera.FrameTimestampLogger
+import com.luxmap.core.camera.LockedCameraProfile
+import com.luxmap.core.camera.SegmentRotationPolicy
+import com.luxmap.core.camera.SegmentedVideoRecorder
+import com.luxmap.core.camera.VideoSegmentResult
+import com.luxmap.feature.survey.data.dao.SurveySessionDao
+import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import java.io.File
+import java.util.UUID
+import javax.inject.Inject
+import kotlin.coroutines.resume
+
+data class FinalizedVideoCapture(
+    val lastSegment: VideoSegmentResult,
+    val actualProfile: LockedCameraProfile,
+    val cameraManufacturer: String,
+    val cameraModel: String,
+    val cameraId: String,
+)
+
+class VideoCaptureSession
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val exposureLockController: ExposureLockController,
+        private val frameTimestampLogger: FrameTimestampLogger,
+        private val sessionDao: SurveySessionDao,
+    ) {
+        private lateinit var cameraDevice: CameraDevice
+        private lateinit var captureSession: CameraCaptureSession
+        private lateinit var mediaCodec: MediaCodec
+        private lateinit var recorder: SegmentedVideoRecorder
+        private lateinit var frameTimestampWriter: NdjsonLogWriter
+        private lateinit var cameraId: String
+        private lateinit var sessionId: String
+        private lateinit var sessionDir: File
+        private var currentMuxerPort: RealMuxerPort? = null
+        private var requestBuilder: CaptureRequest.Builder? = null
+        private var awbLocked = false
+        private var frameIndex = 0
+        private var currentSegmentIndex = 0
+        private val pendingSensorTimestamps = ArrayDeque<Long>()
+        private var lastCaptureResult: TotalCaptureResult? = null
+        private var drainJob: Job? = null
+
+        suspend fun start(
+            scope: CoroutineScope,
+            sessionId: String,
+            sessionDir: File,
+            profile: LockedCameraProfile,
+            segmentDurationMs: Long,
+        ) {
+            this.sessionId = sessionId
+            this.sessionDir = sessionDir
+
+            val cameraManager = context.getSystemService(CameraManager::class.java)
+            cameraId = cameraManager.cameraIdList.first()
+            cameraDevice = openCamera(cameraManager, cameraId)
+
+            mediaCodec = createEncoder(profile)
+            val inputSurface = mediaCodec.createInputSurface()
+            mediaCodec.start()
+
+            recorder =
+                SegmentedVideoRecorder(SegmentRotationPolicy(segmentDurationMs)) { path ->
+                    RealMuxerPort(path, mediaCodec.outputFormat).also { currentMuxerPort = it }
+                }
+            frameTimestampWriter =
+                NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
+
+            val firstSegmentPath = File(sessionDir, "segment_0.mp4").absolutePath
+            persistNewSegment(0, firstSegmentPath)
+            recorder.startSegment(0, firstSegmentPath)
+
+            captureSession = createCaptureSession(cameraDevice, inputSurface)
+            val builder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
+                    addTarget(inputSurface)
+                    exposureLockController.applyTo(this, profile)
+                }
+            requestBuilder = builder
+            captureSession.setRepeatingRequest(builder.build(), captureCallback, null)
+
+            drainJob = scope.launch { drainEncoderOutput() }
+        }
+
+        private val captureCallback =
+            object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    result: TotalCaptureResult,
+                ) {
+                    lastCaptureResult = result
+                    result.get(CaptureResult.SENSOR_TIMESTAMP)?.let { pendingSensorTimestamps.addLast(it) }
+                    if (!awbLocked) {
+                        val builder = requestBuilder ?: return
+                        awbLocked = exposureLockController.lockAwbIfConverged(builder, result)
+                        if (awbLocked) captureSession.setRepeatingRequest(builder.build(), this, null)
+                    }
+                }
+            }
+
+        private suspend fun drainEncoderOutput() {
+            val bufferInfo = MediaCodec.BufferInfo()
+            while (currentCoroutineContext().isActive) {
+                val outputIndex = mediaCodec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
+                if (outputIndex < 0) continue
+                val outputBuffer = requireNotNull(mediaCodec.getOutputBuffer(outputIndex))
+                val isKeyFrame = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
+                // Camera-fed encoder input preserves frame order, so the Nth SENSOR_TIMESTAMP seen in
+                // onCaptureCompleted corresponds to the Nth encoded output frame here (confirmed by
+                // the Task 2 spike's PTS-vs-SENSOR_TIMESTAMP measurement).
+                val sensorTimestampNs = pendingSensorTimestamps.removeFirstOrNull() ?: (bufferInfo.presentationTimeUs * 1000)
+
+                currentMuxerPort?.setPendingSample(outputBuffer, bufferInfo)
+                val closedSegment = recorder.onEncodedFrame(isKeyFrame, bufferInfo.presentationTimeUs, sensorTimestampNs)
+
+                val entry = frameTimestampLogger.buildEntry(frameIndex++, sensorTimestampNs, bufferInfo.presentationTimeUs, currentSegmentIndex)
+                frameTimestampWriter.appendLine(
+                    """{"frame_index":${entry.frameIndex},"sensor_timestamp_ns":${entry.sensorTimestampNs},"video_pts_us":${entry.videoPtsUs},"segment":${entry.segment}}""",
+                )
+
+                mediaCodec.releaseOutputBuffer(outputIndex, false)
+
+                if (closedSegment != null) {
+                    persistClosedSegment(closedSegment)
+                    currentSegmentIndex = closedSegment.segmentIndex + 1
+                    persistNewSegment(currentSegmentIndex, File(sessionDir, "segment_$currentSegmentIndex.mp4").absolutePath)
+                }
+            }
+        }
+
+        // Called from SurveyCaptureService (Task 17d) when the user stops recording. Returns the
+        // REAL applied capture values (from the last CaptureResult) for capture_config.json, per
+        // review feedback — not the requested LockedCameraProfile, which may not be exactly what
+        // the sensor settled on.
+        suspend fun stop(): FinalizedVideoCapture {
+            drainJob?.cancelAndJoin()
+            captureSession.stopRepeating()
+            mediaCodec.signalEndOfInputStream()
+            val finalSegment = recorder.stop()
+            persistClosedSegment(finalSegment)
+            frameTimestampWriter.close()
+            mediaCodec.stop()
+            mediaCodec.release()
+            captureSession.close()
+            cameraDevice.close()
+
+            val result = requireNotNull(lastCaptureResult) { "No CaptureResult observed before stop()" }
+            val actualProfile =
+                LockedCameraProfile(
+                    isoSensitivity = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0,
+                    exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L,
+                    frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
+                )
+            return FinalizedVideoCapture(finalSegment, actualProfile, Build.MANUFACTURER, Build.MODEL, cameraId)
+        }
+
+        private suspend fun persistNewSegment(
+            index: Int,
+            path: String,
+        ) {
+            sessionDao.insertSegment(
+                LocalSurveyVideoSegmentEntity(
+                    segmentId = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    segmentIndex = index,
+                    filePath = path,
+                    startedAtElapsedNs = SystemClock.elapsedRealtimeNanos(),
+                    endedAtElapsedNs = null,
+                    sizeBytes = null,
+                    checksumSha256 = null,
+                ),
+            )
+        }
+
+        private suspend fun persistClosedSegment(result: VideoSegmentResult) {
+            val open = sessionDao.unfinalizedSegmentFor(sessionId) ?: return
+            sessionDao.updateSegment(open.copy(endedAtElapsedNs = SystemClock.elapsedRealtimeNanos(), sizeBytes = result.sizeBytes))
+        }
+
+        private suspend fun openCamera(
+            cameraManager: CameraManager,
+            cameraId: String,
+        ): CameraDevice =
+            suspendCancellableCoroutine { continuation ->
+                cameraManager.openCamera(
+                    cameraId,
+                    object : CameraDevice.StateCallback() {
+                        override fun onOpened(camera: CameraDevice) = continuation.resume(camera)
+
+                        override fun onDisconnected(camera: CameraDevice) {
+                            camera.close()
+                            continuation.cancel()
+                        }
+
+                        override fun onError(
+                            camera: CameraDevice,
+                            error: Int,
+                        ) {
+                            camera.close()
+                            continuation.cancel(IllegalStateException("Camera error $error"))
+                        }
+                    },
+                    null,
+                )
+            }
+
+        private suspend fun createCaptureSession(
+            camera: CameraDevice,
+            surface: Surface,
+        ): CameraCaptureSession =
+            suspendCancellableCoroutine { continuation ->
+                @Suppress("DEPRECATION")
+                camera.createCaptureSession(
+                    listOf(surface),
+                    object : CameraCaptureSession.StateCallback() {
+                        override fun onConfigured(session: CameraCaptureSession) = continuation.resume(session)
+
+                        override fun onConfigureFailed(session: CameraCaptureSession) =
+                            continuation.cancel(IllegalStateException("Camera session configuration failed"))
+                    },
+                    null,
+                )
+            }
+
+        private fun createEncoder(profile: LockedCameraProfile): MediaCodec {
+            val format =
+                MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, VIDEO_WIDTH, VIDEO_HEIGHT).apply {
+                    setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+                    setInteger(MediaFormat.KEY_BIT_RATE, VIDEO_BITRATE_BPS)
+                    setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS)
+                    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, VIDEO_KEYFRAME_INTERVAL_S)
+                }
+            return MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).apply {
+                configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            }
+        }
+
+        // Finalized against the Task 2 spike's findings — do not change these without re-running it.
+        private companion object {
+            const val DEQUEUE_TIMEOUT_US = 10_000L
+            const val VIDEO_WIDTH = 1920
+            const val VIDEO_HEIGHT = 1080
+            const val VIDEO_BITRATE_BPS = 8_000_000
+            const val VIDEO_FPS = 30
+            const val VIDEO_KEYFRAME_INTERVAL_S = 2
+        }
+    }
+```
+
+- [ ] **Step 3: Build to confirm it compiles**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/com/luxmap/feature/survey/capture/RealMuxerPort.kt \
+  app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt
+git commit -m "feat(fm-survey): add real Camera2 + MediaCodec video capture session"
+```
+
+---
+
+## Task 17b: GPS + heading recording
+
+**Done when:** starting a session registers a continuous `FusedLocationProviderClient` location callback and a `SensorManager` rotation-vector listener, each appending to its own `NdjsonLogWriter` (`gps_track.ndjson`, `heading_log.ndjson`); a 1s timer calls `SurveyTrackRecorder.onTick` and exposes the resulting `GpsSignalState` so the UI (Task 18) can warn when GPS is lost.
+
+**Files:**
+- Create: `app/src/main/java/com/luxmap/feature/survey/capture/LocationHeadingRecorder.kt`
+
+**Interfaces:**
+- Consumes: `SurveyTrackRecorder`/`HeadingSensor` (Tasks 6–7), `NdjsonLogWriter` (Task 14).
+- Produces: `class LocationHeadingRecorder { fun start(gpsWriter: NdjsonLogWriter, headingWriter: NdjsonLogWriter); fun stop(); val gpsSignalState: StateFlow<GpsSignalState> }`.
+
+No automated test, same reasoning as Task 17a — `FusedLocationProviderClient` and `SensorManager` registration only do anything meaningful against real hardware/Play Services. `SurveyTrackRecorder`'s and `HeadingSensor`'s own logic is already unit-/instrumented-tested in Tasks 6–7; this class is pure plumbing on top.
+
+- [ ] **Step 1: Implement**
+
+```kotlin
+// app/src/main/java/com/luxmap/feature/survey/capture/LocationHeadingRecorder.kt
+package com.luxmap.feature.survey.capture
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Looper
+import android.os.SystemClock
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.luxmap.core.location.GpsSignalState
+import com.luxmap.core.location.HeadingSensor
+import com.luxmap.core.location.SurveyTrackRecorder
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.Timer
+import java.util.TimerTask
+import javax.inject.Inject
+
+class LocationHeadingRecorder
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+        private val trackRecorder: SurveyTrackRecorder,
+        private val headingSensor: HeadingSensor,
+    ) {
+        private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+        private val sensorManager = context.getSystemService(SensorManager::class.java)
+        private var locationCallback: LocationCallback? = null
+        private var sensorListener: SensorEventListener? = null
+        private var tickTimer: Timer? = null
+
+        private val _gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
+        val gpsSignalState: StateFlow<GpsSignalState> = _gpsSignalState.asStateFlow()
+
+        @SuppressLint("MissingPermission")
+        fun start(
+            gpsWriter: NdjsonLogWriter,
+            headingWriter: NdjsonLogWriter,
+        ) {
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL_MS).build()
+            val callback =
+                object : LocationCallback() {
+                    override fun onLocationResult(result: LocationResult) {
+                        val location = result.lastLocation ?: return
+                        val point = trackRecorder.onLocationUpdate(location)
+                        gpsWriter.appendLine(
+                            """{"elapsed_realtime_ns":${point.elapsedRealtimeNs},"lat":${point.lat},"lng":${point.lng},""" +
+                                """"accuracy_m":${point.accuracyM},"gps_bearing_deg":${point.gpsBearingDeg ?: "null"},""" +
+                                """"speed_mps":${point.speedMps ?: "null"}}""",
+                        )
+                    }
+                }
+            locationCallback = callback
+            fusedClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+
+            // NOTE for the real-device checklist (spec §16): confirm SensorEvent.timestamp for
+            // TYPE_ROTATION_VECTOR is in the same elapsedRealtimeNanos timebase on every supported
+            // device — documented as true since API 26, but device-specific drivers have been known
+            // to diverge from spec.
+            val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            val listener =
+                object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        val sample = headingSensor.headingFromRotationVector(event.values, event.timestamp)
+                        headingWriter.appendLine("""{"elapsed_realtime_ns":${sample.elapsedRealtimeNs},"heading_deg":${sample.headingDeg}}""")
+                    }
+
+                    override fun onAccuracyChanged(
+                        sensor: Sensor,
+                        accuracy: Int,
+                    ) = Unit
+                }
+            sensorListener = listener
+            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+
+            tickTimer =
+                Timer(/* isDaemon = */ true).apply {
+                    scheduleAtFixedRate(
+                        object : TimerTask() {
+                            override fun run() {
+                                _gpsSignalState.value = trackRecorder.onTick(SystemClock.elapsedRealtimeNanos())
+                            }
+                        },
+                        GPS_SIGNAL_CHECK_INTERVAL_MS,
+                        GPS_SIGNAL_CHECK_INTERVAL_MS,
+                    )
+                }
+        }
+
+        fun stop() {
+            locationCallback?.let { fusedClient.removeLocationUpdates(it) }
+            sensorListener?.let { sensorManager.unregisterListener(it) }
+            tickTimer?.cancel()
+        }
+
+        private companion object {
+            const val LOCATION_INTERVAL_MS = 1_000L
+            const val GPS_SIGNAL_CHECK_INTERVAL_MS = 1_000L
+        }
+    }
+```
+
+- [ ] **Step 2: Build to confirm it compiles**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/src/main/java/com/luxmap/feature/survey/capture/LocationHeadingRecorder.kt
+git commit -m "feat(fm-survey): add GPS and heading recording with signal-lost detection"
+```
+
+---
+
+## Task 17c: BLE Bước 0 — scan, connect, and the real notify flow
+
+**Done when:** the BLE device address is no longer hardcoded (a scan step picks one); `connect(address)` establishes the GATT link, discovers services, enables notify with a real CCCD write, and is a separate call from the `samples` flow that keeps emitting whatever arrives after that; a dropped connection auto-reconnects; both the pre- and post-API-33 `onCharacteristicChanged` overrides are implemented; every parsed sample's `boot_id` reaches `lux_log.ndjson`.
+
+**Files:**
+- Create: `app/src/main/java/com/luxmap/core/ble/LuxDeviceScanner.kt`
+- Modify: `app/src/main/java/com/luxmap/core/ble/LuxSensorBleClient.kt` (rewrites the Task 8 skeleton)
+
+**Interfaces:**
+- Consumes: `LuxPacketCodec` (Task 8, with the `bootId`-aware `gapSize`).
+- Produces: `data class LuxDevice(val name: String?, val address: String)`; `class LuxDeviceScanner { fun scan(timeoutMs: Long = 10_000L): Flow<LuxDevice> }`; `class LuxSensorBleClient { fun connect(deviceAddress: String); fun disconnect(); val connectionState: StateFlow<BleConnectionState>; val samples: SharedFlow<LuxSample> }` — `connect`/`disconnect` no longer take part in producing the samples flow; `samples` just keeps emitting whatever arrives while connected, independent of how many times `connect()`/`disconnect()` is called.
+
+No automated test — `BluetoothLeScanner`/`BluetoothGatt` only do anything against a real BLE peripheral (spec §16: pair with the actual ESP32+BH1750 module, pull its power mid-session to confirm auto-reconnect and the `boot_id` change are both observed).
+
+- [ ] **Step 1: `LuxDeviceScanner`**
+
+```kotlin
+// app/src/main/java/com/luxmap/core/ble/LuxDeviceScanner.kt
+package com.luxmap.core.ble
+
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import javax.inject.Inject
+
+data class LuxDevice(
+    val name: String?,
+    val address: String,
+)
+
+// Replaces Bước 0's old hardcoded device address (spec's own open point) with a real scan the
+// user picks from — filtered to LuxSensorBleContract.SERVICE_UUID so unrelated BLE devices nearby
+// do not clutter the picker.
+class LuxDeviceScanner
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+    ) {
+        fun scan(timeoutMs: Long = 10_000L): Flow<LuxDevice> =
+            callbackFlow {
+                val adapter = context.getSystemService(BluetoothAdapter::class.java)
+                val scanner = adapter.bluetoothLeScanner
+                val callback =
+                    object : ScanCallback() {
+                        override fun onScanResult(
+                            callbackType: Int,
+                            result: ScanResult,
+                        ) {
+                            trySend(LuxDevice(result.device.name, result.device.address))
+                        }
+                    }
+                scanner.startScan(callback)
+                awaitClose { scanner.stopScan(callback) }
+            }.distinctUntilChanged()
+    }
+```
+
+- [ ] **Step 2: Rewrite `LuxSensorBleClient`**
+
+```kotlin
+// app/src/main/java/com/luxmap/core/ble/LuxSensorBleClient.kt
+package com.luxmap.core.ble
+
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCallback
+import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothGattDescriptor
+import android.content.Context
+import android.os.SystemClock
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
+
+sealed interface BleConnectionState {
+    data object Disconnected : BleConnectionState
+
+    data object Connecting : BleConnectionState
+
+    data object Connected : BleConnectionState
+}
+
+// UUIDs are PROPOSALS pending confirmation with the firmware owner (spec §9) — see
+// docs/contract-drift.md. Rename these two constants once real values are confirmed; nothing
+// else in this class should need to change.
+object LuxSensorBleContract {
+    val SERVICE_UUID: UUID = UUID.fromString("0000fee0-0000-1000-8000-00805f9b34fb")
+    val LUX_CHARACTERISTIC_UUID: UUID = UUID.fromString("0000fee1-0000-1000-8000-00805f9b34fb")
+    val CLIENT_CHARACTERISTIC_CONFIG_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+}
+
+// connect()/disconnect() are separate from `samples` (review feedback) — Bước 0 calls connect()
+// once a device is picked from LuxDeviceScanner; `samples` just keeps emitting for as long as the
+// client is connected, and auto-reconnects on an unexpected drop without the caller doing anything.
+@Singleton
+class LuxSensorBleClient
+    @Inject
+    constructor(
+        @ApplicationContext private val context: Context,
+    ) {
+        private val _connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
+        val connectionState: StateFlow<BleConnectionState> = _connectionState.asStateFlow()
+
+        private val _samples = MutableSharedFlow<LuxSample>(extraBufferCapacity = 64)
+        val samples: SharedFlow<LuxSample> = _samples.asSharedFlow()
+
+        private var gatt: BluetoothGatt? = null
+        private var lastDeviceAddress: String? = null
+        private var userInitiatedDisconnect = false
+
+        fun connect(deviceAddress: String) {
+            userInitiatedDisconnect = false
+            lastDeviceAddress = deviceAddress
+            _connectionState.value = BleConnectionState.Connecting
+            val device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(deviceAddress)
+            gatt = device.connectGatt(context, false, gattCallback)
+        }
+
+        fun disconnect() {
+            userInitiatedDisconnect = true
+            gatt?.disconnect()
+            gatt?.close()
+            gatt = null
+            _connectionState.value = BleConnectionState.Disconnected
+        }
+
+        private val gattCallback =
+            object : BluetoothGattCallback() {
+                override fun onConnectionStateChange(
+                    connectedGatt: BluetoothGatt,
+                    status: Int,
+                    newState: Int,
+                ) {
+                    if (newState == BluetoothGatt.STATE_CONNECTED) {
+                        connectedGatt.discoverServices()
+                    } else {
+                        _connectionState.value = BleConnectionState.Disconnected
+                        if (!userInitiatedDisconnect) {
+                            // Auto-reconnect (spec §11 — a session must not stop on a BLE drop).
+                            lastDeviceAddress?.let { connect(it) }
+                        }
+                    }
+                }
+
+                override fun onServicesDiscovered(
+                    connectedGatt: BluetoothGatt,
+                    status: Int,
+                ) {
+                    val characteristic =
+                        connectedGatt
+                            .getService(LuxSensorBleContract.SERVICE_UUID)
+                            ?.getCharacteristic(LuxSensorBleContract.LUX_CHARACTERISTIC_UUID)
+                            ?: return
+                    connectedGatt.setCharacteristicNotification(characteristic, true)
+                    // setCharacteristicNotification() only flips a local flag — the peripheral is
+                    // not told to start sending until the CCCD descriptor is written (a common BLE
+                    // gotcha this review feedback specifically called out).
+                    val descriptor = characteristic.getDescriptor(LuxSensorBleContract.CLIENT_CHARACTERISTIC_CONFIG_UUID)
+                    descriptor?.let {
+                        @Suppress("DEPRECATION")
+                        it.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                        @Suppress("DEPRECATION")
+                        connectedGatt.writeDescriptor(it)
+                    }
+                    _connectionState.value = BleConnectionState.Connected
+                }
+
+                // Pre-API-33 callback — still invoked on those devices; characteristic.value holds the payload.
+                @Suppress("DEPRECATION")
+                override fun onCharacteristicChanged(
+                    connectedGatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                ) {
+                    emitSample(characteristic.value)
+                }
+
+                // API 33+ callback — the value is passed directly instead of read from the characteristic.
+                override fun onCharacteristicChanged(
+                    connectedGatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray,
+                ) {
+                    emitSample(value)
+                }
+            }
+
+        private fun emitSample(bytes: ByteArray) {
+            val now = SystemClock.elapsedRealtimeNanos()
+            _samples.tryEmit(LuxPacketCodec.decode(bytes, now))
+        }
+    }
+```
+
+- [ ] **Step 3: Build to confirm it compiles**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/src/main/java/com/luxmap/core/ble/LuxDeviceScanner.kt \
+  app/src/main/java/com/luxmap/core/ble/LuxSensorBleClient.kt
+git commit -m "feat(fm-survey): split BLE connect from the samples flow, add scan and auto-reconnect"
+```
+
+---
+
+## Task 17d: Service lifecycle — Intent START/STOP, ordered stop, real `capture_config.json`
+
+**Done when:** the service is controlled by `ACTION_START`/`ACTION_STOP` intents through `onStartCommand`, calling `startForeground()` as the very first line regardless of which action arrived; stopping runs in the exact order — cancel the GPS/heading/lux jobs, close their `NdjsonLogWriter`s, close the final video segment, write `capture_config.json` from `VideoCaptureSession`'s real applied values, set `recordingState = stopped` with `endedAtUtc`/`durationSeconds`, run `PackageSurveySessionUseCase`, then `stopSelf()`; `onDestroy()` cancels `serviceScope` so nothing leaks if the process is killed anyway.
+
+**Files:**
+- Modify: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt` (replaces the Task-17-skeleton body entirely)
+- Modify: `app/src/main/AndroidManifest.xml`
+
+**Interfaces:**
+- Consumes: `VideoCaptureSession` (Task 17a), `LocationHeadingRecorder` (Task 17b), `LuxSensorBleClient` (Task 17c), `CaptureConfigWriter`/`CaptureConfig` (below), `SurveySessionDao` (Task 13), `PackageSurveySessionUseCase` (Task 15).
+- Produces: `object CaptureConfigWriter { fun toJson(config: CaptureConfig): String }` (moved here from the old Task 17 — same pure function, unit-tested); `val SurveyCaptureService.packagingResult: StateFlow<PackageResult?>`, read by `SurveyCaptureController` (Task 18) after sending `ACTION_STOP`; `val SurveyCaptureService.gpsSignalState: StateFlow<GpsSignalState>` (proxies `LocationHeadingRecorder.gpsSignalState`, Task 17b), read the same bound-service way for the GPS-lost warning in `CaptureUiState.Recording`.
 
 - [ ] **Step 1: Add manifest permissions and service declaration**
 
@@ -2881,6 +4203,7 @@ class CaptureConfigWriterTest {
                 fps = 30,
                 isoSensitivity = 800,
                 shutterNs = 20_000_000L,
+                frameDurationNs = 33_333_333L,
                 codec = "video/avc",
                 bitrateBps = 8_000_000,
                 keyframeIntervalS = 2,
@@ -2920,9 +4243,10 @@ Expected: FAIL — `CaptureConfig`/`CaptureConfigWriter` do not exist yet.
 // app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt
 package com.luxmap.feature.survey.capture
 
-// Values populated from the Task 2 spike's findings (docs/superpowers/specs/2026-09-28-survey-capture-spike-findings.md),
-// not invented here. sensorTimestampSource is always "REALTIME" because CheckSurveyReadinessUseCase
-// (Task 11) already hard-blocked any device that is not (spec §10).
+// Values (except sensor/exposure numbers, which come from the real applied CaptureResult in
+// Task 17a) are the Task 2 spike's findings, not invented here. sensorTimestampSource is always
+// "REALTIME" because CheckSurveyReadinessUseCase (Task 11) already hard-blocked any device that
+// is not.
 data class CaptureConfig(
     val utcAnchorIso: String,
     val elapsedAnchorNs: Long,
@@ -2930,6 +4254,7 @@ data class CaptureConfig(
     val fps: Int,
     val isoSensitivity: Int,
     val shutterNs: Long,
+    val frameDurationNs: Long,
     val codec: String,
     val bitrateBps: Int,
     val keyframeIntervalS: Int,
@@ -2950,9 +4275,9 @@ object CaptureConfigWriter {
         {"schema_version":"v0",
         "utc_elapsed_anchor":{"utc_iso":"${config.utcAnchorIso}","elapsed_realtime_ns":${config.elapsedAnchorNs}},
         "camera":{"resolution":"${config.resolution}","fps":${config.fps},"iso":${config.isoSensitivity},
-        "shutter_ns":${config.shutterNs},"codec":"${config.codec}","bitrate_bps":${config.bitrateBps},
-        "keyframe_interval_s":${config.keyframeIntervalS},"af_locked":true,"awb_locked":true,
-        "eis_disabled":true,"hdr_disabled":true,"night_mode_disabled":true,
+        "shutter_ns":${config.shutterNs},"frame_duration_ns":${config.frameDurationNs},"codec":"${config.codec}",
+        "bitrate_bps":${config.bitrateBps},"keyframe_interval_s":${config.keyframeIntervalS},
+        "af_locked":true,"eis_disabled":true,"hdr_disabled":true,"night_mode_disabled":true,
         "sensor_timestamp_source":"REALTIME"},
         "segment_duration_s":${config.segmentDurationS},
         "device":{"manufacturer":"${config.cameraManufacturer}","model":"${config.cameraModel}","camera_id":"${config.cameraId}"},
@@ -2976,45 +4301,35 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
-import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxSensorBleClient
-import com.luxmap.core.camera.ExposureLockController
-import com.luxmap.core.camera.SegmentRotationPolicy
-import com.luxmap.core.camera.SegmentedVideoRecorder
-import com.luxmap.core.location.HeadingSensor
-import com.luxmap.core.location.SurveyTrackRecorder
+import com.luxmap.core.camera.LockedCameraProfile
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 
 private const val NOTIFICATION_CHANNEL_ID = "survey_capture"
 private const val NOTIFICATION_ID = 1001
 
-// Orchestrates the three independent streams (spec §5) — each stream's collector runs in its own
-// serviceScope.launch{} so a failure in one (e.g. BLE disconnect, spec §11) never cancels the
-// others: SupervisorJob is what makes that isolation hold. Camera2/SensorManager/BluetoothGatt
-// object wiring itself is verified on real devices (Task 2 spike, spec §16 checklist), not here.
 @AndroidEntryPoint
 class SurveyCaptureService : Service() {
-    @Inject lateinit var exposureLockController: ExposureLockController
+    @Inject lateinit var videoCaptureSession: VideoCaptureSession
 
-    @Inject lateinit var trackRecorder: SurveyTrackRecorder
-
-    @Inject lateinit var headingSensor: HeadingSensor
+    @Inject lateinit var locationHeadingRecorder: LocationHeadingRecorder
 
     @Inject lateinit var luxClient: LuxSensorBleClient
 
@@ -3024,9 +4339,22 @@ class SurveyCaptureService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob())
     private val jobs = mutableListOf<Job>()
-    private lateinit var videoRecorder: SegmentedVideoRecorder
+    private lateinit var luxWriter: NdjsonLogWriter
+    private lateinit var gpsWriter: NdjsonLogWriter
+    private lateinit var headingWriter: NdjsonLogWriter
     private lateinit var sessionDir: File
     private var currentSessionId: String = ""
+    private var currentSurveySweepId: String = ""
+    private var startedAtElapsedNs: Long = 0L
+    private var utcAnchorIso: String = ""
+
+    private val _packagingResult = MutableStateFlow<PackageResult?>(null)
+    val packagingResult: StateFlow<PackageResult?> = _packagingResult.asStateFlow()
+
+    // Exposed for CaptureViewModel's GPS-lost warning (Task 18) via the same bound-service path
+    // packagingResult uses.
+    val gpsSignalState: StateFlow<com.luxmap.core.location.GpsSignalState>
+        get() = locationHeadingRecorder.gpsSignalState
 
     inner class LocalBinder : Binder() {
         fun service(): SurveyCaptureService = this@SurveyCaptureService
@@ -3037,26 +4365,43 @@ class SurveyCaptureService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        videoRecorder =
-            SegmentedVideoRecorder(SegmentRotationPolicy(targetDurationMs = SEGMENT_TARGET_DURATION_MS)) { path ->
-                RealMuxerPort(path) // wraps android.media.MediaMuxer; finalized against the Task 2 spike
-            }
     }
 
-    fun startSession(
+    // Android requires startForeground() within seconds of startForegroundService() (API 26+) —
+    // it runs first, unconditionally, before the action/extras are even read (review feedback).
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
+        startForeground(NOTIFICATION_ID, buildNotification())
+        when (intent?.action) {
+            ACTION_START -> {
+                val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
+                val surveySweepId = intent.getStringExtra(EXTRA_SURVEY_SWEEP_ID) ?: return START_NOT_STICKY
+                val luxDeviceAddress = intent.getStringExtra(EXTRA_LUX_DEVICE_ADDRESS) ?: return START_NOT_STICKY
+                startSessionInternal(sessionId, surveySweepId, luxDeviceAddress)
+            }
+            ACTION_STOP -> stopSessionInternal()
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun startSessionInternal(
+        sessionId: String,
         surveySweepId: String,
         luxDeviceAddress: String,
     ) {
-        currentSessionId = UUID.randomUUID().toString()
-        sessionDir = File(getExternalFilesDir(null), "survey/$currentSessionId").apply { mkdirs() }
-        val startedAtElapsedNs = SystemClock.elapsedRealtimeNanos()
-
-        startForeground(NOTIFICATION_ID, buildNotification())
+        currentSessionId = sessionId
+        currentSurveySweepId = surveySweepId
+        sessionDir = File(getExternalFilesDir(null), "survey/$sessionId").apply { mkdirs() }
+        startedAtElapsedNs = SystemClock.elapsedRealtimeNanos()
+        utcAnchorIso = Instant.now().toString()
 
         serviceScope.launch {
             sessionDao.insertSession(
                 LocalSurveySessionEntity(
-                    sessionId = currentSessionId,
+                    sessionId = sessionId,
                     surveySweepId = surveySweepId,
                     recordingState = "recording",
                     syncState = null,
@@ -3080,43 +4425,112 @@ class SurveyCaptureService : Service() {
             )
         }
 
-        videoRecorder.startSegment(segmentIndex = 0, outputFilePath = File(sessionDir, "segment_0.mp4").absolutePath)
+        luxWriter = NdjsonLogWriter(File(sessionDir, "lux_log.ndjson"), fileRole = "lux_log")
+        gpsWriter = NdjsonLogWriter(File(sessionDir, "gps_track.ndjson"), fileRole = "gps_track")
+        headingWriter = NdjsonLogWriter(File(sessionDir, "heading_log.ndjson"), fileRole = "heading_log")
 
-        // Each stream writes to its own NdjsonLogWriter independently — one failing (e.g. an
-        // IOException from a full disk) does not cancel the others, since each runs in its own job.
-        val luxWriter = NdjsonLogWriter(File(sessionDir, "lux_log.ndjson"), fileRole = "lux_log")
+        luxClient.connect(luxDeviceAddress)
         jobs +=
             serviceScope.launch {
-                luxClient.observeSamples(luxDeviceAddress).collect { sample ->
+                luxClient.samples.collect { sample ->
                     luxWriter.appendLine(
-                        """{"seq":${sample.seq},"module_ms":${sample.moduleMs},"phone_elapsed_ns":${sample.phoneElapsedNs},"lux":${sample.lux}}""",
+                        """{"seq":${sample.seq},"module_ms":${sample.moduleMs},""" +
+                            """"phone_elapsed_ns":${sample.phoneElapsedNs},"lux":${sample.lux},"boot_id":${sample.bootId}}""",
                     )
                 }
             }
+        var lastConnected = false
         jobs +=
             serviceScope.launch {
                 luxClient.connectionState.collect { state ->
-                    if (state is BleConnectionState.Disconnected && currentSessionId.isNotEmpty()) {
-                        // Do not stop the session (spec §11) — just flag the gap for later review.
+                    val isConnected = state is com.luxmap.core.ble.BleConnectionState.Connected
+                    // Only flag a gap on a Connected -> Disconnected TRANSITION (review feedback) —
+                    // not on the StateFlow's initial Disconnected value before the first connect.
+                    if (lastConnected && !isConnected) {
                         sessionDao.sessionById(currentSessionId)?.let { session ->
                             sessionDao.updateSession(session.copy(bleGapDetected = true, updatedAt = Instant.now()))
                         }
                     }
+                    lastConnected = isConnected
                 }
             }
 
-        // GPS track and heading log wiring follow the same NdjsonLogWriter pattern as lux above,
-        // fed by SurveyTrackRecorder.onLocationUpdate()/HeadingSensor.headingFromRotationVector()
-        // callbacks registered against FusedLocationProviderClient/SensorManager on a real device.
+        locationHeadingRecorder.start(gpsWriter, headingWriter)
+
+        serviceScope.launch {
+            videoCaptureSession.start(
+                scope = serviceScope,
+                sessionId = sessionId,
+                sessionDir = sessionDir,
+                // ISO/exposure/frame duration here are the requested profile — Task 17a reads back
+                // the actual applied values at stop() for capture_config.json.
+                profile = LockedCameraProfile(isoSensitivity = 800, exposureTimeNs = 20_000_000L, frameDurationNs = 33_333_333L),
+                segmentDurationMs = SEGMENT_TARGET_DURATION_MS,
+            )
+        }
     }
 
-    fun stopSession() {
-        jobs.forEach { it.cancel() }
-        jobs.clear()
-        videoRecorder.stop()
-        serviceScope.launch { packager.invoke(currentSessionId) }
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+    private fun stopSessionInternal() {
+        serviceScope.launch {
+            jobs.forEach { it.cancel() }
+            jobs.clear()
+            luxClient.disconnect()
+            locationHeadingRecorder.stop()
+            luxWriter.close()
+            gpsWriter.close()
+            headingWriter.close()
+
+            val finalized = videoCaptureSession.stop()
+
+            val captureConfigFile = File(sessionDir, "capture_config.json")
+            captureConfigFile.writeText(
+                CaptureConfigWriter.toJson(
+                    CaptureConfig(
+                        utcAnchorIso = utcAnchorIso,
+                        elapsedAnchorNs = startedAtElapsedNs,
+                        resolution = "${VIDEO_WIDTH}x$VIDEO_HEIGHT",
+                        fps = VIDEO_FPS,
+                        isoSensitivity = finalized.actualProfile.isoSensitivity,
+                        shutterNs = finalized.actualProfile.exposureTimeNs,
+                        frameDurationNs = finalized.actualProfile.frameDurationNs,
+                        codec = "video/avc",
+                        bitrateBps = VIDEO_BITRATE_BPS,
+                        keyframeIntervalS = VIDEO_KEYFRAME_INTERVAL_S,
+                        segmentDurationS = (SEGMENT_TARGET_DURATION_MS / 1000).toInt(),
+                        cameraManufacturer = finalized.cameraManufacturer,
+                        cameraModel = finalized.cameraModel,
+                        cameraId = finalized.cameraId,
+                        appVersion = BuildConfig.VERSION_NAME,
+                        luxModuleId = "LUX-001", // real value comes from Bước 0's device pick, wired in Task 18
+                        luxModuleFirmware = "unknown", // pending firmware contract (Task 17c / docs/contract-drift.md)
+                    ),
+                ),
+            )
+
+            val session = sessionDao.sessionById(currentSessionId)
+            val endedAtUtc = Instant.now()
+            val durationSeconds = (SystemClock.elapsedRealtimeNanos() - startedAtElapsedNs) / 1_000_000_000L
+            if (session != null) {
+                sessionDao.updateSession(
+                    session.copy(
+                        recordingState = "stopped",
+                        endedAtUtc = endedAtUtc,
+                        durationSeconds = durationSeconds,
+                        captureConfigFilePath = captureConfigFile.absolutePath,
+                        updatedAt = Instant.now(),
+                    ),
+                )
+            }
+
+            _packagingResult.value = packager.invoke(currentSessionId)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    override fun onDestroy() {
+        serviceScope.coroutineContext[Job]?.cancel()
+        super.onDestroy()
     }
 
     private fun createNotificationChannel() {
@@ -3134,12 +4548,23 @@ class SurveyCaptureService : Service() {
             .build()
 
     companion object {
-        private const val SEGMENT_TARGET_DURATION_MS = 180_000L // overridden with the Task 2 spike's chosen value
+        const val ACTION_START = "com.luxmap.survey.action.START"
+        const val ACTION_STOP = "com.luxmap.survey.action.STOP"
+        const val EXTRA_SESSION_ID = "session_id"
+        const val EXTRA_SURVEY_SWEEP_ID = "survey_sweep_id"
+        const val EXTRA_LUX_DEVICE_ADDRESS = "lux_device_address"
+
+        // Finalized against the Task 2 spike's findings — kept in sync with VideoCaptureSession's
+        // own private constants; a fast-follow could hoist these into one shared place.
+        private const val SEGMENT_TARGET_DURATION_MS = 180_000L
+        private const val VIDEO_WIDTH = 1920
+        private const val VIDEO_HEIGHT = 1080
+        private const val VIDEO_BITRATE_BPS = 8_000_000
+        private const val VIDEO_FPS = 30
+        private const val VIDEO_KEYFRAME_INTERVAL_S = 2
     }
 }
 ```
-
-Note: `RealMuxerPort` (the real `android.media.MediaMuxer` wrapper behind `MuxerPort`, Task 5) and the actual `FusedLocationProviderClient`/`SensorManager` registration feeding `SurveyTrackRecorder`/`HeadingSensor` are Android framework glue verified on a real device (Task 2 spike, spec §16 checklist) rather than by a unit test — the wiring pattern above (one `NdjsonLogWriter` per stream, one independent `serviceScope.launch` per stream) is what every stream follows.
 
 - [ ] **Step 7: Build to confirm the service compiles and is registered**
 
@@ -3153,16 +4578,16 @@ git add app/src/main/AndroidManifest.xml \
   app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt \
   app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt \
   app/src/test/java/com/luxmap/feature/survey/capture/CaptureConfigWriterTest.kt
-git commit -m "feat(fm-survey): add SurveyCaptureService orchestration and capture_config writer"
+git commit -m "feat(fm-survey): drive SurveyCaptureService by intent actions, write real capture_config"
 ```
 
 ---
 
-## Task 18: F04 UI — `CaptureScreen`
+## Task 18: F04 UI — `CaptureScreen` with GPS/BLE warnings and F06 handoff
 
 **Files:**
 - Create: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureController.kt`
-- Create: `app/src/main/java/com/luxmap/di/CaptureModule.kt`
+- Modify: `app/src/main/java/com/luxmap/di/CaptureModule.kt` (adds `SurveyCaptureController`'s binding to the file Task 12 created)
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureUiState.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureViewModel.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt`
@@ -3171,8 +4596,12 @@ git commit -m "feat(fm-survey): add SurveyCaptureService orchestration and captu
 - Test: `app/src/test/java/com/luxmap/feature/survey/ui/capture/CaptureViewModelTest.kt`
 
 **Interfaces:**
-- Consumes: `LuxSensorBleClient.connectionState` (Task 8); `SurveyCaptureService.startSession(surveySweepId, luxDeviceAddress)`/`stopSession()` (Task 17), reached through the `SurveyCaptureController` interface below so the ViewModel never binds a `Service` or holds a `Context` directly, keeping it constructor-mockable like every other ViewModel in this codebase.
-- Produces: `interface SurveyCaptureController { fun startSession(surveySweepId: String, luxDeviceAddress: String); fun stopSession() }`; `sealed interface CaptureUiState { data object AwaitingBleConnection; data object Ready; data object Recording; data object Packaging }` (spec's Bước 0–4 as explicit states, matching the P9 states for F04: BLE not connected/disconnected, recording, storage low, packaging).
+- Consumes: `LuxSensorBleClient.connectionState`/`LuxDeviceScanner` (Task 17c); `SurveyCaptureService`'s `ACTION_START`/`ACTION_STOP`/`packagingResult` (Task 17d), reached through `SurveyCaptureController` so the ViewModel never binds a `Service` or holds a `Context` directly.
+- Produces: `interface SurveyCaptureController { fun startSession(sessionId: String, surveySweepId: String, luxDeviceAddress: String); fun stopSession(): Flow<PackageResult>; val gpsSignalState: StateFlow<GpsSignalState> }`; `sealed interface CaptureUiState { data object AwaitingBleConnection; data object Ready; data class Recording(val gpsSignalLost: Boolean = false, val bleGapDetected: Boolean = false); data object Packaging; data class Packaged(val sessionId: String); data class PackagingFailed(val reason: String) }`.
+
+Two corrections from the original review of this task:
+- **`CaptureUiState.Recording` now carries GPS/BLE warning flags** instead of being a bare state — spec §16's real-device checklist and P9's F04 states both call for a visible (color+text+vibration) warning while still recording, not a screen that just says "Recording" through a GPS dropout.
+- **Navigation to F06 happens via `LaunchedEffect` reacting to `Packaged`**, carrying the `sessionId` the ViewModel itself generated when the user pressed "Bắt đầu quay" — not as a side effect fired directly inside the `when` block during composition. A failed packaging attempt surfaces `PackagingFailed` instead of silently proceeding.
 
 - [ ] **Step 1: Write the failing ViewModel test**
 
@@ -3183,6 +4612,8 @@ package com.luxmap.feature.survey.ui.capture
 import app.cash.turbine.test
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxSensorBleClient
+import com.luxmap.core.location.GpsSignalState
+import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import io.mockk.every
 import io.mockk.mockk
@@ -3190,12 +4621,14 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -3230,7 +4663,7 @@ class CaptureViewModelTest {
         }
 
     @Test
-    fun `starting a recording tells the controller to start the service session`() =
+    fun `starting a recording generates a session id and tells the controller to start`() =
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val luxClient = mockk<LuxSensorBleClient>()
@@ -3242,9 +4675,79 @@ class CaptureViewModelTest {
                 assertEquals(CaptureUiState.AwaitingBleConnection, awaitItem())
                 assertEquals(CaptureUiState.Ready, awaitItem())
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1", luxDeviceAddress = "AA:BB:CC:DD:EE:FF")
-                assertEquals(CaptureUiState.Recording, awaitItem())
+                val recording = awaitItem() as CaptureUiState.Recording
+                assertEquals(false, recording.gpsSignalLost)
             }
-            verify { controller.startSession("SWEEP-1", "AA:BB:CC:DD:EE:FF") }
+            verify { controller.startSession(any(), "SWEEP-1", "AA:BB:CC:DD:EE:FF") }
+        }
+
+    @Test
+    fun `stopping a recording moves through Packaging to Packaged on success`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val luxClient = mockk<LuxSensorBleClient>()
+            every { luxClient.connectionState } returns connectionState
+            val controller = mockk<SurveyCaptureController>(relaxed = true)
+            every { controller.stopSession() } returns flowOf(PackageResult.Success("/data/manifest.json"))
+            val viewModel = CaptureViewModel(luxClient, controller)
+
+            viewModel.uiState.test {
+                awaitItem() // AwaitingBleConnection
+                awaitItem() // Ready
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", luxDeviceAddress = "AA:BB:CC:DD:EE:FF")
+                awaitItem() // Recording
+                viewModel.onStopRecording()
+                assertEquals(CaptureUiState.Packaging, awaitItem())
+                val packaged = awaitItem() as CaptureUiState.Packaged
+                assertTrue(packaged.sessionId.isNotBlank())
+            }
+        }
+
+    @Test
+    fun `stopping a recording surfaces PackagingFailed on failure`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val luxClient = mockk<LuxSensorBleClient>()
+            every { luxClient.connectionState } returns connectionState
+            val controller = mockk<SurveyCaptureController>(relaxed = true)
+            every { controller.stopSession() } returns flowOf(PackageResult.Failure("disk full"))
+            val viewModel = CaptureViewModel(luxClient, controller)
+
+            viewModel.uiState.test {
+                awaitItem() // AwaitingBleConnection
+                awaitItem() // Ready
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", luxDeviceAddress = "AA:BB:CC:DD:EE:FF")
+                awaitItem() // Recording
+                viewModel.onStopRecording()
+                assertEquals(CaptureUiState.Packaging, awaitItem())
+                val failed = awaitItem() as CaptureUiState.PackagingFailed
+                assertEquals("disk full", failed.reason)
+            }
+        }
+
+    @Test
+    fun `GPS signal lost while recording raises the warning flag without leaving Recording`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val luxClient = mockk<LuxSensorBleClient>()
+            every { luxClient.connectionState } returns connectionState
+            val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
+            val controller = mockk<SurveyCaptureController>(relaxed = true)
+            every { controller.gpsSignalState } returns gpsSignalState
+            val viewModel = CaptureViewModel(luxClient, controller)
+
+            viewModel.uiState.test {
+                awaitItem() // AwaitingBleConnection
+                awaitItem() // Ready
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", luxDeviceAddress = "AA:BB:CC:DD:EE:FF")
+                val recording = awaitItem() as CaptureUiState.Recording
+                assertEquals(false, recording.gpsSignalLost)
+
+                gpsSignalState.value = GpsSignalState.Lost
+
+                val warned = awaitItem() as CaptureUiState.Recording
+                assertEquals(true, warned.gpsSignalLost)
+            }
         }
 }
 ```
@@ -3260,15 +4763,23 @@ Expected: FAIL — classes do not exist yet.
 // app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureUiState.kt
 package com.luxmap.feature.survey.ui.capture
 
-// Bước 0-4 of F04 (spec §8/C7) as explicit states — the "Nút Bắt đầu quay" only enables in Ready.
+// Bước 0-4 of F04 (spec §8/C7) as explicit states. Recording carries its own warning flags
+// (spec §16, P9) instead of the screen just reading "Recording" through a GPS dropout or BLE gap.
 sealed interface CaptureUiState {
     data object AwaitingBleConnection : CaptureUiState
 
     data object Ready : CaptureUiState
 
-    data object Recording : CaptureUiState
+    data class Recording(
+        val gpsSignalLost: Boolean = false,
+        val bleGapDetected: Boolean = false,
+    ) : CaptureUiState
 
     data object Packaging : CaptureUiState
+
+    data class Packaged(val sessionId: String) : CaptureUiState
+
+    data class PackagingFailed(val reason: String) : CaptureUiState
 }
 ```
 
@@ -3281,20 +4792,39 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import androidx.core.content.ContextCompat
+import com.luxmap.core.location.GpsSignalState
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Thin seam over binding SurveyCaptureService (Task 17) so CaptureViewModel takes an interface,
-// not a Context or a live Service — keeping it constructor-mockable like every other ViewModel
-// in this codebase (see HomeViewModel/HomeRepository).
+// Thin seam over SurveyCaptureService (Task 17d) so CaptureViewModel takes an interface, not a
+// Context or a live Service — keeping it constructor-mockable like every other ViewModel in this
+// codebase. Control goes through Intent actions (review feedback); the bound connection exists
+// only to read packagingResult and gpsSignalState back out.
 interface SurveyCaptureController {
     fun startSession(
+        sessionId: String,
         surveySweepId: String,
         luxDeviceAddress: String,
     )
 
-    fun stopSession()
+    fun stopSession(): Flow<PackageResult>
+
+    val gpsSignalState: StateFlow<GpsSignalState>
 }
 
 @Singleton
@@ -3304,56 +4834,65 @@ class RealSurveyCaptureController
         @ApplicationContext private val context: Context,
     ) : SurveyCaptureController {
         private var boundService: SurveyCaptureService? = null
+        private val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        private var gpsForwardingJob: Job? = null
+
+        private val _gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
+        override val gpsSignalState: StateFlow<GpsSignalState> = _gpsSignalState.asStateFlow()
+
         private val connection =
             object : ServiceConnection {
                 override fun onServiceConnected(
                     name: ComponentName?,
                     binder: IBinder?,
                 ) {
-                    boundService = (binder as SurveyCaptureService.LocalBinder).service()
+                    val service = (binder as SurveyCaptureService.LocalBinder).service()
+                    boundService = service
+                    // Forward the service's live GPS signal state into this controller's own
+                    // StateFlow, since binder connections can drop/rebind but the ViewModel holds
+                    // one stable StateFlow reference for the whole screen's lifetime.
+                    gpsForwardingJob?.cancel()
+                    gpsForwardingJob = controllerScope.launch { service.gpsSignalState.collect { _gpsSignalState.value = it } }
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     boundService = null
+                    gpsForwardingJob?.cancel()
                 }
             }
 
         override fun startSession(
+            sessionId: String,
             surveySweepId: String,
             luxDeviceAddress: String,
         ) {
-            val intent = Intent(context, SurveyCaptureService::class.java)
-            context.startForegroundService(intent)
-            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
-            boundService?.startSession(surveySweepId, luxDeviceAddress)
+            val intent =
+                Intent(context, SurveyCaptureService::class.java)
+                    .setAction(SurveyCaptureService.ACTION_START)
+                    .putExtra(SurveyCaptureService.EXTRA_SESSION_ID, sessionId)
+                    .putExtra(SurveyCaptureService.EXTRA_SURVEY_SWEEP_ID, surveySweepId)
+                    .putExtra(SurveyCaptureService.EXTRA_LUX_DEVICE_ADDRESS, luxDeviceAddress)
+            ContextCompat.startForegroundService(context, intent)
+            context.bindService(Intent(context, SurveyCaptureService::class.java), connection, Context.BIND_AUTO_CREATE)
         }
 
-        override fun stopSession() {
-            boundService?.stopSession()
-            context.unbindService(connection)
+        override fun stopSession(): Flow<PackageResult> {
+            context.startService(Intent(context, SurveyCaptureService::class.java).setAction(SurveyCaptureService.ACTION_STOP))
+            val service = boundService ?: return flowOf(PackageResult.Failure("Service not bound"))
+            return service.packagingResult
+                .filterNotNull()
+                .take(1)
+                .onCompletion { context.unbindService(connection) }
         }
     }
 ```
 
-`SurveyCaptureController` is not a data Repository, so it does not belong in `RepositoryModule.kt` (per `CLAUDE.md`, that file is for Fake/Real repository bindings only) — create a small dedicated module instead:
+Add `SurveyCaptureController`'s binding to `CaptureModule.kt` (created in Task 12):
 
 ```kotlin
-// app/src/main/java/com/luxmap/di/CaptureModule.kt
-package com.luxmap.di
-
-import com.luxmap.feature.survey.capture.RealSurveyCaptureController
-import com.luxmap.feature.survey.capture.SurveyCaptureController
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class CaptureModule {
+// app/src/main/java/com/luxmap/di/CaptureModule.kt — add alongside bindSurveyReadinessInputProvider
     @Binds
     abstract fun bindSurveyCaptureController(impl: RealSurveyCaptureController): SurveyCaptureController
-}
 ```
 
 ```kotlin
@@ -3364,12 +4903,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxSensorBleClient
+import com.luxmap.core.location.GpsSignalState
+import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -3382,13 +4925,30 @@ class CaptureViewModel
         private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.AwaitingBleConnection)
         val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
 
+        private var sessionId: String = ""
+
         init {
             viewModelScope.launch {
                 luxClient.connectionState.collect { state ->
-                    // Only advances AwaitingBleConnection -> Ready; does not regress Recording back
-                    // to AwaitingBleConnection on a mid-session drop (spec §11 — session keeps going).
-                    if (_uiState.value == CaptureUiState.AwaitingBleConnection && state == BleConnectionState.Connected) {
-                        _uiState.value = CaptureUiState.Ready
+                    when (val current = _uiState.value) {
+                        // Only advances AwaitingBleConnection -> Ready.
+                        is CaptureUiState.AwaitingBleConnection ->
+                            if (state == BleConnectionState.Connected) _uiState.value = CaptureUiState.Ready
+
+                        // Does not regress out of Recording on a mid-session drop (spec §11) — just
+                        // raises the warning flag on the existing Recording state.
+                        is CaptureUiState.Recording ->
+                            _uiState.value = current.copy(bleGapDetected = state == BleConnectionState.Disconnected)
+
+                        else -> Unit
+                    }
+                }
+            }
+            viewModelScope.launch {
+                captureController.gpsSignalState.collect { state ->
+                    val current = _uiState.value
+                    if (current is CaptureUiState.Recording) {
+                        _uiState.value = current.copy(gpsSignalLost = state == GpsSignalState.Lost)
                     }
                 }
             }
@@ -3399,14 +4959,20 @@ class CaptureViewModel
             luxDeviceAddress: String,
         ) {
             if (_uiState.value != CaptureUiState.Ready) return
-            captureController.startSession(surveySweepId, luxDeviceAddress)
-            _uiState.value = CaptureUiState.Recording
+            sessionId = UUID.randomUUID().toString()
+            captureController.startSession(sessionId, surveySweepId, luxDeviceAddress)
+            _uiState.value = CaptureUiState.Recording()
         }
 
         fun onStopRecording() {
-            if (_uiState.value != CaptureUiState.Recording) return
-            captureController.stopSession()
+            if (_uiState.value !is CaptureUiState.Recording) return
             _uiState.value = CaptureUiState.Packaging
+            viewModelScope.launch {
+                when (val result = captureController.stopSession().first()) {
+                    is PackageResult.Success -> _uiState.value = CaptureUiState.Packaged(sessionId)
+                    is PackageResult.Failure -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
+                }
+            }
         }
     }
 ```
@@ -3422,6 +4988,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -3431,43 +4998,70 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun CaptureScreen(
     surveySweepId: String,
-    onSessionPackaged: () -> Unit,
+    onSessionPackaged: (sessionId: String) -> Unit,
     viewModel: CaptureViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Side effect lives here, reacting to state, instead of being called inline inside the `when`
+    // branch during composition (review feedback) — LaunchedEffect only fires once per new sessionId.
+    val packagedSessionId = (uiState as? CaptureUiState.Packaged)?.sessionId
+    if (packagedSessionId != null) {
+        LaunchedEffect(packagedSessionId) { onSessionPackaged(packagedSessionId) }
+    }
+
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column {
-            when (uiState) {
+            when (val state = uiState) {
                 is CaptureUiState.AwaitingBleConnection ->
                     Text("Đang kết nối cảm biến ánh sáng...", style = MaterialTheme.typography.bodyLarge)
 
                 is CaptureUiState.Ready ->
                     Button(onClick = {
-                        // luxDeviceAddress hardcoded pending a BLE scan/pairing step — that step
-                        // is real-device integration work, out of this plan's unit-testable scope
-                        // (spec §16), and is deliberately not guessed at here.
+                        // luxDeviceAddress hardcoded pending a BLE scan/pairing UI (LuxDeviceScanner,
+                        // Task 17c, is not wired into this screen yet — tracked in docs/contract-drift.md).
                         viewModel.onStartRecording(surveySweepId, luxDeviceAddress = KNOWN_LUX_DEVICE_ADDRESS)
                     }) { Text("Bắt đầu quay") }
 
-                is CaptureUiState.Recording ->
+                is CaptureUiState.Recording -> {
+                    if (state.gpsSignalLost) {
+                        Text(
+                            "Mất tín hiệu GPS",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                    if (state.bleGapDetected) {
+                        Text(
+                            "Mất kết nối cảm biến ánh sáng — vẫn tiếp tục quay",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                     Button(onClick = viewModel::onStopRecording) { Text("Dừng quay") }
-
-                is CaptureUiState.Packaging -> {
-                    Text("Đang đóng gói phiên khảo sát...", style = MaterialTheme.typography.bodyLarge)
-                    onSessionPackaged()
                 }
+
+                is CaptureUiState.Packaging ->
+                    Text("Đang đóng gói phiên khảo sát...", style = MaterialTheme.typography.bodyLarge)
+
+                is CaptureUiState.Packaged ->
+                    Text("Đã đóng gói xong", style = MaterialTheme.typography.bodyLarge)
+
+                is CaptureUiState.PackagingFailed ->
+                    Text(
+                        "Đóng gói thất bại: ${state.reason}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
             }
         }
     }
 }
 
-// Placeholder until Bước 0's BLE scan/pairing UI exists — tracked in docs/contract-drift.md,
-// not invented as a real address here.
 private const val KNOWN_LUX_DEVICE_ADDRESS = "AA:BB:CC:DD:EE:FF"
 ```
 
-Add `Routes.SURVEY_CAPTURE` (carrying `surveySweepId` as a nav argument) and wire it into `NavGraph.kt`, and update Task 12's `onRouteSelected` callback to navigate to it. Add a line to `docs/contract-drift.md` (Task 1) noting that the BLE device address is hardcoded pending a scan/pairing UI — this is a real product gap (F04's Bước 0 needs a device picker, not just a connection status panel), not just a naming placeholder, so flag it for the project owner rather than treating it as done.
+Add `Routes.SURVEY_CAPTURE` (carrying `surveySweepId`) and `Routes.SURVEY_SUBMIT` (carrying `sessionId`) to `Routes.kt`, and wire both into `NavGraph.kt`; update Task 12's `onEnterCaptureMode` callback to navigate to `Routes.SURVEY_CAPTURE`, and `CaptureScreen`'s `onSessionPackaged` callback to navigate to `Routes.SURVEY_SUBMIT` with the packaged `sessionId`. Add the BLE-address and GPS-warning-wiring gaps above to `docs/contract-drift.md` (Task 1) — both are real product gaps, not just naming placeholders.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -3484,7 +5078,7 @@ git add app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureControl
   app/src/main/java/com/luxmap/navigation/NavGraph.kt \
   docs/contract-drift.md \
   app/src/test/java/com/luxmap/feature/survey/ui/capture/CaptureViewModelTest.kt
-git commit -m "feat(fm-survey): add F04 capture screen state machine and capture controller"
+git commit -m "feat(fm-survey): add F04 capture screen with GPS/BLE warnings and F06 handoff"
 ```
 
 ---
@@ -3842,5 +5436,6 @@ git commit -m "feat(fm-survey): add F06 submit screen"
 ## After all tasks: full verification
 
 - [ ] Run the full unit test suite: `./gradlew :app:testDebugUnitTest` — expect all green.
+- [ ] Run the instrumented test suite on an emulator/device: `./gradlew :app:connectedDebugAndroidTest` — covers Tasks 3, 7, 9, and 13's Room/Camera2/SensorManager tests that cannot run on the plain JVM stub.
 - [ ] Run ktlint: `./gradlew ktlintCheck` — fix any formatting issues before calling this plan done.
 - [ ] Manually run the spec §16 real-device checklist (10+ minute recording, segment rotation check, PTS/sensor-timestamp offset measurement, BLE disconnect/reconnect with a real ESP32+BH1750 module, low-light test) — this cannot be automated and is not covered by any task above.
