@@ -43,9 +43,9 @@ app/build.gradle.kts                                          (modify — Room d
 gradle/libs.versions.toml                                      (modify — Room version/libs)
 app/src/main/AndroidManifest.xml                                (modify — permissions, service)
 
-app/src/main/java/com/luxmap/core/database/AppDatabase.kt      (create)
+app/src/main/java/com/luxmap/core/database/AppDatabase.kt      (create — Task 9, not Task 1: Room rejects an empty @Database)
 app/src/main/java/com/luxmap/core/database/InstantConverters.kt (create — Task 13)
-app/src/main/java/com/luxmap/di/DatabaseModule.kt               (create)
+app/src/main/java/com/luxmap/di/DatabaseModule.kt               (create — Task 9)
 
 app/src/main/java/com/luxmap/core/camera/ExposureLockController.kt   (create)
 app/src/main/java/com/luxmap/core/camera/FrameTimestampLogger.kt     (create)
@@ -148,12 +148,12 @@ git commit -m "docs(fm-survey): reconcile CLAUDE.md with C8.5 naming authority a
 **Files:**
 - Modify: `gradle/libs.versions.toml`
 - Modify: `app/build.gradle.kts`
-- Create: `app/src/main/java/com/luxmap/core/database/AppDatabase.kt`
-- Create: `app/src/main/java/com/luxmap/di/DatabaseModule.kt`
 - Create: `docs/contract-drift.md` (only if it does not already exist — check first, per spec §14)
 
 **Interfaces:**
-- Produces: `AppDatabase` (abstract Room `RoomDatabase`, empty entity list for now — later tasks add `@Database(entities = [...])` entries here), provided as a Hilt singleton via `DatabaseModule`.
+- Produces: the Room Gradle dependencies (runtime, ktx, ksp compiler, testing), available for Task 9 to use.
+
+**Correction found while executing this plan (Round-1 blocker, real):** the original version of this task also created an empty `AppDatabase` (`@Database(entities = [], ...)`) and its `DatabaseModule`. Room's KSP processor rejects an empty `entities` list at compile time (`@Database annotation must specify list of entities`) — reproduced directly, not a implementer misdiagnosis. `AppDatabase.kt` and `DatabaseModule.kt` cannot exist until there is at least one real `@Entity`, so their creation moves to Task 9 (the first task with entities to put in it). This task now only wires the Gradle dependencies and the drift log — no Room-annotated Kotlin code yet.
 
 - [ ] **Step 1: Check whether `docs/contract-drift.md` already exists**
 
@@ -217,72 +217,16 @@ Add after `testImplementation(libs.kotlinx.coroutines.test)`:
     testImplementation(libs.androidx.room.testing)
 ```
 
-- [ ] **Step 4: Create the empty `AppDatabase`**
-
-```kotlin
-// app/src/main/java/com/luxmap/core/database/AppDatabase.kt
-package com.luxmap.core.database
-
-import androidx.room.Database
-import androidx.room.RoomDatabase
-
-// Entities are added here task by task as each feature's Room schema lands —
-// keeping the list here is the single place that shows the whole local schema.
-@Database(
-    entities = [],
-    version = 1,
-    exportSchema = false,
-)
-abstract class AppDatabase : RoomDatabase()
-```
-
-- [ ] **Step 5: Create `DatabaseModule`**
-
-```kotlin
-// app/src/main/java/com/luxmap/di/DatabaseModule.kt
-package com.luxmap.di
-
-import android.content.Context
-import androidx.room.Room
-import com.luxmap.core.database.AppDatabase
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
-
-@Module
-@InstallIn(SingletonComponent::class)
-object DatabaseModule {
-    @Provides
-    @Singleton
-    fun provideAppDatabase(
-        @ApplicationContext context: Context,
-    ): AppDatabase =
-        Room
-            .databaseBuilder(context, AppDatabase::class.java, "luxmap.db")
-            // No shipped release yet (versionCode = 1) and the schema is still changing task by
-            // task in this plan (Task 9 adds v1's tables, Task 13 bumps to v2) — destructive
-            // migration is acceptable pre-release. Revisit before the app ships to a real device
-            // with data worth preserving across an update.
-            .fallbackToDestructiveMigration()
-            .build()
-}
-```
-
-- [ ] **Step 6: Build to confirm the empty database compiles**
+- [ ] **Step 4: Build to confirm the Gradle wiring resolves**
 
 Run: `./gradlew :app:compileDebugKotlin`
-Expected: BUILD SUCCESSFUL (no DAOs/entities yet, so nothing to test at runtime — this task only proves the Room toolchain is wired correctly).
+Expected: BUILD SUCCESSFUL. No Room-annotated code exists yet — this only proves the dependencies resolve and nothing else in the project broke by adding them. Room's own toolchain (KSP + `AppDatabase`) is proven in Task 9, where the first real `@Entity` exists — `@Database(entities = [])` is rejected by Room's KSP processor at compile time, so an empty database cannot be built or verified before then.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add gradle/libs.versions.toml app/build.gradle.kts \
-  app/src/main/java/com/luxmap/core/database/AppDatabase.kt \
-  app/src/main/java/com/luxmap/di/DatabaseModule.kt docs/contract-drift.md
-git commit -m "chore(fm-survey): add room to the project"
+git add gradle/libs.versions.toml app/build.gradle.kts docs/contract-drift.md
+git commit -m "chore(fm-survey): add room gradle dependencies"
 ```
 
 ---
@@ -1334,16 +1278,19 @@ git commit -m "feat(fm-survey): add lux BLE packet codec with seq wraparound han
 - Create: `app/src/main/java/com/luxmap/feature/survey/data/entity/LocalSurveyPlanEntity.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/data/entity/LocalRoadSegmentEntity.kt`
 - Create: `app/src/main/java/com/luxmap/feature/survey/data/dao/SurveyPlanDao.kt`
-- Modify: `app/src/main/java/com/luxmap/core/database/AppDatabase.kt`
+- Create: `app/src/main/java/com/luxmap/core/database/AppDatabase.kt`
+- Create: `app/src/main/java/com/luxmap/di/DatabaseModule.kt`
 - Test: `app/src/androidTest/java/com/luxmap/feature/survey/data/dao/SurveyPlanDaoTest.kt`
 
 **Interfaces:**
-- Produces: `LocalSurveyPlanEntity` (table `local_survey_plan`), `LocalRoadSegmentEntity` (table `local_road_segment`), `SurveyPlanDao` with `suspend fun upsertPlans(plans: List<LocalSurveyPlanEntity>)`, `suspend fun upsertRoadSegments(segments: List<LocalRoadSegmentEntity>)`, `fun observePlans(): Flow<List<LocalSurveyPlanEntity>>`, `suspend fun roadSegmentsFor(surveySweepId: String): List<LocalRoadSegmentEntity>`.
+- Produces: `LocalSurveyPlanEntity` (table `local_survey_plan`), `LocalRoadSegmentEntity` (table `local_road_segment`), `SurveyPlanDao` with `suspend fun upsertPlans(plans: List<LocalSurveyPlanEntity>)`, `suspend fun upsertRoadSegments(segments: List<LocalRoadSegmentEntity>)`, `fun observePlans(): Flow<List<LocalSurveyPlanEntity>>`, `suspend fun roadSegmentsFor(surveySweepId: String): List<LocalRoadSegmentEntity>`; `AppDatabase` (Room's `@Database`, provided as a Hilt singleton via `DatabaseModule`).
+
+**Correction found during execution (Task 1's original scope moved here):** Room's KSP processor rejects `@Database(entities = [])` at compile time — an empty database cannot exist. `AppDatabase.kt` and `DatabaseModule.kt` are created here instead, in the first task that has real entities to put in the `@Database` annotation. Task 1 only added the Gradle dependencies.
 
 A Room DAO test needs a real SQLite implementation, which a plain JVM unit test does not have.
 `CLAUDE.md`'s approved test stack lists "Room Testing" but not Robolectric, so this runs as an
 **instrumented test** (`app/src/androidTest`, on an emulator/device) instead of adding a new
-library — no `libs.versions.toml`/`build.gradle.kts` change needed for this task.
+library — no further `libs.versions.toml`/`build.gradle.kts` change needed for this task.
 
 - [ ] **Step 1: Write the failing DAO test**
 
@@ -1496,7 +1443,7 @@ interface SurveyPlanDao {
 }
 ```
 
-Update `AppDatabase.kt`:
+Create `AppDatabase.kt` (the first entities Room can compile against):
 
 ```kotlin
 // app/src/main/java/com/luxmap/core/database/AppDatabase.kt
@@ -1508,6 +1455,8 @@ import com.luxmap.feature.survey.data.dao.SurveyPlanDao
 import com.luxmap.feature.survey.data.entity.LocalRoadSegmentEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyPlanEntity
 
+// Entities are added here task by task as each feature's Room schema lands —
+// keeping the list here is the single place that shows the whole local schema.
 @Database(
     entities = [LocalSurveyPlanEntity::class, LocalRoadSegmentEntity::class],
     version = 1,
@@ -1515,6 +1464,41 @@ import com.luxmap.feature.survey.data.entity.LocalSurveyPlanEntity
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun surveyPlanDao(): SurveyPlanDao
+}
+```
+
+Create `DatabaseModule.kt` (Task 1's original content, moved here since it references `AppDatabase`):
+
+```kotlin
+// app/src/main/java/com/luxmap/di/DatabaseModule.kt
+package com.luxmap.di
+
+import android.content.Context
+import androidx.room.Room
+import com.luxmap.core.database.AppDatabase
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+    @Provides
+    @Singleton
+    fun provideAppDatabase(
+        @ApplicationContext context: Context,
+    ): AppDatabase =
+        Room
+            .databaseBuilder(context, AppDatabase::class.java, "luxmap.db")
+            // No shipped release yet (versionCode = 1) and the schema is still changing task by
+            // task in this plan (this task adds v1's tables, Task 13 bumps to v2) — destructive
+            // migration is acceptable pre-release. Revisit before the app ships to a real device
+            // with data worth preserving across an update.
+            .fallbackToDestructiveMigration()
+            .build()
 }
 ```
 
@@ -1530,6 +1514,7 @@ git add app/src/main/java/com/luxmap/feature/survey/data/entity/LocalSurveyPlanE
   app/src/main/java/com/luxmap/feature/survey/data/entity/LocalRoadSegmentEntity.kt \
   app/src/main/java/com/luxmap/feature/survey/data/dao/SurveyPlanDao.kt \
   app/src/main/java/com/luxmap/core/database/AppDatabase.kt \
+  app/src/main/java/com/luxmap/di/DatabaseModule.kt \
   app/src/androidTest/java/com/luxmap/feature/survey/data/dao/SurveyPlanDaoTest.kt
 git commit -m "feat(fm-survey): add local_survey_plan and local_road_segment room tables"
 ```
