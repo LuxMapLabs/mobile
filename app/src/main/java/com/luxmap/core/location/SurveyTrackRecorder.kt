@@ -26,6 +26,12 @@ class SurveyTrackRecorder
     @Inject
     constructor() {
         private val signalLostThresholdMs: Long = 10_000L
+
+        // Volatile because onLocationUpdate() runs on the main-looper location callback thread
+        // while onTick() runs on LocationHeadingRecorder's own Timer thread (Task 17b) — without
+        // this, a write on one thread is not guaranteed to be visible when the other thread reads
+        // it, so the GPS-lost warning could stay stale or flip inconsistently.
+        @Volatile
         private var lastFixElapsedRealtimeNs: Long? = null
 
         fun onLocationUpdate(location: Location): TrackPoint {
