@@ -39,6 +39,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.nio.ByteBuffer
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.coroutines.resume
@@ -79,6 +80,12 @@ class VideoCaptureSession
         private var currentMuxerPort: RealMuxerPort? = null
         private var frameIndex = 0
         private var currentSegmentIndex = 0
+
+        // The frame the drain loop is handling right now. Kept here, not only on the port, because
+        // a rotation builds a NEW RealMuxerPort in the middle of onEncodedFrame() and writes this
+        // same frame to it -- the new port has to be staged with this data before that write.
+        private var pendingBuffer: ByteBuffer? = null
+        private var pendingBufferInfo: MediaCodec.BufferInfo? = null
 
         // Written in start(), read on the camera thread.
         @Volatile
@@ -165,7 +172,17 @@ class VideoCaptureSession
             recorder =
                 SegmentedVideoRecorder(SegmentRotationPolicy(segmentDurationMs)) { path ->
                     val format = requireNotNull(encoderOutputFormat) { "Encoder output format is not known yet" }
-                    RealMuxerPort(path, format).also { currentMuxerPort = it }
+                    RealMuxerPort(path, format).also { port ->
+                        currentMuxerPort = port
+                        // A rotation builds this port inside onEncodedFrame() and writes the frame
+                        // in flight to it right away, before the drain loop can stage anything on
+                        // it. Copy that frame over now. Null on the very first segment, where no
+                        // frame has been drained yet -- nothing to stage, and nothing writes to
+                        // this port until the normal per-frame path reaches it.
+                        val buffer = pendingBuffer
+                        val info = pendingBufferInfo
+                        if (buffer != null && info != null) port.setPendingSample(buffer, info)
+                    }
                 }
             frameTimestampWriter =
                 NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
@@ -268,6 +285,8 @@ class VideoCaptureSession
                 val isKeyFrame = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
                 val sensorTimestampNs = takeSensorTimestampFor(bufferInfo.presentationTimeUs)
 
+                pendingBuffer = outputBuffer
+                pendingBufferInfo = bufferInfo
                 currentMuxerPort?.setPendingSample(outputBuffer, bufferInfo)
                 val closedSegment =
                     recorder.onEncodedFrame(isKeyFrame, bufferInfo.presentationTimeUs, sensorTimestampNs)
@@ -290,6 +309,10 @@ class VideoCaptureSession
                 )
 
                 mediaCodec.releaseOutputBuffer(outputIndex, false)
+                // The buffer belongs to the codec again, so drop our reference: a port built later
+                // must never be staged with data that no longer exists.
+                pendingBuffer = null
+                pendingBufferInfo = null
 
                 if (closedSegment != null) {
                     persistClosedSegment(closedSegment)
@@ -376,6 +399,10 @@ class VideoCaptureSession
                 runCatching { mediaCodec.signalEndOfInputStream() }
                 awaitDrainTail()
 
+                // Make a mid-session drain failure visible even if nothing reads `failure`:
+                // without this, stop() returns a normal-looking result for a broken recording.
+                drainFailure?.let { Log.w(TAG, "The drain loop failed earlier; this recording is incomplete", it) }
+
                 val finalSegment = recorder.stop()
                 persistClosedSegment(finalSegment)
 
@@ -412,7 +439,15 @@ class VideoCaptureSession
         // Every step is guarded on its own: one failing release must not skip the rest, and some
         // of these fields are lateinit, so a failure early in start() leaves them unset.
         private fun releaseCaptureResources() {
-            runCatching { frameTimestampWriter.close() }
+            runCatching { frameTimestampWriter.close() }.onFailure { failed ->
+                // Skip the case where start() failed before this field was ever set.
+                if (failed is UninitializedPropertyAccessException) return@onFailure
+                // A failing close (a full disk, for example) means the tail of
+                // frame_timestamp_log.ndjson never reached the file. stop() would otherwise return
+                // a successful-looking result, so record it like any other capture failure.
+                Log.e(TAG, "Failed to close the frame timestamp log; its tail may be missing", failed)
+                if (drainFailure == null) drainFailure = failed
+            }
             runCatching { mediaCodec.stop() }
             runCatching { mediaCodec.release() }
             runCatching { captureSession.close() }
