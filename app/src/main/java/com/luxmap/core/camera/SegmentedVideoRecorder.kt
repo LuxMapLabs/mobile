@@ -46,15 +46,24 @@ class SegmentedVideoRecorder(
         // per segment (Task 17a reuses one encoder across all segments) — so this segment's own start
         // must be captured from its first observed frame, not assumed to be zero.
         if (segmentStartUs < 0) segmentStartUs = presentationTimeUs
+        val currentDurationMs = (presentationTimeUs - segmentStartUs) / 1000
+
+        if (rotationPolicy.shouldRotate(currentDurationMs, isKeyFrame)) {
+            val closedResult = closeCurrentSegment()
+            startSegment(currentSegmentIndex + 1, nextSegmentPath(currentFilePath, currentSegmentIndex + 1))
+            // This triggering keyframe becomes the new segment's own first frame (and sets its
+            // baseline) instead of going to the segment that just closed -- otherwise every segment
+            // after the first would start on a non-keyframe with no I-frame in that file, so it
+            // could not be decoded until the next keyframe interval.
+            segmentStartUs = presentationTimeUs
+            val newMuxer = requireNotNull(currentMuxer) { "startSegment() must be called before onEncodedFrame()" }
+            newMuxer.writeSample(presentationTimeUs)
+            return closedResult
+        }
+
         val muxer = requireNotNull(currentMuxer) { "startSegment() must be called before onEncodedFrame()" }
         muxer.writeSample(presentationTimeUs)
-
-        val currentDurationMs = (presentationTimeUs - segmentStartUs) / 1000
-        if (!rotationPolicy.shouldRotate(currentDurationMs, isKeyFrame)) return null
-
-        val closedResult = closeCurrentSegment()
-        startSegment(currentSegmentIndex + 1, nextSegmentPath(currentFilePath, currentSegmentIndex + 1))
-        return closedResult
+        return null
     }
 
     fun stop(): VideoSegmentResult = closeCurrentSegment()

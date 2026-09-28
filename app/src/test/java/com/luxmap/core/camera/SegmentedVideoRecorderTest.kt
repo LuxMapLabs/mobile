@@ -69,6 +69,24 @@ class SegmentedVideoRecorderTest {
     }
 
     @Test
+    fun `the triggering keyframe is written to the new segment, not the one that just closed`() {
+        val muxers = mutableListOf<FakeMuxerPort>()
+        val recorder = SegmentedVideoRecorder(policy) { _ -> FakeMuxerPort().also { muxers.add(it) } }
+        recorder.startSegment(segmentIndex = 0, outputFilePath = "/tmp/segment_0.mp4")
+
+        recorder.onEncodedFrame(isKeyFrame = true, presentationTimeUs = 1_000_000L, sensorTimestampNs = 1_000_000_000L)
+        recorder.onEncodedFrame(
+            isKeyFrame = true,
+            presentationTimeUs = 1_000_000L + 181_000_000L,
+            sensorTimestampNs = 182_000_000_000L,
+        )
+
+        assertEquals(2, muxers.size)
+        assertEquals(1, muxers[0].written) // old segment: only the baseline frame
+        assertEquals(1, muxers[1].written) // new segment: the triggering keyframe, not zero
+    }
+
+    @Test
     fun `does not rotate before the target duration`() {
         val muxer = FakeMuxerPort()
         val recorder = SegmentedVideoRecorder(policy) { _ -> muxer }
