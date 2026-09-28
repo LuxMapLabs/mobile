@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.capture
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +23,12 @@ fun CaptureScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // The foreground service keeps recording even if the screen is left, and nothing can reach a
+    // still-running session again except starting a NEW CaptureViewModel — which would then send a
+    // second ACTION_START to the same live service (see SurveyCaptureService's isRecording guard).
+    // Block system Back while Recording so leaving mid-session is not possible from here at all.
+    BackHandler(enabled = uiState is CaptureUiState.Recording) {}
+
     // Side effect lives here, reacting to state, instead of being called inline inside the `when`
     // branch during composition (review feedback) — LaunchedEffect only fires once per new sessionId.
     val packagedSessionId = (uiState as? CaptureUiState.Packaged)?.sessionId
@@ -37,9 +44,12 @@ fun CaptureScreen(
 
                 is CaptureUiState.Ready ->
                     Button(onClick = {
-                        // luxDeviceAddress hardcoded pending a BLE scan/pairing UI (LuxDeviceScanner,
-                        // Task 17c, is not wired into this screen yet — tracked in docs/contract-drift.md).
-                        viewModel.onStartRecording(surveySweepId, luxDeviceAddress = KNOWN_LUX_DEVICE_ADDRESS)
+                        // Same hardcoded address the ViewModel already used to connect() in init —
+                        // tracked in docs/contract-drift.md.
+                        viewModel.onStartRecording(
+                            surveySweepId,
+                            luxDeviceAddress = CaptureViewModel.KNOWN_LUX_DEVICE_ADDRESS,
+                        )
                     }) { Text("Bắt đầu quay") }
 
                 is CaptureUiState.Recording -> {
@@ -76,5 +86,3 @@ fun CaptureScreen(
         }
     }
 }
-
-private const val KNOWN_LUX_DEVICE_ADDRESS = "AA:BB:CC:DD:EE:FF"

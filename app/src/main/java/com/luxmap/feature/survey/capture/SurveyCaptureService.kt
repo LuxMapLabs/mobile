@@ -84,6 +84,16 @@ class SurveyCaptureService : Service() {
     @Volatile
     private var isStopping = false
 
+    // Guards a second ACTION_START arriving while a session is still live. Without this, leaving
+    // CaptureScreen mid-recording and opening a new CaptureViewModel (which sees BLE already
+    // Connected and shows Ready right away) lets the user press "Bắt đầu quay" again, sending a
+    // second ACTION_START to this SAME service instance — overwriting sessionDir/writers/
+    // videoStartJob and calling VideoCaptureSession.start() twice on one single-use object while
+    // the first session's camera/jobs are still open. Reset only once stopSessionInternal's stop
+    // sequence has fully finished.
+    @Volatile
+    private var isRecording = false
+
     // Kept apart from `jobs`: starting the camera must never be cancelled halfway, it is waited
     // for instead (see stopSessionInternal).
     private var videoStartJob: Job? = null
@@ -125,10 +135,15 @@ class SurveyCaptureService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification())
         when (intent?.action) {
             ACTION_START -> {
-                val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
-                val surveySweepId = intent.getStringExtra(EXTRA_SURVEY_SWEEP_ID) ?: return START_NOT_STICKY
-                val luxDeviceAddress = intent.getStringExtra(EXTRA_LUX_DEVICE_ADDRESS) ?: return START_NOT_STICKY
-                startSessionInternal(sessionId, surveySweepId, luxDeviceAddress)
+                if (isRecording) {
+                    Log.w(TAG, "ACTION_START arrived while a session is already recording; ignoring it")
+                } else {
+                    val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
+                    val surveySweepId = intent.getStringExtra(EXTRA_SURVEY_SWEEP_ID) ?: return START_NOT_STICKY
+                    val luxDeviceAddress = intent.getStringExtra(EXTRA_LUX_DEVICE_ADDRESS) ?: return START_NOT_STICKY
+                    isRecording = true
+                    startSessionInternal(sessionId, surveySweepId, luxDeviceAddress)
+                }
             }
             ACTION_STOP -> stopSessionInternal()
         }
@@ -178,7 +193,14 @@ class SurveyCaptureService : Service() {
         gpsWriter = NdjsonLogWriter(File(sessionDir, "gps_track.ndjson"), fileRole = "gps_track")
         headingWriter = NdjsonLogWriter(File(sessionDir, "heading_log.ndjson"), fileRole = "heading_log")
 
-        luxClient.connect(luxDeviceAddress)
+        // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE is
+        // normally already Connected by the time a session starts. Only connect here if that did
+        // NOT happen (for example something else drives this service directly) - calling connect()
+        // again on an already-live connection would tear down and reopen the GATT link right as
+        // recording begins (a real BLE gap at the start of every survey).
+        if (luxClient.connectionState.value != com.luxmap.core.ble.BleConnectionState.Connected) {
+            luxClient.connect(luxDeviceAddress)
+        }
         jobs +=
             serviceScope.launch {
                 luxClient.samples.collect { sample ->
@@ -291,6 +313,8 @@ class SurveyCaptureService : Service() {
                 if (_packagingResult.value == null) {
                     _packagingResult.value = PackageResult.Failure("Stopping the session failed; see the log")
                 }
+                // Only now is a new ACTION_START safe to accept (see isRecording's own comment).
+                isRecording = false
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }

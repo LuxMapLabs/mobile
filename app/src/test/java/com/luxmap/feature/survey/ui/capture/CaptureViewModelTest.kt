@@ -6,7 +6,9 @@ import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,9 @@ class CaptureViewModelTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
             val luxClient = mockk<LuxSensorBleClient>()
             every { luxClient.connectionState } returns connectionState
+            // CaptureViewModel's init now calls connect() once (Critical #1 fix) - luxClient is a
+            // strict (non-relaxed) mock, so this needs an explicit stub in every test.
+            every { luxClient.connect(any()) } just Runs
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             // Relaxed mockk cannot auto-answer a suspend collect() on a generic StateFlow (it
             // throws KotlinNothingValueException), so every test needs an explicit stub here, same
@@ -63,6 +68,9 @@ class CaptureViewModelTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val luxClient = mockk<LuxSensorBleClient>()
             every { luxClient.connectionState } returns connectionState
+            // CaptureViewModel's init now calls connect() once (Critical #1 fix) - luxClient is a
+            // strict (non-relaxed) mock, so this needs an explicit stub in every test.
+            every { luxClient.connect(any()) } just Runs
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns MutableStateFlow(GpsSignalState.Ok)
             val viewModel = CaptureViewModel(luxClient, controller)
@@ -83,6 +91,9 @@ class CaptureViewModelTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val luxClient = mockk<LuxSensorBleClient>()
             every { luxClient.connectionState } returns connectionState
+            // CaptureViewModel's init now calls connect() once (Critical #1 fix) - luxClient is a
+            // strict (non-relaxed) mock, so this needs an explicit stub in every test.
+            every { luxClient.connect(any()) } just Runs
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns MutableStateFlow(GpsSignalState.Ok)
             every { controller.stopSession() } returns flowOf(PackageResult.Success("/data/manifest.json"))
@@ -106,6 +117,9 @@ class CaptureViewModelTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val luxClient = mockk<LuxSensorBleClient>()
             every { luxClient.connectionState } returns connectionState
+            // CaptureViewModel's init now calls connect() once (Critical #1 fix) - luxClient is a
+            // strict (non-relaxed) mock, so this needs an explicit stub in every test.
+            every { luxClient.connect(any()) } just Runs
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns MutableStateFlow(GpsSignalState.Ok)
             every { controller.stopSession() } returns flowOf(PackageResult.Failure("disk full"))
@@ -129,6 +143,9 @@ class CaptureViewModelTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val luxClient = mockk<LuxSensorBleClient>()
             every { luxClient.connectionState } returns connectionState
+            // CaptureViewModel's init now calls connect() once (Critical #1 fix) - luxClient is a
+            // strict (non-relaxed) mock, so this needs an explicit stub in every test.
+            every { luxClient.connect(any()) } just Runs
             val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns gpsSignalState

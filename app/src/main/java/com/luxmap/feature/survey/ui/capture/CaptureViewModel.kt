@@ -29,6 +29,13 @@ class CaptureViewModel
         private var sessionId: String = ""
 
         init {
+            // Bước 0 (spec) needs someone to call connect() once a device is picked. Nothing else
+            // in the app did this (SurveyCaptureService only connects when a session actually
+            // starts), so the screen would sit on AwaitingBleConnection forever with no way to
+            // reach Ready. The ViewModel is the natural owner: it is created when the user enters
+            // this screen, matching "connect once the screen is entered".
+            luxClient.connect(KNOWN_LUX_DEVICE_ADDRESS)
+
             viewModelScope.launch {
                 luxClient.connectionState.collect { state ->
                     when (val current = _uiState.value) {
@@ -74,5 +81,12 @@ class CaptureViewModel
                     is PackageResult.Failure -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
                 }
             }
+        }
+
+        companion object {
+            // BLE lux device address hardcoded pending a scan/pairing UI (LuxDeviceScanner, Task
+            // 17c, is not wired into this screen yet) — tracked in docs/contract-drift.md. Lives
+            // here (not CaptureScreen) because the ViewModel is the one that must call connect().
+            const val KNOWN_LUX_DEVICE_ADDRESS = "AA:BB:CC:DD:EE:FF"
         }
     }
