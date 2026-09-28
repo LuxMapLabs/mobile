@@ -12,7 +12,7 @@ sealed interface PackageResult {
     data class Failure(val reason: String) : PackageResult
 }
 
-// Runs on "Dung quay" or after crash recovery (Task 16) closes out the remaining segments.
+// Runs on "Stop recording" or after crash recovery (Task 16) closes out the remaining segments.
 // Fails loudly rather than writing a manifest that references a file that is not actually there
 // (spec section 14 Review Focus) - a missing file is a real data-loss event, not something to paper over.
 // Deliberate v0 simplification vs spec section 8's example: the "device" block is not duplicated in

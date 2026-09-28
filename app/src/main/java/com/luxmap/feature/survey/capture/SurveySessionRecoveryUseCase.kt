@@ -10,8 +10,8 @@ import javax.inject.Inject
 // Called exactly once, from LuxMapApp.onCreate() (Step 4 below) - not from the capture feature's
 // own entry point, so recovery runs on every process start regardless of which screen opens first.
 // A session stuck in "recording" means the app was killed mid-session without going through the
-// normal "Dung quay" path - its last segment is unfinalized and MediaMuxer likely never closed it
-// cleanly, so both its DB row and its file are dropped rather than trusted.
+// normal "Stop recording" path - its last segment is unfinalized and MediaMuxer likely never
+// closed it cleanly, so both its DB row and its file are dropped rather than trusted.
 class SurveySessionRecoveryUseCase
     @Inject
     constructor(
@@ -59,8 +59,10 @@ class SurveySessionRecoveryUseCase
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
-                // Nothing more we can do - the session stays in whatever state it was last
-                // successfully written to, and will be picked up again on the next app start.
+                // Nothing more we can do - the session stays at whatever state the last successful
+                // write left it at. If that was "stopped" (not "recording"), it will NOT be picked
+                // up again by sessionsInRecordingState() on the next app start; this double-fault
+                // case (two independent DAO failures) is a known gap, not silently guaranteed safe.
             }
         }
     }

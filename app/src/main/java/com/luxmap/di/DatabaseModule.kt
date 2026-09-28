@@ -32,5 +32,6 @@ object DatabaseModule {
     // injected directly by LuxMapApp that needs this DAO. Only this one DAO is added here because
     // it is the only one a real Hilt injection site currently needs - not general DAO wiring.
     @Provides
+    @Singleton
     fun provideSurveySessionDao(db: AppDatabase): SurveySessionDao = db.surveySessionDao()
 }
