@@ -33,7 +33,7 @@ class SegmentedVideoRecorder(
         currentSegmentIndex = segmentIndex
         currentFilePath = outputFilePath
         currentMuxer = openMuxer(outputFilePath)
-        segmentStartUs = 0L
+        segmentStartUs = -1L
     }
 
     // Returns the just-closed segment's result when this frame triggers a rotation, null otherwise.
@@ -42,6 +42,10 @@ class SegmentedVideoRecorder(
         presentationTimeUs: Long,
         sensorTimestampNs: Long,
     ): VideoSegmentResult? {
+        // presentationTimeUs is continuous across the whole MediaCodec encoder lifetime, never reset
+        // per segment (Task 17a reuses one encoder across all segments) — so this segment's own start
+        // must be captured from its first observed frame, not assumed to be zero.
+        if (segmentStartUs < 0) segmentStartUs = presentationTimeUs
         val muxer = requireNotNull(currentMuxer) { "startSegment() must be called before onEncodedFrame()" }
         muxer.writeSample(presentationTimeUs)
 

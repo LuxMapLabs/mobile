@@ -28,11 +28,15 @@ class SegmentedVideoRecorderTest {
         val recorder = SegmentedVideoRecorder(policy) { _ -> muxer }
         recorder.startSegment(segmentIndex = 0, outputFilePath = "/tmp/segment_0.mp4")
 
+        // First frame establishes this segment's own start (presentationTimeUs is continuous across
+        // the whole encoder lifetime, never reset per segment — see SegmentedVideoRecorder).
+        recorder.onEncodedFrame(isKeyFrame = true, presentationTimeUs = 1_000_000L, sensorTimestampNs = 1_000_000_000L)
+
         val result =
             recorder.onEncodedFrame(
                 isKeyFrame = true,
-                presentationTimeUs = 181_000_000L,
-                sensorTimestampNs = 181_000_000_000L,
+                presentationTimeUs = 1_000_000L + 181_000_000L,
+                sensorTimestampNs = 182_000_000_000L,
             )
 
         assertEquals(VideoSegmentResult(segmentIndex = 0, filePath = "/tmp/segment_0.mp4", sizeBytes = 4_096L), result)
@@ -44,11 +48,13 @@ class SegmentedVideoRecorderTest {
         val recorder = SegmentedVideoRecorder(policy) { _ -> muxer }
         recorder.startSegment(segmentIndex = 0, outputFilePath = "/tmp/segment_0.mp4")
 
+        recorder.onEncodedFrame(isKeyFrame = true, presentationTimeUs = 1_000_000L, sensorTimestampNs = 1_000_000_000L)
+
         val result =
             recorder.onEncodedFrame(
                 isKeyFrame = true,
-                presentationTimeUs = 1_000_000L,
-                sensorTimestampNs = 1_000_000_000L,
+                presentationTimeUs = 1_000_000L + 1_000_000L,
+                sensorTimestampNs = 2_000_000_000L,
             )
 
         assertNull(result)
