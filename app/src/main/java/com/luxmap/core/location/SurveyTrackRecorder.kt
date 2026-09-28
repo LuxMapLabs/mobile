@@ -36,7 +36,7 @@ class SurveyTrackRecorder
                 lng = location.longitude,
                 accuracyM = location.accuracy,
                 gpsBearingDeg = if (location.hasBearing()) location.bearing else null,
-                speedMps = location.speed,
+                speedMps = if (location.hasSpeed()) location.speed else null,
             )
         }
 
