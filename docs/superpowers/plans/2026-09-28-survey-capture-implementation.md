@@ -2768,7 +2768,7 @@ interface SurveySessionDao {
 }
 ```
 
-Update `AppDatabase.kt` to add both entities to the `entities` array, bump `version = 2`, and add `abstract fun surveySessionDao(): SurveySessionDao`. Room needs a type converter for `java.time.Instant`; add:
+Room needs a type converter for `java.time.Instant`:
 
 ```kotlin
 // app/src/main/java/com/luxmap/core/database/InstantConverters.kt
@@ -2786,7 +2786,39 @@ class InstantConverters {
 }
 ```
 
-and add `@TypeConverters(InstantConverters::class)` on the `AppDatabase` class.
+Replace `AppDatabase.kt` in full (keep Task 9's two entities/DAO, add this task's two entities/DAO, bump to version 2, register the converter):
+
+```kotlin
+// app/src/main/java/com/luxmap/core/database/AppDatabase.kt
+package com.luxmap.core.database
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.luxmap.feature.survey.data.dao.SurveyPlanDao
+import com.luxmap.feature.survey.data.dao.SurveySessionDao
+import com.luxmap.feature.survey.data.entity.LocalRoadSegmentEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPlanEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
+
+@Database(
+    entities = [
+        LocalSurveyPlanEntity::class,
+        LocalRoadSegmentEntity::class,
+        LocalSurveySessionEntity::class,
+        LocalSurveyVideoSegmentEntity::class,
+    ],
+    version = 2,
+    exportSchema = false,
+)
+@TypeConverters(InstantConverters::class)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun surveyPlanDao(): SurveyPlanDao
+
+    abstract fun surveySessionDao(): SurveySessionDao
+}
+```
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -3009,7 +3041,7 @@ git commit -m "feat(fm-survey): add ndjson log writer/reader with periodic flush
 - Consumes: `SurveySessionDao` (Task 13), `NdjsonLogReader` (Task 14).
 - Produces: `sealed interface PackageResult { data class Success(val manifestFilePath: String) : PackageResult; data class Failure(val reason: String) : PackageResult }`; `class PackageSurveySessionUseCase { suspend fun invoke(sessionId: String): PackageResult }`.
 
-Computes each file's SHA-256 checksum, writes `manifest.json` and updates `local_survey_session.recordingState = "packaged"`. Fails loudly (does not write a manifest) if any file the session references is missing — pinning the Review Focus item about a manifest that lies.
+Computes each file's SHA-256 checksum, writes `manifest.json` and updates `local_survey_session.recordingState = "packaged"`. Fails loudly (does not write a manifest) if any file the session references is missing — pinning the Review Focus item about a manifest that lies. Before checksumming, every `.ndjson` file (not `capture_config.json`, not the video segments) is rewritten through `NdjsonLogReader.readDataLines()` — this is the actual use of the "Consumes: NdjsonLogReader" relationship: a session recovered after a crash (Task 16) can carry a truncated last line in a log file, and packaging that torn line as-is would ship it to the server instead of cleaning it once, here, where the tolerant reader already exists.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3024,6 +3056,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -3088,6 +3121,32 @@ class PackageSurveySessionUseCaseTest {
             assertTrue(result is PackageResult.Failure)
             coVerify(exactly = 0) { dao.updateSession(match { it.recordingState == "packaged" }) }
         }
+
+    @Test
+    fun `strips a truncated last line from an ndjson file before packaging it`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            // Simulate a crash-recovered session (Task 16): the last line of gps_track.ndjson is
+            // cut off mid-write.
+            File(session.gpsTrackFilePath!!).writeText(
+                """
+                {"schema_version":"v0","file_role":"gps_track"}
+                {"elapsed_realtime_ns":1,"lat":10.0}
+                {"elapsed_realtime_ns":2,"lat":1
+                """.trimIndent(),
+            )
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session
+            coEvery { dao.segmentsFor("SESSION-1") } returns emptyList()
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            val cleanedLines = File(session.gpsTrackFilePath!!).readLines()
+            assertEquals(2, cleanedLines.size) // header + the one complete data line
+            assertTrue(cleanedLines[1].endsWith("}"))
+        }
 }
 ```
 
@@ -3145,6 +3204,8 @@ class PackageSurveySessionUseCase
                 return PackageResult.Failure("Missing file(s) at packaging time: ${missing.map { it.first }}")
             }
 
+            referencedFiles.forEach { (path, _, _) -> cleanIfNdjson(File(path)) }
+
             val manifestFile = File(File(referencedFiles.first().first).parentFile, "manifest.json")
             manifestFile.writeText(
                 buildManifestJson(
@@ -3164,6 +3225,16 @@ class PackageSurveySessionUseCase
                 ),
             )
             return PackageResult.Success(manifestFile.absolutePath)
+        }
+
+        // A session recovered after a crash (Task 16) can carry a truncated last line in a log
+        // file (spec §12) — rewrite it here, once, using the same tolerant reader, instead of
+        // shipping a torn JSON line in the package.
+        private fun cleanIfNdjson(file: File) {
+            if (!file.name.endsWith(".ndjson")) return
+            val header = file.readLines().firstOrNull() ?: return
+            val dataLines = NdjsonLogReader.readDataLines(file)
+            file.writeText((listOf(header) + dataLines).joinToString("\n", postfix = "\n"))
         }
 
         private fun sha256Of(file: File): String {
@@ -4152,12 +4223,14 @@ git commit -m "feat(fm-survey): split BLE connect from the samples flow, add sca
 **Done when:** the service is controlled by `ACTION_START`/`ACTION_STOP` intents through `onStartCommand`, calling `startForeground()` as the very first line regardless of which action arrived; stopping runs in the exact order — cancel the GPS/heading/lux jobs, close their `NdjsonLogWriter`s, close the final video segment, write `capture_config.json` from `VideoCaptureSession`'s real applied values, set `recordingState = stopped` with `endedAtUtc`/`durationSeconds`, run `PackageSurveySessionUseCase`, then `stopSelf()`; `onDestroy()` cancels `serviceScope` so nothing leaks if the process is killed anyway.
 
 **Files:**
-- Modify: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt` (replaces the Task-17-skeleton body entirely)
+- Create: `app/src/main/java/com/luxmap/feature/survey/capture/CaptureConfigWriter.kt`
+- Create: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt`
 - Modify: `app/src/main/AndroidManifest.xml`
+- Test: `app/src/test/java/com/luxmap/feature/survey/capture/CaptureConfigWriterTest.kt`
 
 **Interfaces:**
-- Consumes: `VideoCaptureSession` (Task 17a), `LocationHeadingRecorder` (Task 17b), `LuxSensorBleClient` (Task 17c), `CaptureConfigWriter`/`CaptureConfig` (below), `SurveySessionDao` (Task 13), `PackageSurveySessionUseCase` (Task 15).
-- Produces: `object CaptureConfigWriter { fun toJson(config: CaptureConfig): String }` (moved here from the old Task 17 — same pure function, unit-tested); `val SurveyCaptureService.packagingResult: StateFlow<PackageResult?>`, read by `SurveyCaptureController` (Task 18) after sending `ACTION_STOP`; `val SurveyCaptureService.gpsSignalState: StateFlow<GpsSignalState>` (proxies `LocationHeadingRecorder.gpsSignalState`, Task 17b), read the same bound-service way for the GPS-lost warning in `CaptureUiState.Recording`.
+- Consumes: `VideoCaptureSession` (Task 17a), `LocationHeadingRecorder` (Task 17b), `LuxSensorBleClient` (Task 17c), `SurveySessionDao` (Task 13), `PackageSurveySessionUseCase` (Task 15).
+- Produces: `object CaptureConfigWriter { fun toJson(config: CaptureConfig): String }` (pure function, unit-tested); `val SurveyCaptureService.packagingResult: StateFlow<PackageResult?>`, read by `SurveyCaptureController` (Task 18) after sending `ACTION_STOP`; `val SurveyCaptureService.gpsSignalState: StateFlow<GpsSignalState>` (proxies `LocationHeadingRecorder.gpsSignalState`, Task 17b), read the same bound-service way for the GPS-lost warning in `CaptureUiState.Recording`.
 
 - [ ] **Step 1: Add manifest permissions and service declaration**
 
