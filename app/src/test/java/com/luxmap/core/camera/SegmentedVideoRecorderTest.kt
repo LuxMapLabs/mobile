@@ -43,6 +43,32 @@ class SegmentedVideoRecorderTest {
     }
 
     @Test
+    fun `a new segment after rotation does not immediately re-rotate on a continuing large pts`() {
+        val recorder = SegmentedVideoRecorder(policy) { _ -> FakeMuxerPort().apply { closedSizeBytes = 4_096L } }
+        recorder.startSegment(segmentIndex = 0, outputFilePath = "/tmp/segment_0.mp4")
+
+        // Establish segment 0's baseline, then rotate once its duration exceeds the target.
+        recorder.onEncodedFrame(isKeyFrame = true, presentationTimeUs = 1_000_000L, sensorTimestampNs = 1_000_000_000L)
+        recorder.onEncodedFrame(
+            isKeyFrame = true,
+            presentationTimeUs = 1_000_000L + 181_000_000L,
+            sensorTimestampNs = 182_000_000_000L,
+        )
+
+        // The next frame lands in the new segment, but presentationTimeUs keeps climbing from the
+        // same continuous encoder (never reset) — this must not look like segment 1 already
+        // exceeded its own budget just because the encoder's pts is already large.
+        val result =
+            recorder.onEncodedFrame(
+                isKeyFrame = true,
+                presentationTimeUs = 1_000_000L + 181_000_000L + 1_000_000L,
+                sensorTimestampNs = 183_000_000_000L,
+            )
+
+        assertNull(result)
+    }
+
+    @Test
     fun `does not rotate before the target duration`() {
         val muxer = FakeMuxerPort()
         val recorder = SegmentedVideoRecorder(policy) { _ -> muxer }
