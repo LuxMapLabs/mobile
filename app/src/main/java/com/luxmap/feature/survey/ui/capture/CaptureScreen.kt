@@ -42,19 +42,31 @@ fun CaptureScreen(
     BackHandler(enabled = uiState is CaptureUiState.Recording) {}
 
     val context = LocalContext.current
-    val isDuringRecordingWindow = uiState is CaptureUiState.StartingRecording || uiState is CaptureUiState.Recording
-    // The preview Surface (below) is a live target on an active Camera2 capture session -
-    // a physical rotation would otherwise destroy and recreate this Activity (no orientation lock
-    // or configChanges declared for it), tearing that Surface down out from under a running
-    // recording. Locking only for this window, not the whole app, keeps every other screen's
-    // rotation behavior unchanged.
-    DisposableEffect(isDuringRecordingWindow) {
+    // One shared flag for the whole window where a Camera2 session may be live: it opens in
+    // StartingRecording, runs through Recording, and is still being torn down during Packaging -
+    // VideoCaptureSession.stop() only calls stopRepeating() and then waits for the encoder tail
+    // before it closes the session. The preview below and the orientation lock both key off this
+    // same value, so the two can never drift apart.
+    val isCameraSessionLive =
+        uiState is CaptureUiState.StartingRecording ||
+            uiState is CaptureUiState.Recording ||
+            uiState is CaptureUiState.Packaging
+    // The preview Surface (below) is a live target on that camera session - a physical rotation
+    // would otherwise destroy and recreate this Activity (no orientation lock or configChanges
+    // declared for it), tearing that Surface down while the camera is still using it.
+    // Use SCREEN_ORIENTATION_LOCKED, not SCREEN_ORIENTATION_PORTRAIT: LOCKED pins whatever
+    // rotation the screen is in right now, while PORTRAIT asks for one specific rotation. If the
+    // user starts recording while holding the phone in landscape, PORTRAIT would itself force a
+    // configuration change and recreate the Activity - causing the very problem this code is here
+    // to stop. LOCKED can never do that, and it still blocks every later rotation.
+    // Locking only for this window, not the whole app, keeps every other screen unchanged.
+    DisposableEffect(isCameraSessionLive) {
         val activity = context as? Activity
-        if (isDuringRecordingWindow) {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (isCameraSessionLive) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
         }
         onDispose {
-            if (isDuringRecordingWindow) {
+            if (isCameraSessionLive) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
@@ -68,11 +80,14 @@ fun CaptureScreen(
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        // Shown for both StartingRecording and Recording, from the SAME `if` branch, so Compose
-        // keeps the same TextureView (and the same underlying Surface) alive across that
-        // transition instead of tearing it down and recreating it - the Camera2 capture session
-        // is built once, against this exact Surface object, when the preview becomes ready.
-        if (uiState is CaptureUiState.StartingRecording || uiState is CaptureUiState.Recording) {
+        // Shown for the whole isCameraSessionLive window from the SAME `if` branch, so Compose
+        // keeps the same TextureView (and the same underlying Surface) alive the entire time
+        // instead of tearing it down and building it again - the Camera2 capture session is built
+        // once, against this exact Surface object, when the preview becomes ready. This must stay
+        // up through Packaging too: dropping the view there would abandon the Surface while the
+        // repeating request can still be producing into it, which some devices report as a
+        // capture error and can hurt the tail of the recording.
+        if (isCameraSessionLive) {
             AndroidView(
                 factory = { context ->
                     TextureView(context).apply {
