@@ -6,9 +6,12 @@ import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -26,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.ble.LuxDevice
+import com.luxmap.core.theme.Spacing
 
 @Composable
 fun CaptureScreen(
@@ -123,7 +127,19 @@ fun CaptureScreen(
             )
         }
 
-        Column {
+        // Anchored to the bottom with an opaque scrim behind it, not centered directly over the
+        // live camera feed - a plain Button/Text with no background can end up nearly the same
+        // color as whatever the camera is pointed at (a light pole, a bright wall) and become
+        // hard to read while recording.
+        Column(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
+                    .padding(Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             when (val state = uiState) {
                 is CaptureUiState.Connecting -> {
                     val label =
