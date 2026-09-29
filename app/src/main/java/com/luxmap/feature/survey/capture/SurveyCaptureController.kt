@@ -101,6 +101,14 @@ class RealSurveyCaptureController
                     .putExtra(SurveyCaptureService.EXTRA_SURVEY_SWEEP_ID, surveySweepId)
                     .putExtra(SurveyCaptureService.EXTRA_LUX_DEVICE_ADDRESS, luxDeviceAddress)
             ContextCompat.startForegroundService(context, intent)
+            // Unbind any still-registered connection from a previous session before rebinding with
+            // the SAME ServiceConnection instance. Android treats a bindService() call with an
+            // already-registered connection as a no-op (it does not fire onServiceConnected again),
+            // so without this, boundService would stay null forever after a second startSession()
+            // in the same controller lifetime, and stopSession() would report a false "Service not
+            // bound" for a session that actually packaged fine. Safe even if nothing was bound yet
+            // (startForegroundService above keeps the service alive independently of any binding).
+            runCatching { context.unbindService(connection) }
             // Drop the previous session's service reference before binding again. unbindService()
             // does NOT call onServiceDisconnected (that only fires when the process dies), so
             // without this a stopSession() for THIS session could read the old, already finished
