@@ -862,21 +862,33 @@ Add the new function that actually starts the session, once the preview surface 
         }
 ```
 
-- [ ] **Step 5: Run to verify the tests pass**
+- [ ] **Step 5: Add the one new `when` branch `CaptureScreen.kt` needs to compile**
+
+**Why this step exists (a plan gap found during implementation, not part of the original brief):** `CaptureUiState` is a `sealed interface`, and `CaptureScreen.kt` (which already exists — it was NOT built by this plan; it's the F04 screen from the earlier BLE device-picker work) already switches over every `CaptureUiState` case with an exhaustive `when` and no `else` branch, per this project's own CLAUDE.md rule. Adding `StartingRecording` in Step 1 above makes that `when` non-exhaustive, which is a compile error in `CaptureScreen.kt` — a file outside this task's original file list. `:app:testDebugUnitTest` cannot run at all while any main-source file fails to compile, so this task cannot reach GREEN without this one addition. Task 1 and Task 2 had the same kind of transitional breakage in their own downstream callers, but neither of them needed to run tests to finish, so it didn't block them the way it blocks this task.
+
+Add ONLY this one branch to the existing `when (val state = uiState) { ... }` in `CaptureScreen.kt`, in the same position Task 4 was going to add it (between the `Ready` branch and the `Recording` branch) — do not touch anything else in that file, the `TextureView`/`AndroidView`/orientation-lock work is still entirely Task 4's job:
+
+```kotlin
+                is CaptureUiState.StartingRecording ->
+                    Text("Đang mở camera...", style = MaterialTheme.typography.bodyLarge)
+```
+
+- [ ] **Step 6: Run to verify the tests pass**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.feature.survey.ui.capture.CaptureViewModelTest"`
 Expected: PASS, all 11 tests.
 
-- [ ] **Step 6: Run ktlint**
+- [ ] **Step 7: Run ktlint**
 
 Run: `./gradlew ktlintCheck`
 Expected: BUILD SUCCESSFUL. Fix any formatting issues (`./gradlew ktlintFormat` if needed, then re-check).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureUiState.kt \
   app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureViewModel.kt \
+  app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt \
   app/src/test/java/com/luxmap/feature/survey/ui/capture/CaptureViewModelTest.kt
 git commit -m "feat(fm-08): add StartingRecording state, wait for the preview surface before recording"
 ```
@@ -887,6 +899,8 @@ git commit -m "feat(fm-08): add StartingRecording state, wait for the preview su
 
 **Files:**
 - Modify: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt`
+
+**Note (plan amended after Task 3 ran into this):** the `is CaptureUiState.StartingRecording -> Text("Đang mở camera...", ...)` branch this task originally added in its own Step 1 was moved to **Task 3 Step 5**, because `CaptureScreen.kt`'s exhaustive `when` had to compile before Task 3's tests could run. That branch already exists in the file by the time this task starts — do not re-add it or you will get a duplicate-branch compile error. Everything else below (the `TextureView`/`AndroidView`, the imports, the orientation lock) is still this task's own, unstarted work.
 
 **Interfaces:**
 - Consumes: `CaptureUiState.StartingRecording` and `CaptureViewModel.onPreviewSurfaceReady(surface: Surface)` (Task 3).
@@ -954,14 +968,7 @@ Inside the `Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { .
         Column {
 ```
 
-(The `Column { ... }` and everything inside it stays exactly as it currently is in the file — this step does not change any existing `when` branch's content, it only wraps the existing `Column` with the new `AndroidView` as a sibling inside the same `Box`, and adds one new branch below.)
-
-Add the new `StartingRecording` branch to the existing `when (val state = uiState) { ... }`, between the `Ready` branch and the `Recording` branch:
-
-```kotlin
-                is CaptureUiState.StartingRecording ->
-                    Text("Đang mở camera...", style = MaterialTheme.typography.bodyLarge)
-```
+(The `Column { ... }` and everything inside it stays exactly as it currently is in the file — this step does not change any existing `when` branch's content, it only wraps the existing `Column` with the new `AndroidView` as a sibling inside the same `Box`. The `is CaptureUiState.StartingRecording -> Text("Đang mở camera...", ...)` branch this step used to add here was moved to Task 3 Step 5 — it already exists in the file, do not add it again.)
 
 - [ ] **Step 2: Lock the screen to portrait while a recording is starting or in progress**
 
