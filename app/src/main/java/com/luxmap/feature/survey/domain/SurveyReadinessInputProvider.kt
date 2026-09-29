@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.StatFs
 import androidx.core.content.ContextCompat
+import com.luxmap.core.camera.CameraSelector
 import com.luxmap.core.camera.ExposureLockController
 import com.luxmap.core.location.LocationTracker
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
@@ -33,7 +34,9 @@ class RealSurveyReadinessInputProvider
     ) : SurveyReadinessInputProvider {
         override suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput {
             val cameraManager = context.getSystemService(CameraManager::class.java)
-            val cameraId = cameraManager.cameraIdList.firstOrNull()
+            // Same selection as VideoCaptureSession, so the checklist and the recorder can never
+            // mean different cameras.
+            val cameraId = CameraSelector.pickBackCameraId(cameraManager)
             val characteristics = cameraId?.let { cameraManager.getCameraCharacteristics(it) }
             val timestampSourceRealtime =
                 characteristics?.let { exposureLockController.isTimestampSourceRealtime(it) } ?: false

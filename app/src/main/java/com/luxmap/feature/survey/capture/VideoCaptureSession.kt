@@ -16,6 +16,7 @@ import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
+import com.luxmap.core.camera.CameraSelector
 import com.luxmap.core.camera.ExposureLockController
 import com.luxmap.core.camera.FrameTimestampLogger
 import com.luxmap.core.camera.LockedCameraProfile
@@ -162,7 +163,10 @@ class VideoCaptureSession
             cameraHandler = handler
 
             val cameraManager = context.getSystemService(CameraManager::class.java)
-            cameraId = cameraManager.cameraIdList.first()
+            // Same selection as the readiness check (CameraSelector), so the camera the checklist
+            // passed is the camera we open here. Still fails loudly on a device with no camera at
+            // all, like the old cameraIdList.first() did.
+            cameraId = CameraSelector.pickBackCameraId(cameraManager) ?: error("No camera available")
             cameraDevice = openCamera(cameraManager, cameraId, handler)
 
             mediaCodec = createEncoder(profile)
