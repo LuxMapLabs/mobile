@@ -3,7 +3,10 @@ package com.luxmap.feature.survey.domain
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.StatFs
 import androidx.core.content.ContextCompat
@@ -34,6 +37,26 @@ class RealSurveyReadinessInputProvider
             val characteristics = cameraId?.let { cameraManager.getCameraCharacteristics(it) }
             val timestampSourceRealtime =
                 characteristics?.let { exposureLockController.isTimestampSourceRealtime(it) } ?: false
+
+            // The exposure lock is the one hard gate against recording unusable auto-exposure video,
+            // so it must check what ExposureLockController.applyTo() really needs: the MANUAL_SENSOR
+            // capability (ISO, exposure time, frame duration, focus distance) plus CONTROL_AE_MODE_OFF.
+            // A camera that has neither cannot hold a locked exposure at all.
+            val manualSensorSupported =
+                characteristics
+                    ?.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+                    ?.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR) == true
+            val aeModeOffSupported =
+                characteristics
+                    ?.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES)
+                    ?.contains(CameraMetadata.CONTROL_AE_MODE_OFF) == true
+
+            // Location permission alone is not enough: the user can grant it and still leave the
+            // system Location toggle off, which would give us a gps_track.ndjson with a header and
+            // no data. The server needs that track to match video frames to poles.
+            val locationManager = context.getSystemService(LocationManager::class.java)
+            val gpsProviderEnabled = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
+
             val statFs = StatFs(context.filesDir.path)
             val batteryManager = context.getSystemService(BatteryManager::class.java)
 
@@ -41,9 +64,9 @@ class RealSurveyReadinessInputProvider
                 cameraPermissionGranted =
                     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                         PackageManager.PERMISSION_GRANTED,
-                exposureLockSupported = characteristics != null,
+                exposureLockSupported = manualSensorSupported && aeModeOffSupported,
                 timestampSourceRealtime = timestampSourceRealtime,
-                gpsAvailable = locationTracker.hasLocationPermission(),
+                gpsAvailable = locationTracker.hasLocationPermission() && gpsProviderEnabled,
                 freeStorageBytes = statFs.availableBytes,
                 requiredStorageBytes = estimateRequiredStorageBytes(route),
                 batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
