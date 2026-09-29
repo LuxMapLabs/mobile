@@ -34,7 +34,16 @@ class CaptureViewModel
             // starts), so the screen would sit on AwaitingBleConnection forever with no way to
             // reach Ready. The ViewModel is the natural owner: it is created when the user enters
             // this screen, matching "connect once the screen is entered".
-            luxClient.connect(KNOWN_LUX_DEVICE_ADDRESS)
+            //
+            // Guarded to Disconnected only: connect() does not close the previous gatt before
+            // reassigning the field when called this way (only the internal auto-reconnect path
+            // does that), so calling it again while already Connected/Connecting from a prior
+            // screen entry would leak a BluetoothGatt client and briefly log lux samples twice.
+            // The connectionState collector below still replays Connected -> Ready on its own if a
+            // connection from a prior entry is still live, so this does not get the screen stuck.
+            if (luxClient.connectionState.value is BleConnectionState.Disconnected) {
+                luxClient.connect(KNOWN_LUX_DEVICE_ADDRESS)
+            }
 
             viewModelScope.launch {
                 luxClient.connectionState.collect { state ->
@@ -80,6 +89,17 @@ class CaptureViewModel
                     is PackageResult.Success -> _uiState.value = CaptureUiState.Packaged(sessionId)
                     is PackageResult.Failure -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
                 }
+            }
+        }
+
+        // Leaving the screen before a recording ever started (AwaitingBleConnection/Ready/
+        // Packaging/Packaged/PackagingFailed) should give the GATT connection back, same reasoning
+        // as the BackHandler in CaptureScreen. Recording is the one exception: the foreground
+        // service owns the connection at that point (it keeps running after the screen is gone),
+        // so disconnecting here would cut off a live recording out from under it.
+        override fun onCleared() {
+            if (_uiState.value !is CaptureUiState.Recording) {
+                luxClient.disconnect()
             }
         }
 
