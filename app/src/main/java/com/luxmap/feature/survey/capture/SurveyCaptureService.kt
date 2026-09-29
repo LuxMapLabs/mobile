@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
 import javax.inject.Inject
+import javax.inject.Provider
 
 private const val TAG = "SurveyCaptureService"
 private const val NOTIFICATION_CHANNEL_ID = "survey_capture"
@@ -43,7 +44,11 @@ private const val STATE_PACKAGE_FAILED = "package_failed"
 
 @AndroidEntryPoint
 class SurveyCaptureService : Service() {
-    @Inject lateinit var videoCaptureSession: VideoCaptureSession
+    // A Provider, not a plain field: VideoCaptureSession is single-use (its firstSegmentReady,
+    // encoderOutputFormat and lateinit camera fields are never reset), but field injection happens
+    // once per Service instance, so a second ACTION_START on the same instance would reuse a spent
+    // one. Every session takes a fresh instance from here instead.
+    @Inject lateinit var videoCaptureSessionProvider: Provider<VideoCaptureSession>
 
     @Inject lateinit var locationHeadingRecorder: LocationHeadingRecorder
 
@@ -88,15 +93,19 @@ class SurveyCaptureService : Service() {
     // CaptureScreen mid-recording and opening a new CaptureViewModel (which sees BLE already
     // Connected and shows Ready right away) lets the user press "Bắt đầu quay" again, sending a
     // second ACTION_START to this SAME service instance — overwriting sessionDir/writers/
-    // videoStartJob and calling VideoCaptureSession.start() twice on one single-use object while
-    // the first session's camera/jobs are still open. Reset only once stopSessionInternal's stop
-    // sequence has fully finished.
+    // videoStartJob and opening a second camera session while the first session's camera/jobs are
+    // still open. Reset only once stopSessionInternal's stop sequence has fully finished.
     @Volatile
     private var isRecording = false
 
     // Kept apart from `jobs`: starting the camera must never be cancelled halfway, it is waited
     // for instead (see stopSessionInternal).
     private var videoStartJob: Job? = null
+
+    // The instance for the session that is running right now. Set at the top of
+    // startSessionInternal and read by the whole stop path, so start and stop always mean the same
+    // instance.
+    private lateinit var videoCaptureSession: VideoCaptureSession
     private lateinit var luxWriter: NdjsonLogWriter
     private lateinit var gpsWriter: NdjsonLogWriter
     private lateinit var headingWriter: NdjsonLogWriter
@@ -155,6 +164,16 @@ class SurveyCaptureService : Service() {
         surveySweepId: String,
         luxDeviceAddress: String,
     ) {
+        // An ACTION_START can land in the short window after stopSelf() but before the OS really
+        // destroys this instance, so every per-session field has to start clean. Leaving isStopping
+        // true would make this session's own STOP a no-op (camera never stops), and a leftover
+        // _packagingResult would be reported right away as this session's result.
+        val videoSession = videoCaptureSessionProvider.get()
+        videoCaptureSession = videoSession
+        isStopping = false
+        brokenReason = null
+        _packagingResult.value = null
+
         currentSessionId = sessionId
         currentSurveySweepId = surveySweepId
         sessionDir = File(getExternalFilesDir(null), "survey/$sessionId").apply { mkdirs() }
@@ -232,7 +251,9 @@ class SurveyCaptureService : Service() {
         videoStartJob =
             serviceScope.launch {
                 try {
-                    videoCaptureSession.start(
+                    // The local, not the field: this coroutine must always use the instance made
+                    // for THIS session.
+                    videoSession.start(
                         scope = serviceScope,
                         sessionId = sessionId,
                         sessionDir = sessionDir,

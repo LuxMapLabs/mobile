@@ -101,6 +101,11 @@ class RealSurveyCaptureController
                     .putExtra(SurveyCaptureService.EXTRA_SURVEY_SWEEP_ID, surveySweepId)
                     .putExtra(SurveyCaptureService.EXTRA_LUX_DEVICE_ADDRESS, luxDeviceAddress)
             ContextCompat.startForegroundService(context, intent)
+            // Drop the previous session's service reference before binding again. unbindService()
+            // does NOT call onServiceDisconnected (that only fires when the process dies), so
+            // without this a stopSession() for THIS session could read the old, already finished
+            // service and report its result as this session's outcome.
+            boundService.value = null
             context.bindService(Intent(context, SurveyCaptureService::class.java), connection, Context.BIND_AUTO_CREATE)
         }
 
@@ -117,6 +122,13 @@ class RealSurveyCaptureController
                     return@flow
                 }
                 emitAll(service.packagingResult.filterNotNull().take(1))
-            }.onCompletion { context.unbindService(connection) }
+            }.onCompletion {
+                // unbindService throws IllegalArgumentException ("Service not registered") when no
+                // bind ever landed (the timeout path above), and a throw here would escape
+                // onCompletion and crash the caller.
+                runCatching { context.unbindService(connection) }
+                // This session is over; the next startSession() must wait for its own bind.
+                boundService.value = null
+            }
         }
     }
