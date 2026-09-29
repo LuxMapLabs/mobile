@@ -39,22 +39,24 @@ fun CaptureScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // The foreground service keeps recording even if the screen is left, and nothing can reach a
-    // still-running session again except starting a NEW CaptureViewModel — which would then send a
-    // second ACTION_START to the same live service (see SurveyCaptureService's isRecording guard).
-    // Block system Back while Recording so leaving mid-session is not possible from here at all.
-    BackHandler(enabled = uiState is CaptureUiState.Recording) {}
-
     val context = LocalContext.current
     // One shared flag for the whole window where a Camera2 session may be live: it opens in
     // StartingRecording, runs through Recording, and is still being torn down during Packaging -
     // VideoCaptureSession.stop() only calls stopRepeating() and then waits for the encoder tail
-    // before it closes the session. The preview below and the orientation lock both key off this
-    // same value, so the two can never drift apart.
+    // before it closes the session. The preview, the orientation lock, and BackHandler all key
+    // off this same value, so none of them can drift apart from the others.
     val isCameraSessionLive =
         uiState is CaptureUiState.StartingRecording ||
             uiState is CaptureUiState.Recording ||
             uiState is CaptureUiState.Packaging
+
+    // The foreground service keeps recording even if the screen is left, and nothing can reach a
+    // still-running session again except starting a NEW CaptureViewModel — which would then send a
+    // second ACTION_START to the same live service (see SurveyCaptureService's isRecording guard).
+    // Block system Back for the whole isCameraSessionLive window, not only Recording, so leaving
+    // mid-session is not possible from here at all.
+    BackHandler(enabled = isCameraSessionLive) {}
+
     // The preview Surface (below) is a live target on that camera session - a physical rotation
     // would otherwise destroy and recreate this Activity (no orientation lock or configChanges
     // declared for it), tearing that Surface down while the camera is still using it.
@@ -95,6 +97,9 @@ fun CaptureScreen(
             AndroidView(
                 factory = { context ->
                     TextureView(context).apply {
+                        // Kept so the Surface built below can be released when its SurfaceTexture
+                        // goes away. Without this the Surface is only ever freed by the finalizer.
+                        var attachedSurface: Surface? = null
                         surfaceTextureListener =
                             object : TextureView.SurfaceTextureListener {
                                 override fun onSurfaceTextureAvailable(
@@ -108,7 +113,9 @@ fun CaptureScreen(
                                     // work. Whether every device accepts two streams at this size
                                     // together still needs a real-device check (see Review Focus).
                                     surfaceTexture.setDefaultBufferSize(1920, 1080)
-                                    viewModel.onPreviewSurfaceReady(Surface(surfaceTexture))
+                                    val surface = Surface(surfaceTexture)
+                                    attachedSurface = surface
+                                    viewModel.onPreviewSurfaceReady(surface)
                                 }
 
                                 override fun onSurfaceTextureSizeChanged(
@@ -117,7 +124,14 @@ fun CaptureScreen(
                                     height: Int,
                                 ) = Unit
 
-                                override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture) = true
+                                override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                                    // Returning true hands the SurfaceTexture back to the platform,
+                                    // so the Surface wrapping it is dead either way - release it
+                                    // here instead of waiting for the finalizer to do it.
+                                    attachedSurface?.release()
+                                    attachedSurface = null
+                                    return true
+                                }
 
                                 override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
                             }
@@ -201,12 +215,18 @@ fun CaptureScreen(
                 is CaptureUiState.Packaged ->
                     Text("Đã đóng gói xong", style = MaterialTheme.typography.bodyLarge)
 
-                is CaptureUiState.PackagingFailed ->
+                // This state is also reached when the camera never started, not only when a real
+                // recording failed to package - so the label does not name the packaging step. The
+                // button is the only way to reach ACTION_STOP on that path, and without it the
+                // foreground service would be left running.
+                is CaptureUiState.PackagingFailed -> {
                     Text(
-                        "Đóng gói thất bại: ${state.reason}",
+                        "Không thể hoàn tất phiên khảo sát: ${state.reason}",
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    Button(onClick = viewModel::onDismissFailure) { Text("Dừng và đóng phiên") }
+                }
             }
         }
     }

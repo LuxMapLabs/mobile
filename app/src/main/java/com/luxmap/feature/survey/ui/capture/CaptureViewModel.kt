@@ -87,7 +87,17 @@ class CaptureViewModel
                 captureController.recordingStartResult.collect { result ->
                     if (_uiState.value !is CaptureUiState.StartingRecording) return@collect
                     when (result) {
-                        RecordingStartResult.Ready -> _uiState.value = CaptureUiState.Recording()
+                        // Seed the warning flags from what is already known right now instead of
+                        // always starting at false - a GPS or BLE issue that happened while the
+                        // camera was still opening must not be silently dropped the instant the
+                        // screen reaches Recording.
+                        RecordingStartResult.Ready ->
+                            _uiState.value =
+                                CaptureUiState.Recording(
+                                    gpsSignalLost = captureController.gpsSignalState.value == GpsSignalState.Lost,
+                                    bleGapDetected = luxClient.connectionState.value == BleConnectionState.Disconnected,
+                                )
+
                         is RecordingStartResult.Failed -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
                         null -> Unit
                     }
@@ -143,6 +153,17 @@ class CaptureViewModel
                     is PackageResult.Failure -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
                 }
             }
+        }
+
+        // Available from PackagingFailed for all 3 ways this screen can reach it (the camera
+        // never started, a real recording's packaging step failed, or the service reported a
+        // mid-session failure on its own) - guarantees ACTION_STOP reaches the service even when
+        // the camera never started and onStopRecording() (Recording-only) was never reachable.
+        // Without it the foreground service is left running for the rest of the process's life.
+        // Safe to call more than once: SurveyCaptureService's ACTION_STOP handling is idempotent.
+        fun onDismissFailure() {
+            if (_uiState.value !is CaptureUiState.PackagingFailed) return
+            viewModelScope.launch { captureController.stopSession().first() }
         }
 
         private fun connectTo(device: LuxDevice) {
