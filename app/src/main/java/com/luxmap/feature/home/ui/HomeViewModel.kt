@@ -40,11 +40,11 @@ class HomeViewModel
         }
     }
 
-// Rỗng khi không có việc nào để làm hôm nay — cả 3 loại lệnh sửa chữa lẫn đợt khảo sát đã lên
-// kế hoạch đều bằng 0 (đúng nguyên tắc A6: không coi offline/cache là Error, chỉ Empty khi thật
-// sự không có dữ liệu).
+// Rỗng khi không có việc nào để làm hôm nay - dựa trên 3 số liệu work-order thật (nguyên tắc A6:
+// không coi offline/cache là Error, chỉ Empty khi thật sự không có dữ liệu). plannedSweepCount
+// không tính vào đây: null nghĩa là "chưa có nguồn dữ liệu", không phải "chắc chắn bằng 0", nên
+// không thể dùng nó để kết luận màn hình rỗng.
 private fun HomeData.isEmpty(): Boolean =
     metrics.assignedCount == 0 &&
         metrics.inProgressCount == 0 &&
-        metrics.overdueCount == 0 &&
-        metrics.plannedSweepCount == 0
+        metrics.overdueCount == 0
