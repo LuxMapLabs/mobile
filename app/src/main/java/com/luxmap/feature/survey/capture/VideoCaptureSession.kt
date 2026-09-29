@@ -1,12 +1,15 @@
 package com.luxmap.feature.survey.capture
 
 import android.content.Context
+import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
+import android.hardware.camera2.params.OutputConfiguration
+import android.media.ImageReader
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -63,6 +66,33 @@ class VideoCaptureSession
     ) {
         private lateinit var cameraDevice: CameraDevice
         private lateinit var captureSession: CameraCaptureSession
+
+        // The preview's own OutputConfiguration, kept apart from the encoder's, so the real
+        // preview Surface can be attached and detached while the session runs. Only set on the
+        // API 28+ path (see supportsLivePreviewSwap).
+        private lateinit var previewOutputConfig: OutputConfiguration
+
+        // The base surface of previewOutputConfig. A shared OutputConfiguration cannot have its
+        // base surface removed (OutputConfiguration.removeSurface throws for it), so a throwaway
+        // ImageReader is used as the base and the real preview Surface is added on top of it.
+        // That way detaching the real Surface never leaves the output slot empty. Nothing ever
+        // targets this reader, so it receives no frames; the listener is only there so buffers
+        // cannot pile up if a device ever does deliver one.
+        private lateinit var placeholderPreviewReader: ImageReader
+
+        // API 28 is where CameraCaptureSession.updateOutputConfiguration() and
+        // OutputConfiguration.removeSurface() were added - both are needed to attach or detach a
+        // preview Surface while the session runs. minSdk here is 26, so some real devices take
+        // the pre-28 path where updatePreviewSurface() can only be a no-op.
+        private val supportsLivePreviewSwap = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+
+        // The real preview Surface attached to previewOutputConfig right now, or null when only
+        // the placeholder base is attached. Set once while the session is being built, then only
+        // touched on the camera thread - @Volatile for that first hand-off, same reason as
+        // requestBuilder below.
+        @Volatile
+        private var currentSharedPreviewSurface: Surface? = null
+
         private lateinit var mediaCodec: MediaCodec
         private lateinit var recorder: SegmentedVideoRecorder
         private lateinit var frameTimestampWriter: NdjsonLogWriter
@@ -197,6 +227,10 @@ class VideoCaptureSession
             val builder =
                 cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
                     addTarget(inputSurface)
+                    // The real preview Surface, on both paths. On the API 28+ path it is a shared
+                    // member of previewOutputConfig, and a target has to name the exact surface
+                    // that should receive frames - naming the placeholder base instead would leave
+                    // the preview black. updatePreviewSurface() swaps this target later.
                     addTarget(previewSurface)
                     exposureLockController.applyTo(this, profile)
                 }
@@ -393,6 +427,52 @@ class VideoCaptureSession
                 paired
             }
 
+        // Called whenever the real preview Surface is destroyed (an ordinary Activity stop - screen
+        // off, Home, an incoming call, not only rotation) or attached again. Only the preview
+        // output is touched; the encoder output and the recording itself are never interrupted.
+        //
+        // The repeating request HAS to be resubmitted on both paths. A capture request routes to
+        // one exact surface inside a shared OutputConfiguration (the framework resolves each
+        // target to a stream id plus the surface's index in that config), so a newly added surface
+        // gets no frames until a request targets it, and a surface still targeted by the repeating
+        // request cannot be removed at all - CameraCaptureSession.updateOutputConfiguration says
+        // removed surfaces "must not be part of any active repeating or single/burst request".
+        // This is the same kind of resubmit the AWB lock does, so the same SENSOR_TIMESTAMP FIFO
+        // desync can happen here; takeSensorTimestampFor()'s guard is what corrects it.
+        //
+        // Below API 28 this is a no-op: updateOutputConfiguration()/removeSurface() do not exist
+        // there, so no live swap is possible and CaptureScreen's FLAG_KEEP_SCREEN_ON is the only
+        // mitigation on those devices.
+        fun updatePreviewSurface(surface: Surface?) {
+            if (!supportsLivePreviewSwap) return
+            val handler = cameraHandler ?: return
+            if (!::captureSession.isInitialized || !::previewOutputConfig.isInitialized) return
+            handler.post {
+                val builder = requestBuilder ?: return@post
+                runCatching {
+                    val previous = currentSharedPreviewSurface
+                    if (previous != null) {
+                        // Stop targeting it first, otherwise removeSurface() below is rejected.
+                        builder.removeTarget(previous)
+                        captureSession.setRepeatingRequest(builder.build(), captureCallback, handler)
+                        previewOutputConfig.removeSurface(previous)
+                        currentSharedPreviewSurface = null
+                    }
+                    if (surface != null) previewOutputConfig.addSurface(surface)
+                    captureSession.updateOutputConfiguration(previewOutputConfig)
+                    if (surface != null) {
+                        // Only now can a request name the new surface.
+                        builder.addTarget(surface)
+                        captureSession.setRepeatingRequest(builder.build(), captureCallback, handler)
+                        currentSharedPreviewSurface = surface
+                    }
+                }.onFailure { failed ->
+                    // The recording keeps going; only the on-screen preview is affected.
+                    Log.w(TAG, "Failed to update the preview surface target; the preview may go blank", failed)
+                }
+            }
+        }
+
         // Called from SurveyCaptureService (Task 17d) when the user stops recording. Returns the
         // REAL applied capture values (from the last CaptureResult) for capture_config.json, per
         // review feedback — not the requested LockedCameraProfile, which may not be exactly what
@@ -457,6 +537,7 @@ class VideoCaptureSession
             }
             runCatching { mediaCodec.stop() }
             runCatching { mediaCodec.release() }
+            runCatching { if (::placeholderPreviewReader.isInitialized) placeholderPreviewReader.close() }
             runCatching { captureSession.close() }
             runCatching { cameraDevice.close() }
             cameraThread?.quitSafely()
@@ -522,11 +603,46 @@ class VideoCaptureSession
             encoderSurface: Surface,
             previewSurface: Surface,
             handler: Handler,
+        ): CameraCaptureSession {
+            if (!supportsLivePreviewSwap) {
+                // Below API 28 no public Camera2 API can attach or detach a preview surface while
+                // the session runs, so build the session the plain way and let
+                // updatePreviewSurface() be a no-op. CaptureScreen's FLAG_KEEP_SCREEN_ON is the
+                // only thing that helps on these devices.
+                return awaitCaptureSession { callback ->
+                    @Suppress("DEPRECATION")
+                    camera.createCaptureSession(listOf(encoderSurface, previewSurface), callback, handler)
+                }
+            }
+
+            placeholderPreviewReader =
+                ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.PRIVATE, 2).apply {
+                    setOnImageAvailableListener({ reader -> reader.acquireLatestImage()?.close() }, handler)
+                }
+            val previewConfig =
+                OutputConfiguration(placeholderPreviewReader.surface).apply {
+                    enableSurfaceSharing()
+                    addSurface(previewSurface)
+                }
+            previewOutputConfig = previewConfig
+            currentSharedPreviewSurface = previewSurface
+            return awaitCaptureSession { callback ->
+                @Suppress("DEPRECATION")
+                camera.createCaptureSessionByOutputConfigurations(
+                    listOf(OutputConfiguration(encoderSurface), previewConfig),
+                    callback,
+                    handler,
+                )
+            }
+        }
+
+        // Both session-creation paths report through the same StateCallback, so the callback is
+        // written once here instead of twice.
+        private suspend fun awaitCaptureSession(
+            create: (CameraCaptureSession.StateCallback) -> Unit,
         ): CameraCaptureSession =
             suspendCancellableCoroutine { continuation ->
-                @Suppress("DEPRECATION")
-                camera.createCaptureSession(
-                    listOf(encoderSurface, previewSurface),
+                create(
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) = continuation.resume(session)
 
@@ -534,7 +650,6 @@ class VideoCaptureSession
                             continuation.cancel(IllegalStateException("Camera session configuration failed"))
                         }
                     },
-                    handler,
                 )
             }
 

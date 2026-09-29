@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -78,6 +79,24 @@ fun CaptureScreen(
         }
     }
 
+    // Keep the screen on for the same window. On API 26-27 the live preview swap is not possible
+    // at all (VideoCaptureSession.updatePreviewSurface is a no-op there), so stopping the screen
+    // from timing out is the only thing that helps - it is a partial fix, since it does not stop
+    // the Home button or an incoming call from backgrounding the app. On API 28+ it is still worth
+    // setting: it is free, and it means the swap only has to run for a real interruption instead
+    // of on every ordinary screen timeout during a 10-30 minute survey.
+    DisposableEffect(isCameraSessionLive) {
+        val window = (context as? Activity)?.window
+        if (isCameraSessionLive) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (isCameraSessionLive) {
+                window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
     // Side effect lives here, reacting to state, instead of being called inline inside the `when`
     // branch during composition (review feedback) — LaunchedEffect only fires once per new sessionId.
     val packagedSessionId = (uiState as? CaptureUiState.Packaged)?.sessionId
@@ -125,6 +144,9 @@ fun CaptureScreen(
                                 ) = Unit
 
                                 override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                                    // Tell the session to detach this Surface BEFORE releasing it,
+                                    // so the camera stops writing into it first.
+                                    viewModel.onPreviewSurfaceLost()
                                     // Returning true hands the SurfaceTexture back to the platform,
                                     // so the Surface wrapping it is dead either way - release it
                                     // here instead of waiting for the finalizer to do it.

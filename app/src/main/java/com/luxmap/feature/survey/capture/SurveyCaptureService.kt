@@ -477,6 +477,11 @@ class SurveyCaptureService : Service() {
         }
     }
 
+    // Forwards to the live VideoCaptureSession - a no-op if no session has opened the camera yet.
+    fun updatePreviewSurface(surface: Surface?) {
+        if (::videoCaptureSession.isInitialized) videoCaptureSession.updatePreviewSurface(surface)
+    }
+
     override fun onDestroy() {
         serviceScope.coroutineContext[Job]?.cancel()
         super.onDestroy()

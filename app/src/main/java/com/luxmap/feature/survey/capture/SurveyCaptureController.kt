@@ -45,6 +45,8 @@ interface SurveyCaptureController {
         previewSurface: Surface,
     )
 
+    fun updatePreviewSurface(surface: Surface?)
+
     fun stopSession(): Flow<PackageResult>
 
     val gpsSignalState: StateFlow<GpsSignalState>
@@ -134,6 +136,10 @@ class RealSurveyCaptureController
             boundService.value = null
             _recordingStartResult.value = null
             context.bindService(Intent(context, SurveyCaptureService::class.java), connection, Context.BIND_AUTO_CREATE)
+        }
+
+        override fun updatePreviewSurface(surface: Surface?) {
+            boundService.value?.updatePreviewSurface(surface)
         }
 
         override fun stopSession(): Flow<PackageResult> {

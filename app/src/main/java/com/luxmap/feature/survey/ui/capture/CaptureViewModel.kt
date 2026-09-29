@@ -46,6 +46,13 @@ class CaptureViewModel
         // and startSession() can actually be called (Cach A - see the plan this came from).
         private var pendingSurveySweepId: String = ""
 
+        // onPreviewSurfaceReady can legitimately fire twice in one recording: once to start the
+        // session (StartingRecording), and again later if the TextureView's SurfaceTexture is
+        // destroyed and recreated (an ordinary Activity stop, not only rotation - see
+        // onPreviewSurfaceLost). This guards only the StartingRecording branch against firing a
+        // SECOND time before the first call has resolved to Recording.
+        private var startingSessionRequested = false
+
         init {
             viewModelScope.launch {
                 val remembered = luxDevicePreferences.lastDevice()
@@ -135,13 +142,33 @@ class CaptureViewModel
         }
 
         fun onPreviewSurfaceReady(surface: Surface) {
-            if (_uiState.value !is CaptureUiState.StartingRecording) return
-            // pendingDevice is the device the connectionState collector already confirmed
-            // Connected to reach Ready - it cannot be null here, but a session cannot start
-            // without an address either way, so this is checked rather than assumed with !!.
-            val luxDeviceAddress = pendingDevice?.address ?: return
-            sessionId = UUID.randomUUID().toString()
-            captureController.startSession(sessionId, pendingSurveySweepId, luxDeviceAddress, surface)
+            when (_uiState.value) {
+                is CaptureUiState.StartingRecording -> {
+                    if (startingSessionRequested) return
+                    // pendingDevice is the device the connectionState collector already confirmed
+                    // Connected to reach Ready - it cannot be null here, but a session cannot start
+                    // without an address either way, so this is checked rather than assumed with !!.
+                    val luxDeviceAddress = pendingDevice?.address ?: return
+                    startingSessionRequested = true
+                    sessionId = UUID.randomUUID().toString()
+                    captureController.startSession(sessionId, pendingSurveySweepId, luxDeviceAddress, surface)
+                }
+
+                // The screen came back after an ordinary Activity stop and the TextureView built a
+                // new SurfaceTexture. Hand the new Surface to the running session so the preview
+                // shows again; the recording never stopped.
+                is CaptureUiState.Recording -> captureController.updatePreviewSurface(surface)
+                else -> Unit
+            }
+        }
+
+        // The camera keeps recording through this - only the preview output is detached inside
+        // VideoCaptureSession, the encoder is never touched. Does nothing during StartingRecording:
+        // the camera has not opened yet, so there is no live preview target to drop.
+        fun onPreviewSurfaceLost() {
+            if (_uiState.value is CaptureUiState.Recording) {
+                captureController.updatePreviewSurface(null)
+            }
         }
 
         fun onStopRecording() {
