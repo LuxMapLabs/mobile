@@ -6,9 +6,11 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LuxDevice(
@@ -17,8 +19,10 @@ data class LuxDevice(
 )
 
 // Replaces Bước 0's old hardcoded device address (spec's own open point) with a real scan the
-// user picks from — filtered to LuxSensorBleContract.SERVICE_UUID so unrelated BLE devices nearby
-// do not clutter the picker.
+// user picks from. Shows every nearby BLE device, not just ones matching
+// LuxSensorBleContract.SERVICE_UUID - the project chose this over a ScanFilter since the UUID is
+// still an unconfirmed placeholder (see docs/contract-drift.md), and the Field Engineer can tell
+// their own sensor apart by its advertised name.
 class LuxDeviceScanner
     @Inject
     constructor(
@@ -42,6 +46,17 @@ class LuxDeviceScanner
                         }
                     }
                 scanner.startScan(callback)
-                awaitClose { scanner.stopScan(callback) }
+                // timeoutMs used to be accepted and ignored, so a scan never stopped on its own.
+                // Closing the flow after the window lets a collector tell "still scanning" apart
+                // from "scan finished, here is everything found."
+                val timeoutJob =
+                    launch {
+                        delay(timeoutMs)
+                        close()
+                    }
+                awaitClose {
+                    timeoutJob.cancel()
+                    scanner.stopScan(callback)
+                }
             }.distinctUntilChanged()
     }
