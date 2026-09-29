@@ -1127,7 +1127,8 @@ Replace `createCaptureSession()` with:
             // removeSurface() - only surfaces added on top of it can). The real TextureView
             // surface is added as a shared member from the start. updatePreviewSurface() later
             // swaps which surfaces are attached with add/removeSurface() + updateOutputConfiguration(),
-            // with no session rebuild and no repeating-request resubmit.
+            // with no session rebuild. (CORRECTED: it DOES need a repeating-request resubmit -
+            // see the evidence block further down this step.)
             placeholderPreviewReader =
                 ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.PRIVATE, 2).apply {
                     setOnImageAvailableListener({ reader -> reader.acquireLatestImage()?.close() }, handler)
@@ -1177,37 +1178,72 @@ Add the `android.os.Build` import alongside the existing `android.os.*` imports 
 
 (`createCaptureSessionByOutputConfigurations` replaces the old `createCaptureSession(List<Surface>, ...)` call on the API 28+ path — both targets go in as `OutputConfiguration`, which is what makes the later live swap possible. This is the same deprecated-but-functional API tier this file already uses elsewhere, hence the same `@Suppress("DEPRECATION")`.)
 
-Change `startCapture()`'s `addTarget(previewSurface)` line (the request must target the config's actual live member — the placeholder base on the API 28+ shared-config path, or the real surface directly on the pre-28 path; verify this against real Camera2 behavior/documentation before committing, the same way `task-5-report.md` verified the API-28 floor, rather than assuming the below is exactly right):
+**CORRECTED AGAIN (second round, after the implementer verified the shared-surface targeting question that
+this step explicitly asked to be checked):** `startCapture()`'s `addTarget(previewSurface)` line **stays
+exactly as it is** — do NOT change it to the placeholder base. Targeting the base does not feed the shared
+members.
 
-```kotlin
-            addTarget(if (supportsLivePreviewSwap) placeholderPreviewReader.surface else previewSurface)
-```
+Evidence (AOSP framework source shipped with the SDK, `sources/android-36.1/android/hardware/camera2/`,
+plus the class javadoc there):
+
+- `CaptureRequest.convertSurfaceToStreamId()` resolves **each** target surface to a `(streamId, surfaceId)`
+  pair, where `surfaceId` is that surface's **index within `outConfig.getSurfaces()`**. The request carries
+  one entry per targeted surface. So a request targeting only the base produces exactly one entry —
+  `(previewStream, 0)` — and the shared member at index 1 receives nothing. The preview would be
+  permanently black on the API 28+ path, i.e. the exact opposite of this task's purpose.
+- `CameraCaptureSession.updateOutputConfiguration()` javadoc: *"After the update call returns without
+  throwing exceptions any newly added surfaces **can be referenced in subsequent capture requests**"* — a
+  surface has to be referenced by a request, it is not fed implicitly.
+
+Because `previewSurface` is the target, the surface is by definition part of the active repeating request,
+which forces the second correction below.
+
+**The "no repeating-request resubmit" premise of this design is also wrong.** The same
+`updateOutputConfiguration()` javadoc states: *"Surfaces that get removed **must not be part of any active
+repeating or single/burst request** or have any pending results. Consider updating any repeating requests
+first via `setRepeatingRequest` ... before calling updateOutputConfiguration to remove a previously active
+Surface."* So `updatePreviewSurface()` **must** resubmit the repeating request on both paths — once to drop
+the old target before `removeSurface()`, and once to pick up the new target after `addSurface()`. The
+earlier claim that this design needs "no repeating-request resubmit", and that it is therefore unlike "the
+AWB-lock resubmit this file already has to guard against elsewhere", does not hold.
+
+**This has a real consequence that needs a decision (see `task-5-report.md` Concerns):** the AWB-lock
+resubmit is exactly what the Task 2 spike measured permanently desyncing the `SENSOR_TIMESTAMP`-to-frame
+FIFO pairing, and it is why `takeSensorTimestampFor()`'s staleness guard and re-anchor logic exist. That
+guard now has to absorb **two resubmits per screen-off/on cycle**, repeatedly, instead of one resubmit per
+session. It was built for and validated against the once-per-session case.
 
 Add this new public method anywhere among the other public members (near `stop()`):
 
 ```kotlin
-        // Called whenever the real preview Surface is destroyed (an ordinary Activity stop -
-        // screen off, Home, an incoming call, not only rotation) or reattached. On API 28+, swaps
-        // ONLY the preview output's shared member via OutputConfiguration.add/removeSurface() +
-        // CameraCaptureSession.updateOutputConfiguration() - the encoder output is never touched,
-        // so the recording itself is never interrupted, and the placeholder base always keeps the
-        // output slot valid so it is never left surface-less. Below API 28 this is a no-op - no
-        // public Camera2 API can do a live swap there (see the note above createCaptureSession());
-        // CaptureScreen's FLAG_KEEP_SCREEN_ON (Step 6) is the only mitigation on those devices.
+        // CORRECTED (second round) - the version below resubmits the repeating request, which the
+        // original text said was not needed. See the evidence block above this method.
         fun updatePreviewSurface(surface: Surface?) {
             if (!supportsLivePreviewSwap) return
             val handler = cameraHandler ?: return
             if (!::captureSession.isInitialized || !::previewOutputConfig.isInitialized) return
             handler.post {
+                val builder = requestBuilder ?: return@post
                 runCatching {
-                    val target = surface ?: placeholderPreviewReader.surface
                     val previous = currentSharedPreviewSurface
-                    if (previous != null && previous !== target) previewOutputConfig.removeSurface(previous)
-                    if (target !== placeholderPreviewReader.surface) previewOutputConfig.addSurface(target)
+                    if (previous != null) {
+                        // Stop targeting it first, otherwise removeSurface() below is rejected.
+                        builder.removeTarget(previous)
+                        captureSession.setRepeatingRequest(builder.build(), captureCallback, handler)
+                        previewOutputConfig.removeSurface(previous)
+                        currentSharedPreviewSurface = null
+                    }
+                    if (surface != null) previewOutputConfig.addSurface(surface)
                     captureSession.updateOutputConfiguration(previewOutputConfig)
-                    currentSharedPreviewSurface = if (target === placeholderPreviewReader.surface) null else target
+                    if (surface != null) {
+                        // Only now can a request name the new surface.
+                        builder.addTarget(surface)
+                        captureSession.setRepeatingRequest(builder.build(), captureCallback, handler)
+                        currentSharedPreviewSurface = surface
+                    }
                 }.onFailure { failed ->
-                    Log.w(TAG, "Failed to update the preview surface target; the live preview may go blank", failed)
+                    // The recording keeps going; only the on-screen preview is affected.
+                    Log.w(TAG, "Failed to update the preview surface target; the preview may go blank", failed)
                 }
             }
         }
@@ -1493,4 +1529,5 @@ This plan has no automated coverage for the actual camera behavior (Task 1, 2, a
 - [ ] Start a recording (press "Bắt đầu quay") while the device is ALREADY in landscape — confirm the screen does NOT flip to portrait at that moment (which would recreate the Activity mid-camera-open) and the recording starts and completes normally, staying in landscape throughout. This is the specific scenario Task 4's review found broken with the original `SCREEN_ORIENTATION_PORTRAIT` choice; the fix locks whichever orientation was already current instead of forcing portrait, so the app may end up recording in landscape in this scenario — that is expected and fine, not a bug (this plan never promised a portrait-only recording, only "don't let rotation break a running recording").
 - [ ] Stop a recording and watch the screen during the brief "Đang đóng gói phiên khảo sát..." window — confirm the camera preview stays visible (does not black out or flicker) through that window too, not just through `Recording`. Task 4's review found the preview/orientation-lock could otherwise drop right when `Packaging` starts, before the camera session underneath has actually finished closing.
 - [ ] **(Task 5 — the actual C2 trigger, not rotation)** While `Recording`, turn the screen off with the power button, wait a few seconds, then turn it back on. Confirm: the recording is NOT interrupted (check the notification is still showing "Đang quay khảo sát", and the resulting video afterward has no gap or corruption at that point); the preview reappears live once the screen is back (not permanently black); nothing in logcat shows a Camera2 session error at the moment the screen turned off. Repeat once pressing Home and returning to the app instead of the power button. This is the scenario the final whole-branch review found completely unhandled by Task 4's orientation lock — it is the actual everyday trigger a 10-30 minute survey recording will hit, not device rotation.
+- [ ] **(Task 5 — the resubmit risk found in the second-round correction, API 28+ devices only)** Do the screen-off/on cycle above **at least 4-5 times during one continuous recording**, then pull `frame_timestamp_log.ndjson` and check that `sensor_timestamp_ns` still increases monotonically and stays in step with `video_pts_us` across every one of those moments — no jump, no long run of identical or backwards values. Each swap resubmits the repeating request twice, and a repeating-request resubmit is exactly what the Task 2 spike measured permanently desyncing the `SENSOR_TIMESTAMP`-to-frame FIFO pairing. `takeSensorTimestampFor()`'s staleness guard and re-anchor logic are what correct it, but they were built and validated for ONE resubmit per session (the AWB lock), not for repeated swaps. Also grep logcat for `Timestamp guard dropped` and `Re-anchored pts->sensor offset` around each screen-off: a couple of drops per swap is the guard working as designed; the guard firing continuously, or re-anchoring repeatedly, means this trade-off is not safe and needs escalating before shipping.
 - [ ] Force a `RecordingStartResult.Failed` if possible (same trick as the "camera busy" check above), then tap the new "Dừng và đóng phiên" button on the `PackagingFailed` screen — confirm the foreground notification disappears and a fresh recording can be started right after (confirms Task 5's fix for the previously-unreachable `ACTION_STOP` path actually releases the service instead of leaving it stuck).
