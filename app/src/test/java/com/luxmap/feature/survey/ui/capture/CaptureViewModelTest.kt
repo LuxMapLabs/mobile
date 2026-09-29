@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.capture
 
+import android.view.Surface
 import app.cash.turbine.test
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxDevice
@@ -8,6 +9,7 @@ import com.luxmap.core.ble.LuxDeviceScanner
 import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
+import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -47,13 +49,14 @@ class CaptureViewModelTest {
         Dispatchers.resetMain()
     }
 
-    // Builds a ViewModel whose luxClient/scanner/preferences behavior is fully controlled by the
-    // caller - every test wires only the mocks its scenario needs.
+    // Builds a ViewModel whose luxClient/scanner/preferences/controller behavior is fully
+    // controlled by the caller - every test wires only the mocks its scenario needs.
     private fun viewModel(
         connectionState: MutableStateFlow<BleConnectionState> = MutableStateFlow(BleConnectionState.Disconnected),
         rememberedDevice: LuxDevice? = null,
         scanResults: List<LuxDevice> = emptyList(),
         gpsSignalState: MutableStateFlow<GpsSignalState> = MutableStateFlow(GpsSignalState.Ok),
+        recordingStartResult: MutableStateFlow<RecordingStartResult?> = MutableStateFlow(null),
     ): Triple<CaptureViewModel, LuxSensorBleClient, SurveyCaptureController> {
         val luxClient = mockk<LuxSensorBleClient>()
         every { luxClient.connectionState } returns connectionState
@@ -69,6 +72,7 @@ class CaptureViewModelTest {
 
         val controller = mockk<SurveyCaptureController>(relaxed = true)
         every { controller.gpsSignalState } returns gpsSignalState
+        every { controller.recordingStartResult } returns recordingStartResult
 
         val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller)
         return Triple(viewModel, luxClient, controller)
@@ -132,6 +136,7 @@ class CaptureViewModelTest {
             every { scanner.scan() } returns flowOf(SENSOR_1)
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns MutableStateFlow(GpsSignalState.Ok)
+            every { controller.recordingStartResult } returns MutableStateFlow(null)
             val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller)
 
             viewModel.uiState.test {
@@ -183,27 +188,71 @@ class CaptureViewModelTest {
         }
 
     @Test
-    fun `starting a recording generates a session id and tells the controller to start`() =
+    fun `pressing start moves to StartingRecording, and the preview becoming ready starts the session`() =
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
-            val (viewModel, _, controller) = viewModel(connectionState = connectionState, rememberedDevice = SENSOR_1)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            val surface = mockk<Surface>()
 
             viewModel.uiState.test {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
                 assertEquals(CaptureUiState.Ready, awaitItem())
+
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                assertEquals(CaptureUiState.StartingRecording, awaitItem())
+
+                viewModel.onPreviewSurfaceReady(surface)
+                recordingStartResult.value = RecordingStartResult.Ready
                 val recording = awaitItem() as CaptureUiState.Recording
                 assertEquals(false, recording.gpsSignalLost)
             }
-            verify { controller.startSession(any(), "SWEEP-1", SENSOR_1.address) }
+            verify { controller.startSession(any(), "SWEEP-1", SENSOR_1.address, surface) }
+        }
+
+    @Test
+    fun `a failed camera start surfaces PackagingFailed`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, _) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            val surface = mockk<Surface>()
+
+            viewModel.uiState.test {
+                awaitItem() // Scanning() field default
+                awaitItem() // Connecting
+                awaitItem() // Ready
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                awaitItem() // StartingRecording
+                viewModel.onPreviewSurfaceReady(surface)
+                recordingStartResult.value = RecordingStartResult.Failed("camera busy")
+                val failed = awaitItem() as CaptureUiState.PackagingFailed
+                assertEquals("camera busy", failed.reason)
+            }
         }
 
     @Test
     fun `stopping a recording moves through Packaging to Packaged on success`() =
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
-            val (viewModel, _, controller) = viewModel(connectionState = connectionState, rememberedDevice = SENSOR_1)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
             every { controller.stopSession() } returns flowOf(PackageResult.Success("/data/manifest.json"))
 
             viewModel.uiState.test {
@@ -211,6 +260,9 @@ class CaptureViewModelTest {
                 awaitItem() // Connecting
                 awaitItem() // Ready
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                awaitItem() // StartingRecording
+                viewModel.onPreviewSurfaceReady(mockk())
+                recordingStartResult.value = RecordingStartResult.Ready
                 awaitItem() // Recording
                 viewModel.onStopRecording()
                 assertEquals(CaptureUiState.Packaging, awaitItem())
@@ -223,7 +275,13 @@ class CaptureViewModelTest {
     fun `stopping a recording surfaces PackagingFailed on failure`() =
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
-            val (viewModel, _, controller) = viewModel(connectionState = connectionState, rememberedDevice = SENSOR_1)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
             every { controller.stopSession() } returns flowOf(PackageResult.Failure("disk full"))
 
             viewModel.uiState.test {
@@ -231,6 +289,9 @@ class CaptureViewModelTest {
                 awaitItem() // Connecting
                 awaitItem() // Ready
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                awaitItem() // StartingRecording
+                viewModel.onPreviewSurfaceReady(mockk())
+                recordingStartResult.value = RecordingStartResult.Ready
                 awaitItem() // Recording
                 viewModel.onStopRecording()
                 assertEquals(CaptureUiState.Packaging, awaitItem())
@@ -244,11 +305,13 @@ class CaptureViewModelTest {
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
             val (viewModel, _, _) =
                 viewModel(
                     connectionState = connectionState,
                     rememberedDevice = SENSOR_1,
                     gpsSignalState = gpsSignalState,
+                    recordingStartResult = recordingStartResult,
                 )
 
             viewModel.uiState.test {
@@ -256,6 +319,9 @@ class CaptureViewModelTest {
                 awaitItem() // Connecting
                 awaitItem() // Ready
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                awaitItem() // StartingRecording
+                viewModel.onPreviewSurfaceReady(mockk())
+                recordingStartResult.value = RecordingStartResult.Ready
                 val recording = awaitItem() as CaptureUiState.Recording
                 assertEquals(false, recording.gpsSignalLost)
 

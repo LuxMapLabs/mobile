@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.capture
 
+import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.ble.BleConnectionState
@@ -9,6 +10,7 @@ import com.luxmap.core.ble.LuxDeviceScanner
 import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
+import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -39,6 +41,10 @@ class CaptureViewModel
         // Connecting. Null while scanning or once a recording starts (nothing new to save then).
         private var pendingDevice: LuxDevice? = null
         private var scanJob: Job? = null
+
+        // The surveySweepId passed to onStartRecording, held until the preview surface is ready
+        // and startSession() can actually be called (Cach A - see the plan this came from).
+        private var pendingSurveySweepId: String = ""
 
         init {
             viewModelScope.launch {
@@ -77,6 +83,16 @@ class CaptureViewModel
                     }
                 }
             }
+            viewModelScope.launch {
+                captureController.recordingStartResult.collect { result ->
+                    if (_uiState.value !is CaptureUiState.StartingRecording) return@collect
+                    when (result) {
+                        RecordingStartResult.Ready -> _uiState.value = CaptureUiState.Recording()
+                        is RecordingStartResult.Failed -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
+                        null -> Unit
+                    }
+                }
+            }
         }
 
         fun onDeviceSelected(device: LuxDevice) {
@@ -104,13 +120,18 @@ class CaptureViewModel
 
         fun onStartRecording(surveySweepId: String) {
             if (_uiState.value != CaptureUiState.Ready) return
-            // pendingDevice is the device the connectionState collector just confirmed Connected
-            // to reach Ready - it cannot be null here, but a session cannot start without an
-            // address either way, so this is checked rather than assumed with !!.
+            pendingSurveySweepId = surveySweepId
+            _uiState.value = CaptureUiState.StartingRecording
+        }
+
+        fun onPreviewSurfaceReady(surface: Surface) {
+            if (_uiState.value !is CaptureUiState.StartingRecording) return
+            // pendingDevice is the device the connectionState collector already confirmed
+            // Connected to reach Ready - it cannot be null here, but a session cannot start
+            // without an address either way, so this is checked rather than assumed with !!.
             val luxDeviceAddress = pendingDevice?.address ?: return
             sessionId = UUID.randomUUID().toString()
-            captureController.startSession(sessionId, surveySweepId, luxDeviceAddress)
-            _uiState.value = CaptureUiState.Recording()
+            captureController.startSession(sessionId, pendingSurveySweepId, luxDeviceAddress, surface)
         }
 
         fun onStopRecording() {

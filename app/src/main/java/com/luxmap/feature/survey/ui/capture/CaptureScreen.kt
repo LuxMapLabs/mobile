@@ -76,6 +76,9 @@ fun CaptureScreen(
                     TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
                 }
 
+                is CaptureUiState.StartingRecording ->
+                    Text("Đang mở camera...", style = MaterialTheme.typography.bodyLarge)
+
                 is CaptureUiState.Recording -> {
                     if (state.gpsSignalLost) {
                         Text(

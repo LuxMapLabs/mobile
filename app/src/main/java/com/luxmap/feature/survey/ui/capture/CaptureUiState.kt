@@ -18,6 +18,11 @@ sealed interface CaptureUiState {
 
     data object Ready : CaptureUiState
 
+    // Between pressing "Bat dau quay" and the camera actually being open with a live preview
+    // (Cach A, agreed in brainstorming) - CaptureScreen keeps the same TextureView alive through
+    // this state and into Recording, so the preview never flickers or resets.
+    data object StartingRecording : CaptureUiState
+
     data class Recording(
         val gpsSignalLost: Boolean = false,
         val bleGapDetected: Boolean = false,
