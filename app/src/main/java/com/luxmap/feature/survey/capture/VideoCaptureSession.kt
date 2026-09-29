@@ -1,7 +1,7 @@
 package com.luxmap.feature.survey.capture
 
 import android.content.Context
-import android.graphics.ImageFormat
+import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
@@ -9,7 +9,6 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.OutputConfiguration
-import android.media.ImageReader
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -73,12 +72,22 @@ class VideoCaptureSession
         private lateinit var previewOutputConfig: OutputConfiguration
 
         // The base surface of previewOutputConfig. A shared OutputConfiguration cannot have its
-        // base surface removed (OutputConfiguration.removeSurface throws for it), so a throwaway
-        // ImageReader is used as the base and the real preview Surface is added on top of it.
-        // That way detaching the real Surface never leaves the output slot empty. Nothing ever
-        // targets this reader, so it receives no frames; the listener is only there so buffers
-        // cannot pile up if a device ever does deliver one.
-        private lateinit var placeholderPreviewReader: ImageReader
+        // base surface removed (OutputConfiguration.removeSurface throws for it), so an app-owned
+        // SurfaceTexture is used as the base and the real preview Surface is added on top of it.
+        // That way detaching the real Surface never leaves the output slot empty.
+        //
+        // A SurfaceTexture, not an ImageReader: enableSurfaceSharing() only GUARANTEES that
+        // surfaces of the same size, format, dataSpace AND "Surface source class" can share one
+        // output. Two surfaces of different source classes "are generally not compatible" and only
+        // work on some devices - the sole way to find out is the session failing to configure on
+        // that device. The TextureView preview is SurfaceTexture-backed, so making this base a
+        // SurfaceTexture too keeps both in the guaranteed tier instead of the device-dependent one.
+        //
+        // SurfaceTexture(false) is the detached (no GL context) constructor, added in API 26. It
+        // is never a capture-request target, so nothing is ever produced into it and nothing has
+        // to drain it.
+        private var placeholderPreviewTexture: SurfaceTexture? = null
+        private var placeholderPreviewSurface: Surface? = null
 
         // API 28 is where CameraCaptureSession.updateOutputConfiguration() and
         // OutputConfiguration.removeSurface() were added - both are needed to attach or detach a
@@ -272,7 +281,13 @@ class VideoCaptureSession
                     // saw this exact resubmit desync the SENSOR_TIMESTAMP-to-frame FIFO pairing for
                     // the rest of a session, which is why takeSensorTimestampFor() checks every
                     // pairing against the learned offset instead of trusting queue order blindly.
-                    session.setRepeatingRequest(builder.build(), this, cameraHandler)
+                    // Guarded because this builder now has a second writer: updatePreviewSurface()
+                    // adds and removes the preview target on this same camera thread. An uncaught
+                    // throw here would run on the camera HandlerThread and kill the process, and
+                    // with it the whole recording. Losing the AWB lock only costs colour
+                    // consistency, so log it and keep recording.
+                    runCatching { session.setRepeatingRequest(builder.build(), this, cameraHandler) }
+                        .onFailure { failed -> Log.w(TAG, "Failed to resubmit the request for the AWB lock", failed) }
                 }
             }
 
@@ -469,6 +484,12 @@ class VideoCaptureSession
                 }.onFailure { failed ->
                     // The recording keeps going; only the on-screen preview is affected.
                     Log.w(TAG, "Failed to update the preview surface target; the preview may go blank", failed)
+                    // A swap that failed halfway can leave this field disagreeing with what the
+                    // config really holds, and the next swap would then remove or add the wrong
+                    // Surface. Read the truth back instead of trusting the bookkeeping: the base
+                    // is index 0, so anything past it is the attached real Surface, if any.
+                    currentSharedPreviewSurface =
+                        runCatching { previewOutputConfig.surfaces.getOrNull(1) }.getOrNull()
                 }
             }
         }
@@ -537,7 +558,9 @@ class VideoCaptureSession
             }
             runCatching { mediaCodec.stop() }
             runCatching { mediaCodec.release() }
-            runCatching { if (::placeholderPreviewReader.isInitialized) placeholderPreviewReader.close() }
+            // The Surface first, then the SurfaceTexture behind it.
+            runCatching { placeholderPreviewSurface?.release() }
+            runCatching { placeholderPreviewTexture?.release() }
             runCatching { captureSession.close() }
             runCatching { cameraDevice.close() }
             cameraThread?.quitSafely()
@@ -615,12 +638,13 @@ class VideoCaptureSession
                 }
             }
 
-            placeholderPreviewReader =
-                ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.PRIVATE, 2).apply {
-                    setOnImageAvailableListener({ reader -> reader.acquireLatestImage()?.close() }, handler)
-                }
+            val placeholderTexture =
+                SurfaceTexture(false).apply { setDefaultBufferSize(VIDEO_WIDTH, VIDEO_HEIGHT) }
+            val placeholderSurface = Surface(placeholderTexture)
+            placeholderPreviewTexture = placeholderTexture
+            placeholderPreviewSurface = placeholderSurface
             val previewConfig =
-                OutputConfiguration(placeholderPreviewReader.surface).apply {
+                OutputConfiguration(placeholderSurface).apply {
                     enableSurfaceSharing()
                     addSurface(previewSurface)
                 }

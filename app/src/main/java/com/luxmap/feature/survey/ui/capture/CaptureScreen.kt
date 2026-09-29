@@ -144,12 +144,19 @@ fun CaptureScreen(
                                 ) = Unit
 
                                 override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
-                                    // Tell the session to detach this Surface BEFORE releasing it,
-                                    // so the camera stops writing into it first.
+                                    // Ask the session to detach this Surface. This only POSTS the
+                                    // work to the camera thread, so it is NOT ordered against the
+                                    // release below: if that thread is busy for a moment, the
+                                    // camera can still write into this BufferQueue right after it
+                                    // is torn down. Returning true also hands the SurfaceTexture
+                                    // back to the platform, which tears it down anyway, so the
+                                    // release call below is not what opens that window.
+                                    // Closing it properly means returning false (taking ownership)
+                                    // and releasing from the camera thread once the detach has
+                                    // really run, which needs a completion callback back through
+                                    // the service and controller. Left for a follow-up - see the
+                                    // real-device checklist for what to watch for.
                                     viewModel.onPreviewSurfaceLost()
-                                    // Returning true hands the SurfaceTexture back to the platform,
-                                    // so the Surface wrapping it is dead either way - release it
-                                    // here instead of waiting for the finalizer to do it.
                                     attachedSurface?.release()
                                     attachedSurface = null
                                     return true

@@ -165,8 +165,14 @@ class CaptureViewModel
         // The camera keeps recording through this - only the preview output is detached inside
         // VideoCaptureSession, the encoder is never touched. Does nothing during StartingRecording:
         // the camera has not opened yet, so there is no live preview target to drop.
+        //
+        // Packaging counts too, not only Recording: the camera session is still being torn down
+        // there (VideoCaptureSession.stop() calls stopRepeating() and then waits for the encoder
+        // tail), which is the same reason CaptureScreen keeps the preview mounted through
+        // Packaging. A Surface dropped in that window still needs detaching.
         fun onPreviewSurfaceLost() {
-            if (_uiState.value is CaptureUiState.Recording) {
+            val state = _uiState.value
+            if (state is CaptureUiState.Recording || state is CaptureUiState.Packaging) {
                 captureController.updatePreviewSurface(null)
             }
         }
