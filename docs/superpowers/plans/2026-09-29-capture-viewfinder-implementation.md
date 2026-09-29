@@ -1079,6 +1079,18 @@ Add these two fields next to the existing `private lateinit var captureSession: 
         private lateinit var placeholderPreviewReader: ImageReader
 ```
 
+**CORRECTED after the implementer's own SDK verification (see `task-5-report.md` — `javap` against this
+project's `compileSdk = 35` `android.jar`, cross-checked against `android-36`/`36.1`/`37.0` and
+`api-versions.xml`):** the original text below this point was wrong on two counts, both now fixed —
+`OutputConfiguration.setSurface(Surface)` **does not exist at any API level** (invented for the original
+plan text — the real surface-mutating members are `addSurface`/`removeSurface`/`getSurface`/`getSurfaces`/
+`enableSurfaceSharing`), and the live-swap mechanism (`CameraCaptureSession.updateOutputConfiguration`,
+`OutputConfiguration.removeSurface`) is **only available from API 28**, not API 26 as this plan originally
+claimed — this project's `minSdk = 26`. **User's ruling (asked explicitly, same pattern as the rotation-lock
+and Cách A/B decisions earlier in this plan):** fix it at the root on API 28+ (the vast majority of real
+devices), fall back to `FLAG_KEEP_SCREEN_ON` (Step 6) on API 26-27, where no public API can do a live swap
+at all.
+
 Replace `createCaptureSession()` with:
 
 ```kotlin
@@ -1088,12 +1100,45 @@ Replace `createCaptureSession()` with:
             previewSurface: Surface,
             handler: Handler,
         ): CameraCaptureSession {
+            if (!supportsLivePreviewSwap) {
+                // Below API 28 there is no public Camera2 API that can swap a live preview
+                // target (see the note above this function). Target the real Surface directly,
+                // the same as Task 1 originally built it - updatePreviewSurface() is a no-op on
+                // these devices, and CaptureScreen's FLAG_KEEP_SCREEN_ON (Step 6) is the only
+                // mitigation available here.
+                return suspendCancellableCoroutine { continuation ->
+                    @Suppress("DEPRECATION")
+                    camera.createCaptureSession(
+                        listOf(encoderSurface, previewSurface),
+                        object : CameraCaptureSession.StateCallback() {
+                            override fun onConfigured(session: CameraCaptureSession) = continuation.resume(session)
+
+                            override fun onConfigureFailed(session: CameraCaptureSession) {
+                                continuation.cancel(IllegalStateException("Camera session configuration failed"))
+                            }
+                        },
+                        handler,
+                    )
+                }
+            }
+
+            // API 28+: preview is a SHARED OutputConfiguration whose base surface is the
+            // always-drained placeholder (a shared config's base can never be removed via
+            // removeSurface() - only surfaces added on top of it can). The real TextureView
+            // surface is added as a shared member from the start. updatePreviewSurface() later
+            // swaps which surfaces are attached with add/removeSurface() + updateOutputConfiguration(),
+            // with no session rebuild and no repeating-request resubmit.
             placeholderPreviewReader =
                 ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.PRIVATE, 2).apply {
                     setOnImageAvailableListener({ reader -> reader.acquireLatestImage()?.close() }, handler)
                 }
-            val previewConfig = OutputConfiguration(previewSurface)
+            val previewConfig =
+                OutputConfiguration(placeholderPreviewReader.surface).apply {
+                    enableSurfaceSharing()
+                    addSurface(previewSurface)
+                }
             previewOutputConfig = previewConfig
+            currentSharedPreviewSurface = previewSurface
             return suspendCancellableCoroutine { continuation ->
                 @Suppress("DEPRECATION")
                 camera.createCaptureSessionByOutputConfigurations(
@@ -1111,25 +1156,56 @@ Replace `createCaptureSession()` with:
         }
 ```
 
-(`createCaptureSessionByOutputConfigurations` replaces the old `createCaptureSession(List<Surface>, ...)` call — both targets now go in as `OutputConfiguration`, which is what makes a later live swap possible. This is the same deprecated-but-functional API tier this file already uses elsewhere, hence the same `@Suppress("DEPRECATION")`.)
+Add this field next to `previewOutputConfig`/`placeholderPreviewReader`, and this constant-ish val near the top of the class body (wherever the other `private val`/`private var` fields for this class are declared):
+
+```kotlin
+        // API 28 is where CameraCaptureSession.updateOutputConfiguration() and
+        // OutputConfiguration.removeSurface() were added - both required for a live preview-
+        // surface swap. Computed once; this project's minSdk (26) means some real devices run
+        // this path, and updatePreviewSurface() must be a safe no-op on them, not a crash.
+        private val supportsLivePreviewSwap = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+
+        // The Surface currently added as the shared member of previewOutputConfig (API 28+ path
+        // only) - null means only the placeholder base is attached. Tracked so
+        // updatePreviewSurface() knows what to removeSurface() before adding a new one; a shared
+        // OutputConfiguration can only usefully hold the placeholder base plus ONE extra real
+        // surface at a time here (getMaxSharedSurfaceCount() is not assumed to be large).
+        private var currentSharedPreviewSurface: Surface? = null
+```
+
+Add the `android.os.Build` import alongside the existing `android.os.*` imports (this file already imports `android.os.Handler`/`android.os.HandlerThread`/`android.os.SystemClock`).
+
+(`createCaptureSessionByOutputConfigurations` replaces the old `createCaptureSession(List<Surface>, ...)` call on the API 28+ path — both targets go in as `OutputConfiguration`, which is what makes the later live swap possible. This is the same deprecated-but-functional API tier this file already uses elsewhere, hence the same `@Suppress("DEPRECATION")`.)
+
+Change `startCapture()`'s `addTarget(previewSurface)` line (the request must target the config's actual live member — the placeholder base on the API 28+ shared-config path, or the real surface directly on the pre-28 path; verify this against real Camera2 behavior/documentation before committing, the same way `task-5-report.md` verified the API-28 floor, rather than assuming the below is exactly right):
+
+```kotlin
+            addTarget(if (supportsLivePreviewSwap) placeholderPreviewReader.surface else previewSurface)
+```
 
 Add this new public method anywhere among the other public members (near `stop()`):
 
 ```kotlin
         // Called whenever the real preview Surface is destroyed (an ordinary Activity stop -
-        // screen off, Home, an incoming call, not only rotation) or reattached. Swaps ONLY the
-        // preview output's target via OutputConfiguration/updateOutputConfiguration (API 26+,
-        // matches this project's minSdk) - the encoder output is never touched, so the recording
-        // itself is never interrupted. Falls back to the always-drained placeholder instead of
-        // leaving a released Surface as a live session target, which used to risk a capture
-        // session error on some devices.
+        // screen off, Home, an incoming call, not only rotation) or reattached. On API 28+, swaps
+        // ONLY the preview output's shared member via OutputConfiguration.add/removeSurface() +
+        // CameraCaptureSession.updateOutputConfiguration() - the encoder output is never touched,
+        // so the recording itself is never interrupted, and the placeholder base always keeps the
+        // output slot valid so it is never left surface-less. Below API 28 this is a no-op - no
+        // public Camera2 API can do a live swap there (see the note above createCaptureSession());
+        // CaptureScreen's FLAG_KEEP_SCREEN_ON (Step 6) is the only mitigation on those devices.
         fun updatePreviewSurface(surface: Surface?) {
+            if (!supportsLivePreviewSwap) return
             val handler = cameraHandler ?: return
             if (!::captureSession.isInitialized || !::previewOutputConfig.isInitialized) return
             handler.post {
                 runCatching {
-                    previewOutputConfig.setSurface(surface ?: placeholderPreviewReader.surface)
+                    val target = surface ?: placeholderPreviewReader.surface
+                    val previous = currentSharedPreviewSurface
+                    if (previous != null && previous !== target) previewOutputConfig.removeSurface(previous)
+                    if (target !== placeholderPreviewReader.surface) previewOutputConfig.addSurface(target)
                     captureSession.updateOutputConfiguration(previewOutputConfig)
+                    currentSharedPreviewSurface = if (target === placeholderPreviewReader.surface) null else target
                 }.onFailure { failed ->
                     Log.w(TAG, "Failed to update the preview surface target; the live preview may go blank", failed)
                 }
@@ -1301,6 +1377,24 @@ Move the `context`/`isCameraSessionLive` declarations to BEFORE `BackHandler`, a
 ```
 
 Delete the old `val context = LocalContext.current` / `val isCameraSessionLive = ...` block that used to sit just above the orientation-lock `DisposableEffect` (it is now declared once, above, before `BackHandler`) — the `DisposableEffect(isCameraSessionLive) { ... }` block itself is unchanged, it just now reads the `isCameraSessionLive` declared above instead of redeclaring it.
+
+**Addendum (added after the API-28 correction to Step 1) — keep the screen on during the whole live-session window.** On API 26-27 `updatePreviewSurface()` is a no-op (see Step 1) — the ONLY mitigation for the screen-off trigger there is preventing the automatic screen timeout from firing in the first place. `FLAG_KEEP_SCREEN_ON` does that; it does not stop the Home button or an incoming call from backgrounding the app, so it is a partial mitigation on 26-27, not a fix. On API 28+ it is still worth setting unconditionally: it is free, and it means the real fix's swap path only has to fire for a genuine Home-button/incoming-call interruption instead of also firing on every ordinary screen timeout. Add this right after the `DisposableEffect` for the orientation lock, reusing the same `isCameraSessionLive`:
+
+```kotlin
+    DisposableEffect(isCameraSessionLive) {
+        val window = (context as? Activity)?.window
+        if (isCameraSessionLive) {
+            window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            if (isCameraSessionLive) {
+                window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+```
+
+Add the import `android.view.WindowManager`.
 
 Inside the `TextureView.SurfaceTextureListener`, track the `Surface` this listener created and release it when the `SurfaceTexture` goes away, and tell the ViewModel:
 
