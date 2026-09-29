@@ -30,7 +30,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
-import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -40,6 +39,7 @@ import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
+import com.luxmap.feature.survey.ui.submit.SubmitScreen
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -166,11 +166,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(
                 route = Routes.SurveySubmit.route,
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
-            ) {
-                // F06 (Task 19/20) is not built yet — this is a documented placeholder, same pattern
-                // Task 12 used for the Survey tab before its own screen existed. Do not build the
-                // real F06 screen here.
-                PlaceholderScreen(title = "Nộp đợt khảo sát")
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+                SubmitScreen(sessionId = sessionId)
             }
             composable(Routes.Map.route) {
                 MapScreen(
