@@ -24,6 +24,7 @@
 - **The preview is not orientation-corrected against `CameraCharacteristics.SENSOR_ORIENTATION`.** A reasonable person expects the live preview to look right-side-up and matching what the recorded video will show. This plan deliberately does not solve that (agreed as out of scope in brainstorming, Cách A was about *when* the preview appears, not its orientation correctness) — Task 4's own step says so explicitly so nobody "fixes" it as an afterthought without review, and it is listed again here so it is not lost.
 - **`recordingStartResult` must never leak a previous session's value into a new session.** The FM-08 final review found and fixed this exact bug class for `boundService`/`_packagingResult` (a stale StateFlow value from a finished session being read as the new session's result). Task 2's steps reset `_recordingStartResult` to `null` in BOTH `SurveyCaptureService.startSessionInternal` (service-side, alongside the other per-session resets) AND `RealSurveyCaptureController.startSession` (controller-side, alongside the existing `boundService` reset) — verify both resets are present, not just one.
 - **A `TextureView` torn down while its `Surface` is still an active Camera2 capture-session target is not specially handled for every case — only rotation is.** Task 1's implementer found this risk during self-review and confirmed the concrete trigger (this app does not lock orientation or declare `configChanges`, so a physical rotation recreates the Activity mid-recording); Task 4 Step 2 closes exactly that trigger by locking to portrait for the `StartingRecording`/`Recording` window. What remains genuinely unhandled: process death, an aggressive OS-level recreation unrelated to rotation, or the user somehow navigating away despite the `BackHandler` (already an accepted, narrow risk elsewhere in this codebase). This plan relies on `VideoCaptureSession`'s existing `releaseCaptureResources()`/`stop()` cleanup paths for those remaining cases, unmodified — no task adds new handling for them. Also verify on a real device that `requestedOrientation = SCREEN_ORIENTATION_PORTRAIT` actually prevents recreation on that device (some OEM multi-window/split-screen/foldable modes can still change the Activity's configuration despite an orientation lock) — if it does not, the fallback discussed with the user was a manifest-wide `android:screenOrientation="portrait"` on `MainActivity`, not a second scoped mechanism.
+- **UPDATE (final whole-branch review, after Task 4): the orientation lock above does NOT cover the actual most-common real-world trigger.** `TextureView.onSurfaceTextureDestroyed` also fires on an ordinary Activity `onStop()` — screen timeout, the Home button, an incoming call — completely independent of rotation, and none of those are prevented by an orientation lock. A real survey recording can run 10-30 minutes; the phone's screen timing out during that window is not an edge case, it is close to guaranteed. The user chose to fix this at the root rather than take a partial mitigation (`FLAG_KEEP_SCREEN_ON`) — see **Task 5**.
 - **Every existing `CaptureViewModelTest.kt` test that calls `onStartRecording` and then expects `Recording` next now breaks**, because `onStartRecording` no longer transitions to `Recording` directly — it goes through `StartingRecording` first. Task 3's own step rewrites the whole test file; the risk here is a task reviewer accepting a diff that only adds new tests without checking the existing ones were actually updated (a stale existing test that still expects the old direct transition would fail to compile or fail at runtime — check for it explicitly, do not assume "existing tests still there" means "existing tests still correct").
 
 ---
@@ -1032,6 +1033,359 @@ git commit -m "feat(fm-08): show a live camera preview while starting and during
 
 ---
 
+---
+
+### Task 5: Make the preview resilient to an ordinary Activity stop, and close the final-review findings
+
+**Added after Task 4** — the final whole-branch review (see the ledger, `.superpowers/sdd/2026-09-29-capture-viewfinder-implementation/progress.md`) found 2 Critical and 3 Important findings across the whole plan. The user was asked how to handle the Critical about preview-surface loss (C2) and chose to fix it at the root now, not take the `FLAG_KEEP_SCREEN_ON` partial mitigation. Because that root fix is materially bigger than a normal fix-wave diff — it changes how `VideoCaptureSession` builds its Camera2 session — it gets its own task and task review, same as every other task in this plan, instead of being folded into an unreviewed fix-wave dispatch. The other findings that touch the exact same files are folded in here rather than opening a second overlapping dispatch.
+
+**Files:**
+- Modify: `app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt`
+- Modify: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt`
+- Modify: `app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureController.kt`
+- Modify: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureViewModel.kt`
+- Modify: `app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt`
+
+**Interfaces:**
+- Consumes: everything Tasks 1-4 produced, unchanged.
+- Produces: `VideoCaptureSession.updatePreviewSurface(surface: Surface?)` (new, `null` means "no real surface right now, use the placeholder"); `SurveyCaptureService.updatePreviewSurface(surface: Surface?)` (new, forwards to the live `VideoCaptureSession`); `SurveyCaptureController.updatePreviewSurface(surface: Surface?)` (new interface member); `CaptureViewModel.onPreviewSurfaceLost()` (new, called by `CaptureScreen`'s `onSurfaceTextureDestroyed`); `CaptureViewModel.onDismissFailure()` (new, called by the new button on `PackagingFailed`).
+
+No automated test for the Camera2/Service/View changes (same reasoning as Tasks 1/2/4). The `CaptureViewModel` changes are covered by hand-traced logic in this task's own steps, not new automated tests — adding tests for `onPreviewSurfaceLost()`/`onDismissFailure()` would need a live `Surface`/service double this test file does not currently have infrastructure for; verify these by reading the diff carefully during task review instead. Real behavior confirmed on a real device per the updated checklist below.
+
+- [ ] **Step 1: Give `VideoCaptureSession` a way to swap its preview target live**
+
+Read the CURRENT `VideoCaptureSession.kt` in full first — it now has Task 1's `previewSurface` parameter threaded through `start()`/`startCapture()`/`createCaptureSession()`. This step changes `createCaptureSession()` again and adds one new public method; it does not touch `startCapture()`'s `addTarget(previewSurface)` line, which stays exactly as-is (the request still targets the SAME `Surface` object it always did — Camera2's `updateOutputConfiguration()` is designed so a request built against that object keeps routing to whatever surface currently backs that output slot, with no request resubmit needed, unlike the AWB-lock resubmit this file already has to guard against elsewhere).
+
+Add these imports, alongside the existing `android.hardware.camera2.*` imports:
+
+```kotlin
+import android.graphics.ImageFormat
+import android.hardware.camera2.params.OutputConfiguration
+import android.media.ImageReader
+```
+
+Add these two fields next to the existing `private lateinit var captureSession: CameraCaptureSession`:
+
+```kotlin
+        private lateinit var captureSession: CameraCaptureSession
+        // Tracks the preview's own OutputConfiguration (separate from the encoder's) so its
+        // target Surface can be swapped live via updateOutputConfiguration() without touching the
+        // encoder's output or rebuilding the repeating request.
+        private lateinit var previewOutputConfig: OutputConfiguration
+        // A valid target for the preview output slot when no real TextureView Surface is
+        // attached - the slot must always point at something, updateOutputConfiguration() cannot
+        // leave an output surface-less. Every frame delivered to it is closed immediately so it
+        // never backs up the shared capture session.
+        private lateinit var placeholderPreviewReader: ImageReader
+```
+
+Replace `createCaptureSession()` with:
+
+```kotlin
+        private suspend fun createCaptureSession(
+            camera: CameraDevice,
+            encoderSurface: Surface,
+            previewSurface: Surface,
+            handler: Handler,
+        ): CameraCaptureSession {
+            placeholderPreviewReader =
+                ImageReader.newInstance(VIDEO_WIDTH, VIDEO_HEIGHT, ImageFormat.PRIVATE, 2).apply {
+                    setOnImageAvailableListener({ reader -> reader.acquireLatestImage()?.close() }, handler)
+                }
+            val previewConfig = OutputConfiguration(previewSurface)
+            previewOutputConfig = previewConfig
+            return suspendCancellableCoroutine { continuation ->
+                @Suppress("DEPRECATION")
+                camera.createCaptureSessionByOutputConfigurations(
+                    listOf(OutputConfiguration(encoderSurface), previewConfig),
+                    object : CameraCaptureSession.StateCallback() {
+                        override fun onConfigured(session: CameraCaptureSession) = continuation.resume(session)
+
+                        override fun onConfigureFailed(session: CameraCaptureSession) {
+                            continuation.cancel(IllegalStateException("Camera session configuration failed"))
+                        }
+                    },
+                    handler,
+                )
+            }
+        }
+```
+
+(`createCaptureSessionByOutputConfigurations` replaces the old `createCaptureSession(List<Surface>, ...)` call — both targets now go in as `OutputConfiguration`, which is what makes a later live swap possible. This is the same deprecated-but-functional API tier this file already uses elsewhere, hence the same `@Suppress("DEPRECATION")`.)
+
+Add this new public method anywhere among the other public members (near `stop()`):
+
+```kotlin
+        // Called whenever the real preview Surface is destroyed (an ordinary Activity stop -
+        // screen off, Home, an incoming call, not only rotation) or reattached. Swaps ONLY the
+        // preview output's target via OutputConfiguration/updateOutputConfiguration (API 26+,
+        // matches this project's minSdk) - the encoder output is never touched, so the recording
+        // itself is never interrupted. Falls back to the always-drained placeholder instead of
+        // leaving a released Surface as a live session target, which used to risk a capture
+        // session error on some devices.
+        fun updatePreviewSurface(surface: Surface?) {
+            val handler = cameraHandler ?: return
+            if (!::captureSession.isInitialized || !::previewOutputConfig.isInitialized) return
+            handler.post {
+                runCatching {
+                    previewOutputConfig.setSurface(surface ?: placeholderPreviewReader.surface)
+                    captureSession.updateOutputConfiguration(previewOutputConfig)
+                }.onFailure { failed ->
+                    Log.w(TAG, "Failed to update the preview surface target; the live preview may go blank", failed)
+                }
+            }
+        }
+```
+
+In `releaseCaptureResources()`, add the placeholder's cleanup next to the other `runCatching` release lines:
+
+```kotlin
+            runCatching { mediaCodec.stop() }
+            runCatching { mediaCodec.release() }
+            runCatching { if (::placeholderPreviewReader.isInitialized) placeholderPreviewReader.close() }
+            runCatching { captureSession.close() }
+            runCatching { cameraDevice.close() }
+```
+
+- [ ] **Step 2: Forward `updatePreviewSurface` through `SurveyCaptureService`**
+
+Add this method anywhere among the service's other public members (near `onDestroy`):
+
+```kotlin
+    // Forwards to the live VideoCaptureSession - a no-op if no session has opened the camera yet.
+    fun updatePreviewSurface(surface: Surface?) {
+        if (::videoCaptureSession.isInitialized) videoCaptureSession.updatePreviewSurface(surface)
+    }
+```
+
+- [ ] **Step 3: Forward `updatePreviewSurface` through `SurveyCaptureController`**
+
+Add to the `SurveyCaptureController` interface:
+
+```kotlin
+interface SurveyCaptureController {
+    fun startSession(
+        sessionId: String,
+        surveySweepId: String,
+        luxDeviceAddress: String,
+        previewSurface: Surface,
+    )
+
+    fun updatePreviewSurface(surface: Surface?)
+
+    fun stopSession(): Flow<PackageResult>
+
+    val gpsSignalState: StateFlow<GpsSignalState>
+    val recordingStartResult: StateFlow<RecordingStartResult?>
+}
+```
+
+Add the implementation to `RealSurveyCaptureController`, near `startSession()`:
+
+```kotlin
+        override fun updatePreviewSurface(surface: Surface?) {
+            boundService.value?.updatePreviewSurface(surface)
+        }
+```
+
+- [ ] **Step 4: Build to confirm it compiles**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD FAILED — `CaptureViewModel.kt`'s mock/usage of `SurveyCaptureController` needs the new interface member wired (next step), and any `mockk<SurveyCaptureController>()` without `relaxed = true` would otherwise fail at runtime, not compile time — so the only expected compile error here is none from production code; if you see one outside the files this step is about to touch, stop and report it.
+
+- [ ] **Step 5: Fix `onPreviewSurfaceReady`, add `onPreviewSurfaceLost`, seed `Recording`'s warning flags, add `onDismissFailure`**
+
+Read the CURRENT `CaptureViewModel.kt` in full first.
+
+Add this field next to `pendingSurveySweepId`:
+
+```kotlin
+        // onPreviewSurfaceReady can legitimately fire twice in one recording: once to start the
+        // session (StartingRecording), and again later if the TextureView's SurfaceTexture is
+        // destroyed and recreated (an ordinary Activity stop, not only rotation - see
+        // onPreviewSurfaceLost). This guards only the StartingRecording branch against firing a
+        // SECOND time before the first call has resolved to Recording.
+        private var startingSessionRequested = false
+```
+
+Replace the `recordingStartResult` collector inside `init` with:
+
+```kotlin
+            viewModelScope.launch {
+                captureController.recordingStartResult.collect { result ->
+                    if (_uiState.value !is CaptureUiState.StartingRecording) return@collect
+                    when (result) {
+                        // Seed the warning flags from what is already known right now instead of
+                        // always starting at false - a GPS or BLE issue that happened while the
+                        // camera was still opening must not be silently dropped the instant the
+                        // screen reaches Recording.
+                        RecordingStartResult.Ready ->
+                            _uiState.value =
+                                CaptureUiState.Recording(
+                                    gpsSignalLost = captureController.gpsSignalState.value == GpsSignalState.Lost,
+                                    bleGapDetected = luxClient.connectionState.value == BleConnectionState.Disconnected,
+                                )
+                        is RecordingStartResult.Failed -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
+                        null -> Unit
+                    }
+                }
+            }
+```
+
+Replace `onPreviewSurfaceReady` with:
+
+```kotlin
+        fun onPreviewSurfaceReady(surface: Surface) {
+            when (_uiState.value) {
+                is CaptureUiState.StartingRecording -> {
+                    if (startingSessionRequested) return
+                    val luxDeviceAddress = pendingDevice?.address ?: return
+                    startingSessionRequested = true
+                    sessionId = UUID.randomUUID().toString()
+                    captureController.startSession(sessionId, pendingSurveySweepId, luxDeviceAddress, surface)
+                }
+                is CaptureUiState.Recording -> captureController.updatePreviewSurface(surface)
+                else -> Unit
+            }
+        }
+
+        // The camera keeps recording through this - only the preview output's target is swapped
+        // to a placeholder inside VideoCaptureSession, the encoder is never touched. Does nothing
+        // during StartingRecording: the camera has not opened yet, so there is no live preview
+        // target to drop.
+        fun onPreviewSurfaceLost() {
+            if (_uiState.value is CaptureUiState.Recording) {
+                captureController.updatePreviewSurface(null)
+            }
+        }
+```
+
+Add this new function near `onStopRecording`:
+
+```kotlin
+        // Available from PackagingFailed for all 3 ways this screen can reach it (the camera
+        // never started, a real recording's packaging step failed, or the service reported a
+        // mid-session failure on its own) - guarantees ACTION_STOP reaches the service even when
+        // the camera never started and onStopRecording() (Recording-only) was never reachable.
+        // Safe to call more than once: SurveyCaptureService's ACTION_STOP handling is idempotent.
+        fun onDismissFailure() {
+            if (_uiState.value !is CaptureUiState.PackagingFailed) return
+            viewModelScope.launch { captureController.stopSession().first() }
+        }
+```
+
+- [ ] **Step 6: Update `CaptureScreen`'s `TextureView` to report loss, release its `Surface`, extend `BackHandler`, and add a real recovery button to `PackagingFailed`**
+
+Read the CURRENT `CaptureScreen.kt` in full first.
+
+Move the `context`/`isCameraSessionLive` declarations to BEFORE `BackHandler`, and widen `BackHandler` to the whole live-session window (it only checked `Recording` before; `StartingRecording` and `Packaging` are an active camera session too and were the same gap the orientation lock exists to close):
+
+```kotlin
+    val context = LocalContext.current
+    // One shared flag for the whole window where a Camera2 session may be live: it opens in
+    // StartingRecording, runs through Recording, and is still being torn down during Packaging -
+    // VideoCaptureSession.stop() only calls stopRepeating() and then waits for the encoder tail
+    // before it closes the session. The preview, the orientation lock, and BackHandler all key
+    // off this same value, so none of them can drift apart from the others.
+    val isCameraSessionLive =
+        uiState is CaptureUiState.StartingRecording ||
+            uiState is CaptureUiState.Recording ||
+            uiState is CaptureUiState.Packaging
+
+    // The foreground service keeps recording even if the screen is left, and nothing can reach a
+    // still-running session again except starting a NEW CaptureViewModel — which would then send a
+    // second ACTION_START to the same live service (see SurveyCaptureService's isRecording guard).
+    // Block system Back for the whole isCameraSessionLive window, not only Recording, so leaving
+    // mid-session is not possible from here at all.
+    BackHandler(enabled = isCameraSessionLive) {}
+```
+
+Delete the old `val context = LocalContext.current` / `val isCameraSessionLive = ...` block that used to sit just above the orientation-lock `DisposableEffect` (it is now declared once, above, before `BackHandler`) — the `DisposableEffect(isCameraSessionLive) { ... }` block itself is unchanged, it just now reads the `isCameraSessionLive` declared above instead of redeclaring it.
+
+Inside the `TextureView.SurfaceTextureListener`, track the `Surface` this listener created and release it when the `SurfaceTexture` goes away, and tell the ViewModel:
+
+```kotlin
+                    TextureView(context).apply {
+                        var attachedSurface: Surface? = null
+                        surfaceTextureListener =
+                            object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(
+                                    surfaceTexture: SurfaceTexture,
+                                    width: Int,
+                                    height: Int,
+                                ) {
+                                    // Must match a size the camera can actually use as a second,
+                                    // simultaneous stream alongside the 1920x1080 encoder surface -
+                                    // reusing that same resolution is the one already known to
+                                    // work. Whether every device accepts two streams at this size
+                                    // together still needs a real-device check (see Review Focus).
+                                    surfaceTexture.setDefaultBufferSize(1920, 1080)
+                                    val surface = Surface(surfaceTexture)
+                                    attachedSurface = surface
+                                    viewModel.onPreviewSurfaceReady(surface)
+                                }
+
+                                override fun onSurfaceTextureSizeChanged(
+                                    surfaceTexture: SurfaceTexture,
+                                    width: Int,
+                                    height: Int,
+                                ) = Unit
+
+                                override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
+                                    viewModel.onPreviewSurfaceLost()
+                                    attachedSurface?.release()
+                                    attachedSurface = null
+                                    return true
+                                }
+
+                                override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
+                            }
+                    }
+```
+
+Change the `PackagingFailed` branch to a more accurate label (it fires for a camera that never started too, not only a packaging failure) and add a real recovery button:
+
+```kotlin
+                is CaptureUiState.PackagingFailed -> {
+                    Text(
+                        "Không thể hoàn tất phiên khảo sát: ${state.reason}",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Button(onClick = viewModel::onDismissFailure) { Text("Dừng và đóng phiên") }
+                }
+```
+
+- [ ] **Step 7: Build to confirm it compiles**
+
+Run: `./gradlew :app:compileDebugKotlin`
+Expected: BUILD SUCCESSFUL.
+
+- [ ] **Step 8: Run the full unit test suite**
+
+Run: `./gradlew :app:testDebugUnitTest`
+Expected: BUILD SUCCESSFUL. `CaptureViewModelTest.kt`'s existing `mockk<SurveyCaptureController>(relaxed = true)` already tolerates the new `updatePreviewSurface` interface member with no test changes needed — confirm this is actually true by reading the test file's `viewModel()` helper before assuming it, and report back (not fix silently) if any test needs a change to compile or pass.
+
+- [ ] **Step 9: Run ktlint**
+
+Run: `./gradlew ktlintCheck`
+Expected: BUILD SUCCESSFUL. Fix any formatting issues (`./gradlew ktlintFormat` if needed, then re-check).
+
+- [ ] **Step 10: Commit**
+
+Estimate the diff size before committing — if it is over 400 changed lines, split into two commits along the natural boundary (camera/service/controller in one, ViewModel/screen in the other) instead of forcing one oversized commit (CLAUDE.md).
+
+```bash
+git add app/src/main/java/com/luxmap/feature/survey/capture/VideoCaptureSession.kt \
+  app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureService.kt \
+  app/src/main/java/com/luxmap/feature/survey/capture/SurveyCaptureController.kt \
+  app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureViewModel.kt \
+  app/src/main/java/com/luxmap/feature/survey/ui/capture/CaptureScreen.kt
+git commit -m "fix(fm-08): keep the camera preview and recording alive through an ordinary screen-off"
+```
+
+---
+
 ## After all tasks: real-device verification
 
 This plan has no automated coverage for the actual camera behavior (Task 1, 2, and 4 all touch real Camera2/Service/View code with no automated test, per Global Constraints). Before treating this feature as done, install on a real device and check:
@@ -1044,3 +1398,5 @@ This plan has no automated coverage for the actual camera behavior (Task 1, 2, a
 - [ ] Try physically rotating the device to landscape while `StartingRecording`/`Recording` is showing — confirm the screen stays LOCKED TO WHATEVER ORIENTATION IT WAS ALREADY IN (does not rotate) and the recording is NOT interrupted. Task 4's review found and fixed a real bug where the original `SCREEN_ORIENTATION_PORTRAIT` choice could itself trigger the exact Activity recreation this step exists to prevent — the fix (`SCREEN_ORIENTATION_LOCKED`) locks the current rotation instead of forcing portrait specifically, so this check should now hold regardless of which orientation the device started in. If the device still rotates or the recording drops, escalate before shipping — see Review Focus for the manifest-wide fallback discussed with the user.
 - [ ] Start a recording (press "Bắt đầu quay") while the device is ALREADY in landscape — confirm the screen does NOT flip to portrait at that moment (which would recreate the Activity mid-camera-open) and the recording starts and completes normally, staying in landscape throughout. This is the specific scenario Task 4's review found broken with the original `SCREEN_ORIENTATION_PORTRAIT` choice; the fix locks whichever orientation was already current instead of forcing portrait, so the app may end up recording in landscape in this scenario — that is expected and fine, not a bug (this plan never promised a portrait-only recording, only "don't let rotation break a running recording").
 - [ ] Stop a recording and watch the screen during the brief "Đang đóng gói phiên khảo sát..." window — confirm the camera preview stays visible (does not black out or flicker) through that window too, not just through `Recording`. Task 4's review found the preview/orientation-lock could otherwise drop right when `Packaging` starts, before the camera session underneath has actually finished closing.
+- [ ] **(Task 5 — the actual C2 trigger, not rotation)** While `Recording`, turn the screen off with the power button, wait a few seconds, then turn it back on. Confirm: the recording is NOT interrupted (check the notification is still showing "Đang quay khảo sát", and the resulting video afterward has no gap or corruption at that point); the preview reappears live once the screen is back (not permanently black); nothing in logcat shows a Camera2 session error at the moment the screen turned off. Repeat once pressing Home and returning to the app instead of the power button. This is the scenario the final whole-branch review found completely unhandled by Task 4's orientation lock — it is the actual everyday trigger a 10-30 minute survey recording will hit, not device rotation.
+- [ ] Force a `RecordingStartResult.Failed` if possible (same trick as the "camera busy" check above), then tap the new "Dừng và đóng phiên" button on the `PackagingFailed` screen — confirm the foreground notification disappears and a fresh recording can be started right after (confirms Task 5's fix for the previously-unreachable `ACTION_STOP` path actually releases the service instead of leaving it stuck).
