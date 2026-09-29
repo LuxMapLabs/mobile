@@ -137,11 +137,12 @@ class VideoCaptureSession
             sessionDir: File,
             profile: LockedCameraProfile,
             segmentDurationMs: Long,
+            previewSurface: Surface,
         ) {
             this.sessionId = sessionId
             this.sessionDir = sessionDir
             try {
-                startCapture(scope, profile, segmentDurationMs)
+                startCapture(scope, profile, segmentDurationMs, previewSurface)
             } catch (failed: Throwable) {
                 // One failed attempt must not leave the camera device open: every later attempt
                 // would then fail with CAMERA_IN_USE for the rest of the process's life.
@@ -156,6 +157,7 @@ class VideoCaptureSession
             scope: CoroutineScope,
             profile: LockedCameraProfile,
             segmentDurationMs: Long,
+            previewSurface: Surface,
         ) {
             val thread = HandlerThread("luxmap-camera").apply { start() }
             cameraThread = thread
@@ -191,10 +193,11 @@ class VideoCaptureSession
             frameTimestampWriter =
                 NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
 
-            captureSession = createCaptureSession(cameraDevice, inputSurface, handler)
+            captureSession = createCaptureSession(cameraDevice, inputSurface, previewSurface, handler)
             val builder =
                 cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
                     addTarget(inputSurface)
+                    addTarget(previewSurface)
                     exposureLockController.applyTo(this, profile)
                 }
             requestBuilder = builder
@@ -516,13 +519,14 @@ class VideoCaptureSession
 
         private suspend fun createCaptureSession(
             camera: CameraDevice,
-            surface: Surface,
+            encoderSurface: Surface,
+            previewSurface: Surface,
             handler: Handler,
         ): CameraCaptureSession =
             suspendCancellableCoroutine { continuation ->
                 @Suppress("DEPRECATION")
                 camera.createCaptureSession(
-                    listOf(surface),
+                    listOf(encoderSurface, previewSurface),
                     object : CameraCaptureSession.StateCallback() {
                         override fun onConfigured(session: CameraCaptureSession) = continuation.resume(session)
 
