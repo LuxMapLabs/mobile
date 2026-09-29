@@ -1,5 +1,10 @@
 package com.luxmap.feature.survey.ui.capture
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,11 +16,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.ble.LuxDevice
 
@@ -33,6 +41,25 @@ fun CaptureScreen(
     // Block system Back while Recording so leaving mid-session is not possible from here at all.
     BackHandler(enabled = uiState is CaptureUiState.Recording) {}
 
+    val context = LocalContext.current
+    val isDuringRecordingWindow = uiState is CaptureUiState.StartingRecording || uiState is CaptureUiState.Recording
+    // The preview Surface (below) is a live target on an active Camera2 capture session -
+    // a physical rotation would otherwise destroy and recreate this Activity (no orientation lock
+    // or configChanges declared for it), tearing that Surface down out from under a running
+    // recording. Locking only for this window, not the whole app, keeps every other screen's
+    // rotation behavior unchanged.
+    DisposableEffect(isDuringRecordingWindow) {
+        val activity = context as? Activity
+        if (isDuringRecordingWindow) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        onDispose {
+            if (isDuringRecordingWindow) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+    }
+
     // Side effect lives here, reacting to state, instead of being called inline inside the `when`
     // branch during composition (review feedback) — LaunchedEffect only fires once per new sessionId.
     val packagedSessionId = (uiState as? CaptureUiState.Packaged)?.sessionId
@@ -41,6 +68,46 @@ fun CaptureScreen(
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Shown for both StartingRecording and Recording, from the SAME `if` branch, so Compose
+        // keeps the same TextureView (and the same underlying Surface) alive across that
+        // transition instead of tearing it down and recreating it - the Camera2 capture session
+        // is built once, against this exact Surface object, when the preview becomes ready.
+        if (uiState is CaptureUiState.StartingRecording || uiState is CaptureUiState.Recording) {
+            AndroidView(
+                factory = { context ->
+                    TextureView(context).apply {
+                        surfaceTextureListener =
+                            object : TextureView.SurfaceTextureListener {
+                                override fun onSurfaceTextureAvailable(
+                                    surfaceTexture: SurfaceTexture,
+                                    width: Int,
+                                    height: Int,
+                                ) {
+                                    // Must match a size the camera can actually use as a second,
+                                    // simultaneous stream alongside the 1920x1080 encoder surface -
+                                    // reusing that same resolution is the one already known to
+                                    // work. Whether every device accepts two streams at this size
+                                    // together still needs a real-device check (see Review Focus).
+                                    surfaceTexture.setDefaultBufferSize(1920, 1080)
+                                    viewModel.onPreviewSurfaceReady(Surface(surfaceTexture))
+                                }
+
+                                override fun onSurfaceTextureSizeChanged(
+                                    surfaceTexture: SurfaceTexture,
+                                    width: Int,
+                                    height: Int,
+                                ) = Unit
+
+                                override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture) = true
+
+                                override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
+                            }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
         Column {
             when (val state = uiState) {
                 is CaptureUiState.Connecting -> {
