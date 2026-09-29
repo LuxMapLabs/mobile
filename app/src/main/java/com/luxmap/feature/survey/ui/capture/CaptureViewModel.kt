@@ -3,11 +3,15 @@ package com.luxmap.feature.survey.ui.capture
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.ble.BleConnectionState
+import com.luxmap.core.ble.LuxDevice
+import com.luxmap.core.ble.LuxDevicePreferences
+import com.luxmap.core.ble.LuxDeviceScanner
 import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,36 +25,40 @@ class CaptureViewModel
     @Inject
     constructor(
         private val luxClient: LuxSensorBleClient,
+        private val luxDeviceScanner: LuxDeviceScanner,
+        private val luxDevicePreferences: LuxDevicePreferences,
         private val captureController: SurveyCaptureController,
     ) : ViewModel() {
-        private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.AwaitingBleConnection)
+        private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.Scanning())
         val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
 
         private var sessionId: String = ""
 
+        // The device connect() was last called for - used to save it to LuxDevicePreferences once
+        // the connectionState collector below observes Connected, and to show its name while
+        // Connecting. Null while scanning or once a recording starts (nothing new to save then).
+        private var pendingDevice: LuxDevice? = null
+        private var scanJob: Job? = null
+
         init {
-            // Bước 0 (spec) needs someone to call connect() once a device is picked. Nothing else
-            // in the app did this (SurveyCaptureService only connects when a session actually
-            // starts), so the screen would sit on AwaitingBleConnection forever with no way to
-            // reach Ready. The ViewModel is the natural owner: it is created when the user enters
-            // this screen, matching "connect once the screen is entered".
-            //
-            // Guarded to Disconnected only: connect() does not close the previous gatt before
-            // reassigning the field when called this way (only the internal auto-reconnect path
-            // does that), so calling it again while already Connected/Connecting from a prior
-            // screen entry would leak a BluetoothGatt client and briefly log lux samples twice.
-            // The connectionState collector below still replays Connected -> Ready on its own if a
-            // connection from a prior entry is still live, so this does not get the screen stuck.
-            if (luxClient.connectionState.value is BleConnectionState.Disconnected) {
-                luxClient.connect(KNOWN_LUX_DEVICE_ADDRESS)
+            viewModelScope.launch {
+                val remembered = luxDevicePreferences.lastDevice()
+                if (remembered != null) {
+                    connectTo(remembered)
+                } else {
+                    startScan()
+                }
             }
 
             viewModelScope.launch {
                 luxClient.connectionState.collect { state ->
                     when (val current = _uiState.value) {
-                        // Only advances AwaitingBleConnection -> Ready.
-                        is CaptureUiState.AwaitingBleConnection ->
-                            if (state == BleConnectionState.Connected) _uiState.value = CaptureUiState.Ready
+                        // Only advances Connecting -> Ready.
+                        is CaptureUiState.Connecting ->
+                            if (state == BleConnectionState.Connected) {
+                                pendingDevice?.let { luxDevicePreferences.saveLastDevice(it) }
+                                _uiState.value = CaptureUiState.Ready
+                            }
 
                         // Does not regress out of Recording on a mid-session drop (spec §11) — just
                         // raises the warning flag on the existing Recording state.
@@ -71,11 +79,35 @@ class CaptureViewModel
             }
         }
 
-        fun onStartRecording(
-            surveySweepId: String,
-            luxDeviceAddress: String,
-        ) {
+        fun onDeviceSelected(device: LuxDevice) {
+            if (_uiState.value !is CaptureUiState.Scanning) return
+            scanJob?.cancel()
+            connectTo(device)
+        }
+
+        // Available from Connecting/Scanning/ScanTimedOut/Ready - lets the user back out of a
+        // remembered device that is not answering, or pick a different sensor than the one saved
+        // from a past session. Not available during Recording: the foreground service owns the
+        // connection then, and CaptureScreen's BackHandler already keeps the user on that screen.
+        fun onChangeDevice() {
+            if (_uiState.value is CaptureUiState.Recording) return
+            scanJob?.cancel()
+            pendingDevice = null
+            luxClient.disconnect()
+            startScan()
+        }
+
+        fun onRetryScan() {
+            if (_uiState.value !is CaptureUiState.ScanTimedOut) return
+            startScan()
+        }
+
+        fun onStartRecording(surveySweepId: String) {
             if (_uiState.value != CaptureUiState.Ready) return
+            // pendingDevice is the device the connectionState collector just confirmed Connected
+            // to reach Ready - it cannot be null here, but a session cannot start without an
+            // address either way, so this is checked rather than assumed with !!.
+            val luxDeviceAddress = pendingDevice?.address ?: return
             sessionId = UUID.randomUUID().toString()
             captureController.startSession(sessionId, surveySweepId, luxDeviceAddress)
             _uiState.value = CaptureUiState.Recording()
@@ -92,21 +124,41 @@ class CaptureViewModel
             }
         }
 
-        // Leaving the screen before a recording ever started (AwaitingBleConnection/Ready/
-        // Packaging/Packaged/PackagingFailed) should give the GATT connection back, same reasoning
-        // as the BackHandler in CaptureScreen. Recording is the one exception: the foreground
-        // service owns the connection at that point (it keeps running after the screen is gone),
-        // so disconnecting here would cut off a live recording out from under it.
+        private fun connectTo(device: LuxDevice) {
+            pendingDevice = device
+            _uiState.value = CaptureUiState.Connecting(device.name)
+            luxClient.connect(device.address)
+        }
+
+        private fun startScan() {
+            scanJob?.cancel()
+            _uiState.value = CaptureUiState.Scanning()
+            scanJob =
+                viewModelScope.launch {
+                    val found = mutableListOf<LuxDevice>()
+                    luxDeviceScanner.scan().collect { device ->
+                        if (found.none { it.address == device.address }) {
+                            found += device
+                            _uiState.value = CaptureUiState.Scanning(found.toList())
+                        }
+                    }
+                    // The scan window closed with nothing found at all - a device that showed up
+                    // and is just waiting to be tapped is left as-is, not turned into a timeout.
+                    if (found.isEmpty() && _uiState.value is CaptureUiState.Scanning) {
+                        _uiState.value = CaptureUiState.ScanTimedOut
+                    }
+                }
+        }
+
+        // Leaving the screen before a recording ever started (Connecting/Scanning/ScanTimedOut/
+        // Ready/Packaging/Packaged/PackagingFailed) should give the GATT connection back, same
+        // reasoning as the BackHandler in CaptureScreen. Recording is the one exception: the
+        // foreground service owns the connection at that point (it keeps running after the screen
+        // is gone), so disconnecting here would cut off a live recording out from under it.
+        // scanJob and the collectors above are cancelled automatically with viewModelScope.
         override fun onCleared() {
             if (_uiState.value !is CaptureUiState.Recording) {
                 luxClient.disconnect()
             }
-        }
-
-        companion object {
-            // BLE lux device address hardcoded pending a scan/pairing UI (LuxDeviceScanner, Task
-            // 17c, is not wired into this screen yet) — tracked in docs/contract-drift.md. Lives
-            // here (not CaptureScreen) because the ViewModel is the one that must call connect().
-            const val KNOWN_LUX_DEVICE_ADDRESS = "AA:BB:CC:DD:EE:FF"
         }
     }
