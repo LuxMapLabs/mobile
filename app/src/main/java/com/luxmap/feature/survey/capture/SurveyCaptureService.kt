@@ -9,7 +9,9 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
+import android.view.Surface
 import androidx.core.app.NotificationCompat
+import androidx.core.content.IntentCompat
 import com.luxmap.BuildConfig
 import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.camera.LockedCameraProfile
@@ -41,6 +43,12 @@ private const val NOTIFICATION_ID = 1001
 private const val STATE_RECORDING = "recording"
 private const val STATE_STOPPED = "stopped"
 private const val STATE_PACKAGE_FAILED = "package_failed"
+
+sealed interface RecordingStartResult {
+    data object Ready : RecordingStartResult
+
+    data class Failed(val reason: String) : RecordingStartResult
+}
 
 @AndroidEntryPoint
 class SurveyCaptureService : Service() {
@@ -118,6 +126,11 @@ class SurveyCaptureService : Service() {
     private val _packagingResult = MutableStateFlow<PackageResult?>(null)
     val packagingResult: StateFlow<PackageResult?> = _packagingResult.asStateFlow()
 
+    // null = still starting (or no session started yet). Reset to null at the top of every new
+    // startSessionInternal call, so a stale value from a finished session never leaks into a new one.
+    private val _recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+    val recordingStartResult: StateFlow<RecordingStartResult?> = _recordingStartResult.asStateFlow()
+
     // Exposed for CaptureViewModel's GPS-lost warning (Task 18) via the same bound-service path
     // packagingResult uses.
     val gpsSignalState: StateFlow<com.luxmap.core.location.GpsSignalState>
@@ -150,8 +163,11 @@ class SurveyCaptureService : Service() {
                     val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
                     val surveySweepId = intent.getStringExtra(EXTRA_SURVEY_SWEEP_ID) ?: return START_NOT_STICKY
                     val luxDeviceAddress = intent.getStringExtra(EXTRA_LUX_DEVICE_ADDRESS) ?: return START_NOT_STICKY
+                    val previewSurface =
+                        IntentCompat.getParcelableExtra(intent, EXTRA_PREVIEW_SURFACE, Surface::class.java)
+                            ?: return START_NOT_STICKY
                     isRecording = true
-                    startSessionInternal(sessionId, surveySweepId, luxDeviceAddress)
+                    startSessionInternal(sessionId, surveySweepId, luxDeviceAddress, previewSurface)
                 }
             }
             ACTION_STOP -> stopSessionInternal()
@@ -163,6 +179,7 @@ class SurveyCaptureService : Service() {
         sessionId: String,
         surveySweepId: String,
         luxDeviceAddress: String,
+        previewSurface: Surface,
     ) {
         // An ACTION_START can land in the short window after stopSelf() but before the OS really
         // destroys this instance, so every per-session field has to start clean. Leaving isStopping
@@ -173,6 +190,7 @@ class SurveyCaptureService : Service() {
         isStopping = false
         brokenReason = null
         _packagingResult.value = null
+        _recordingStartResult.value = null
 
         currentSessionId = sessionId
         currentSurveySweepId = surveySweepId
@@ -266,13 +284,16 @@ class SurveyCaptureService : Service() {
                                 frameDurationNs = 33_333_333L,
                             ),
                         segmentDurationMs = SEGMENT_TARGET_DURATION_MS,
+                        previewSurface = previewSurface,
                     )
+                    _recordingStartResult.value = RecordingStartResult.Ready
                 } catch (error: Throwable) {
                     // Camera or encoder setup can still fail in the field after the readiness
                     // checklist passed (another app holding the camera, an encoder that cannot be
-                    // allocated). VideoCaptureSession.start() rethrows those after releasing the
-                    // camera, and an uncaught throw here would kill the app in the middle of a
-                    // night survey.
+                    // allocated, or the new preview surface making the stream combination
+                    // unsupported on this device). VideoCaptureSession.start() rethrows those after
+                    // releasing the camera, and an uncaught throw here would kill the app in the
+                    // middle of a night survey.
                     //
                     // A CancellationException here means one of two very different things.
                     // openCamera's onDisconnected cancels its own continuation with no cause when
@@ -282,7 +303,9 @@ class SurveyCaptureService : Service() {
                     // cancellation must keep propagating instead of being turned into a result.
                     if (error is CancellationException && !currentCoroutineContext().isActive) throw error
                     Log.e(TAG, "Video capture failed to start; this session has no video", error)
-                    failSession("Video capture failed to start: ${error.message}")
+                    val reason = "Video capture failed to start: ${error.message}"
+                    failSession(reason)
+                    _recordingStartResult.value = RecordingStartResult.Failed(reason)
                 }
             }
     }
@@ -479,6 +502,7 @@ class SurveyCaptureService : Service() {
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_SURVEY_SWEEP_ID = "survey_sweep_id"
         const val EXTRA_LUX_DEVICE_ADDRESS = "lux_device_address"
+        const val EXTRA_PREVIEW_SURFACE = "preview_surface"
 
         // Finalized against the Task 2 spike's findings — kept in sync with VideoCaptureSession's
         // own private constants; a fast-follow could hoist these into one shared place.

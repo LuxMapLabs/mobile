@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
+import android.view.Surface
 import androidx.core.content.ContextCompat
 import com.luxmap.core.location.GpsSignalState
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,11 +42,13 @@ interface SurveyCaptureController {
         sessionId: String,
         surveySweepId: String,
         luxDeviceAddress: String,
+        previewSurface: Surface,
     )
 
     fun stopSession(): Flow<PackageResult>
 
     val gpsSignalState: StateFlow<GpsSignalState>
+    val recordingStartResult: StateFlow<RecordingStartResult?>
 }
 
 @Singleton
@@ -65,6 +68,11 @@ class RealSurveyCaptureController
         private val _gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
         override val gpsSignalState: StateFlow<GpsSignalState> = _gpsSignalState.asStateFlow()
 
+        private val _recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+        override val recordingStartResult: StateFlow<RecordingStartResult?> = _recordingStartResult.asStateFlow()
+
+        private var recordingStartForwardingJob: Job? = null
+
         private val connection =
             object : ServiceConnection {
                 override fun onServiceConnected(
@@ -81,11 +89,17 @@ class RealSurveyCaptureController
                         controllerScope.launch {
                             service.gpsSignalState.collect { _gpsSignalState.value = it }
                         }
+                    recordingStartForwardingJob?.cancel()
+                    recordingStartForwardingJob =
+                        controllerScope.launch {
+                            service.recordingStartResult.collect { _recordingStartResult.value = it }
+                        }
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     boundService.value = null
                     gpsForwardingJob?.cancel()
+                    recordingStartForwardingJob?.cancel()
                 }
             }
 
@@ -93,6 +107,7 @@ class RealSurveyCaptureController
             sessionId: String,
             surveySweepId: String,
             luxDeviceAddress: String,
+            previewSurface: Surface,
         ) {
             val intent =
                 Intent(context, SurveyCaptureService::class.java)
@@ -100,6 +115,7 @@ class RealSurveyCaptureController
                     .putExtra(SurveyCaptureService.EXTRA_SESSION_ID, sessionId)
                     .putExtra(SurveyCaptureService.EXTRA_SURVEY_SWEEP_ID, surveySweepId)
                     .putExtra(SurveyCaptureService.EXTRA_LUX_DEVICE_ADDRESS, luxDeviceAddress)
+                    .putExtra(SurveyCaptureService.EXTRA_PREVIEW_SURFACE, previewSurface)
             ContextCompat.startForegroundService(context, intent)
             // Unbind any still-registered connection from a previous session before rebinding with
             // the SAME ServiceConnection instance. Android treats a bindService() call with an
@@ -112,8 +128,11 @@ class RealSurveyCaptureController
             // Drop the previous session's service reference before binding again. unbindService()
             // does NOT call onServiceDisconnected (that only fires when the process dies), so
             // without this a stopSession() for THIS session could read the old, already finished
-            // service and report its result as this session's outcome.
+            // service and report its result as this session's outcome. The same reason applies to
+            // recordingStartResult: a Ready/Failed left over from the finished session would be read
+            // as this session's result before the new bind's forwarding job starts collecting.
             boundService.value = null
+            _recordingStartResult.value = null
             context.bindService(Intent(context, SurveyCaptureService::class.java), connection, Context.BIND_AUTO_CREATE)
         }
 
