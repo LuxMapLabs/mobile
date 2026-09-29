@@ -9,7 +9,9 @@ import com.luxmap.feature.map.data.FakePoleDetailRepository
 import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleDetailRepository
 import com.luxmap.feature.survey.data.FakeSurveyRepository
+import com.luxmap.feature.survey.data.FakeUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.survey.data.UploadRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -35,4 +37,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindSurveyRepository(impl: FakeSurveyRepository): SurveyRepository
+
+    @Binds
+    abstract fun bindUploadRepository(impl: FakeUploadRepository): UploadRepository
 }
