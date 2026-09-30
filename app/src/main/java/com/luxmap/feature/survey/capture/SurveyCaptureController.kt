@@ -75,7 +75,10 @@ class RealSurveyCaptureController
 
         private var recordingStartForwardingJob: Job? = null
 
-        private val connection =
+        // Explicit type needed: onServiceDisconnected below refers to `connection` by name to
+        // rebind, and without an annotation here Kotlin can't infer this property's own type from
+        // an object expression that references itself ("recursive problem").
+        private val connection: ServiceConnection =
             object : ServiceConnection {
                 override fun onServiceConnected(
                     name: ComponentName?,
@@ -98,10 +101,27 @@ class RealSurveyCaptureController
                         }
                 }
 
+                // unbindService() itself never triggers this callback (see startSession's own
+                // comment) - it only fires on an unexpected binder death, which can happen in the
+                // middle of a 10-30 minute recording while SurveyCaptureService (a foreground
+                // service) is still alive and running on its own. Without a rebind here,
+                // gpsSignalState/recordingStartResult would freeze at their last value for the
+                // rest of the session instead of tracking the service again.
+                //
+                // No automated test for this: bindService() below needs a real android.content.
+                // Intent, which throws "not mocked" under the plain JVM unit tests this codebase
+                // uses (no Robolectric) - same reason VideoCaptureSession has no unit test.
+                // Verify on a real device instead: added to the real-device checklist in
+                // docs/superpowers/plans/2026-09-29-capture-viewfinder-implementation.md.
                 override fun onServiceDisconnected(name: ComponentName?) {
                     boundService.value = null
                     gpsForwardingJob?.cancel()
                     recordingStartForwardingJob?.cancel()
+                    context.bindService(
+                        Intent(context, SurveyCaptureService::class.java),
+                        connection,
+                        Context.BIND_AUTO_CREATE,
+                    )
                 }
             }
 
