@@ -558,11 +558,17 @@ class VideoCaptureSession
             }
             runCatching { mediaCodec.stop() }
             runCatching { mediaCodec.release() }
+            runCatching { captureSession.close() }
+            runCatching { cameraDevice.close() }
+            // Only after the session and the device are closed, so the camera can no longer be
+            // holding this output. Releasing it while the session was still open logged
+            // "BufferQueue has been abandoned" during normal teardown - harmless in itself (the
+            // placeholder is never a capture-request target), but it is the same line the
+            // real-device check greps for to catch the screen-off detach race, and a false
+            // positive there would make that signal useless.
             // The Surface first, then the SurfaceTexture behind it.
             runCatching { placeholderPreviewSurface?.release() }
             runCatching { placeholderPreviewTexture?.release() }
-            runCatching { captureSession.close() }
-            runCatching { cameraDevice.close() }
             cameraThread?.quitSafely()
             cameraThread = null
             cameraHandler = null
