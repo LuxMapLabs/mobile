@@ -13,7 +13,7 @@ Bốn vai trò còn lại theo đúng tên trong hồ sơ đăng ký: **Superior
 - `docs/LuxMap_Mobile_Technology_Stack.docx` — ngăn xếp công nghệ chốt, kiến trúc 5 lớp (Presentation/Domain/Data/Sync/Device), bảng local DB, quy tắc offline-first chi tiết
 - `docs/LuxMap_Rural_Road_Lighting_GIS_phuonglhk.md` — hồ sơ đề tài: bối cảnh, kiến trúc tổng thể, vai trò hệ thống, câu hỏi nghiên cứu (RQ1/RQ2)
 - `docs/FA26SE222 v1.2.docx` — hồ sơ đăng ký đề tài Capstone (bản chính thức nộp GVHD): bối cảnh, 8 module giải pháp, danh sách vai trò hệ thống (Superior/Manager/Field Engineer/System Admin/Citizen) và nghiệp vụ từng vai trò, yêu cầu phi chức năng, deliverables, phân công thành viên, câu hỏi nghiên cứu. Đây là nguồn xác định **tên và phạm vi vai trò hệ thống** — khi có khác biệt với các tài liệu đặc tả chi tiết khác về vai trò/phạm vi, ưu tiên đối chiếu lại với file này trước khi kết luận. **Đã xác nhận với chủ dự án (2026-09-25) và đã sửa lại mục A2 của `LuxMap_Mobile_DacTaChiTiet_v2.2.docx`** cho khớp: hệ thống có 5 vai trò (thêm Citizen), không còn ghi "đúng 4 vai trò, Citizen không tồn tại" như bản cũ
-- `docs/api-contract-v1.1.md.docx` — hợp đồng API chính thức giữa Backend và Frontend ("đổi field/enum phải mở issue, tăng version, không đổi ngầm"). Mục 2.9 (BE-42) đã chốt endpoint + field thật cho `lux-readings` — dùng file này thay vì phần "đề xuất" trong đặc tả chi tiết khi code F07 (xem "Khoảng trống đã biết"). Mục 2.8 (BE-41) chốt `POST /api/v1/faults`. Không có mục nào cho `notification`/BE-27 — F14 vẫn là khoảng trống thật.
+- `docs/api-contract-v1.1.md.docx` — hợp đồng API chính thức giữa Backend và Frontend ("đổi field/enum phải mở issue, tăng version, không đổi ngầm"). Mục 2.9 (BE-42, lux-readings) không còn áp dụng cho mobile — F07 đã bị loại bỏ khỏi đặc tả (xem "Khoảng trống đã biết"). Mục 2.8 (BE-41) chốt `POST /api/v1/faults`. Không có mục nào cho `notification`/BE-27 — F14 vẫn là khoảng trống thật.
 - `docs/LuxMap_TaskList_v2.xlsx` — file task list dạng bảng tính đã xuất hiện (sheet `Frontend-Mobile`, `Huong dan`, `Backend`...). Theo đúng nguyên tắc đã nêu, **ưu tiên đối chiếu file này** cho mã `FM-XX` thay vì chỉ dùng mục A3 của đặc tả chi tiết.
 - `docs/LuxMap_Mobile_Luong_Hoat_Dong_v1.0.md` — luồng hoạt động chi tiết vòng đời 1 sự cố đèn đường theo quyết định 2026-09-25 (video+track, AI phân loại, Inspection/Repair Task, 2 cổng duyệt). Mục 4 của file này liệt kê đúng các khoảng trống chưa chốt, khớp với mục "Khoảng trống đã biết" ở đây — đọc cả hai cùng nhau.
 - `docs/Backend_API_Requirements_For_Mobile.docx` (2026-09-25) — đối chiếu trực tiếp từ source code backend (nhánh dev), liệt kê chính xác endpoint nào đã có Controller, endpoint nào chỉ thiếu Controller (field đã chốt, code được ngay), và endpoint nào còn phải chờ WP2/WP5/Dylan chốt schema (nhóm `survey-sweeps`, `inspection-tasks`, `repair-tasks`, `sync/bundle`, `sync/push`, `notifications`). **Dùng file này để biết endpoint nào code được ngay** thay vì tự đoán từ đặc tả chi tiết bản cũ.
@@ -25,10 +25,11 @@ Bốn vai trò còn lại theo đúng tên trong hồ sơ đăng ký: **Superior
 
 ### Khoảng trống đã biết — dừng lại hỏi, không tự đoán
 
-- **F07 (Nhập lux) — ĐÃ CHỐT, không còn là khoảng trống:** `docs/api-contract-v1.1.md.docx` mục 2.9 (BE-42) đã có endpoint và field thật: `POST /api/v1/lux-readings` với body `client_op_id, pole_id, measured_at, lux_value, meter_model, data_source, note`, trả về `lux_id` (201) hoặc bản ghi đã có (200) nếu trùng `client_op_id`. Có thêm `GET /api/v1/poles/{pole_id}/lux-readings` và `GET /api/v1/lux-readings` (query `pole_id, from, to, data_source, page, page_size`). Khi code F07, dùng đúng bộ field này — **không dùng** field `photo_uri`/`upload_status` từng đề xuất trong đặc tả chi tiết bản 2.2 (mục C1/C2), vì contract thật không có `photo_uri` ở entity server-side.
+- **F07 (Nhập lux) — ĐÃ BỊ LOẠI BỎ khỏi đặc tả (cập nhật 2026-09-27):** không còn màn nhập lux thủ công. Không dùng `lux_reading`/`local_lux_reading`/`POST /api/v1/lux-readings`. Nguồn lux cho RQ1/CV-12 chuyển sang log lux BLE ghi trong phiên quay ở F04 (xem mục C7 của `LuxMap_Mobile_DacTaChiTiet_v2.2.docx`), còn chờ WP4 xác nhận cách dùng lại dữ liệu này cho đối chiếu độ chính xác.
 - **F14 (Thông báo):** module `notification` đã có ở backend (BE-27) nhưng `api-contract-v1.1.md.docx` chưa có mục nào cho notification — vẫn chưa có tên bảng/field chi tiết. Vẫn là khoảng trống thật, xác nhận trước khi code F14.
 - **F06/F13 (Phiên khảo sát bị từ chối do chất lượng → khảo sát lại):** hồ sơ đăng ký đề tài (`FA26SE222 v1.2.docx`, mục 3.2.c) mô tả nghiệp vụ Manager "review... accept or reject submitted sessions" và Field Engineer "re-survey a segment when a session is rejected for quality", nhưng đặc tả chi tiết hiện tại (`LuxMap_Mobile_DacTaChiTiet_v2.2.docx` mục C4, D1) chỉ có `survey_sweep.status`: `planned/in_progress/pending_upload/submitted/processed` — không có trạng thái "bị từ chối"/"cần khảo sát lại", và luồng D1 dừng ở bước Kỹ sư bảo trì xác nhận sự cố, không có bước từ chối cả phiên. Trước khi code phần xử lý trạng thái sweep sau khi nộp (F06/F13), xác nhận với WP2/WP5 có bổ sung trạng thái/API mới hay không — không tự thêm enum hay màn hình cho việc này.
-- **Cảm biến lux qua BLE trong phiên quay khảo sát (F03/F04) — ĐÃ XÁC NHẬN với chủ dự án (2026-09-27), không còn là mâu thuẫn nghiệp vụ:** mâu thuẫn nêu ở bản trước (mobile tự kết nối BLE theo `docs/nghiep_vu_khao_sat_den.docx` so với `iot_node`/`runtime_history` là hạ tầng IoT cố định tự báo cáo lên server theo `docs/Backend_API_Requirements_For_Mobile.docx` mục 2.1) đã được xác nhận: đây là 1 nguồn dữ liệu thứ ba thật — video + track GPS/heading/timestamp (đã có ở mục C6) **cộng thêm** log lux liên tục qua BLE, gán timestamp bằng đồng hồ điện thoại — chứ không phải cách diễn đạt khác của IoT cố định. Luồng đầy đủ (chặn cứng "Bắt đầu quay" tới khi kết nối BLE ổn định → 3 luồng dữ liệu video/GPS/lux chạy song song độc lập trong phiên quay → dừng quay đóng gói video + 1 file log GPS+lux theo thời gian → upload cả bộ lên server, mobile không tự xử lý gì thêm) đã ghi vào mục **C7** của `docs/LuxMap_Mobile_DacTaChiTiet_v2.2.docx`. **Vẫn còn khoảng trống thật:** chưa có tên bảng Room, tên field log lux/GPS, hay endpoint upload chính thức cho luồng này — không tự đặt tên khi code F03/F04, vẫn cần xác nhận với WP2/WP5 cách BE tiếp nhận và lưu file log này trước khi code (cùng nguyên tắc "chưa có tên bảng/field/endpoint chính thức" áp dụng cho phần còn lại của C6).
+- **Cảm biến lux qua BLE trong phiên quay khảo sát (F03/F04) — ĐÃ XÁC NHẬN với chủ dự án (2026-09-27), không còn là mâu thuẫn nghiệp vụ:** mâu thuẫn nêu ở bản trước (mobile tự kết nối BLE theo `docs/nghiep_vu_khao_sat_den.docx` so với `iot_node`/`runtime_history` là hạ tầng IoT cố định tự báo cáo lên server theo `docs/Backend_API_Requirements_For_Mobile.docx` mục 2.1) đã được xác nhận: đây là 1 nguồn dữ liệu thứ ba thật — video + track GPS/heading/timestamp (đã có ở mục C6) **cộng thêm** log lux liên tục qua BLE, gán timestamp bằng đồng hồ điện thoại — chứ không phải cách diễn đạt khác của IoT cố định. Luồng đầy đủ (chặn cứng "Bắt đầu quay" tới khi kết nối BLE ổn định → 3 luồng dữ liệu video/GPS/lux chạy song song độc lập trong phiên quay → dừng quay đóng gói video + 1 file log GPS+lux theo thời gian → upload cả bộ lên server, mobile không tự xử lý gì thêm) đã ghi vào mục **C7** của `docs/LuxMap_Mobile_DacTaChiTiet_v2.2.docx`. **Cập nhật 2026-09-28 (mục C8.5 của đặc tả):** phân quyền đặt tên đã chốt — bảng Room cục bộ do WP6 (mobile) tự đặt tên chính thức, không cần chờ WP2/WP5; định dạng file trong "Session package" (log lux, GPS track, log timestamp frame, file cấu hình quay, manifest) do mobile soạn bản đầu (`v0`), WP4 duyệt sau; chỉ endpoint upload và tên field phía server vẫn chờ Backend (WP2/WP5). Mọi tên tạm và điểm lệch được theo dõi ở `docs/contract-drift.md`.
+Xem `docs/contract-drift.md` để biết chính xác tên nào đã chốt, tên nào còn tạm.
 
 ### Quyết định nghiệp vụ mới đã chốt (2026-09-25) — chưa cập nhật vào đặc tả chi tiết / api-contract v1.1
 
@@ -75,7 +76,7 @@ Hai điểm tác động trực tiếp tới mô hình dữ liệu và kiến tr
 - **Firebase Cloud Messaging** — push notification
 - **Android Keystore** — bảo vệ token và dữ liệu xác thực nhạy cảm
 - ktlint cho format code
-- Testing: JUnit + MockK (unit), Turbine (Flow/StateFlow), MockWebServer (API), Room Testing (migration/transaction/queue), Compose UI Test (luồng UI chính)
+- Testing: JUnit + MockK (unit), MockK-Android (`io.mockk:mockk-android`, chỉ dùng trong `androidTest` — bản `mockk` thường không mock được final class/Camera2 type trên runtime Android thật, đã xác nhận với chủ dự án 2026-09-28 khi làm FM-08 Task 3 `ExposureLockController`), `androidx.test:core` (hạ tầng nền tảng AndroidX Test cho `ApplicationProvider`/Context trong `androidTest`, cùng họ với `androidx.test.ext:junit`/`espresso-core` đã có sẵn — đã xác nhận với chủ dự án 2026-09-28 khi làm FM-08 Task 9 Room DAO test, cần cho mọi instrumented test dùng Room in-memory database), Turbine (Flow/StateFlow — dùng được cả ở `test` lẫn `androidTest`), MockWebServer (API), Room Testing (migration/transaction/queue), Compose UI Test (luồng UI chính)
 
 ### Công nghệ chủ động không dùng ở giai đoạn hiện tại
 
@@ -160,12 +161,11 @@ app/src/main/java/com/luxmap/
         HomeViewModel.kt
         HomeUiState.kt
 
-    survey/                   # F03–F07, feature lớn nhất — khảo sát đêm, đường găng dự án
+    survey/                   # F03–F06, feature lớn nhất — khảo sát đêm, đường găng dự án
       data/
         SurveyRepository.kt
         FakeSurveyRepository.kt
         RealSurveyRepository.kt
-        LuxReadingRepository.kt      # F07 — endpoint/entity đã chốt ở api-contract-v1.1.md.docx mục 2.9 (BE-42)
         dto/SurveySweepDto.kt
         dto/SurveyFrameDto.kt
       domain/
@@ -177,7 +177,6 @@ app/src/main/java/com/luxmap/
         capture/              # F04 Chế độ chụp khảo sát (Capture Mode, dark bắt buộc)
         coverage/              # F05 Kiểm tra độ phủ & chất lượng
         submit/                 # F06 Nộp đợt khảo sát (upload chunk/resume)
-        lux/                    # F07 Nhập số đo lux đối chứng
 
     workorder/                 # F08–F10 — lệnh sửa chữa
       data/
@@ -300,7 +299,7 @@ Typography: nội dung tối thiểu 16sp, H1 20sp/700 (tiêu đề màn hình),
 
 Danh sách đầy đủ ở mục C5 của đặc tả; các quy tắc dưới đây lặp lại xuyên suốt nhiều màn hình nên cần nắm trước khi code bất kỳ feature nào:
 
-- **Offline-first tuyệt đối**: mọi màn hình thao tác chính (F03, F04, F05, F06, F07, F10, F11) ghi Room trước, không chờ phản hồi mạng; đồng bộ là tiến trình nền độc lập qua `sync_queue` + WorkManager.
+- **Offline-first tuyệt đối**: mọi màn hình thao tác chính (F03, F04, F05, F06, F10, F11) ghi Room trước, không chờ phản hồi mạng; đồng bộ là tiến trình nền độc lập qua `sync_queue` + WorkManager.
 - **Không cho bắt đầu khảo sát nếu chưa khoá exposure thật** (F03 chặn cứng, không chỉ nhắc nhở) — ảnh auto-exposure không sửa lại được sau khi chụp.
 - **`RepairEvidence` (F10) và `SurveyFrame` (F04) là hai luồng ảnh tách biệt hoàn toàn** (BE-11): không dùng chung API upload, không dùng chung bảng lưu trữ.
 - **Không tự động ghi đè khi xung đột đồng bộ** (`conflict`, HTTP 409 dựa trên `version`/`updated_at`): giữ nguyên bản ghi local, đánh dấu xung đột, để người dùng hoặc Kỹ sư bảo trì xử lý qua Web.
@@ -316,7 +315,7 @@ Backend đang làm song song. Quy tắc:
 2. Data class DTO đặt đúng tên field tiếng Anh như trong đặc tả (VD: `work_order_id`, `status`, không tự đặt tên khác).
 3. Viết implementation giả (`FakeXxxRepository`) ghi dữ liệu mẫu vào Room hoặc trả `Flow` tĩnh đúng schema, mô phỏng đúng hành vi offline-first (queued → syncing → done) thay vì chỉ trả JSON tĩnh một lần.
 4. Dùng Hilt để sau này đổi từ Fake sang Real repository chỉ bằng 1 dòng trong `RepositoryModule`, không sửa UI.
-5. Với `lux_reading` (F07): dùng đúng entity/endpoint đã chốt ở `api-contract-v1.1.md.docx` mục 2.9 (BE-42), không dùng bản "đề xuất" cũ trong đặc tả chi tiết. Với `notification` (F14): xem mục "Khoảng trống đã biết" ở trên — vẫn cần xác nhận entity/endpoint thật với WP2 trước khi code, không tự đặt tên bảng/field.
+5. F07 đã bị loại bỏ khỏi đặc tả — không tạo `LuxReadingRepository`/entity `lux_reading` nữa (xem "Khoảng trống đã biết"). Với `notification` (F14): xem mục "Khoảng trống đã biết" ở trên — vẫn cần xác nhận entity/endpoint thật với WP2 trước khi code, không tự đặt tên bảng/field.
 
 ## Quy ước Git — theo chuẩn [Conventional Commits](https://www.conventionalcommits.org/)
 
@@ -348,12 +347,12 @@ Backend đang làm song song. Quy tắc:
 
 ## Nguyên tắc làm việc với Claude Code (bổ sung, đi cùng bộ nguyên tắc Karpathy đã cài qua plugin)
 
-- Trước khi sửa code, nêu ngắn gọn kế hoạch và các file sẽ đụng tới; dừng lại hỏi nếu đặc tả không nói rõ field/behavior nào đó thay vì tự đoán (đặc biệt với `notification` và trạng thái sweep bị từ chối/khảo sát lại — xem "Khoảng trống đã biết"; `lux_reading` đã chốt, xem `api-contract-v1.1.md.docx`).
+- Trước khi sửa code, nêu ngắn gọn kế hoạch và các file sẽ đụng tới; dừng lại hỏi nếu đặc tả không nói rõ field/behavior nào đó thay vì tự đoán (đặc biệt với `notification` và trạng thái sweep bị từ chối/khảo sát lại — xem "Khoảng trống đã biết"; F07/`lux_reading` đã bị loại bỏ khỏi đặc tả, không code lại).
 - Không tự thêm thư viện mới ngoài danh sách ở mục "Ngăn xếp công nghệ" nếu chưa hỏi qua.
 - Không refactor code không liên quan tới task đang làm, kể cả khi thấy code cũ chưa đẹp.
 - Sau khi code xong 1 task, tự chạy `./gradlew ktlintCheck` và sửa lỗi format trước khi coi là xong.
 - Nếu 1 màn hình có 4 trạng thái bắt buộc theo đặc tả (đang tải / có dữ liệu / rỗng / lỗi), phải làm đủ cả 4, không được bỏ qua trạng thái rỗng/lỗi vì "ít quan trọng".
-- Với các màn hình thao tác chính (F03, F04, F05, F06, F07, F10, F11), luôn tự kiểm tra lại: thao tác có ghi Room trước khi gọi API không, có bị chặn bởi trạng thái mạng không — nếu có, đó là vi phạm nguyên tắc offline-first.
+- Với các màn hình thao tác chính (F03, F04, F05, F06, F10, F11), luôn tự kiểm tra lại: thao tác có ghi Room trước khi gọi API không, có bị chặn bởi trạng thái mạng không — nếu có, đó là vi phạm nguyên tắc offline-first.
 - **Comment trong code viết bằng tiếng Anh, không dùng tiếng Việt** — kể cả comment giải thích lý do/quyết định kỹ thuật (dạng "vì sao chọn cách này"), không chỉ comment mô tả đơn thuần. Áp dụng cho mọi file code (`.kt`, `.kts`...). Tài liệu (`CLAUDE.md`, đặc tả, PR description, commit message) vẫn viết tiếng Việt/tiếng Anh như quy ước riêng của từng loại đã nêu ở trên, không đổi.
   - **Dùng từ tiếng Anh đơn giản, thông dụng** — loại ai trong nhóm cũng biết nghĩa ngay không cần tra từ điển (VD: `use`/`need`/`because`/`before`/`instead of`), tránh từ học thuật/ít gặp (VD: tránh `leverage`, `utilize`, `henceforth`, `aforementioned` — dùng `use`, `use`, `from now on`, `mentioned above`). Câu ngắn, đúng ngữ pháp cơ bản, không viết văn hoa. Mục tiêu: người đọc code (kể cả người không giỏi tiếng Anh) đọc lướt qua là hiểu ngay, không phải để chứng tỏ vốn từ.
 

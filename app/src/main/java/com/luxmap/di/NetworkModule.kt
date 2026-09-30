@@ -4,6 +4,8 @@ import com.luxmap.core.network.ApiClient
 import com.luxmap.core.network.AuthApi
 import com.luxmap.core.network.AuthHeaderInterceptor
 import com.luxmap.core.network.TokenAuthenticator
+import com.luxmap.core.network.UserApi
+import com.luxmap.core.network.WorkOrdersApi
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -65,4 +67,12 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit = ApiClient.retrofit(client)
+
+    @Provides
+    @Singleton
+    fun provideUserApi(retrofit: Retrofit): UserApi = retrofit.create(UserApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideWorkOrdersApi(retrofit: Retrofit): WorkOrdersApi = retrofit.create(WorkOrdersApi::class.java)
 }

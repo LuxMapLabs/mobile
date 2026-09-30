@@ -165,3 +165,45 @@ fun WorkOrderPriority.color(): Color =
         WorkOrderPriority.HIGH -> Amber500
         WorkOrderPriority.URGENT -> Rose600
     }
+
+// Component - badge trạng thái work order (wo_status, backend WorkOrderStatus enum). Design
+// System v2.0 mục 6.3 chỉ nói "work-order status" là 1 variant của Status Badge, không cho bảng
+// màu cụ thể - các cặp bg/text dưới đây dùng lại đúng những giá trị đã có ở badge sync (mục trên),
+// không tự bịa màu mới, chỉ ánh xạ theo ngữ nghĩa (mở/mới = xám, đang xử lý = cam, hoàn tất/đã
+// duyệt = xanh lá, huỷ = đỏ).
+enum class WorkOrderStatus { OPEN, ASSIGNED, IN_PROGRESS, DONE, VERIFIED, CANCELLED }
+
+fun WorkOrderStatus.label(): String =
+    when (this) {
+        WorkOrderStatus.OPEN -> "Mở"
+        WorkOrderStatus.ASSIGNED -> "Đã giao"
+        WorkOrderStatus.IN_PROGRESS -> "Đang xử lý"
+        WorkOrderStatus.DONE -> "Hoàn tất"
+        WorkOrderStatus.VERIFIED -> "Đã nghiệm thu"
+        WorkOrderStatus.CANCELLED -> "Đã huỷ"
+    }
+
+fun WorkOrderStatus.badgeColors(): BadgeColors =
+    when (this) {
+        WorkOrderStatus.OPEN -> BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555))
+        WorkOrderStatus.ASSIGNED -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
+        WorkOrderStatus.IN_PROGRESS -> BadgeColors(Color(0xFFFFF3DC), Color(0xFF8A5A00))
+        WorkOrderStatus.DONE -> BadgeColors(Color(0xFFE3F6F1), Color(0xFF1E6B5C))
+        WorkOrderStatus.VERIFIED -> BadgeColors(Color(0xFFD1FAE5), Color(0xFF065F46))
+        WorkOrderStatus.CANCELLED -> BadgeColors(Color(0xFFFBE4E4), Color(0xFF9B2C2C))
+    }
+
+// wo_status arrives from the backend as a snake_case wire string (WireEnum, e.g. "in_progress")
+// - never guess a mapping at the call site, always go through this one function. An unknown
+// value (a status added on the backend before the app knows about it) falls back to OPEN's
+// neutral gray rather than crashing the screen.
+fun workOrderStatusFromWire(value: String): WorkOrderStatus =
+    when (value) {
+        "open" -> WorkOrderStatus.OPEN
+        "assigned" -> WorkOrderStatus.ASSIGNED
+        "in_progress" -> WorkOrderStatus.IN_PROGRESS
+        "done" -> WorkOrderStatus.DONE
+        "verified" -> WorkOrderStatus.VERIFIED
+        "cancelled" -> WorkOrderStatus.CANCELLED
+        else -> WorkOrderStatus.OPEN
+    }

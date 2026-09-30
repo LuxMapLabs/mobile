@@ -46,3 +46,6 @@ appsettings.Production.json
 # Temporary migration artifacts
 migration-preview.sql
 *.sql.bak
+
+# Git worktrees (scratch space for subagent-driven-development)
+.worktrees/

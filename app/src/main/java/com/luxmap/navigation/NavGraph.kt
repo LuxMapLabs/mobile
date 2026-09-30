@@ -30,7 +30,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
-import com.luxmap.core.ui.components.PlaceholderScreen
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -38,6 +37,9 @@ import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
+import com.luxmap.feature.survey.ui.capture.CaptureScreen
+import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
+import com.luxmap.feature.survey.ui.submit.SubmitScreen
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -141,7 +143,32 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 HomeRoute()
             }
             composable(Routes.Survey.route) {
-                PlaceholderScreen(title = "Khảo sát")
+                SurveyPlanScreen(
+                    onEnterCaptureMode = { surveySweepId ->
+                        navController.navigate(Routes.SurveyCapture.createRoute(surveySweepId))
+                    },
+                )
+            }
+            composable(
+                route = Routes.SurveyCapture.route,
+                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
+                CaptureScreen(
+                    surveySweepId = surveySweepId,
+                    onSessionPackaged = { sessionId ->
+                        navController.navigate(Routes.SurveySubmit.createRoute(sessionId)) {
+                            popUpTo(Routes.Survey.route)
+                        }
+                    },
+                )
+            }
+            composable(
+                route = Routes.SurveySubmit.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+                SubmitScreen(sessionId = sessionId)
             }
             composable(Routes.Map.route) {
                 MapScreen(

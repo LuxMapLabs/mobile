@@ -12,25 +12,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.WorkOrderPriority
-import com.luxmap.core.theme.color
+import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.theme.workOrderStatusFromWire
 
-// Thẻ 1 lệnh sửa chữa — cùng field cho F08 (danh sách đầy đủ) lẫn F02 (danh sách rút gọn trên
-// Trang chủ), theo đúng "Thành phần giao diện" của F08 trong đặc tả chi tiết: mã lệnh, địa chỉ
-// rút gọn, loại sự cố, mức ưu tiên (màu + chữ), hạn xử lý (SLA), khoảng cách tới vị trí hiện tại.
-// slaDueAt nhận ISO string thô (như PoleDetail lưu field JSON), format ở đây bằng DateFormatUtils.
+// Thẻ 1 lệnh sửa chữa — dùng chung cho F02 (danh sách rút gọn trên Trang chủ) và F08 (danh sách
+// đầy đủ) sau này, cả 2 đều đọc từ cùng GET /work-orders. Rút gọn còn đúng field API danh sách
+// thật sự trả về (mã lệnh, trạng thái, hạn xử lý, điểm ưu tiên thô) - KHÔNG có địa chỉ/loại sự
+// cố/khoảng cách như mục 6.4 Design System v2.0 mô tả, vì backend list endpoint không trả các
+// field đó (chỉ GET /work-orders/{id} mới có). Sai lệch có chủ đích, ghi ở docs/contract-drift.md.
+// dueDate nhận chuỗi ngày thô "YYYY-MM-DD" (wo_status.due_date), không parse ở đây.
 @Composable
 fun WorkOrderCard(
     workOrderId: String,
-    shortAddress: String,
-    faultTypeLabel: String,
-    priority: WorkOrderPriority,
-    slaDueAt: String?,
-    distanceMeters: Double?,
+    woStatus: String,
+    dueDate: String?,
+    priorityScore: Double?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -47,32 +48,27 @@ fun WorkOrderCard(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(text = workOrderId, style = MaterialTheme.typography.titleMedium)
-            // Priority chỉ có 1 màu chữ, không có nền riêng (mục 2.5 CLAUDE.md) — dùng
-            // TextOnlyStatusBadge, không dùng StatusBadge (StatusBadge cần cặp bg/text).
-            TextOnlyStatusBadge(text = priority.label(), color = priority.color())
+            Text(
+                text = workOrderId,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val status = workOrderStatusFromWire(woStatus)
+            StatusBadge(text = status.label(), colors = status.badgeColors())
         }
-        Text(
-            text = shortAddress,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = faultTypeLabel,
-            style = MaterialTheme.typography.bodyMedium,
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "Hạn: ${DateFormatUtils.formatIsoInstant(slaDueAt)}",
+                text = if (dueDate != null) "Hạn: ${DateFormatUtils.formatPlainDate(dueDate)}" else "Chưa có hạn",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (distanceMeters != null) {
+            if (priorityScore != null) {
                 Text(
-                    text = formatDistance(distanceMeters),
+                    text = "Ưu tiên: ${priorityScore.toInt()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -80,10 +76,3 @@ fun WorkOrderCard(
         }
     }
 }
-
-private fun formatDistance(meters: Double): String =
-    if (meters >= 1000) {
-        "%.1f km".format(meters / 1000)
-    } else {
-        "${meters.toInt()} m"
-    }

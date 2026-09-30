@@ -1,5 +1,6 @@
 package com.luxmap.feature.auth.data
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -30,6 +31,19 @@ data class AuthTokenResponseDto(
     val refresh_token: String,
     val token_type: String,
     val expires_in: Int,
+)
+
+// GET /api/v1/auth/me response (AuthContracts.cs CurrentUserResponse) — read from the database,
+// not decoded from the JWT, so a fresh commune assignment shows up right away instead of waiting
+// for the next login.
+@Serializable
+data class CurrentUserResponseDto(
+    @SerialName("user_id") val userId: String,
+    val username: String,
+    val email: String,
+    @SerialName("full_name") val fullName: String,
+    val role: String,
+    @SerialName("commune_ids") val communeIds: List<String>,
 )
 
 // Shared error shape for the whole API — backend CLAUDE.md section 0:
