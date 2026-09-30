@@ -104,6 +104,24 @@ class CaptureViewModelTest {
         }
 
     @Test
+    fun `a later scan result for the same address with a resolved name replaces the nameless entry`() =
+        runTest {
+            // Some BLE peripherals (e.g. ESP32 devices) put their name in the scan response
+            // packet, not the primary advertisement - Android can call onScanResult once with
+            // name = null before the scan response arrives, then again for the same address
+            // once it does. The list must pick up that later name, not freeze on the first hit.
+            val nameless = LuxDevice(name = null, address = SENSOR_1.address)
+            val (viewModel, _, _) =
+                viewModel(scanResults = listOf(nameless, SENSOR_1))
+
+            viewModel.uiState.test {
+                assertEquals(CaptureUiState.Scanning(), awaitItem())
+                assertEquals(CaptureUiState.Scanning(listOf(nameless)), awaitItem())
+                assertEquals(CaptureUiState.Scanning(listOf(SENSOR_1)), awaitItem())
+            }
+        }
+
+    @Test
     fun `a remembered device connects automatically without scanning`() =
         runTest {
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)

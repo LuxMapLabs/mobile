@@ -212,10 +212,18 @@ class CaptureViewModel
                 viewModelScope.launch {
                     val found = mutableListOf<LuxDevice>()
                     luxDeviceScanner.scan().collect { device ->
-                        if (found.none { it.address == device.address }) {
-                            found += device
-                            _uiState.value = CaptureUiState.Scanning(found.toList())
+                        // Some BLE peripherals (e.g. ESP32 devices) put their name in the scan
+                        // response packet, not the primary advertisement, so the first sighting
+                        // of an address can have name = null with the real name arriving in a
+                        // later scan result for the same address. Update in place instead of
+                        // ignoring it, or that name never shows up in the list.
+                        val index = found.indexOfFirst { it.address == device.address }
+                        when {
+                            index == -1 -> found += device
+                            found[index].name == null && device.name != null -> found[index] = device
+                            else -> return@collect
                         }
+                        _uiState.value = CaptureUiState.Scanning(found.toList())
                     }
                     // The scan window closed with nothing found at all - a device that showed up
                     // and is just waiting to be tapped is left as-is, not turned into a timeout.

@@ -1,42 +1,48 @@
 package com.luxmap.core.ble
 
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-// Byte layout is a PROPOSAL (spec §9), not yet confirmed with the firmware owner — see
-// docs/contract-drift.md. seq: uint16 LE, module_ms: uint32 LE, lux: float32 LE, boot_id: uint8.
-private const val SEQ_MODULO = 65536
+// The real device (LuxMap_ESP32) sends one plain text line per reading over classic Bluetooth
+// SPP, roughly once a second, like: "2026-09-30 23:32:07 | Light: 69.17 lux" - confirmed by a
+// real-device check (2026-09-30), replacing an earlier binary layout that was only ever a
+// proposal (spec §9) and never matched what the firmware actually sends. See docs/contract-drift.md.
+private val LINE_PATTERN = Regex("""^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| Light: ([0-9.]+) lux$""")
+private val TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
 data class LuxSample(
+    // Locally counted from 0 for this connection - the device's own text line carries no
+    // sequence number, so this cannot detect a real dropped reading the way a device-side
+    // counter would. Confirming a real sequence/boot field with the firmware owner is needed
+    // before this can support accurate gap detection for RQ1.
     val seq: Int,
+    // The module's own wall-clock reading for this line, parsed as milliseconds since epoch in
+    // the phone's local zone (the two clocks were observed roughly in sync - not a synchronized
+    // monotonic counter like the earlier binary proposal assumed).
     val moduleMs: Long,
     val phoneElapsedNs: Long,
     val lux: Float,
+    // Always 0 - the device's own text line carries no boot/reset counter to tell reconnects
+    // after a power cycle apart from an ordinary reconnect.
     val bootId: Int,
 )
 
 object LuxPacketCodec {
+    // Returns null for a line that does not match the expected format (a partial read at the
+    // start of a connection, or noise) - the caller skips it rather than crashing the session.
     fun decode(
-        bytes: ByteArray,
+        line: String,
         receivedAtElapsedRealtimeNs: Long,
-    ): LuxSample {
-        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        val seq = buffer.short.toInt() and 0xFFFF
-        val moduleMs = buffer.int.toLong() and 0xFFFFFFFFL
-        val lux = buffer.float
-        val bootId = buffer.get().toInt() and 0xFF
-        return LuxSample(seq, moduleMs, receivedAtElapsedRealtimeNs, lux, bootId)
-    }
-
-    // Counts packets missed between two samples, correctly handling both the uint16 seq wraparound
-    // and a module reboot (bootId change) — a naive (currentSeq - previousSeq - 1) would report a
-    // false ~65000-packet gap at the rollover, and an even bigger false gap across a reboot.
-    fun gapSize(
-        previous: LuxSample,
-        current: LuxSample,
-    ): Int {
-        if (previous.bootId != current.bootId) return 0
-        val forwardDistance = ((current.seq - previous.seq) + SEQ_MODULO) % SEQ_MODULO
-        return (forwardDistance - 1).coerceAtLeast(0)
+        seq: Int,
+    ): LuxSample? {
+        val match = LINE_PATTERN.matchEntire(line.trim()) ?: return null
+        val (timestampText, luxText) = match.destructured
+        val moduleMs =
+            LocalDateTime.parse(timestampText, TIMESTAMP_FORMAT)
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        return LuxSample(seq, moduleMs, receivedAtElapsedRealtimeNs, luxText.toFloat(), bootId = 0)
     }
 }

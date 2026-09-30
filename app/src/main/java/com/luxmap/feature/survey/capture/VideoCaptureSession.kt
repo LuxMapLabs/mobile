@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.capture
 import android.content.Context
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
+import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
@@ -233,6 +234,17 @@ class VideoCaptureSession
                 NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
 
             captureSession = createCaptureSession(cameraDevice, inputSurface, previewSurface, handler)
+
+            // Locking AF_MODE_OFF (below) freezes the lens at whatever LENS_FOCUS_DISTANCE the
+            // profile carries. The caller has no way to know the right distance for the actual
+            // scene, so find it here with a real AF scan before locking - otherwise the profile's
+            // 0-diopter default (infinity focus) locks in and the whole recording comes out
+            // blurry unless the subject really is at infinity.
+            val resolvedFocusDistance = resolveFocusDistance(cameraManager, profile, previewSurface, handler)
+            // TEMPORARY DEBUG LOG - do not commit.
+            Log.d(TAG, "focus debug: resolvedFocusDistance=$resolvedFocusDistance diopters")
+            val lockedProfile = profile.copy(focusDistanceDiopters = resolvedFocusDistance)
+
             val builder =
                 cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
                     addTarget(inputSurface)
@@ -241,7 +253,7 @@ class VideoCaptureSession
                     // that should receive frames - naming the placeholder base instead would leave
                     // the preview black. updatePreviewSurface() swaps this target later.
                     addTarget(previewSurface)
-                    exposureLockController.applyTo(this, profile)
+                    exposureLockController.applyTo(this, lockedProfile)
                 }
             requestBuilder = builder
             captureSession.setRepeatingRequest(builder.build(), captureCallback, handler)
@@ -259,6 +271,74 @@ class VideoCaptureSession
             } catch (timeout: TimeoutCancellationException) {
                 throw IllegalStateException("Encoder produced no output within $FIRST_SEGMENT_TIMEOUT_MS ms", timeout)
             }
+        }
+
+        // The Field Engineer points the camera at the actual pole before pressing record, so a
+        // real AF scan converging on whatever is in frame at that moment is the right target
+        // distance - this is primary. LENS_INFO_HYPERFOCAL_DISTANCE is only a fallback for when
+        // the scan itself cannot converge (e.g. a very low-contrast scene): it is a static value
+        // from the device's reported characteristics, not verified against this device's real
+        // optics, and a real-device check found it locking focus far past where it should for a
+        // close, high-contrast test target - trust a real AF result over it whenever one exists.
+        private suspend fun resolveFocusDistance(
+            cameraManager: CameraManager,
+            requestedProfile: LockedCameraProfile,
+            previewSurface: Surface,
+            handler: Handler,
+        ): Float {
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val minFocusDistance = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+            // A fixed-focus lens reports 0 here and has no LENS_FOCUS_DISTANCE control at all -
+            // nothing to scan for, keep whatever the caller asked for.
+            if (minFocusDistance == null || minFocusDistance <= 0f) return requestedProfile.focusDistanceDiopters
+
+            // Used only if the scan below never reaches a locked AF state at all.
+            val fallbackDistance =
+                characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE)
+                    ?: requestedProfile.focusDistanceDiopters
+            var lastSeenFocusDistance = fallbackDistance
+
+            // Standard Camera2 "tap to focus" sequence, run once on the preview surface before the
+            // locked recording request is ever submitted: a preview-only repeating request in AUTO
+            // mode, one explicit AF_TRIGGER_START, then back to idle while polling CONTROL_AF_STATE
+            // on the same repeating request until it reaches a locked state (found or not found).
+            // Doing this before the recording request means the recording request is only ever
+            // submitted once here - no later resubmit like the AWB lock needs, so no new risk to
+            // the SENSOR_TIMESTAMP pairing (see takeSensorTimestampFor()).
+
+            val converged = CompletableDeferred<Float?>()
+            val afCallback =
+                object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(
+                        session: CameraCaptureSession,
+                        request: CaptureRequest,
+                        result: TotalCaptureResult,
+                    ) {
+                        result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let { lastSeenFocusDistance = it }
+                        when (result.get(CaptureResult.CONTROL_AF_STATE)) {
+                            CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED,
+                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED,
+                            -> converged.complete(result.get(CaptureResult.LENS_FOCUS_DISTANCE))
+                            else -> Unit
+                        }
+                    }
+                }
+
+            val meteringBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                    addTarget(previewSurface)
+                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+                }
+            captureSession.setRepeatingRequest(meteringBuilder.build(), null, handler)
+            meteringBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START)
+            captureSession.capture(meteringBuilder.build(), afCallback, handler)
+            meteringBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_IDLE)
+            captureSession.setRepeatingRequest(meteringBuilder.build(), afCallback, handler)
+
+            // A low-contrast scene (very dark, blank wall) can leave AF_STATE scanning forever -
+            // never block the recording on it, fall back to the hyperfocal distance instead.
+            val resolved = withTimeoutOrNull(AF_CONVERGENCE_TIMEOUT_MS) { converged.await() }
+            return resolved ?: lastSeenFocusDistance
         }
 
         private val captureCallback =
@@ -520,6 +600,7 @@ class VideoCaptureSession
                         isoSensitivity = result.get(CaptureResult.SENSOR_SENSITIVITY) ?: 0,
                         exposureTimeNs = result.get(CaptureResult.SENSOR_EXPOSURE_TIME) ?: 0L,
                         frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
+                        focusDistanceDiopters = result.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: 0f,
                     )
                 return FinalizedVideoCapture(finalSegment, actualProfile, Build.MANUFACTURER, Build.MODEL, cameraId)
             } finally {
@@ -709,6 +790,10 @@ class VideoCaptureSession
             // At 30 fps the first encoded frame lands in well under a second; 10 s only exists so a
             // camera that never delivers a frame fails with a clear error instead of hanging.
             const val FIRST_SEGMENT_TIMEOUT_MS = 10_000L
+
+            // Generous for a one-shot AF scan (typically well under 1s) - only exists so a
+            // low-contrast scene that never converges cannot delay the start of a recording for long.
+            const val AF_CONVERGENCE_TIMEOUT_MS = 3_000L
 
             // ~7 frames at 30 fps. Deliberately loose: it must never fire on normal jitter or on a
             // learned offset that is a frame or two off, only on the kind of gross desync the spike
