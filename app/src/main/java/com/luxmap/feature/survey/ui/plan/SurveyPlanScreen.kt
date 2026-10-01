@@ -9,7 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,10 +27,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.CameraReadinessPanel
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.ReadinessCheckItem
+import com.luxmap.core.ui.components.ReadinessCheckStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 
@@ -65,58 +73,100 @@ private fun hasBlePermissions(context: Context): Boolean =
                 PackageManager.PERMISSION_GRANTED
         )
 
+// F03 is a night-planning screen (Design System v2.0 Dark Mode table), so it forces dark mode
+// no matter the system setting, same rule as F04 Capture Mode.
 @Composable
 fun SurveyPlanScreen(
     onEnterCaptureMode: (surveySweepId: String) -> Unit,
     viewModel: SurveyPlanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    LuxMapTheme(forceDark = true) {
+        SurveyPlanContent(
+            state = uiState,
+            onRouteSelected = viewModel::onRouteSelected,
+            onRetry = viewModel::onRetry,
+            onEnterCaptureMode = onEnterCaptureMode,
+        )
+    }
+}
+
+// Stateless so UI tests can drive every SurveyPlanUiState branch directly, without a ViewModel or
+// Hilt in the loop.
+@Composable
+fun SurveyPlanContent(
+    state: SurveyPlanUiState,
+    onRouteSelected: (String) -> Unit,
+    onRetry: () -> Unit = {},
+    onEnterCaptureMode: (String) -> Unit = {},
+) {
     val context = LocalContext.current
     var hasBlePermissions by remember { mutableStateOf(hasBlePermissions(context)) }
 
-    when (val state = uiState) {
-        is SurveyPlanUiState.Loading ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+    Column(Modifier.fillMaxSize()) {
+        Text(
+            text = "Tuyến khảo sát được giao",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(Spacing.lg),
+        )
+        when (state) {
+            is SurveyPlanUiState.Loading ->
+                Box(
+                    Modifier.fillMaxSize().testTag("survey_plan_loading"),
+                    contentAlignment = Alignment.Center,
+                ) { CircularProgressIndicator() }
+
+            is SurveyPlanUiState.Success -> {
+                // Re-check readiness after the permission prompt closes, no matter the result, so
+                // the checklist shows the real state right away instead of needing the user to
+                // leave and come back to this screen (onRouteSelected already re-runs
+                // SurveyReadinessInputProvider.gather()).
+                val permissionLauncher =
+                    rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+                        hasBlePermissions = hasBlePermissions(context)
+                        state.selectedSurveySweepId?.let(onRouteSelected)
+                    }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    items(state.routes) { route ->
+                        SurveyRouteCard(
+                            route = route,
+                            isSelected = route.surveySweepId == state.selectedSurveySweepId,
+                            readiness =
+                                if (route.surveySweepId == state.selectedSurveySweepId) {
+                                    state.readiness
+                                } else {
+                                    null
+                                },
+                            hasBlePermissions = hasBlePermissions,
+                            onClick = { onRouteSelected(route.surveySweepId) },
+                            onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
+                            onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
+                        )
+                    }
+                }
             }
 
-        is SurveyPlanUiState.Success -> {
-            // Re-check readiness after the permission prompt closes, no matter the result, so the
-            // checklist shows the real state right away instead of needing the user to leave and
-            // come back to this screen (onRouteSelected already re-runs
-            // SurveyReadinessInputProvider.gather()).
-            val permissionLauncher =
-                rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-                    hasBlePermissions = hasBlePermissions(context)
-                    state.selectedSurveySweepId?.let { viewModel.onRouteSelected(it) }
-                }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                items(state.routes) { route ->
-                    SurveyRouteCard(
-                        route = route,
-                        isSelected = route.surveySweepId == state.selectedSurveySweepId,
-                        readiness = if (route.surveySweepId == state.selectedSurveySweepId) state.readiness else null,
-                        hasBlePermissions = hasBlePermissions,
-                        onClick = { viewModel.onRouteSelected(route.surveySweepId) },
-                        onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
-                        onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
+            is SurveyPlanUiState.Empty ->
+                Box(Modifier.fillMaxSize().padding(Spacing.lg), contentAlignment = Alignment.Center) {
+                    Text(
+                        "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
                     )
                 }
-            }
+
+            is SurveyPlanUiState.Error ->
+                Box(Modifier.fillMaxSize().padding(Spacing.lg), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(state.message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(Spacing.md))
+                        PrimaryButton(text = "Thử lại", onClick = onRetry)
+                    }
+                }
         }
-
-        is SurveyPlanUiState.Empty ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Chưa có tuyến khảo sát nào được giao", style = MaterialTheme.typography.bodyLarge)
-            }
-
-        is SurveyPlanUiState.Error ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(state.message, style = MaterialTheme.typography.bodyLarge)
-            }
     }
 }
 
@@ -163,33 +213,36 @@ private fun SurveyRouteCard(
 
 @Composable
 private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
-    Column {
-        ReadinessRow("Quyền camera", readiness.cameraPermissionGranted)
-        ReadinessRow("Khoá exposure hỗ trợ", readiness.exposureLockSupported)
-        ReadinessRow("Đồng hồ cảm biến REALTIME", readiness.timestampSourceRealtime)
-        ReadinessRow("GPS", readiness.gpsAvailable)
-        ReadinessRow("Đủ dung lượng trống", readiness.freeStorageBytes >= readiness.requiredStorageBytes)
-        ReadinessRow("Pin đủ (>= 20%)", readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT)
-        if (!readiness.timestampSourceRealtime) {
-            // Hard block, not just a warning (spec §10) — the label makes clear this is a device
-            // support issue, not a transient check that will pass on retry.
-            Text(
-                "Thiết bị này không được hỗ trợ khảo sát (đồng hồ cảm biến camera không đạt yêu cầu)",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
+    val items =
+        listOf(
+            ReadinessCheckItem("Quyền camera", readiness.cameraPermissionGranted.toStatus()),
+            ReadinessCheckItem("Khoá exposure hỗ trợ", readiness.exposureLockSupported.toStatus()),
+            ReadinessCheckItem(
+                "Đồng hồ cảm biến REALTIME",
+                readiness.timestampSourceRealtime.toStatus(),
+                fixHint =
+                    if (!readiness.timestampSourceRealtime) {
+                        "Thiết bị này không được hỗ trợ khảo sát (đồng hồ cảm biến camera không đạt yêu cầu)"
+                    } else {
+                        null
+                    },
+            ),
+            ReadinessCheckItem("GPS", readiness.gpsAvailable.toStatus()),
+            ReadinessCheckItem(
+                "Heading",
+                readiness.headingAvailable.toStatus(),
+                fixHint = if (!readiness.headingAvailable) "Thiết bị không có cảm biến la bàn" else null,
+            ),
+            ReadinessCheckItem(
+                "Đủ dung lượng trống",
+                (readiness.freeStorageBytes >= readiness.requiredStorageBytes).toStatus(),
+            ),
+            ReadinessCheckItem(
+                "Pin đủ (>= 20%)",
+                (readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT).toStatus(),
+            ),
+        )
+    CameraReadinessPanel(items)
 }
 
-@Composable
-private fun ReadinessRow(
-    label: String,
-    passed: Boolean,
-) {
-    Text(
-        text = "${if (passed) "✓" else "✗"} $label",
-        color = if (passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.bodySmall,
-    )
-}
+private fun Boolean.toStatus() = if (this) ReadinessCheckStatus.PASS else ReadinessCheckStatus.FAIL

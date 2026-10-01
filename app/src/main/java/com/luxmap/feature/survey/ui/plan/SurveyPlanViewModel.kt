@@ -25,6 +25,16 @@ class SurveyPlanViewModel
         val uiState: StateFlow<SurveyPlanUiState> = _uiState.asStateFlow()
 
         init {
+            loadRoutes()
+        }
+
+        fun onRetry() {
+            if (_uiState.value !is SurveyPlanUiState.Error) return
+            _uiState.value = SurveyPlanUiState.Loading
+            loadRoutes()
+        }
+
+        private fun loadRoutes() {
             viewModelScope.launch {
                 repository
                     .observeAssignedRoutes()
@@ -32,11 +42,7 @@ class SurveyPlanViewModel
                         _uiState.value = SurveyPlanUiState.Error(e.message ?: "Không tải được tuyến khảo sát")
                     }.collect { routes ->
                         _uiState.value =
-                            if (routes.isEmpty()) {
-                                SurveyPlanUiState.Empty
-                            } else {
-                                SurveyPlanUiState.Success(routes)
-                            }
+                            if (routes.isEmpty()) SurveyPlanUiState.Empty else SurveyPlanUiState.Success(routes)
                     }
             }
         }
