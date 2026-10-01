@@ -96,4 +96,46 @@ class SurveyTrackRecorderTest {
 
         assertNull(point.speedMps)
     }
+
+    @Test
+    fun `total distance starts at zero before any fix`() {
+        val recorder = SurveyTrackRecorder()
+        assertEquals(0f, recorder.totalDistanceMeters.value)
+    }
+
+    @Test
+    fun `total distance stays zero after only one fix`() {
+        val recorder = SurveyTrackRecorder()
+        recorder.onLocationUpdate(fakeLocation(elapsedRealtimeNs = 0L))
+        assertEquals(0f, recorder.totalDistanceMeters.value)
+    }
+
+    @Test
+    fun `total distance accumulates the real distance between two fixes`() {
+        val recorder = SurveyTrackRecorder()
+        val first = fakeLocation(elapsedRealtimeNs = 0L, lat = 10.0, lng = 106.0)
+        val second = fakeLocation(elapsedRealtimeNs = 1_000_000_000L, lat = 10.0001, lng = 106.0)
+        every { first.distanceTo(second) } returns 11.1f
+
+        recorder.onLocationUpdate(first)
+        recorder.onLocationUpdate(second)
+
+        assertEquals(11.1f, recorder.totalDistanceMeters.value)
+    }
+
+    @Test
+    fun `total distance keeps accumulating across three or more fixes`() {
+        val recorder = SurveyTrackRecorder()
+        val a = fakeLocation(elapsedRealtimeNs = 0L)
+        val b = fakeLocation(elapsedRealtimeNs = 1_000_000_000L)
+        val c = fakeLocation(elapsedRealtimeNs = 2_000_000_000L)
+        every { a.distanceTo(b) } returns 10f
+        every { b.distanceTo(c) } returns 5f
+
+        recorder.onLocationUpdate(a)
+        recorder.onLocationUpdate(b)
+        recorder.onLocationUpdate(c)
+
+        assertEquals(15f, recorder.totalDistanceMeters.value)
+    }
 }

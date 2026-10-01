@@ -41,6 +41,11 @@ class LocationHeadingRecorder
         private val _gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
         val gpsSignalState: StateFlow<GpsSignalState> = _gpsSignalState.asStateFlow()
 
+        private val _livePoint = MutableStateFlow<com.luxmap.core.location.TrackPoint?>(null)
+        val livePoint: StateFlow<com.luxmap.core.location.TrackPoint?> = _livePoint.asStateFlow()
+
+        val distanceMeters: StateFlow<Float> get() = trackRecorder.totalDistanceMeters
+
         @SuppressLint("MissingPermission")
         fun start(
             gpsWriter: NdjsonLogWriter,
@@ -52,6 +57,7 @@ class LocationHeadingRecorder
                     override fun onLocationResult(result: LocationResult) {
                         val location = result.lastLocation ?: return
                         val point = trackRecorder.onLocationUpdate(location)
+                        _livePoint.value = point
                         val json =
                             """{"elapsed_realtime_ns":${point.elapsedRealtimeNs},""" +
                                 """"lat":${point.lat},"lng":${point.lng},""" +

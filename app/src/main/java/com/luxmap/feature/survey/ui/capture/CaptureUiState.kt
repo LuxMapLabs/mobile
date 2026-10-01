@@ -26,6 +26,12 @@ sealed interface CaptureUiState {
     data class Recording(
         val gpsSignalLost: Boolean = false,
         val bleGapDetected: Boolean = false,
+        val durationSeconds: Long = 0,
+        val distanceMeters: Float = 0f,
+        val gpsAccuracyMeters: Float? = null,
+        val headingDeg: Float? = null,
+        val latestLuxValue: Float? = null,
+        val freeStorageBytes: Long? = null,
     ) : CaptureUiState
 
     data object Packaging : CaptureUiState

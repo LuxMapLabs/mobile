@@ -1,6 +1,9 @@
 package com.luxmap.core.location
 
 import android.location.Location
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 // gpsBearingDeg/speedMps share the fix's own elapsedRealtimeNs (spec §8) — they come from the
@@ -27,6 +30,9 @@ class SurveyTrackRecorder
     constructor() {
         private val signalLostThresholdMs: Long = 10_000L
 
+        private val _totalDistanceMeters = MutableStateFlow(0f)
+        val totalDistanceMeters: StateFlow<Float> = _totalDistanceMeters.asStateFlow()
+
         // Volatile because onLocationUpdate() runs on the main-looper location callback thread
         // while onTick() runs on LocationHeadingRecorder's own Timer thread (Task 17b) — without
         // this, a write on one thread is not guaranteed to be visible when the other thread reads
@@ -34,7 +40,13 @@ class SurveyTrackRecorder
         @Volatile
         private var lastFixElapsedRealtimeNs: Long? = null
 
+        // Null only before the first fix of the session - nothing to measure a distance against yet.
+        @Volatile
+        private var lastLocation: Location? = null
+
         fun onLocationUpdate(location: Location): TrackPoint {
+            lastLocation?.let { previous -> _totalDistanceMeters.value += previous.distanceTo(location) }
+            lastLocation = location
             lastFixElapsedRealtimeNs = location.elapsedRealtimeNanos
             return TrackPoint(
                 elapsedRealtimeNs = location.elapsedRealtimeNanos,
