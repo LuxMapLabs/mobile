@@ -23,9 +23,6 @@ data class LuxSample(
     val moduleMs: Long,
     val phoneElapsedNs: Long,
     val lux: Float,
-    // Always 0 - the device's own text line carries no boot/reset counter to tell reconnects
-    // after a power cycle apart from an ordinary reconnect.
-    val bootId: Int,
 )
 
 object LuxPacketCodec {
@@ -43,6 +40,6 @@ object LuxPacketCodec {
                 .atZone(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
-        return LuxSample(seq, moduleMs, receivedAtElapsedRealtimeNs, luxText.toFloat(), bootId = 0)
+        return LuxSample(seq, moduleMs, receivedAtElapsedRealtimeNs, luxText.toFloat())
     }
 }
