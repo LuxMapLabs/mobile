@@ -23,7 +23,7 @@ class LuxPacketCodecTest {
                 .toInstant()
                 .toEpochMilli()
         assertEquals(
-            LuxSample(seq = 10, moduleMs = expectedModuleMs, phoneElapsedNs = 999L, lux = 69.17f, bootId = 0),
+            LuxSample(seq = 10, moduleMs = expectedModuleMs, phoneElapsedNs = 999L, lux = 69.17f),
             decoded,
         )
     }

@@ -249,8 +249,7 @@ class SurveyCaptureService : Service() {
                 luxClient.samples.collect { sample ->
                     luxWriter.appendLine(
                         """{"seq":${sample.seq},"module_ms":${sample.moduleMs},""" +
-                            """"phone_elapsed_ns":${sample.phoneElapsedNs},"lux":${sample.lux},""" +
-                            """"boot_id":${sample.bootId}}""",
+                            """"phone_elapsed_ns":${sample.phoneElapsedNs},"lux":${sample.lux}}""",
                     )
                 }
             }
