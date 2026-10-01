@@ -103,6 +103,7 @@ class SurveyPlanViewModelTest {
                     exposureLockSupported = true,
                     timestampSourceRealtime = false,
                     gpsAvailable = true,
+                    headingAvailable = true,
                     freeStorageBytes = 2_000_000_000L,
                     requiredStorageBytes = 1_000_000_000L,
                     batteryPercent = 80,
