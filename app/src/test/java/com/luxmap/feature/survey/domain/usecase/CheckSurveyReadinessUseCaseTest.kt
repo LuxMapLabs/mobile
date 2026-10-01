@@ -13,6 +13,7 @@ class CheckSurveyReadinessUseCaseTest {
             exposureLockSupported = true,
             timestampSourceRealtime = true,
             gpsAvailable = true,
+            headingAvailable = true,
             freeStorageBytes = 2_000_000_000L,
             requiredStorageBytes = 1_000_000_000L,
             batteryPercent = 80,
@@ -43,5 +44,15 @@ class CheckSurveyReadinessUseCaseTest {
         val result = useCase(readyInput().copy(batteryPercent = 10))
 
         assertFalse(result.isReady)
+    }
+
+    @Test
+    fun `is not ready when heading sensor is unavailable`() {
+        val input = readyInput().copy(headingAvailable = false)
+
+        val result = useCase(input)
+
+        assertFalse(result.isReady)
+        assertFalse(result.headingAvailable)
     }
 }

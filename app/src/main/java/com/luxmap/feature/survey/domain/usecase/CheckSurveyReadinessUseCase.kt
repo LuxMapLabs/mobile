@@ -9,6 +9,7 @@ data class SurveyReadinessInput(
     val exposureLockSupported: Boolean,
     val timestampSourceRealtime: Boolean,
     val gpsAvailable: Boolean,
+    val headingAvailable: Boolean,
     val freeStorageBytes: Long,
     val requiredStorageBytes: Long,
     val batteryPercent: Int,
@@ -19,6 +20,7 @@ data class SurveyReadinessResult(
     val exposureLockSupported: Boolean,
     val timestampSourceRealtime: Boolean,
     val gpsAvailable: Boolean,
+    val headingAvailable: Boolean,
     val freeStorageBytes: Long,
     val requiredStorageBytes: Long,
     val batteryPercent: Int,
@@ -31,6 +33,7 @@ data class SurveyReadinessResult(
                 exposureLockSupported &&
                 timestampSourceRealtime &&
                 gpsAvailable &&
+                headingAvailable &&
                 freeStorageBytes >= requiredStorageBytes &&
                 batteryPercent >= MIN_BATTERY_PERCENT
 
@@ -48,6 +51,7 @@ class CheckSurveyReadinessUseCase
                 exposureLockSupported = input.exposureLockSupported,
                 timestampSourceRealtime = input.timestampSourceRealtime,
                 gpsAvailable = input.gpsAvailable,
+                headingAvailable = input.headingAvailable,
                 freeStorageBytes = input.freeStorageBytes,
                 requiredStorageBytes = input.requiredStorageBytes,
                 batteryPercent = input.batteryPercent,
