@@ -10,10 +10,10 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
 import android.location.LocationManager
 import android.os.BatteryManager
-import android.os.StatFs
 import androidx.core.content.ContextCompat
 import com.luxmap.core.camera.CameraSelector
 import com.luxmap.core.camera.ExposureLockController
+import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.LocationTracker
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
@@ -33,6 +33,7 @@ class RealSurveyReadinessInputProvider
         @ApplicationContext private val context: Context,
         private val exposureLockController: ExposureLockController,
         private val locationTracker: LocationTracker,
+        private val storageMonitor: StorageMonitor,
     ) : SurveyReadinessInputProvider {
         override suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput {
             val cameraManager = context.getSystemService(CameraManager::class.java)
@@ -68,7 +69,6 @@ class RealSurveyReadinessInputProvider
             val rotationVectorSensorAvailable =
                 sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
 
-            val statFs = StatFs(context.filesDir.path)
             val batteryManager = context.getSystemService(BatteryManager::class.java)
 
             return SurveyReadinessInput(
@@ -79,7 +79,7 @@ class RealSurveyReadinessInputProvider
                 timestampSourceRealtime = timestampSourceRealtime,
                 gpsAvailable = locationTracker.hasLocationPermission() && gpsProviderEnabled,
                 headingAvailable = rotationVectorSensorAvailable,
-                freeStorageBytes = statFs.availableBytes,
+                freeStorageBytes = storageMonitor.freeBytes(),
                 requiredStorageBytes = estimateRequiredStorageBytes(route),
                 batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
             )
