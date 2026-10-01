@@ -47,12 +47,14 @@ class CheckSurveyReadinessUseCaseTest {
     }
 
     @Test
-    fun `is not ready when heading sensor is unavailable`() {
+    fun `is still ready when heading sensor is unavailable`() {
+        // Project owner decision (2026-10-02): a missing heading sensor must not block F03 entry
+        // anymore. headingAvailable is still captured on the result, just not part of isReady.
         val input = readyInput().copy(headingAvailable = false)
 
         val result = useCase(input)
 
-        assertFalse(result.isReady)
+        assertTrue(result.isReady)
         assertFalse(result.headingAvailable)
     }
 }

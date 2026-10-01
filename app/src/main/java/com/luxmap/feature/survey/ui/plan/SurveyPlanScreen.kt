@@ -228,11 +228,9 @@ private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
                     },
             ),
             ReadinessCheckItem("GPS", readiness.gpsAvailable.toStatus()),
-            ReadinessCheckItem(
-                "Heading",
-                readiness.headingAvailable.toStatus(),
-                fixHint = if (!readiness.headingAvailable) "Thiết bị không có cảm biến la bàn" else null,
-            ),
+            // Heading is intentionally not shown here anymore (project owner decision, 2026-10-02):
+            // a missing heading sensor must not block or worry the user at F03 - see the comment on
+            // SurveyReadinessResult.isReady for the matching change on the gating side.
             ReadinessCheckItem(
                 "Đủ dung lượng trống",
                 (readiness.freeStorageBytes >= readiness.requiredStorageBytes).toStatus(),
