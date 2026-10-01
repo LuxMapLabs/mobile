@@ -8,12 +8,14 @@ import com.luxmap.core.ble.LuxDevice
 import com.luxmap.core.ble.LuxDevicePreferences
 import com.luxmap.core.ble.LuxDeviceScanner
 import com.luxmap.core.ble.LuxSensorBleClient
+import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +32,7 @@ class CaptureViewModel
         private val luxDeviceScanner: LuxDeviceScanner,
         private val luxDevicePreferences: LuxDevicePreferences,
         private val captureController: SurveyCaptureController,
+        private val storageMonitor: StorageMonitor,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.Scanning())
         val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
@@ -52,6 +55,11 @@ class CaptureViewModel
         // onPreviewSurfaceLost). This guards only the StartingRecording branch against firing a
         // SECOND time before the first call has resolved to Recording.
         private var startingSessionRequested = false
+
+        // The 4 live collectors started once Recording begins (lux, gps point, distance, duration
+        // + storage ticker) - held here so onStopRecording() can cancel all of them in one place,
+        // the same way scanJob is cancelled before a new scan starts.
+        private var recordingJobs: MutableList<Job> = mutableListOf()
 
         init {
             viewModelScope.launch {
@@ -98,12 +106,15 @@ class CaptureViewModel
                         // always starting at false - a GPS or BLE issue that happened while the
                         // camera was still opening must not be silently dropped the instant the
                         // screen reaches Recording.
-                        RecordingStartResult.Ready ->
+                        RecordingStartResult.Ready -> {
                             _uiState.value =
                                 CaptureUiState.Recording(
                                     gpsSignalLost = captureController.gpsSignalState.value == GpsSignalState.Lost,
                                     bleGapDetected = luxClient.connectionState.value == BleConnectionState.Disconnected,
+                                    freeStorageBytes = storageMonitor.freeBytes(),
                                 )
+                            startRecordingTimersAndCollectors()
+                        }
 
                         is RecordingStartResult.Failed -> _uiState.value = CaptureUiState.PackagingFailed(result.reason)
                         null -> Unit
@@ -179,6 +190,7 @@ class CaptureViewModel
 
         fun onStopRecording() {
             if (_uiState.value !is CaptureUiState.Recording) return
+            recordingJobs.forEach { it.cancel() }
             _uiState.value = CaptureUiState.Packaging
             viewModelScope.launch {
                 when (val result = captureController.stopSession().first()) {
@@ -197,6 +209,49 @@ class CaptureViewModel
         fun onDismissFailure() {
             if (_uiState.value !is CaptureUiState.PackagingFailed) return
             viewModelScope.launch { captureController.stopSession().first() }
+        }
+
+        // Starts the 4 live collectors that keep Recording's fields updated while a session runs.
+        // Each one runs independently so a slow or stalled stream (e.g. no lux samples yet) never
+        // blocks the others from updating.
+        private fun startRecordingTimersAndCollectors() {
+            recordingJobs.forEach { it.cancel() }
+            recordingJobs =
+                mutableListOf(
+                    viewModelScope.launch {
+                        luxClient.samples.collect { sample ->
+                            updateRecording { it.copy(latestLuxValue = sample.lux) }
+                        }
+                    },
+                    viewModelScope.launch {
+                        captureController.liveGpsPoint.collect { point ->
+                            updateRecording {
+                                it.copy(gpsAccuracyMeters = point?.accuracyM, headingDeg = point?.gpsBearingDeg)
+                            }
+                        }
+                    },
+                    viewModelScope.launch {
+                        captureController.distanceMeters.collect { distance ->
+                            updateRecording { it.copy(distanceMeters = distance) }
+                        }
+                    },
+                    viewModelScope.launch {
+                        var elapsedSeconds = 0L
+                        while (true) {
+                            delay(1_000)
+                            elapsedSeconds += 1
+                            val freeBytes = storageMonitor.freeBytes()
+                            updateRecording { it.copy(durationSeconds = elapsedSeconds, freeStorageBytes = freeBytes) }
+                        }
+                    },
+                )
+        }
+
+        // No-op once the screen has left Recording (packaging/packaged/failed) - a collector that
+        // fires one more time right after the state already moved on must not resurrect Recording.
+        private fun updateRecording(transform: (CaptureUiState.Recording) -> CaptureUiState.Recording) {
+            val current = _uiState.value
+            if (current is CaptureUiState.Recording) _uiState.value = transform(current)
         }
 
         private fun connectTo(device: LuxDevice) {

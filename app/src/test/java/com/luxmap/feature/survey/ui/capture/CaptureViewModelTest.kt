@@ -6,8 +6,11 @@ import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxDevice
 import com.luxmap.core.ble.LuxDevicePreferences
 import com.luxmap.core.ble.LuxDeviceScanner
+import com.luxmap.core.ble.LuxSample
 import com.luxmap.core.ble.LuxSensorBleClient
+import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.GpsSignalState
+import com.luxmap.core.location.TrackPoint
 import com.luxmap.feature.survey.capture.PackageResult
 import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
@@ -20,9 +23,11 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -57,11 +62,13 @@ class CaptureViewModelTest {
         scanResults: List<LuxDevice> = emptyList(),
         gpsSignalState: MutableStateFlow<GpsSignalState> = MutableStateFlow(GpsSignalState.Ok),
         recordingStartResult: MutableStateFlow<RecordingStartResult?> = MutableStateFlow(null),
+        storageMonitor: StorageMonitor = mockk<StorageMonitor>().also { every { it.freeBytes() } returns 0L },
     ): Triple<CaptureViewModel, LuxSensorBleClient, SurveyCaptureController> {
         val luxClient = mockk<LuxSensorBleClient>()
         every { luxClient.connectionState } returns connectionState
         every { luxClient.connect(any()) } just Runs
         every { luxClient.disconnect() } just Runs
+        every { luxClient.samples } returns MutableSharedFlow(extraBufferCapacity = 1)
 
         val scanner = mockk<LuxDeviceScanner>()
         every { scanner.scan() } returns flowOf(*scanResults.toTypedArray())
@@ -76,7 +83,7 @@ class CaptureViewModelTest {
         every { controller.liveGpsPoint } returns MutableStateFlow(null)
         every { controller.distanceMeters } returns MutableStateFlow(0f)
 
-        val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller)
+        val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller, storageMonitor)
         return Triple(viewModel, luxClient, controller)
     }
 
@@ -157,7 +164,9 @@ class CaptureViewModelTest {
             val controller = mockk<SurveyCaptureController>(relaxed = true)
             every { controller.gpsSignalState } returns MutableStateFlow(GpsSignalState.Ok)
             every { controller.recordingStartResult } returns MutableStateFlow(null)
-            val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller)
+            val storageMonitor = mockk<StorageMonitor>()
+            every { storageMonitor.freeBytes() } returns 0L
+            val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller, storageMonitor)
 
             viewModel.uiState.test {
                 awaitItem() // Scanning()
@@ -350,5 +359,115 @@ class CaptureViewModelTest {
                 val warned = awaitItem() as CaptureUiState.Recording
                 assertEquals(true, warned.gpsSignalLost)
             }
+        }
+
+    // Drives the ViewModel from Ready through StartingRecording into Recording, the same
+    // sequence the already-passing "pressing start..." test above uses - onStartRecording()
+    // only works from Ready, and recordingStartResult must change value (not just already equal
+    // Ready from the start) for its StateFlow collector to fire while the state is
+    // StartingRecording. Returns once Recording is reached and its 4 new collectors are running.
+    //
+    // Deliberately uses runCurrent(), never advanceUntilIdle(), from this point on: Recording
+    // starts a duration ticker that loops on delay(1_000) forever, so advanceUntilIdle() would
+    // never find the scheduler idle and hang the test.
+    private fun TestScope.startRecordingAndReachRecordingState(
+        viewModel: CaptureViewModel,
+        recordingStartResult: MutableStateFlow<RecordingStartResult?>,
+    ) {
+        dispatcher.scheduler.advanceUntilIdle() // let the remembered device connect, reaching Ready
+        viewModel.onStartRecording("SWEEP-1")
+        viewModel.onPreviewSurfaceReady(mockk())
+        recordingStartResult.value = RecordingStartResult.Ready
+        dispatcher.scheduler.runCurrent()
+    }
+
+    @Test
+    fun `recording state picks up the latest lux sample`() =
+        runTest {
+            val samples = MutableSharedFlow<LuxSample>(extraBufferCapacity = 1)
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, luxClient, _) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            every { luxClient.samples } returns samples
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            samples.emit(LuxSample(seq = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f, bootId = 0))
+            dispatcher.scheduler.runCurrent()
+
+            val state = viewModel.uiState.value
+            assertTrue(state is CaptureUiState.Recording)
+            assertEquals(42.5f, (state as CaptureUiState.Recording).latestLuxValue)
+        }
+
+    @Test
+    fun `recording state picks up live gps accuracy and distance`() =
+        runTest {
+            val liveGpsPoint = MutableStateFlow<TrackPoint?>(null)
+            val distanceMeters = MutableStateFlow(0f)
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            every { controller.liveGpsPoint } returns liveGpsPoint
+            every { controller.distanceMeters } returns distanceMeters
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            liveGpsPoint.value = TrackPoint(0L, 10.0, 106.0, accuracyM = 7.5f, gpsBearingDeg = 90f, speedMps = null)
+            distanceMeters.value = 123f
+            dispatcher.scheduler.runCurrent()
+
+            val state = viewModel.uiState.value as CaptureUiState.Recording
+            assertEquals(7.5f, state.gpsAccuracyMeters)
+            assertEquals(90f, state.headingDeg)
+            assertEquals(123f, state.distanceMeters)
+        }
+
+    @Test
+    fun `recording state duration advances with each tick`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, _) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            dispatcher.scheduler.advanceTimeBy(3_000)
+            dispatcher.scheduler.runCurrent()
+
+            val state = viewModel.uiState.value as CaptureUiState.Recording
+            assertEquals(3L, state.durationSeconds)
+        }
+
+    @Test
+    fun `recording state reports free storage from the storage monitor`() =
+        runTest {
+            val storageMonitor = mockk<StorageMonitor>()
+            every { storageMonitor.freeBytes() } returns 2_000_000_000L
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, _) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                    storageMonitor = storageMonitor,
+                )
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            val state = viewModel.uiState.value as CaptureUiState.Recording
+            assertEquals(2_000_000_000L, state.freeStorageBytes)
         }
 }
