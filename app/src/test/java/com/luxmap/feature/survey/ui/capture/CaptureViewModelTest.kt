@@ -493,10 +493,19 @@ class CaptureViewModelTest {
             }
         }
 
+    // Seeding gpsSignalState at Lost from the start (like the test above seeds Ok) would be wrong
+    // here: a StateFlow's very first collected value arrives before Recording is reached, so the
+    // if (current is Recording) guard skips it, and the Recording seed branch in Task 10's code
+    // (RecordingStartResult.Ready) reads gpsSignalState.value directly - it does not go through
+    // the collector this task changed, so it never pulses either. warningPulses would then never
+    // emit anything at all, and awaitItem() would hang forever instead of actually checking
+    // anything. So this test must start at Ok and drive one real Ok -> Lost transition itself,
+    // the same way the test above does, before checking that a second write of the same value
+    // does not add a second pulse.
     @Test
     fun `warning pulse does not repeat while gps signal stays lost`() =
         runTest {
-            val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Lost)
+            val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
             val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
             val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
             val (viewModel, _, controller) =
@@ -509,8 +518,15 @@ class CaptureViewModelTest {
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
             viewModel.warningPulses.test {
-                awaitItem() // the transition into Recording already picked up the lost signal once
-                gpsSignalState.value = GpsSignalState.Lost // no real transition - same value again
+                gpsSignalState.value = GpsSignalState.Lost // real transition - exactly one pulse expected
+                dispatcher.scheduler.runCurrent()
+                awaitItem()
+
+                // Same value written again - a StateFlow conflates equal values and never
+                // re-delivers them to collect, so this never even reaches the pulse guard in
+                // CaptureViewModel. Checking it anyway matches what a caller of warningPulses
+                // actually observes: no second pulse while the signal stays lost.
+                gpsSignalState.value = GpsSignalState.Lost
                 dispatcher.scheduler.runCurrent()
                 expectNoEvents()
             }
