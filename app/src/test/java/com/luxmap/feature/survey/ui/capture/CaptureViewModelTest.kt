@@ -73,6 +73,8 @@ class CaptureViewModelTest {
         val controller = mockk<SurveyCaptureController>(relaxed = true)
         every { controller.gpsSignalState } returns gpsSignalState
         every { controller.recordingStartResult } returns recordingStartResult
+        every { controller.liveGpsPoint } returns MutableStateFlow(null)
+        every { controller.distanceMeters } returns MutableStateFlow(0f)
 
         val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller)
         return Triple(viewModel, luxClient, controller)

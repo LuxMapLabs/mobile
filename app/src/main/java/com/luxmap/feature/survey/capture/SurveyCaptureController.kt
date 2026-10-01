@@ -51,6 +51,8 @@ interface SurveyCaptureController {
 
     val gpsSignalState: StateFlow<GpsSignalState>
     val recordingStartResult: StateFlow<RecordingStartResult?>
+    val liveGpsPoint: StateFlow<com.luxmap.core.location.TrackPoint?>
+    val distanceMeters: StateFlow<Float>
 }
 
 @Singleton
@@ -74,6 +76,12 @@ class RealSurveyCaptureController
         override val recordingStartResult: StateFlow<RecordingStartResult?> = _recordingStartResult.asStateFlow()
 
         private var recordingStartForwardingJob: Job? = null
+
+        private val _liveGpsPoint = MutableStateFlow<com.luxmap.core.location.TrackPoint?>(null)
+        override val liveGpsPoint: StateFlow<com.luxmap.core.location.TrackPoint?> = _liveGpsPoint.asStateFlow()
+
+        private val _distanceMeters = MutableStateFlow(0f)
+        override val distanceMeters: StateFlow<Float> = _distanceMeters.asStateFlow()
 
         // Explicit type needed: onServiceDisconnected below refers to `connection` by name to
         // rebind, and without an annotation here Kotlin can't infer this property's own type from
@@ -99,6 +107,8 @@ class RealSurveyCaptureController
                         controllerScope.launch {
                             service.recordingStartResult.collect { _recordingStartResult.value = it }
                         }
+                    controllerScope.launch { service.liveGpsPoint.collect { _liveGpsPoint.value = it } }
+                    controllerScope.launch { service.distanceMeters.collect { _distanceMeters.value = it } }
                 }
 
                 // unbindService() itself never triggers this callback (see startSession's own

@@ -136,6 +136,12 @@ class SurveyCaptureService : Service() {
     val gpsSignalState: StateFlow<com.luxmap.core.location.GpsSignalState>
         get() = locationHeadingRecorder.gpsSignalState
 
+    val liveGpsPoint: StateFlow<com.luxmap.core.location.TrackPoint?>
+        get() = locationHeadingRecorder.livePoint
+
+    val distanceMeters: StateFlow<Float>
+        get() = locationHeadingRecorder.distanceMeters
+
     inner class LocalBinder : Binder() {
         fun service(): SurveyCaptureService = this@SurveyCaptureService
     }
@@ -429,6 +435,7 @@ class SurveyCaptureService : Service() {
                         if (session.recordingState == STATE_RECORDING) STATE_STOPPED else session.recordingState,
                     endedAtUtc = endedAtUtc,
                     durationSeconds = durationSeconds,
+                    distanceMeters = locationHeadingRecorder.distanceMeters.value.toDouble(),
                     captureConfigFilePath = captureConfigFile.absolutePath,
                     updatedAt = Instant.now(),
                 ),
