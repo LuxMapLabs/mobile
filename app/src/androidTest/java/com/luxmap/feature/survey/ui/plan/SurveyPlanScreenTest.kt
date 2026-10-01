@@ -47,7 +47,9 @@ class SurveyPlanScreenTest {
         composeRule.setContent {
             LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Empty, onRouteSelected = {}) }
         }
-        composeRule.onNodeWithText("Chưa có tuyến nào được phân công").assertExists()
+        // substring = true because the real Empty state text adds a contact hint after this part
+        // (see SurveyPlanContent) - onNodeWithText needs an exact match otherwise.
+        composeRule.onNodeWithText("Chưa có tuyến nào được phân công", substring = true).assertExists()
     }
 
     @Test
