@@ -16,8 +16,11 @@ import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -36,6 +39,13 @@ class CaptureViewModel
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.Scanning())
         val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
+
+        // Fires once per real false->true transition of gpsSignalLost/bleGapDetected, not on
+        // every update - the screen (a later task) turns each pulse into one vibration. Kept as a
+        // SharedFlow, not part of CaptureUiState, because a pulse is a one-time event, not state
+        // that should replay or be read back from uiState.value.
+        private val _warningPulses = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val warningPulses: SharedFlow<Unit> = _warningPulses.asSharedFlow()
 
         private var sessionId: String = ""
 
@@ -83,8 +93,11 @@ class CaptureViewModel
 
                         // Does not regress out of Recording on a mid-session drop (spec §11) — just
                         // raises the warning flag on the existing Recording state.
-                        is CaptureUiState.Recording ->
-                            _uiState.value = current.copy(bleGapDetected = state == BleConnectionState.Disconnected)
+                        is CaptureUiState.Recording -> {
+                            val gapDetected = state == BleConnectionState.Disconnected
+                            if (gapDetected && !current.bleGapDetected) _warningPulses.tryEmit(Unit)
+                            _uiState.value = current.copy(bleGapDetected = gapDetected)
+                        }
 
                         else -> Unit
                     }
@@ -94,7 +107,9 @@ class CaptureViewModel
                 captureController.gpsSignalState.collect { state ->
                     val current = _uiState.value
                     if (current is CaptureUiState.Recording) {
-                        _uiState.value = current.copy(gpsSignalLost = state == GpsSignalState.Lost)
+                        val lost = state == GpsSignalState.Lost
+                        if (lost && !current.gpsSignalLost) _warningPulses.tryEmit(Unit)
+                        _uiState.value = current.copy(gpsSignalLost = lost)
                     }
                 }
             }

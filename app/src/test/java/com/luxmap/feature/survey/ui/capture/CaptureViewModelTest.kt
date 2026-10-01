@@ -470,4 +470,49 @@ class CaptureViewModelTest {
             val state = viewModel.uiState.value as CaptureUiState.Recording
             assertEquals(2_000_000_000L, state.freeStorageBytes)
         }
+
+    @Test
+    fun `warning pulse fires once when gps signal is first lost`() =
+        runTest {
+            val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            every { controller.gpsSignalState } returns gpsSignalState
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            viewModel.warningPulses.test {
+                gpsSignalState.value = GpsSignalState.Lost
+                dispatcher.scheduler.runCurrent()
+                assertEquals(Unit, awaitItem())
+            }
+        }
+
+    @Test
+    fun `warning pulse does not repeat while gps signal stays lost`() =
+        runTest {
+            val gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Lost)
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Connected)
+            val recordingStartResult = MutableStateFlow<RecordingStartResult?>(null)
+            val (viewModel, _, controller) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    recordingStartResult = recordingStartResult,
+                )
+            every { controller.gpsSignalState } returns gpsSignalState
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
+
+            viewModel.warningPulses.test {
+                awaitItem() // the transition into Recording already picked up the lost signal once
+                gpsSignalState.value = GpsSignalState.Lost // no real transition - same value again
+                dispatcher.scheduler.runCurrent()
+                expectNoEvents()
+            }
+        }
 }
