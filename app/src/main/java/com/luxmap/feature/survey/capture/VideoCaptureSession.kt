@@ -277,7 +277,10 @@ class VideoCaptureSession
         // the scan itself cannot converge (e.g. a very low-contrast scene): it is a static value
         // from the device's reported characteristics, not verified against this device's real
         // optics, and a real-device check found it locking focus far past where it should for a
-        // close, high-contrast test target - trust a real AF result over it whenever one exists.
+        // close, high-contrast test target - so a GENUINE AF lock (CONTROL_AF_STATE_FOCUSED_LOCKED)
+        // always wins over it. Everything else does not count as a real AF result: a timeout and
+        // CONTROL_AF_STATE_NOT_FOCUSED_LOCKED (AF finished, found nothing sharp) both leave the lens
+        // parked wherever the sweep stopped, so both take the hyperfocal fallback.
         private suspend fun resolveFocusDistance(
             cameraManager: CameraManager,
             requestedProfile: LockedCameraProfile,
@@ -290,15 +293,23 @@ class VideoCaptureSession
             // nothing to scan for, keep whatever the caller asked for.
             if (minFocusDistance == null || minFocusDistance <= 0f) return requestedProfile.focusDistanceDiopters
 
-            // Used only if the scan below never reaches a locked AF state at all.
+            // Used whenever the scan below does not end in a real focus lock: it never reaches a
+            // locked AF state (timeout), or it reaches NOT_FOCUSED_LOCKED (AF gave up). Hyperfocal
+            // keeps everything from some near distance out to infinity acceptably sharp, which is
+            // the best guess for the kind of dim, far, low-contrast scene that defeats AF.
             val fallbackDistance =
                 characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE)
                     ?: requestedProfile.focusDistanceDiopters
-            var lastSeenFocusDistance = fallbackDistance
             // Diagnostic only, not used for any decision - kept so a real-device test can tell
             // whether AF truly locked focus or gave up (CONTROL_AF_STATE_NOT_FOCUSED_LOCKED),
             // something a plain "it recorded a distance" check cannot distinguish on its own.
             var lastSeenAfState: Int? = null
+            // Diagnostic only too, and for the same reason: it records where the lens really was on
+            // the last capture result, so a log from a blurry recording shows whether the lens was
+            // anywhere near the distance we locked. Never read as a decision input - it is
+            // overwritten by every frame of an in-progress scan, so its value at any given moment is
+            // just wherever the scan happened to be sweeping through.
+            var lastSeenFocusDistance: Float? = null
 
             // Standard Camera2 "tap to focus" sequence, run once on the preview surface before the
             // locked recording request is ever submitted: a preview-only repeating request in AUTO
@@ -308,6 +319,9 @@ class VideoCaptureSession
             // submitted once here - no later resubmit like the AWB lock needs, so no new risk to
             // the SENSOR_TIMESTAMP pairing (see takeSensorTimestampFor()).
 
+            // Completed once the AF scan settles. A non-null value means AF really locked onto
+            // something sharp and this is where it locked; null means AF finished without finding
+            // focus, so the caller must use the fallback instead.
             val converged = CompletableDeferred<Float?>()
             val afCallback =
                 object : CameraCaptureSession.CaptureCallback() {
@@ -320,9 +334,16 @@ class VideoCaptureSession
                         val afState = result.get(CaptureResult.CONTROL_AF_STATE)
                         if (afState != null) lastSeenAfState = afState
                         when (afState) {
-                            CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED,
-                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED,
-                            -> converged.complete(result.get(CaptureResult.LENS_FOCUS_DISTANCE))
+                            // The only case where the lens position is a real focus decision, so the
+                            // only case we trust it. A device that somehow reports no
+                            // LENS_FOCUS_DISTANCE here completes with null and takes the fallback.
+                            CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED ->
+                                converged.complete(result.get(CaptureResult.LENS_FOCUS_DISTANCE))
+                            // AF finished and found nothing sharp - common for a dim, far,
+                            // low-contrast night scene, which is exactly what a street-light pole
+                            // looks like. The lens just stopped wherever the sweep ended, so that
+                            // position means nothing. Report failure and let the fallback decide.
+                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED -> converged.complete(null)
                             else -> Unit
                         }
                     }
@@ -341,20 +362,33 @@ class VideoCaptureSession
 
             // A low-contrast scene (very dark, blank wall) can leave AF_STATE scanning forever -
             // never block the recording on it, fall back to the hyperfocal distance instead.
-            val resolved = withTimeoutOrNull(AF_CONVERGENCE_TIMEOUT_MS) { converged.await() }
-            val finalFocusDistance = resolved ?: lastSeenFocusDistance
+            // Wrapping the awaited value is what keeps the two null cases apart: withTimeoutOrNull()
+            // returns null only when AF never answered, while a wrapper holding null means AF did
+            // answer and the answer was "no focus found".
+            val scanOutcome = withTimeoutOrNull(AF_CONVERGENCE_TIMEOUT_MS) { AfScanOutcome(converged.await()) }
+            val finalFocusDistance = scanOutcome?.focusDistance ?: fallbackDistance
+            val outcomeLabel =
+                when {
+                    scanOutcome?.focusDistance != null -> "AF_LOCKED (scanned distance used)"
+                    scanOutcome != null -> "AF_GAVE_UP (hyperfocal fallback used)"
+                    else -> "AF_TIMED_OUT (hyperfocal fallback used)"
+                }
             // Kept as a permanent diagnostic log (not a "remove before commit" line): this is the
             // only way to tell apart a real focus lock from one that only looks locked, across a
             // real-device test done later. See docs/superpowers plan notes on the night-survey
-            // focus complaint for what afState=NOT_FOCUSED_LOCKED or timedOut=true would mean.
+            // focus complaint for what outcome=AF_GAVE_UP or outcome=AF_TIMED_OUT would mean.
             Log.i(
                 TAG,
-                "Focus lock result: afState=${afStateLabel(lastSeenAfState)} timedOut=${resolved == null} " +
-                    "resolvedDistance=$finalFocusDistance hyperfocalDistance=$fallbackDistance " +
-                    "minFocusDistance=$minFocusDistance",
+                "Focus lock result: outcome=$outcomeLabel afState=${afStateLabel(lastSeenAfState)} " +
+                    "lockedDistance=$finalFocusDistance lastSeenLensDistance=$lastSeenFocusDistance " +
+                    "hyperfocalDistance=$fallbackDistance minFocusDistance=$minFocusDistance",
             )
             return finalFocusDistance
         }
+
+        // Tells "AF answered" apart from "AF never answered" around withTimeoutOrNull(), which
+        // reports a timeout with the same null the AF-failed case already uses. Only resolveFocusDistance() uses it.
+        private data class AfScanOutcome(val focusDistance: Float?)
 
         // Readable names for CONTROL_AF_STATE, used only by the diagnostic log above - Camera2 has
         // no built-in toString() for these int constants.
