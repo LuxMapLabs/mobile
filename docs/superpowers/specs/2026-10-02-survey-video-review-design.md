@@ -96,7 +96,7 @@ sealed interface CoverageUiState {
 ## 7. Việc kỹ thuật kèm theo (không phải code tính năng)
 
 - Thêm `androidx.media3:media3-exoplayer`, `androidx.media3:media3-ui`, `androidx.media3:media3-common` vào `gradle/libs.versions.toml` — 1 commit `chore` riêng tách khỏi code tính năng, theo đúng quy ước commit của dự án (ví dụ `chore(fm-XX): add media3 exoplayer dependency`).
-- Trước khi tạo nhánh code, tra lại `docs/LuxMap_TaskList_v2.xlsx` để lấy đúng mã `FM-XX` cho tên nhánh/commit — spec này chưa gán mã, không tự đoán.
+- Đã tra `docs/LuxMap_TaskList_v2.xlsx` (sheet `Frontend-Mobile`, 2026-10-02): không có mã nào mô tả đúng "xem lại video + quay lại nếu không ưng". Gần nhất là **FM-11** ("Kiểm tra độ phủ và chất lượng ảnh trước khi nộp sweep — Cảnh báo ngay tại xe nếu đoạn nào thiếu SurveyFrame hoặc ảnh mờ") — đúng vị trí trong pipeline (ngay trước khi nộp sweep) nhưng viết theo mô hình ảnh rời cũ. Chủ dự án xác nhận 2026-10-02: **dùng FM-11**, coi là tái định nghĩa cho video (cùng tinh thần tái định nghĩa F05 ở mục 1).
 - Cập nhật `docs/contract-drift.md`: ghi lại việc tái sử dụng slot F05/`coverage/` cho nội dung khác với đặc tả gốc (mục 1 ở trên).
 
 ## 8. Không thuộc phạm vi / cần xác nhận thêm sau này
