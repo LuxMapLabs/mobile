@@ -240,8 +240,18 @@ class VideoCaptureSession
             // scene, so find it here with a real AF scan before locking - otherwise the profile's
             // 0-diopter default (infinity focus) locks in and the whole recording comes out
             // blurry unless the subject really is at infinity.
+            //
+            // The ISO and shutter time the profile carries have the same problem for the same
+            // reason, so a short AE scan measures them here too - see resolveExposure() for why.
+            // Focus first, then exposure, both before the recording request below is built.
             val resolvedFocusDistance = resolveFocusDistance(cameraManager, profile, previewSurface, handler)
-            val lockedProfile = profile.copy(focusDistanceDiopters = resolvedFocusDistance)
+            val resolvedExposure = resolveExposure(cameraManager, profile, previewSurface, handler)
+            val lockedProfile =
+                profile.copy(
+                    focusDistanceDiopters = resolvedFocusDistance,
+                    isoSensitivity = resolvedExposure.isoSensitivity,
+                    exposureTimeNs = resolvedExposure.exposureTimeNs,
+                )
 
             val builder =
                 cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD).apply {
