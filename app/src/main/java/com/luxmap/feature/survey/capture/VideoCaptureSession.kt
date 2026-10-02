@@ -39,6 +39,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -244,6 +245,10 @@ class VideoCaptureSession
 
             captureSession = createCaptureSession(cameraDevice, inputSurface, previewSurface, handler)
 
+            // Give the user a moment of real live preview to aim at the pole before the scans
+            // below measure and lock anything - see startLivePreviewWarmup() for why.
+            startLivePreviewWarmup(previewSurface, handler)
+
             // Locking AF_MODE_OFF (below) freezes the lens at whatever LENS_FOCUS_DISTANCE the
             // profile carries. The caller has no way to know the right distance for the actual
             // scene, so find it here with a real AF scan before locking - otherwise the profile's
@@ -324,6 +329,32 @@ class VideoCaptureSession
                     "deviceRotationDegrees=$deviceRotationDegrees",
             )
             return hint
+        }
+
+        // Until this runs, no repeating request exists on the session at all, so the preview is
+        // plain black and the user cannot see what the camera is pointed at. The first live frames
+        // they ever saw were the AF/AE scan already measuring - so they were often still raising or
+        // turning the phone while focus locked. A real-device test recorded three focus locks at
+        // ~34cm, ~8.9cm and ~12.3cm for a scene several meters away. This shows live frames first,
+        // so the user can aim before anything is measured or locked.
+        private suspend fun startLivePreviewWarmup(
+            previewSurface: Surface,
+            handler: Handler,
+        ) {
+            val previewBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                    addTarget(previewSurface)
+                    // CONTINUOUS_VIDEO, not CONTINUOUS_PICTURE: it keeps the scene in focus
+                    // smoothly instead of stepping through scan-and-lock cycles the user would see.
+                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+                    set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                }
+            // No callback: this only needs to put frames on the screen. resolveFocusDistance() and
+            // resolveExposure() measure on their own requests right after. No "stop" step either -
+            // setRepeatingRequest() always replaces the active repeating request, so their own
+            // calls take over cleanly.
+            captureSession.setRepeatingRequest(previewBuilder.build(), null, handler)
+            delay(PRE_SCAN_PREVIEW_MS)
         }
 
         // The Field Engineer points the camera at the actual pole before pressing record, so a
@@ -1045,6 +1076,11 @@ class VideoCaptureSession
             // At 30 fps the first encoded frame lands in well under a second; 10 s only exists so a
             // camera that never delivers a frame fails with a clear error instead of hanging.
             const val FIRST_SEGMENT_TIMEOUT_MS = 10_000L
+
+            // Long enough to raise the phone and point it at the pole, short enough that the user
+            // does not think the start button failed. Picked in the middle of that range; adjust
+            // after a real-device run if it feels too short or too slow.
+            const val PRE_SCAN_PREVIEW_MS = 1_800L
 
             // Generous for a one-shot AF scan (typically well under 1s) - only exists so a
             // low-contrast scene that never converges cannot delay the start of a recording for long.
