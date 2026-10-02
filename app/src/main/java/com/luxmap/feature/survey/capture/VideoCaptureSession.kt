@@ -295,6 +295,10 @@ class VideoCaptureSession
                 characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE)
                     ?: requestedProfile.focusDistanceDiopters
             var lastSeenFocusDistance = fallbackDistance
+            // Diagnostic only, not used for any decision - kept so a real-device test can tell
+            // whether AF truly locked focus or gave up (CONTROL_AF_STATE_NOT_FOCUSED_LOCKED),
+            // something a plain "it recorded a distance" check cannot distinguish on its own.
+            var lastSeenAfState: Int? = null
 
             // Standard Camera2 "tap to focus" sequence, run once on the preview surface before the
             // locked recording request is ever submitted: a preview-only repeating request in AUTO
@@ -313,7 +317,9 @@ class VideoCaptureSession
                         result: TotalCaptureResult,
                     ) {
                         result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let { lastSeenFocusDistance = it }
-                        when (result.get(CaptureResult.CONTROL_AF_STATE)) {
+                        val afState = result.get(CaptureResult.CONTROL_AF_STATE)
+                        if (afState != null) lastSeenAfState = afState
+                        when (afState) {
                             CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED,
                             CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED,
                             -> converged.complete(result.get(CaptureResult.LENS_FOCUS_DISTANCE))
@@ -336,8 +342,34 @@ class VideoCaptureSession
             // A low-contrast scene (very dark, blank wall) can leave AF_STATE scanning forever -
             // never block the recording on it, fall back to the hyperfocal distance instead.
             val resolved = withTimeoutOrNull(AF_CONVERGENCE_TIMEOUT_MS) { converged.await() }
-            return resolved ?: lastSeenFocusDistance
+            val finalFocusDistance = resolved ?: lastSeenFocusDistance
+            // Kept as a permanent diagnostic log (not a "remove before commit" line): this is the
+            // only way to tell apart a real focus lock from one that only looks locked, across a
+            // real-device test done later. See docs/superpowers plan notes on the night-survey
+            // focus complaint for what afState=NOT_FOCUSED_LOCKED or timedOut=true would mean.
+            Log.i(
+                TAG,
+                "Focus lock result: afState=${afStateLabel(lastSeenAfState)} timedOut=${resolved == null} " +
+                    "resolvedDistance=$finalFocusDistance hyperfocalDistance=$fallbackDistance " +
+                    "minFocusDistance=$minFocusDistance",
+            )
+            return finalFocusDistance
         }
+
+        // Readable names for CONTROL_AF_STATE, used only by the diagnostic log above - Camera2 has
+        // no built-in toString() for these int constants.
+        private fun afStateLabel(state: Int?): String =
+            when (state) {
+                null -> "null"
+                CaptureResult.CONTROL_AF_STATE_INACTIVE -> "INACTIVE"
+                CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN -> "PASSIVE_SCAN"
+                CaptureResult.CONTROL_AF_STATE_PASSIVE_FOCUSED -> "PASSIVE_FOCUSED"
+                CaptureResult.CONTROL_AF_STATE_ACTIVE_SCAN -> "ACTIVE_SCAN"
+                CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED -> "FOCUSED_LOCKED"
+                CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED -> "NOT_FOCUSED_LOCKED"
+                CaptureResult.CONTROL_AF_STATE_PASSIVE_UNFOCUSED -> "PASSIVE_UNFOCUSED"
+                else -> "UNKNOWN($state)"
+            }
 
         private val captureCallback =
             object : CameraCaptureSession.CaptureCallback() {
