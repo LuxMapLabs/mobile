@@ -10,6 +10,7 @@ import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.OutputConfiguration
+import android.hardware.display.DisplayManager
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -18,6 +19,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Log
+import android.view.Display
 import android.view.Surface
 import com.luxmap.core.camera.CameraSelector
 import com.luxmap.core.camera.ExposureLockController
@@ -37,6 +39,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -209,6 +212,13 @@ class VideoCaptureSession
             // passed is the camera we open here. Still fails loudly on a device with no camera at
             // all, like the old cameraIdList.first() did.
             cameraId = CameraSelector.pickBackCameraId(cameraManager) ?: error("No camera available")
+
+            // Worked out once, here, and then used by every segment below. It only needs the camera
+            // characteristics and how the screen is turned right now - neither can change later,
+            // because CaptureScreen locks the screen orientation for the whole session. Doing it
+            // per segment would just repeat the same work.
+            val orientationHint = resolveOrientationHint(cameraManager)
+
             cameraDevice = openCamera(cameraManager, cameraId, handler)
 
             mediaCodec = createEncoder(profile)
@@ -218,7 +228,7 @@ class VideoCaptureSession
             recorder =
                 SegmentedVideoRecorder(SegmentRotationPolicy(segmentDurationMs)) { path ->
                     val format = requireNotNull(encoderOutputFormat) { "Encoder output format is not known yet" }
-                    RealMuxerPort(path, format).also { port ->
+                    RealMuxerPort(path, format, orientationHint).also { port ->
                         currentMuxerPort = port
                         // A rotation builds this port inside onEncodedFrame() and writes the frame
                         // in flight to it right away, before the drain loop can stage anything on
@@ -234,6 +244,10 @@ class VideoCaptureSession
                 NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
 
             captureSession = createCaptureSession(cameraDevice, inputSurface, previewSurface, handler)
+
+            // Give the user a moment of real live preview to aim at the pole before the scans
+            // below measure and lock anything - see startLivePreviewWarmup() for why.
+            startLivePreviewWarmup(previewSurface, handler)
 
             // Locking AF_MODE_OFF (below) freezes the lens at whatever LENS_FOCUS_DISTANCE the
             // profile carries. The caller has no way to know the right distance for the actual
@@ -279,6 +293,68 @@ class VideoCaptureSession
             } catch (timeout: TimeoutCancellationException) {
                 throw IllegalStateException("Encoder produced no output within $FIRST_SEGMENT_TIMEOUT_MS ms", timeout)
             }
+        }
+
+        // Camera2 hands the encoder pixels in the sensor's own orientation, which on a phone is
+        // landscape, no matter how the user holds the device. The encoder is also fixed at
+        // 1920x1080, so a clip shot in portrait still ends up as a landscape file and plays back
+        // sideways. Rotating every frame would cost CPU for a whole 10-30 minute survey, so the
+        // rotation is written into the MP4 as metadata instead (see RealMuxerPort) and the player
+        // applies it. This returns the angle the player has to turn the picture clockwise.
+        //
+        // This is the back-camera formula. Only the back camera is ever opened here
+        // (CameraSelector.pickBackCameraId), so the mirrored front-camera case is left out.
+        private fun resolveOrientationHint(cameraManager: CameraManager): Int {
+            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+            // DisplayManager, not Context.getDisplay(): this is the application context, and on API
+            // 30+ Context.getDisplay() throws UnsupportedOperationException for a context that is
+            // not a UI context. DisplayManager has no such limit and works down to minSdk 26.
+            val display =
+                context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
+            val deviceRotationDegrees =
+                when (display?.rotation) {
+                    Surface.ROTATION_0 -> 0
+                    Surface.ROTATION_90 -> 90
+                    Surface.ROTATION_180 -> 180
+                    Surface.ROTATION_270 -> 270
+                    else -> 0
+                }
+            val hint = (sensorOrientation - deviceRotationDegrees + 360) % 360
+            // Permanent diagnostic: a recording that still plays back sideways on some device can
+            // only be told apart from a wrong sensor value or a wrong screen rotation from here.
+            Log.i(
+                TAG,
+                "Orientation hint: hint=$hint sensorOrientation=$sensorOrientation " +
+                    "deviceRotationDegrees=$deviceRotationDegrees",
+            )
+            return hint
+        }
+
+        // Until this runs, no repeating request exists on the session at all, so the preview is
+        // plain black and the user cannot see what the camera is pointed at. The first live frames
+        // they ever saw were the AF/AE scan already measuring - so they were often still raising or
+        // turning the phone while focus locked. A real-device test recorded three focus locks at
+        // ~34cm, ~8.9cm and ~12.3cm for a scene several meters away. This shows live frames first,
+        // so the user can aim before anything is measured or locked.
+        private suspend fun startLivePreviewWarmup(
+            previewSurface: Surface,
+            handler: Handler,
+        ) {
+            val previewBuilder =
+                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                    addTarget(previewSurface)
+                    // CONTINUOUS_VIDEO, not CONTINUOUS_PICTURE: it keeps the scene in focus
+                    // smoothly instead of stepping through scan-and-lock cycles the user would see.
+                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
+                    set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                }
+            // No callback: this only needs to put frames on the screen. resolveFocusDistance() and
+            // resolveExposure() measure on their own requests right after. No "stop" step either -
+            // setRepeatingRequest() always replaces the active repeating request, so their own
+            // calls take over cleanly.
+            captureSession.setRepeatingRequest(previewBuilder.build(), null, handler)
+            delay(PRE_SCAN_PREVIEW_MS)
         }
 
         // The Field Engineer points the camera at the actual pole before pressing record, so a
@@ -1000,6 +1076,11 @@ class VideoCaptureSession
             // At 30 fps the first encoded frame lands in well under a second; 10 s only exists so a
             // camera that never delivers a frame fails with a clear error instead of hanging.
             const val FIRST_SEGMENT_TIMEOUT_MS = 10_000L
+
+            // Long enough to raise the phone and point it at the pole, short enough that the user
+            // does not think the start button failed. Picked in the middle of that range; adjust
+            // after a real-device run if it feels too short or too slow.
+            const val PRE_SCAN_PREVIEW_MS = 1_800L
 
             // Generous for a one-shot AF scan (typically well under 1s) - only exists so a
             // low-contrast scene that never converges cannot delay the start of a recording for long.

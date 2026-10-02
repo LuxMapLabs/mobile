@@ -13,8 +13,16 @@ import java.nio.ByteBuffer
 class RealMuxerPort(
     private val outputFilePath: String,
     outputFormat: MediaFormat,
+    orientationDegrees: Int,
 ) : MuxerPort {
-    private val muxer = MediaMuxer(outputFilePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+    private val muxer =
+        MediaMuxer(outputFilePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4).apply {
+            // The encoder always gets the pixels the way the sensor reads them out, so the file is
+            // landscape even when the phone was held upright. This writes the needed rotation into
+            // the MP4 header and the player turns the picture on playback; no pixel is touched, so
+            // it costs nothing. Must be set before start(), which writeSample() does lazily below.
+            setOrientationHint(orientationDegrees)
+        }
     private val trackIndex = muxer.addTrack(outputFormat)
     private var started = false
     private var pendingBuffer: ByteBuffer? = null
