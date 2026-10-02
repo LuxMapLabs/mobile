@@ -22,4 +22,12 @@ data class AssignedSurveyRoute(
 // "Kỹ sư bảo trì" assigned, from GET /api/v1/survey-sweeps/planned (already used by F02).
 interface SurveyRepository {
     fun observeAssignedRoutes(): Flow<List<AssignedSurveyRoute>>
+
+    // Pure local data - no network involved, so Fake and Real do the same thing here (see
+    // the design spec §3 for why this still lives on the one repository interface).
+    suspend fun segmentFilePathsFor(sessionId: String): List<String>
+
+    // Deletes the session's local video/log files and its Room rows, returning the
+    // surveySweepId so the caller can start a fresh recording for the same route.
+    suspend fun discardSession(sessionId: String): String
 }

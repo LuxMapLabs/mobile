@@ -116,4 +116,27 @@ class SurveySessionDaoTest {
 
             assertNull(dao.unfinalizedSegmentFor("SESSION-1"))
         }
+
+    @Test
+    fun deleteSessionAndSegmentsRemovesBothTheSessionAndItsSegments() =
+        runTest {
+            dao.insertSession(session("SESSION-1"))
+            dao.insertSegment(
+                LocalSurveyVideoSegmentEntity(
+                    segmentId = "SEG-0",
+                    sessionId = "SESSION-1",
+                    segmentIndex = 0,
+                    filePath = "/data/segment_0.mp4",
+                    startedAtElapsedNs = 0L,
+                    endedAtElapsedNs = 180_000_000_000L,
+                    sizeBytes = 4096L,
+                    checksumSha256 = "abc",
+                ),
+            )
+
+            dao.deleteSessionAndSegments("SESSION-1")
+
+            assertNull(dao.sessionById("SESSION-1"))
+            assertEquals(0, dao.segmentsFor("SESSION-1").size)
+        }
 }

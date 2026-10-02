@@ -1,14 +1,24 @@
 package com.luxmap.feature.survey.data
 
+import android.content.Context
+import android.util.Log
+import com.luxmap.feature.survey.data.dao.SurveySessionDao
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "FakeSurveyRepository"
 
 @Singleton
 class FakeSurveyRepository
     @Inject
-    constructor() : SurveyRepository {
+    constructor(
+        private val sessionDao: SurveySessionDao,
+        @ApplicationContext private val context: Context,
+    ) : SurveyRepository {
         override fun observeAssignedRoutes(): Flow<List<AssignedSurveyRoute>> =
             flow {
                 emit(
@@ -35,4 +45,23 @@ class FakeSurveyRepository
                     ),
                 )
             }
+
+        override suspend fun segmentFilePathsFor(sessionId: String): List<String> =
+            sessionDao.segmentsFor(sessionId).map { it.filePath }
+
+        override suspend fun discardSession(sessionId: String): String {
+            val session =
+                requireNotNull(sessionDao.sessionById(sessionId)) {
+                    "No local_survey_session row for sessionId=$sessionId"
+                }
+            // File deletion failing must never block the Room cleanup below - a stuck session
+            // the user can never redo is worse than a leftover file to clean up later.
+            runCatching {
+                File(context.getExternalFilesDir(null), "survey/$sessionId").deleteRecursively()
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to delete session files for $sessionId", error)
+            }
+            sessionDao.deleteSessionAndSegments(sessionId)
+            return session.surveySweepId
+        }
     }

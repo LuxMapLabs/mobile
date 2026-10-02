@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
@@ -36,4 +37,18 @@ interface SurveySessionDao {
 
     @Query("DELETE FROM local_survey_video_segment WHERE segmentId = :segmentId")
     suspend fun deleteSegment(segmentId: String)
+
+    @Query("DELETE FROM local_survey_video_segment WHERE sessionId = :sessionId")
+    suspend fun deleteSegmentsForSession(sessionId: String)
+
+    @Query("DELETE FROM local_survey_session WHERE sessionId = :sessionId")
+    suspend fun deleteSession(sessionId: String)
+
+    // Wraps both deletes in one transaction so a session row never outlives its segments or
+    // the other way around, even if the process dies mid-call.
+    @Transaction
+    suspend fun deleteSessionAndSegments(sessionId: String) {
+        deleteSegmentsForSession(sessionId)
+        deleteSession(sessionId)
+    }
 }
