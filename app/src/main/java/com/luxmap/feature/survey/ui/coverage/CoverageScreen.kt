@@ -5,12 +5,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -34,6 +35,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import com.luxmap.core.theme.Dimens
+import com.luxmap.core.ui.components.PrimaryButton
 
 // F05 reinterpreted (see docs/superpowers/specs/2026-10-02-survey-video-review-design.md):
 // plain video playback, no coverage percentage. Back is blocked (see BackHandler below) so a
@@ -46,6 +49,7 @@ fun CoverageScreen(
     viewModel: CoverageViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isDiscarding by viewModel.isDiscarding.collectAsState()
     val context = LocalContext.current
     var showRedoConfirm by remember { mutableStateOf(false) }
 
@@ -54,7 +58,7 @@ fun CoverageScreen(
     LaunchedEffect(sessionId) { viewModel.loadSegments(sessionId) }
     LaunchedEffect(Unit) { viewModel.redoCompleted.collect { surveySweepId -> onRedo(surveySweepId) } }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().statusBarsPadding()) {
         when (val state = uiState) {
             is CoverageUiState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
 
@@ -95,10 +99,16 @@ fun CoverageScreen(
                     }
 
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { onApprove(sessionId) }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Nộp")
-                        }
-                        OutlinedButton(onClick = { showRedoConfirm = true }, modifier = Modifier.fillMaxWidth()) {
+                        PrimaryButton(
+                            text = "Nộp",
+                            onClick = { onApprove(sessionId) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isDiscarding,
+                        )
+                        OutlinedButton(
+                            onClick = { showRedoConfirm = true },
+                            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+                        ) {
                             Text("Quay lại")
                         }
                     }
@@ -111,16 +121,24 @@ fun CoverageScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text("Không có video nào để xem lại.", style = MaterialTheme.typography.bodyLarge)
-                    Button(onClick = { showRedoConfirm = true }) { Text("Quay lại") }
+                    PrimaryButton(text = "Quay lại", onClick = { showRedoConfirm = true })
                 }
             }
 
             is CoverageUiState.Error -> {
-                Text(
-                    state.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.align(Alignment.Center).padding(16.dp),
-                )
+                Column(
+                    Modifier.align(Alignment.Center).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        state.message,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    // Error must never be a dead end: it can come from a load failure or a
+                    // discard failure, and the system back button is blocked above, so this is
+                    // the only way out either way.
+                    PrimaryButton(text = "Quay lại", onClick = { showRedoConfirm = true })
+                }
             }
         }
 
@@ -130,13 +148,22 @@ fun CoverageScreen(
                 title = { Text("Xoá video này và quay lại?") },
                 text = { Text("Video và dữ liệu đã quay sẽ bị xoá khỏi máy, không thể hoàn tác.") },
                 confirmButton = {
-                    Button(onClick = {
-                        showRedoConfirm = false
-                        viewModel.onRedoConfirmed(sessionId)
-                    }) { Text("Xoá và quay lại") }
+                    PrimaryButton(
+                        text = "Xoá và quay lại",
+                        enabled = !isDiscarding,
+                        onClick = {
+                            showRedoConfirm = false
+                            viewModel.onRedoConfirmed(sessionId)
+                        },
+                    )
                 },
                 dismissButton = {
-                    OutlinedButton(onClick = { showRedoConfirm = false }) { Text("Huỷ") }
+                    OutlinedButton(
+                        onClick = { showRedoConfirm = false },
+                        modifier = Modifier.defaultMinSize(minHeight = Dimens.minTouchTarget),
+                    ) {
+                        Text("Huỷ")
+                    }
                 },
             )
         }

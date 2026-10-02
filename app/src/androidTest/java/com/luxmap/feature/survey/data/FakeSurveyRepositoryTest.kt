@@ -39,7 +39,7 @@ class FakeSurveyRepositoryTest {
         database.close()
     }
 
-    private fun insertSessionWithOneSegment() =
+    private fun insertSession() =
         runTest {
             database.surveySessionDao().insertSession(
                 LocalSurveySessionEntity(
@@ -65,18 +65,32 @@ class FakeSurveyRepositoryTest {
                     updatedAt = Instant.parse("2026-10-02T20:03:00Z"),
                 ),
             )
-            database.surveySessionDao().insertSegment(
-                LocalSurveyVideoSegmentEntity(
-                    segmentId = "SEG-0",
-                    sessionId = "SESSION-1",
-                    segmentIndex = 0,
-                    filePath = File(sessionDir, "segment_0.mp4").absolutePath,
-                    startedAtElapsedNs = 0L,
-                    endedAtElapsedNs = 180_000_000_000L,
-                    sizeBytes = 4096L,
-                    checksumSha256 = "abc",
-                ),
-            )
+        }
+
+    private fun insertSegment(
+        segmentIndex: Int,
+        checksumSha256: String,
+    ) = runTest {
+        val fileName = "segment_$segmentIndex.mp4"
+        val startedAtElapsedNs = segmentIndex * 180_000_000_000L
+        database.surveySessionDao().insertSegment(
+            LocalSurveyVideoSegmentEntity(
+                segmentId = "SEG-$segmentIndex",
+                sessionId = "SESSION-1",
+                segmentIndex = segmentIndex,
+                filePath = File(sessionDir, fileName).absolutePath,
+                startedAtElapsedNs = startedAtElapsedNs,
+                endedAtElapsedNs = startedAtElapsedNs + 180_000_000_000L,
+                sizeBytes = 4096L,
+                checksumSha256 = checksumSha256,
+            ),
+        )
+    }
+
+    private fun insertSessionWithOneSegment() =
+        runTest {
+            insertSession()
+            insertSegment(segmentIndex = 0, checksumSha256 = "abc")
         }
 
     @Test
@@ -87,6 +101,26 @@ class FakeSurveyRepositoryTest {
             val paths = repository.segmentFilePathsFor("SESSION-1")
 
             assertEquals(listOf(File(sessionDir, "segment_0.mp4").absolutePath), paths)
+        }
+
+    @Test
+    fun segmentFilePathsForOrdersMultipleSegmentsBySegmentIndexNotInsertionOrder() =
+        runTest {
+            insertSession()
+            // Insert segment index 1 BEFORE segment index 0, to prove the query orders by
+            // segmentIndex and does not just return rows in insertion order.
+            insertSegment(segmentIndex = 1, checksumSha256 = "def")
+            insertSegment(segmentIndex = 0, checksumSha256 = "abc")
+
+            val paths = repository.segmentFilePathsFor("SESSION-1")
+
+            assertEquals(
+                listOf(
+                    File(sessionDir, "segment_0.mp4").absolutePath,
+                    File(sessionDir, "segment_1.mp4").absolutePath,
+                ),
+                paths,
+            )
         }
 
     @Test

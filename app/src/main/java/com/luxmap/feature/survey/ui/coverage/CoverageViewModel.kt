@@ -27,6 +27,12 @@ class CoverageViewModel
         private val _redoCompleted = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val redoCompleted: SharedFlow<String> = _redoCompleted.asSharedFlow()
 
+        // Transient in-flight flag for the discard action, kept separate from CoverageUiState
+        // because discard can be triggered from Empty or Error too, not only Success - a flag
+        // bolted onto Success could not represent that.
+        private val _isDiscarding = MutableStateFlow(false)
+        val isDiscarding: StateFlow<Boolean> = _isDiscarding.asStateFlow()
+
         fun loadSegments(sessionId: String) {
             viewModelScope.launch {
                 runCatching { repository.segmentFilePathsFor(sessionId) }
@@ -50,9 +56,22 @@ class CoverageViewModel
         }
 
         fun onRedoConfirmed(sessionId: String) {
+            // Guard against double-tap: discardSession can take real time (deleting a
+            // multi-GB video directory) and discardSession() throws if the session row is
+            // already gone, so running it twice is both wasteful and unsafe.
+            if (_isDiscarding.value) return
+
             viewModelScope.launch {
-                val surveySweepId = repository.discardSession(sessionId)
-                _redoCompleted.emit(surveySweepId)
+                _isDiscarding.value = true
+                runCatching { repository.discardSession(sessionId) }
+                    .onSuccess { surveySweepId -> _redoCompleted.emit(surveySweepId) }
+                    .onFailure { error ->
+                        // Must not let this escape: there is no CoroutineExceptionHandler
+                        // anywhere in this app, so an uncaught throw here would crash the
+                        // whole process instead of just failing this one action.
+                        _uiState.value = CoverageUiState.Error(error.message ?: "Không xoá được phiên khảo sát")
+                    }
+                _isDiscarding.value = false
             }
         }
     }
