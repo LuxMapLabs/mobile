@@ -21,6 +21,12 @@ sealed interface Routes {
         fun createRoute(surveySweepId: String) = "survey/capture/$surveySweepId"
     }
 
+    data object SurveyReview : Routes {
+        override val route = "survey/review/{sessionId}"
+
+        fun createRoute(sessionId: String) = "survey/review/$sessionId"
+    }
+
     data object SurveySubmit : Routes {
         override val route = "survey/submit/{sessionId}"
 

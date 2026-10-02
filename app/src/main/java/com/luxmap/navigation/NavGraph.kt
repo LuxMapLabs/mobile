@@ -38,6 +38,7 @@ import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
+import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 
@@ -157,7 +158,26 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 CaptureScreen(
                     surveySweepId = surveySweepId,
                     onSessionPackaged = { sessionId ->
-                        navController.navigate(Routes.SurveySubmit.createRoute(sessionId)) {
+                        navController.navigate(Routes.SurveyReview.createRoute(sessionId)) {
+                            popUpTo(Routes.Survey.route)
+                        }
+                    },
+                )
+            }
+            composable(
+                route = Routes.SurveyReview.route,
+                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+                CoverageScreen(
+                    sessionId = sessionId,
+                    onApprove = { approvedSessionId ->
+                        navController.navigate(Routes.SurveySubmit.createRoute(approvedSessionId)) {
+                            popUpTo(Routes.Survey.route)
+                        }
+                    },
+                    onRedo = { surveySweepId ->
+                        navController.navigate(Routes.SurveyCapture.createRoute(surveySweepId)) {
                             popUpTo(Routes.Survey.route)
                         }
                     },
