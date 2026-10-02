@@ -241,8 +241,6 @@ class VideoCaptureSession
             // 0-diopter default (infinity focus) locks in and the whole recording comes out
             // blurry unless the subject really is at infinity.
             val resolvedFocusDistance = resolveFocusDistance(cameraManager, profile, previewSurface, handler)
-            // TEMPORARY DEBUG LOG - do not commit.
-            Log.d(TAG, "focus debug: resolvedFocusDistance=$resolvedFocusDistance diopters")
             val lockedProfile = profile.copy(focusDistanceDiopters = resolvedFocusDistance)
 
             val builder =
