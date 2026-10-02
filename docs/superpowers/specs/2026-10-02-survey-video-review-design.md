@@ -44,6 +44,8 @@ Thành phần mới:
 - `navigation/Routes.kt` — thêm `Routes.SurveyReview` (path param `sessionId`, cùng khuôn với `Routes.SurveySubmit`).
 - `navigation/NavGraph.kt` — sửa đích đến của `onSessionPackaged` (từ `SurveySubmit` sang `SurveyReview`), thêm composable mới cho `SurveyReview`.
 
+`CoverageScreen` chặn nút Back hệ thống (giống cách `CaptureScreen` đã chặn Back trong lúc quay) — không cho rời màn mà chưa chọn "Nộp" hay "Quay lại". Không có chặn này, người dùng có thể thoát ngang bằng Back, để lại 1 session đã đóng gói nhưng không ai quyết định số phận (không nộp, không xoá) — chiếm dung lượng máy vĩnh viễn, không có màn nào khác hiển thị lại nó để xử lý tiếp.
+
 ## 3. Data flow — phát video
 
 `SurveyRepository` hiện tại chỉ có 1 hàm (`observeAssignedRoutes()`, dữ liệu tuyến từ server — lý do có Fake/Real là để giả lập mạng chưa sẵn backend). Việc đọc danh sách segment và xoá phiên ở đây là dữ liệu **cục bộ thuần tuý** (không gọi mạng), nên thêm 2 hàm mới vào cùng interface này (đúng nguyên tắc "1 feature = 1 interface Repository"), nhưng `FakeSurveyRepository` và `RealSurveyRepository` **cài đặt giống hệt nhau** cho 2 hàm này — cả hai cùng đọc/ghi Room và file hệ thống thật, không có gì để giả lập mạng (cùng tinh thần "Fake vẫn ghi Room thật" đã ghi trong CLAUDE.md mục "Tầng API").
