@@ -24,7 +24,6 @@ class CaptureConfigWriterTest {
                 cameraId = "0",
                 appVersion = "1.0",
                 luxModuleId = "LUX-001",
-                luxModuleFirmware = "1.2.0",
             )
 
         val json = CaptureConfigWriter.toJson(config)
@@ -35,7 +34,7 @@ class CaptureConfigWriterTest {
         assertTrue(json.contains(""""keyframe_interval_s":2"""))
         assertTrue(json.contains(""""segment_duration_s":180"""))
         assertTrue(json.contains(""""app_version":"1.0""""))
-        assertTrue(json.contains(""""lux_module_firmware":"1.2.0""""))
+        assertTrue(json.contains(""""lux_module_id":"LUX-001""""))
         assertTrue(json.contains(""""sensor_timestamp_source":"REALTIME""""))
         // Not a header line like the .ndjson files (spec §8) — schema_version sits inside the object.
         assertTrue(json.trim().startsWith("{") && json.contains(""""schema_version""""))

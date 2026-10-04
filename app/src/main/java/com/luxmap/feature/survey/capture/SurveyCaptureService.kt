@@ -415,8 +415,6 @@ class SurveyCaptureService : Service() {
                         appVersion = BuildConfig.VERSION_NAME,
                         // real value comes from Bước 0's device pick, wired in Task 18
                         luxModuleId = "LUX-001",
-                        // pending firmware contract (Task 17c / docs/contract-drift.md)
-                        luxModuleFirmware = "unknown",
                     ),
                 ),
             )

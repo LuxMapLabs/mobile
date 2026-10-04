@@ -21,7 +21,6 @@ data class CaptureConfig(
     val cameraId: String,
     val appVersion: String,
     val luxModuleId: String,
-    val luxModuleFirmware: String,
 )
 
 object CaptureConfigWriter {
@@ -38,6 +37,6 @@ object CaptureConfigWriter {
         "sensor_timestamp_source":"REALTIME"},
         "segment_duration_s":${config.segmentDurationS},
         "device":{"manufacturer":"${config.cameraManufacturer}","model":"${config.cameraModel}","camera_id":"${config.cameraId}"},
-        "app_version":"${config.appVersion}","lux_module_id":"${config.luxModuleId}","lux_module_firmware":"${config.luxModuleFirmware}"}
+        "app_version":"${config.appVersion}","lux_module_id":"${config.luxModuleId}"}
         """.trimIndent().replace("\n", "")
 }
