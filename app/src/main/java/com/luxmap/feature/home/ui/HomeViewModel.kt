@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,26 +18,39 @@ import javax.inject.Inject
 class HomeViewModel
     @Inject
     constructor(
-        repository: HomeRepository,
+        private val repository: HomeRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
+        private var loadJob: Job? = null
+
         init {
-            viewModelScope.launch {
-                repository
-                    .observeHomeData()
-                    .catch { e ->
-                        _uiState.value = HomeUiState.Error(e.message ?: "Không tải được dữ liệu")
-                    }.collect { data ->
-                        _uiState.value =
-                            if (data.isEmpty()) {
-                                HomeUiState.Empty
-                            } else {
-                                HomeUiState.Success(data = data, lastSyncedAt = Instant.now())
-                            }
-                    }
-            }
+            load()
+        }
+
+        fun retry() {
+            load()
+        }
+
+        private fun load() {
+            loadJob?.cancel()
+            _uiState.value = HomeUiState.Loading
+            loadJob =
+                viewModelScope.launch {
+                    repository
+                        .observeHomeData()
+                        .catch { e ->
+                            _uiState.value = HomeUiState.Error(e.message ?: "Không tải được dữ liệu")
+                        }.collect { data ->
+                            _uiState.value =
+                                if (data.isEmpty()) {
+                                    HomeUiState.Empty
+                                } else {
+                                    HomeUiState.Success(data = data, lastSyncedAt = Instant.now())
+                                }
+                        }
+                }
         }
     }
 
