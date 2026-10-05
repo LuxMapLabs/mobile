@@ -53,6 +53,7 @@ class WorkOrderDetailViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
     @Test
     fun `emits Loading then Success when the repository has the work order`() =
         runTest {
