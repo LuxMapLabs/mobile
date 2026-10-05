@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 private const val WORK_ORDER_ID = "WO-1"
 
@@ -97,14 +99,13 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `start sets isStarting immediately, then reloads so the button can disappear`() =
+    fun `start sets isStarting immediately, then swaps in the backend's returned detail directly`() =
         runTest {
             val repository = mockk<WorkOrderDetailRepository>()
-            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returnsMany
-                listOf(flowOf(detail(allowedActions = listOf("start"))), flowOf(detail(allowedActions = emptyList())))
+            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(detail(allowedActions = listOf("start")))
             coEvery { repository.start(WORK_ORDER_ID) } coAnswers {
                 delay(10)
-                Result.success(Unit)
+                Result.success(detail(allowedActions = emptyList()))
             }
             val viewModel = WorkOrderDetailViewModel(savedStateHandle(), repository)
 
@@ -118,12 +119,35 @@ class WorkOrderDetailViewModelTest {
                 val starting = awaitItem() as WorkOrderDetailUiState.Success
                 assertTrue(starting.isStarting)
 
-                val reloading = awaitItem()
-                assertEquals(WorkOrderDetailUiState.Loading, reloading)
-                val reloaded = awaitItem() as WorkOrderDetailUiState.Success
-                assertTrue(reloaded.detail.allowedActions.isEmpty())
-                assertFalse(reloaded.isStarting)
+                val started = awaitItem() as WorkOrderDetailUiState.Success
+                assertTrue(started.detail.allowedActions.isEmpty())
+                assertFalse(started.isStarting)
             }
+            coVerify(exactly = 1) { repository.start(WORK_ORDER_ID) }
+        }
+
+    @Test
+    fun `calling start twice before the first call returns only sends one request`() =
+        runTest {
+            val repository = mockk<WorkOrderDetailRepository>()
+            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(detail(allowedActions = listOf("start")))
+            coEvery { repository.start(WORK_ORDER_ID) } coAnswers {
+                delay(10)
+                Result.success(detail(allowedActions = emptyList()))
+            }
+            val viewModel = WorkOrderDetailViewModel(savedStateHandle(), repository)
+
+            viewModel.uiState.test {
+                assertEquals(WorkOrderDetailUiState.Loading, awaitItem())
+                awaitItem() as WorkOrderDetailUiState.Success
+
+                viewModel.start()
+                viewModel.start()
+
+                awaitItem() as WorkOrderDetailUiState.Success
+                awaitItem() as WorkOrderDetailUiState.Success
+            }
+            coVerify(exactly = 1) { repository.start(WORK_ORDER_ID) }
         }
 
     @Test
@@ -144,7 +168,27 @@ class WorkOrderDetailViewModelTest {
                 assertTrue(starting.isStarting)
                 val failed = awaitItem() as WorkOrderDetailUiState.Success
                 assertFalse(failed.isStarting)
-                assertEquals("conflict", failed.startError)
+                assertEquals("Không bắt đầu được lệnh này", failed.startError)
+            }
+        }
+
+    @Test
+    fun `a network failure on start shows a connectivity message, not the raw exception`() =
+        runTest {
+            val repository = mockk<WorkOrderDetailRepository>()
+            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(detail())
+            coEvery { repository.start(WORK_ORDER_ID) } returns Result.failure(IOException("Unable to resolve host"))
+            val viewModel = WorkOrderDetailViewModel(savedStateHandle(), repository)
+
+            viewModel.uiState.test {
+                assertEquals(WorkOrderDetailUiState.Loading, awaitItem())
+                awaitItem() as WorkOrderDetailUiState.Success
+
+                viewModel.start()
+
+                awaitItem() as WorkOrderDetailUiState.Success
+                val failed = awaitItem() as WorkOrderDetailUiState.Success
+                assertEquals("Mất kết nối. Vui lòng thử lại.", failed.startError)
             }
         }
 }

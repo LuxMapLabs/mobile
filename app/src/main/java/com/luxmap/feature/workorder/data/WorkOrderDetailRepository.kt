@@ -5,5 +5,5 @@ import kotlinx.coroutines.flow.Flow
 interface WorkOrderDetailRepository {
     fun observeWorkOrderDetail(workOrderId: String): Flow<WorkOrderDetail?>
 
-    suspend fun start(workOrderId: String): Result<Unit>
+    suspend fun start(workOrderId: String): Result<WorkOrderDetail>
 }

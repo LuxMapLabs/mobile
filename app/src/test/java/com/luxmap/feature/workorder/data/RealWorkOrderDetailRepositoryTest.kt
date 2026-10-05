@@ -75,13 +75,16 @@ class RealWorkOrderDetailRepositoryTest {
         }
 
     @Test
-    fun `start returns success when the backend accepts it`() =
+    fun `start returns the backend's updated detail when it accepts the request`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
-            coEvery { workOrdersApi.start(WORK_ORDER_ID) } returns Unit
+            coEvery { workOrdersApi.start(WORK_ORDER_ID) } returns detailDto().copy(woStatus = "in_progress")
             val repository = RealWorkOrderDetailRepository(workOrdersApi)
 
-            assertTrue(repository.start(WORK_ORDER_ID).isSuccess)
+            val result = repository.start(WORK_ORDER_ID)
+
+            assertTrue(result.isSuccess)
+            assertEquals("in_progress", result.getOrNull()?.woStatus)
         }
 
     @Test

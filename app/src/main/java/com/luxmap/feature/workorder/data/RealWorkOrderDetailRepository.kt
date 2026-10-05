@@ -22,5 +22,6 @@ class RealWorkOrderDetailRepository
                 }
             }
 
-        override suspend fun start(workOrderId: String): Result<Unit> = runCatching { workOrdersApi.start(workOrderId) }
+        override suspend fun start(workOrderId: String): Result<WorkOrderDetail> =
+            runCatching { workOrdersApi.start(workOrderId).toWorkOrderDetail() }
     }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -48,24 +49,27 @@ class WorkOrderDetailViewModel
 
         fun start() {
             val current = _uiState.value
-            if (current !is WorkOrderDetailUiState.Success) return
+            if (current !is WorkOrderDetailUiState.Success || current.isStarting) return
             _uiState.value = current.copy(isStarting = true, startError = null)
             viewModelScope.launch {
                 repository.start(workOrderId).fold(
-                    onSuccess = { load() },
+                    onSuccess = { detail -> _uiState.value = WorkOrderDetailUiState.Success(detail = detail) },
                     onFailure = { e ->
                         val afterFailure = _uiState.value
                         if (afterFailure is WorkOrderDetailUiState.Success) {
                             _uiState.value =
                                 afterFailure.copy(
                                     isStarting = false,
-                                    startError = e.message ?: "Không bắt đầu được lệnh này",
+                                    startError = startErrorMessage(e),
                                 )
                         }
                     },
                 )
             }
         }
+
+        private fun startErrorMessage(e: Throwable): String =
+            if (e is IOException) "Mất kết nối. Vui lòng thử lại." else "Không bắt đầu được lệnh này"
 
         companion object {
             const val WORK_ORDER_ID_ARG = "workOrderId"

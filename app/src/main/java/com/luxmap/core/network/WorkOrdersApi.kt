@@ -25,5 +25,5 @@ interface WorkOrdersApi {
     @POST("api/v1/work-orders/{id}/start")
     suspend fun start(
         @Path("id") id: String,
-    )
+    ): WorkOrderDetailDto
 }
