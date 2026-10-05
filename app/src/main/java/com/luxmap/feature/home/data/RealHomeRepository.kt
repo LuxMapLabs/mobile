@@ -59,6 +59,7 @@ class RealHomeRepository
                 woStatus = woStatus,
                 dueDate = dueDate,
                 priorityScore = priorityScore,
+                taskKind = taskKind,
             )
 
         private companion object {

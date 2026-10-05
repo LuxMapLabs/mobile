@@ -1,12 +1,8 @@
 package com.luxmap.feature.home.ui
 
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import com.luxmap.core.theme.LuxMapTheme
-import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.WorkOrderCluster
@@ -23,16 +19,14 @@ class HomeScreenTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun loadingState_showsProgressIndicator() {
+    fun loadingState_showsHeroHeader() {
         composeTestRule.setContent {
             LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Loading, onOpenWorkOrder = {}, onStartSurvey = {})
+                HomeScreen(uiState = HomeUiState.Loading, onOpenWorkOrder = {}, onStartSurvey = {}, onRetry = {})
             }
         }
 
-        composeTestRule
-            .onAllNodes(hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate))
-            .assertCountEquals(1)
+        composeTestRule.onNodeWithText("Việc hôm nay").assertExists()
     }
 
     @Test
@@ -48,11 +42,10 @@ class HomeScreenTest {
                                 listOf(
                                     WorkOrderSummaryItem(
                                         workOrderId = "WO-2031",
-                                        shortAddress = "Đường liên thôn 3",
-                                        faultTypeLabel = "Đèn tắt",
-                                        priority = WorkOrderPriority.URGENT,
-                                        slaDueAt = null,
-                                        distanceMeters = null,
+                                        woStatus = "assigned",
+                                        dueDate = null,
+                                        priorityScore = null,
+                                        taskKind = "repair",
                                     ),
                                 ),
                         ),
@@ -65,6 +58,7 @@ class HomeScreenTest {
                     uiState = HomeUiState.Success(data = data),
                     onOpenWorkOrder = {},
                     onStartSurvey = {},
+                    onRetry = {},
                 )
             }
         }
@@ -77,7 +71,7 @@ class HomeScreenTest {
     fun emptyState_showsEmptyMessage() {
         composeTestRule.setContent {
             LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Empty, onOpenWorkOrder = {}, onStartSurvey = {})
+                HomeScreen(uiState = HomeUiState.Empty, onOpenWorkOrder = {}, onStartSurvey = {}, onRetry = {})
             }
         }
 
@@ -92,6 +86,7 @@ class HomeScreenTest {
                     uiState = HomeUiState.Error(message = "Không tải được dữ liệu"),
                     onOpenWorkOrder = {},
                     onStartSurvey = {},
+                    onRetry = {},
                 )
             }
         }

@@ -3,9 +3,12 @@ package com.luxmap.core.theme
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -222,4 +225,40 @@ fun workOrderStatusFromWire(value: String): WorkOrderStatus =
         "verified" -> WorkOrderStatus.VERIFIED
         "cancelled" -> WorkOrderStatus.CANCELLED
         else -> WorkOrderStatus.OPEN
+    }
+
+// Component - task_kind badge (F02 cluster list), distinguishes an inspection ticket from a
+// repair ticket on the same work_order entity. Colors reuse the existing ASSIGNED/IN_PROGRESS
+// pairs above rather than adding new ones.
+enum class WorkOrderTaskKind { INSPECTION, REPAIR, SURVEY }
+
+fun WorkOrderTaskKind.label(): String =
+    when (this) {
+        WorkOrderTaskKind.INSPECTION -> "Kiểm tra"
+        WorkOrderTaskKind.REPAIR -> "Sửa chữa"
+        WorkOrderTaskKind.SURVEY -> "Khảo sát"
+    }
+
+fun WorkOrderTaskKind.icon(): ImageVector =
+    when (this) {
+        WorkOrderTaskKind.INSPECTION -> Icons.Filled.Search
+        WorkOrderTaskKind.REPAIR -> Icons.Filled.Build
+        WorkOrderTaskKind.SURVEY -> Icons.Filled.Videocam
+    }
+
+fun WorkOrderTaskKind.badgeColors(): BadgeColors =
+    when (this) {
+        WorkOrderTaskKind.INSPECTION -> WorkOrderStatus.ASSIGNED.badgeColors()
+        WorkOrderTaskKind.REPAIR -> WorkOrderStatus.IN_PROGRESS.badgeColors()
+        WorkOrderTaskKind.SURVEY -> WorkOrderStatus.DONE.badgeColors()
+    }
+
+// task_kind arrives from the backend as a snake_case wire string ("inspection"/"repair"/
+// "survey") - an unknown value falls back to Inspection (the non-destructive one) rather than
+// crashing.
+fun workOrderTaskKindFromWire(value: String): WorkOrderTaskKind =
+    when (value) {
+        "repair" -> WorkOrderTaskKind.REPAIR
+        "survey" -> WorkOrderTaskKind.SURVEY
+        else -> WorkOrderTaskKind.INSPECTION
     }
