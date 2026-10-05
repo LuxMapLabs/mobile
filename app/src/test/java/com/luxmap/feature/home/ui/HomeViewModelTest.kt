@@ -97,4 +97,38 @@ class HomeViewModelTest {
                 assertEquals("network down", error.message)
             }
         }
+
+    @Test
+    fun `retry re-fetches and can recover from a previous error`() =
+        runTest {
+            val data =
+                HomeData(
+                    metrics =
+                        HomeMetrics(
+                            assignedCount = 1,
+                            inProgressCount = 0,
+                            overdueCount = 0,
+                            plannedSweepCount = 0,
+                        ),
+                    clusters = emptyList(),
+                )
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returnsMany
+                listOf(
+                    flow { throw IllegalStateException("network down") },
+                    flowOf(data),
+                )
+            val viewModel = HomeViewModel(repository)
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                awaitItem() as HomeUiState.Error
+
+                viewModel.retry()
+
+                assertEquals(HomeUiState.Loading, awaitItem())
+                val success = awaitItem() as HomeUiState.Success
+                assertEquals(data, success.data)
+            }
+        }
 }
