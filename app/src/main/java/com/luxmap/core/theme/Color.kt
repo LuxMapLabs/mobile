@@ -1,7 +1,14 @@
 package com.luxmap.core.theme
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 // Primitive — giá trị màu gốc (mục 2.1 Design System v2.0)
 val Navy700 = Color(0xFF1F3864)
@@ -181,6 +188,15 @@ fun WorkOrderStatus.label(): String =
         WorkOrderStatus.DONE -> "Hoàn tất"
         WorkOrderStatus.VERIFIED -> "Đã nghiệm thu"
         WorkOrderStatus.CANCELLED -> "Đã huỷ"
+    }
+
+fun WorkOrderStatus.icon(): ImageVector =
+    when (this) {
+        WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED -> Icons.Filled.Assignment
+        WorkOrderStatus.IN_PROGRESS -> Icons.Filled.Autorenew
+        WorkOrderStatus.DONE -> Icons.Filled.CheckCircle
+        WorkOrderStatus.VERIFIED -> Icons.Filled.Verified
+        WorkOrderStatus.CANCELLED -> Icons.Filled.Cancel
     }
 
 fun WorkOrderStatus.badgeColors(): BadgeColors =
