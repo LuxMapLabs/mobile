@@ -123,19 +123,19 @@ private fun WorkOrderDetailContent(
         } else {
             FaultListSection(faults = detail.faults, onNavigateFault = onNavigateFault)
         }
+        if (state.startError != null) {
+            Text(
+                text = state.startError,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         if ("start" in detail.allowedActions) {
             PrimaryButton(
                 text = "Bắt đầu",
                 onClick = onStart,
                 enabled = !state.isStarting,
                 modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (state.startError != null) {
-            Text(
-                text = state.startError,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
             )
         }
     }
@@ -206,7 +206,7 @@ private fun FaultCard(
         Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.bodyMedium)
         Text(text = faultStatusLabel(fault.faultStatus), style = MaterialTheme.typography.bodyMedium)
         if (fault.inspectionOutcome != null) {
-            Text(text = inspectionOutcomeLabel(fault.inspectionOutcome), style = MaterialTheme.typography.bodySmall)
+            Text(text = inspectionOutcomeLabel(fault.inspectionOutcome), style = MaterialTheme.typography.bodyMedium)
         }
         if (fault.hasLocation()) {
             OutlinedButton(
