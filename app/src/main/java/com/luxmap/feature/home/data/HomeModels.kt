@@ -19,13 +19,12 @@ data class HomeMetrics(
 // tracked in docs/contract-drift.md.
 // dueDate/status are raw strings (ISO date / wo_status wire value), not parsed here - same
 // reasoning as PoleDetail: parse at the UI layer when displaying, not in the domain model.
-// taskKind is read but intentionally unused by any UI/logic here (see CLAUDE.md: the
-// Inspection/Repair split is not yet confirmed with WP2/WP5 for mobile use).
 data class WorkOrderSummaryItem(
     val workOrderId: String,
     val woStatus: String,
     val dueDate: String?,
     val priorityScore: Double?,
+    val taskKind: String,
 )
 
 // One cluster - clusterLabel is the raw commune_id (e.g. "COM-001") for now, not a friendly

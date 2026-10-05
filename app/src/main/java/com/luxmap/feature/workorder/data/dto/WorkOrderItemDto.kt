@@ -11,8 +11,8 @@ data class WorkOrderItemDto(
     @SerialName("work_order_id") val workOrderId: String,
     val title: String,
     @SerialName("commune_id") val communeId: String,
-    // "inspection" | "repair" - read but not used for any Inspection/Repair-specific UI or
-    // logic yet (see CLAUDE.md: this split is not confirmed with WP2/WP5 for mobile use).
+    // "inspection" | "repair" | "survey" - checked directly against TaskKind enum in
+    // luxmap_backend/src/LuxMap.Modules.WorkOrders/Entities/WorkOrder.cs.
     @SerialName("task_kind") val taskKind: String,
     @SerialName("segment_id") val segmentId: String? = null,
     @SerialName("cluster_id") val clusterId: String? = null,

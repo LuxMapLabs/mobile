@@ -30,6 +30,7 @@ import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
+import com.luxmap.core.theme.workOrderTaskKindFromWire
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 
@@ -60,12 +61,13 @@ fun WorkOrderCard(
     workOrderId: String,
     woStatus: String,
     dueDate: String?,
-    priorityScore: Double?,
+    taskKind: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val status = workOrderStatusFromWire(woStatus)
     val colors = status.badgeColors()
+    val kind = workOrderTaskKindFromWire(taskKind)
     val due = dueDateLabel(dueDate)
     Row(
         modifier =
@@ -77,7 +79,7 @@ fun WorkOrderCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        StatusTile(icon = status.icon(), background = colors.background, tint = colors.text)
+        StatusTile(icon = kind.icon(), background = colors.background, tint = colors.text)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -90,29 +92,13 @@ fun WorkOrderCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 StatusBadge(text = status.label(), colors = colors)
+                StatusBadge(text = kind.label(), colors = kind.badgeColors())
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                Text(
-                    text = due.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (priorityScore != null) {
-                    Text(
-                        text = "•",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    Text(
-                        text = "Ưu tiên ${priorityScore.toInt()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            Text(
+                text = due.text,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Icon(
             imageVector = Icons.Filled.ChevronRight,

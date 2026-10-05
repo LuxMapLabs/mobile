@@ -360,7 +360,7 @@ private fun ClusterCard(
                 workOrderId = item.workOrderId,
                 woStatus = item.woStatus,
                 dueDate = item.dueDate,
-                priorityScore = item.priorityScore,
+                taskKind = item.taskKind,
                 onClick = { onOpenWorkOrder(item.workOrderId) },
             )
         }
