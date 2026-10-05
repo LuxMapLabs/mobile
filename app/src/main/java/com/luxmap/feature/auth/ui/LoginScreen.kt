@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -166,6 +167,9 @@ fun LoginScreen(
                     .navigationBarsPadding()
                     // The app draws edge to edge, so the window does not shrink when the keyboard
                     // opens. Without this the keyboard would cover the password field and button.
+                    // Footer stays IN this same scrolling column (not pinned outside it) - a
+                    // fixed footer would keep claiming its space when the keyboard opens and
+                    // the form needs that room most.
                     .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(Spacing.xl),
@@ -198,9 +202,14 @@ fun LoginScreen(
                     ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 isError = errorPlacement?.identifierInvalid == true,
-                supportingText = errorPlacement?.identifierMessage?.let { { InlineErrorText(it) } },
                 modifier = Modifier.fillMaxWidth().focusRequester(identifierFocusRequester),
             )
+            // Shown as a sibling below the field, not in supportingText - that slot has its own
+            // Material3 padding and does not line up flush with the field's own edge.
+            errorPlacement?.identifierMessage?.let {
+                Spacer(Modifier.height(Spacing.xs))
+                InlineErrorText(it, modifier = Modifier.fillMaxWidth())
+            }
             Spacer(Modifier.height(Spacing.lg))
 
             FieldLabel("Mật khẩu")
@@ -228,7 +237,6 @@ fun LoginScreen(
                         },
                     ),
                 isError = errorPlacement?.passwordInvalid == true,
-                supportingText = errorPlacement?.passwordMessage?.let { { InlineErrorText(it) } },
                 visualTransformation =
                     if (viewModel.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
@@ -237,12 +245,17 @@ fun LoginScreen(
                             if (viewModel.isPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
                         Icon(
                             imageVector = icon,
-                            contentDescription = if (viewModel.isPasswordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
+                            contentDescription =
+                                if (viewModel.isPasswordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
                         )
                     }
                 },
                 modifier = Modifier.fillMaxWidth().focusRequester(passwordFocusRequester),
             )
+            errorPlacement?.passwordMessage?.let {
+                Spacer(Modifier.height(Spacing.xs))
+                InlineErrorText(it, modifier = Modifier.fillMaxWidth())
+            }
             Spacer(Modifier.height(Spacing.sm))
 
             RememberMeRow(
@@ -300,6 +313,9 @@ fun LoginScreen(
             }
 
             Spacer(Modifier.height(Spacing.lg))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.lg))
+
             // Support flow is not specified yet (no destination/handler in the spec), so this
             // is plain text, not link-styled (no underline/link color) — styling it like a
             // working link when nothing happens on tap would be misleading.
@@ -310,11 +326,11 @@ fun LoginScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.lg))
-
+            Spacer(Modifier.height(Spacing.md))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Lock,
