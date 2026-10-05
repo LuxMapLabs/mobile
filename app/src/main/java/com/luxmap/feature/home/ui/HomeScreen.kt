@@ -78,6 +78,7 @@ import java.util.Locale
 // đang làm với showNotImplemented — không thêm route giả vào NavGraph ở task này.
 @Composable
 fun HomeRoute(
+    onOpenWorkOrder: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -89,7 +90,7 @@ fun HomeRoute(
     }
     HomeScreen(
         uiState = uiState,
-        onOpenWorkOrder = { showNotImplemented() },
+        onOpenWorkOrder = onOpenWorkOrder,
         onStartSurvey = showNotImplemented,
         onRetry = viewModel::retry,
         snackbarHostState = snackbarHostState,

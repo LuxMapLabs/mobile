@@ -41,6 +41,7 @@ import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
+import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -141,7 +142,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Home.route) {
-                HomeRoute()
+                HomeRoute(
+                    onOpenWorkOrder = { workOrderId ->
+                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
+                    },
+                )
             }
             composable(Routes.Survey.route) {
                 SurveyPlanScreen(
@@ -212,6 +217,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 arguments = listOf(navArgument("poleId") { type = NavType.StringType }),
             ) {
                 PoleDetailRoute(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Routes.WorkOrderDetail.route,
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+            ) {
+                WorkOrderDetailRoute(onBack = { navController.popBackStack() })
             }
         }
     }
