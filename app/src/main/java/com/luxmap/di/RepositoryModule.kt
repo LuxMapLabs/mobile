@@ -12,6 +12,8 @@ import com.luxmap.feature.survey.data.FakeSurveyRepository
 import com.luxmap.feature.survey.data.FakeUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.survey.data.UploadRepository
+import com.luxmap.feature.workorder.data.RealWorkOrderDetailRepository
+import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -40,4 +42,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindUploadRepository(impl: FakeUploadRepository): UploadRepository
+
+    @Binds
+    abstract fun bindWorkOrderDetailRepository(impl: RealWorkOrderDetailRepository): WorkOrderDetailRepository
 }
