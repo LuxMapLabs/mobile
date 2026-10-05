@@ -170,16 +170,6 @@ fun LoginScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(Spacing.xl),
         ) {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(width = 40.dp, height = 4.dp)
-                            .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusPill)),
-                )
-            }
-            Spacer(Modifier.height(Spacing.lg))
-
             Text(text = "Đăng nhập làm việc", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(Spacing.xs))
             Text(
@@ -289,12 +279,24 @@ fun LoginScreen(
 
             if (uiState is LoginUiState.Prefetching) {
                 Spacer(Modifier.height(Spacing.lg))
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(Spacing.sm))
-                Text(
-                    text = "Đang tải dữ liệu ngày làm việc...",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                RoundedCornerShape(Dimens.radiusMedium),
+                            )
+                            .padding(Spacing.lg),
+                ) {
+                    Text(
+                        text = "Đang tải dữ liệu ngày làm việc...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(Spacing.sm))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
             }
 
             Spacer(Modifier.height(Spacing.lg))
