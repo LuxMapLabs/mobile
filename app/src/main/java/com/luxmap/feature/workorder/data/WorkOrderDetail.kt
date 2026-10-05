@@ -17,6 +17,7 @@ data class WorkOrderDetail(
 
 data class WorkOrderFaultDetail(
     val faultId: String,
+    val poleId: String?,
     val lat: Double,
     val lng: Double,
     val faultType: String,
@@ -24,6 +25,8 @@ data class WorkOrderFaultDetail(
     val severity: String,
     val inspectionOutcome: String?,
 )
+
+fun WorkOrderFaultDetail.hasLocation(): Boolean = lat != 0.0 || lng != 0.0
 
 fun WorkOrderDetailDto.toWorkOrderDetail(): WorkOrderDetail =
     WorkOrderDetail(
@@ -41,6 +44,7 @@ fun WorkOrderDetailDto.toWorkOrderDetail(): WorkOrderDetail =
 private fun WorkOrderFaultDetailDto.toWorkOrderFaultDetail() =
     WorkOrderFaultDetail(
         faultId = faultId,
+        poleId = poleId,
         lat = location.lat,
         lng = location.lng,
         faultType = faultType,

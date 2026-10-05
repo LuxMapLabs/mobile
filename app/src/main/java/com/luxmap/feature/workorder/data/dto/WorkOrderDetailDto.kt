@@ -19,6 +19,7 @@ data class WorkOrderDetailDto(
 @Serializable
 data class WorkOrderFaultDetailDto(
     @SerialName("fault_id") val faultId: String,
+    @SerialName("pole_id") val poleId: String? = null,
     val location: WorkOrderFaultLocationDto,
     @SerialName("fault_type") val faultType: String,
     @SerialName("fault_status") val faultStatus: String,

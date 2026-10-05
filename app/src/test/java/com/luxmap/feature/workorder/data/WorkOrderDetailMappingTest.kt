@@ -24,6 +24,7 @@ class WorkOrderDetailMappingTest {
                     listOf(
                         WorkOrderFaultDetailDto(
                             faultId = "FAULT-1",
+                            poleId = "POLE-0047",
                             location = WorkOrderFaultLocationDto(lat = 10.97, lng = 106.49),
                             faultType = "lamp_out",
                             faultStatus = "confirmed",
@@ -45,12 +46,78 @@ class WorkOrderDetailMappingTest {
         assertEquals(listOf("start"), detail.allowedActions)
         val fault = detail.faults.single()
         assertEquals("FAULT-1", fault.faultId)
+        assertEquals("POLE-0047", fault.poleId)
         assertTrue(fault.lat == 10.97)
         assertTrue(fault.lng == 106.49)
         assertEquals("lamp_out", fault.faultType)
         assertEquals("confirmed", fault.faultStatus)
         assertEquals("high", fault.severity)
         assertEquals("fault_present", fault.inspectionOutcome)
+    }
+
+    @Test
+    fun `a fault with no pole_id (a segment-level fault) maps to a null poleId, not a crash`() {
+        val dto =
+            WorkOrderDetailDto(
+                workOrderId = "WO-3",
+                title = "Sửa mất điện tuyến C",
+                taskKind = "repair",
+                woStatus = "assigned",
+                dueDate = null,
+                scheduledDate = null,
+                note = null,
+                allowedActions = listOf("start"),
+                faults =
+                    listOf(
+                        WorkOrderFaultDetailDto(
+                            faultId = "FAULT-2",
+                            poleId = null,
+                            location = WorkOrderFaultLocationDto(lat = 10.97, lng = 106.49),
+                            faultType = "segment_outage",
+                            faultStatus = "confirmed",
+                            severity = "critical",
+                            inspectionOutcome = null,
+                        ),
+                    ),
+            )
+
+        val fault = dto.toWorkOrderDetail().faults.single()
+
+        assertEquals(null, fault.poleId)
+    }
+
+    @Test
+    fun `hasLocation is false when lat and lng both come back 0 - the backend's no-coordinate sentinel`() {
+        val noLocation =
+            WorkOrderFaultDetail(
+                faultId = "FAULT-3",
+                poleId = null,
+                lat = 0.0,
+                lng = 0.0,
+                faultType = "segment_outage",
+                faultStatus = "confirmed",
+                severity = "critical",
+                inspectionOutcome = null,
+            )
+
+        assertTrue(!noLocation.hasLocation())
+    }
+
+    @Test
+    fun `hasLocation is true for a real coordinate`() {
+        val located =
+            WorkOrderFaultDetail(
+                faultId = "FAULT-1",
+                poleId = "POLE-0047",
+                lat = 10.97,
+                lng = 106.49,
+                faultType = "lamp_out",
+                faultStatus = "confirmed",
+                severity = "high",
+                inspectionOutcome = null,
+            )
+
+        assertTrue(located.hasLocation())
     }
 
     @Test

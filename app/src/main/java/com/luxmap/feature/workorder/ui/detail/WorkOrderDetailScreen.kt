@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,7 @@ import com.luxmap.core.ui.components.TextOnlyStatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
+import com.luxmap.feature.workorder.data.hasLocation
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -199,16 +201,28 @@ private fun FaultCard(
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
+        Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
         TextOnlyStatusBadge(text = priority.label(), color = priority.color())
-        Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.titleMedium)
+        Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.bodyMedium)
         Text(text = faultStatusLabel(fault.faultStatus), style = MaterialTheme.typography.bodyMedium)
         if (fault.inspectionOutcome != null) {
             Text(text = inspectionOutcomeLabel(fault.inspectionOutcome), style = MaterialTheme.typography.bodySmall)
         }
-        OutlinedButton(onClick = onNavigate, modifier = Modifier.fillMaxWidth()) {
-            Icon(imageVector = Icons.Filled.Navigation, contentDescription = null)
-            Spacer(Modifier.width(Spacing.sm))
-            Text("Điều hướng")
+        if (fault.hasLocation()) {
+            OutlinedButton(
+                onClick = onNavigate,
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+            ) {
+                Icon(imageVector = Icons.Filled.Navigation, contentDescription = null)
+                Spacer(Modifier.width(Spacing.sm))
+                Text("Điều hướng")
+            }
+        } else {
+            Text(
+                text = "Chưa có toạ độ",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -237,6 +251,7 @@ private fun sampleRepairWithFaults() =
             listOf(
                 WorkOrderFaultDetail(
                     faultId = "FAULT-1",
+                    poleId = "POLE-0047",
                     lat = 10.97,
                     lng = 106.49,
                     faultType = "lamp_out",

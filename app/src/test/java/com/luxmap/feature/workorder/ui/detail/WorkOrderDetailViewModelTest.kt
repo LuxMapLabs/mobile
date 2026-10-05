@@ -102,7 +102,8 @@ class WorkOrderDetailViewModelTest {
     fun `start sets isStarting immediately, then swaps in the backend's returned detail directly`() =
         runTest {
             val repository = mockk<WorkOrderDetailRepository>()
-            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(detail(allowedActions = listOf("start")))
+            val assignedDetail = detail(allowedActions = listOf("start"))
+            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(assignedDetail)
             coEvery { repository.start(WORK_ORDER_ID) } coAnswers {
                 delay(10)
                 Result.success(detail(allowedActions = emptyList()))
@@ -130,7 +131,8 @@ class WorkOrderDetailViewModelTest {
     fun `calling start twice before the first call returns only sends one request`() =
         runTest {
             val repository = mockk<WorkOrderDetailRepository>()
-            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(detail(allowedActions = listOf("start")))
+            val initialDetail = detail(allowedActions = listOf("start"))
+            every { repository.observeWorkOrderDetail(WORK_ORDER_ID) } returns flowOf(initialDetail)
             coEvery { repository.start(WORK_ORDER_ID) } coAnswers {
                 delay(10)
                 Result.success(detail(allowedActions = emptyList()))
