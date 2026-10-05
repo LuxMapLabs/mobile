@@ -176,6 +176,14 @@ fun WorkOrderPriority.color(): Color =
         WorkOrderPriority.URGENT -> Rose600
     }
 
+fun severityFromWire(value: String): WorkOrderPriority =
+    when (value) {
+        "low" -> WorkOrderPriority.LOW
+        "high" -> WorkOrderPriority.HIGH
+        "critical" -> WorkOrderPriority.URGENT
+        else -> WorkOrderPriority.NORMAL
+    }
+
 // Component - badge trạng thái work order (wo_status, backend WorkOrderStatus enum). Design
 // System v2.0 mục 6.3 chỉ nói "work-order status" là 1 variant của Status Badge, không cho bảng
 // màu cụ thể - các cặp bg/text dưới đây dùng lại đúng những giá trị đã có ở badge sync (mục trên),
