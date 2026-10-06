@@ -268,16 +268,24 @@ case does not retry silently forever).
   wait for the network. The screen then shows the existing sync-status badge styling (Chờ đồng bộ/Đang đồng
   bộ/Đồng bộ lỗi/Xung đột/Đã đồng bộ from the Design System) rather than treating "offline" as an `Error`.
 
-### `EvidenceCaptureScreen` (new, separate from survey capture)
+### Evidence photo capture — delegate to the system Camera app, no new in-app camera code
 
-A plain CameraX `ImageCapture` screen — explicitly **not** reusing `ExposureLockController`/
-`SegmentedVideoRecorder` (those exist for night survey video with locked exposure; an evidence photo is a
-daytime still of a just-repaired lamp, auto-exposure is correct here). On shutter: takes one JPEG to
-`filesDir/evidence/{workOrderId}/{clientOpId}.jpg`, takes one Fused Location fix (a single point, not a
-continuous track — this is not a survey session), stamps `captured_at` with the device clock, and calls
-`repository.captureAfterEvidence(...)` directly from its own small `EvidenceCaptureViewModel`, then
-navigates back. No shared state is passed through nav args; `WorkOrderCompletionScreen` just re-renders once
-the local evidence row appears via its `Flow`.
+**Correction (2026-10-06, confirmed against the real codebase):** this project does not use CameraX —
+`libs.versions.toml` has no `androidx.camera.*` entry at all, and every existing camera feature
+(`core/camera`, `VideoCaptureSession`) is hand-written on raw `android.hardware.camera2`, built specifically
+for night-survey video's exposure-lock requirement. An evidence photo has no such requirement (a daytime
+still of a just-repaired lamp, for a human reviewer, auto-exposure is correct) — there is no technical
+reason to add a second bespoke camera stack for it.
+
+Instead: `ActivityResultContracts.TakePicture()` (standard AndroidX activity-result API, no new Gradle
+dependency), the same "delegate to the OS instead of building it" choice F09 already made for "Điều hướng"
+(`Intent` to Google Maps rather than in-app turn-by-turn). The screen creates an output file at
+`filesDir/evidence/{workOrderId}/{clientOpId}.jpg` via a `FileProvider` content URI, launches the system
+Camera app to fill it, and on a successful result takes one Fused Location fix (a single point, not a
+continuous track — this is not a survey session) and stamps `captured_at` with the device clock, then calls
+`repository.captureAfterEvidence(...)` from a small `EvidenceCaptureViewModel`, and navigates back. No
+shared state is passed through nav args; `WorkOrderCompletionScreen` just re-renders once the local evidence
+row appears via its `Flow`.
 
 ### Navigation
 
