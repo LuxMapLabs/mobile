@@ -301,7 +301,7 @@ Repair branch). `WorkOrderDetailScreen` adds a "Hoàn thành" button next to "B�
 | `409 AFTER_EVIDENCE_REQUIRED` on `complete` | `SyncOpResult.RetryLater` (self-resolves once evidence syncs); capped attempt count before surfacing as stuck |
 | `404 WORK_ORDER_NOT_FOUND` | `Failed` — order reassigned/out of scope; prompt reload, do not retry |
 | `400 VALIDATION_FAILED` (fault_outcomes mismatch — e.g. a fault was added server-side after the screen loaded) | `Failed`; prompt reload of the work order detail |
-| `415 UNSUPPORTED_IMAGE_FORMAT` | `Failed`; prompt retake (should not normally happen — CameraX produces real JPEGs) |
+| `415 UNSUPPORTED_IMAGE_FORMAT` | `Failed`; prompt retake (should not normally happen — the system Camera app produces real JPEGs) |
 | `409` state-conflict (order completed from another device) | `Conflict`; keep local record, do not auto-overwrite, per CLAUDE.md C5 |
 | Retry of a not-yet-synced evidence capture | delete the local row + file, capture again |
 | Retry of an already-synced evidence capture | capture a new row; server allows multiple `after` photos, only checks that at least one exists |
