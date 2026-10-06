@@ -3,6 +3,8 @@ package com.luxmap.core.database
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.luxmap.core.sync.SyncQueueDao
+import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.feature.survey.data.dao.SurveyPlanDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalRoadSegmentEntity
@@ -18,8 +20,9 @@ import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
         LocalRoadSegmentEntity::class,
         LocalSurveySessionEntity::class,
         LocalSurveyVideoSegmentEntity::class,
+        SyncQueueEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
@@ -27,4 +30,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun surveyPlanDao(): SurveyPlanDao
 
     abstract fun surveySessionDao(): SurveySessionDao
+
+    abstract fun syncQueueDao(): SyncQueueDao
 }

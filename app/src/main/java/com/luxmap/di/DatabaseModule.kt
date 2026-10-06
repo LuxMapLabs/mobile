@@ -3,6 +3,7 @@ package com.luxmap.di
 import android.content.Context
 import androidx.room.Room
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import dagger.Module
 import dagger.Provides
@@ -34,4 +35,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideSurveySessionDao(db: AppDatabase): SurveySessionDao = db.surveySessionDao()
+
+    @Provides
+    @Singleton
+    fun provideSyncQueueDao(db: AppDatabase): SyncQueueDao = db.syncQueueDao()
 }
