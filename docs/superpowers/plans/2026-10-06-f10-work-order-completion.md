@@ -2797,6 +2797,8 @@ In `NavGraph.kt`, update the existing `Routes.WorkOrderDetail` composable block 
             }
 ```
 
+Note for Task 11: this `Routes.WorkOrderCompletion` block does not capture `backStackEntry`, so `workOrderId` is not in scope here yet. Task 11 Step 9 (navigating to `Routes.WorkOrderEvidenceCapture`) must change this block's lambda to `{ backStackEntry -> val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable ... }`, the same pattern the `Routes.WorkOrderDetail` block above already uses, before it can build that route.
+
 (add import `com.luxmap.feature.workorder.ui.completion.WorkOrderCompletionRoute`; note the existing `WorkOrderDetail` composable block did not previously read `backStackEntry.arguments` — it now needs to, to build the completion route)
 
 - [ ] **Step 8: Create `WorkOrderCompletionScreen.kt`**
@@ -3388,11 +3390,12 @@ EOF
 - Modify: `app/src/main/java/com/luxmap/feature/workorder/data/RealWorkOrderCompletionRepository.kt`
 - Modify: `app/src/main/java/com/luxmap/feature/workorder/ui/completion/WorkOrderCompletionViewModel.kt`
 - Modify: `app/src/main/java/com/luxmap/feature/workorder/ui/completion/WorkOrderCompletionScreen.kt`
-- Modify: `app/src/main/java/com/luxmap/navigation/NavGraph.kt`
 - Modify: `app/src/test/java/com/luxmap/feature/workorder/data/RealWorkOrderCompletionRepositoryTest.kt`
 
 **Interfaces:**
 - Produces: `WorkOrderCompletionRepository.retakeEvidence(workOrderId: String)`; `WorkOrderCompletionViewModel.retakeEvidence(onReady: () -> Unit)`.
+
+Note: `NavGraph.kt` is not touched by this task — `onRetakeEvidence` is wired entirely inside `WorkOrderCompletionScreen.kt`'s `WorkOrderCompletionRoute` by reusing the `onCaptureEvidence` callback Task 11 already threaded in from `NavGraph`; no new navigation call site is needed.
 
 This closes the spec's error-handling table rows "Retry of a not-yet-synced evidence capture" (delete the local row + file, capture again) and "Retry of an already-synced evidence capture" (capture a new row, old one stays — the server allows multiple `after` photos).
 
