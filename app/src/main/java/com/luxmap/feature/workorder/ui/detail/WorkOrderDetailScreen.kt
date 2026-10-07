@@ -58,6 +58,7 @@ import com.luxmap.feature.workorder.data.hasLocation
 @Composable
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
+    onComplete: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
 ) {
@@ -68,6 +69,7 @@ fun WorkOrderDetailRoute(
         onBack = onBack,
         onStart = viewModel::start,
         onNavigateFault = { lat, lng -> openInMaps(context, lat, lng) },
+        onComplete = onComplete,
         modifier = modifier,
     )
 }
@@ -79,6 +81,7 @@ fun WorkOrderDetailScreen(
     onBack: () -> Unit,
     onStart: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
+    onComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -98,7 +101,12 @@ fun WorkOrderDetailScreen(
             when (uiState) {
                 is WorkOrderDetailUiState.Loading -> LoadingState()
                 is WorkOrderDetailUiState.Success ->
-                    WorkOrderDetailContent(state = uiState, onStart = onStart, onNavigateFault = onNavigateFault)
+                    WorkOrderDetailContent(
+                        state = uiState,
+                        onStart = onStart,
+                        onNavigateFault = onNavigateFault,
+                        onComplete = onComplete,
+                    )
                 is WorkOrderDetailUiState.Empty -> MessageState("Không tìm thấy lệnh này")
                 is WorkOrderDetailUiState.Error -> MessageState(uiState.message)
             }
@@ -111,6 +119,7 @@ private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
     onStart: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
+    onComplete: () -> Unit,
 ) {
     val detail = state.detail
     Column(
@@ -135,6 +144,13 @@ private fun WorkOrderDetailContent(
                 text = "Bắt đầu",
                 onClick = onStart,
                 enabled = !state.isStarting,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if ("complete" in detail.allowedActions) {
+            PrimaryButton(
+                text = "Hoàn thành",
+                onClick = onComplete,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -275,6 +291,7 @@ private fun WorkOrderDetailScreenRepairPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
+        onComplete = {},
     )
 }
 
@@ -286,6 +303,7 @@ private fun WorkOrderDetailScreenNoFaultsPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
+        onComplete = {},
     )
 }
 
@@ -297,27 +315,32 @@ private fun WorkOrderDetailScreenSurveyPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
+        onComplete = {},
     )
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun WorkOrderDetailScreenLoadingPreview() {
-    WorkOrderDetailScreen(uiState = WorkOrderDetailUiState.Loading, onBack = {}, onStart = {}, onNavigateFault = {
-            _,
-            _,
-        ->
-    })
+    WorkOrderDetailScreen(
+        uiState = WorkOrderDetailUiState.Loading,
+        onBack = {},
+        onStart = {},
+        onNavigateFault = { _, _ -> },
+        onComplete = {},
+    )
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun WorkOrderDetailScreenEmptyPreview() {
-    WorkOrderDetailScreen(uiState = WorkOrderDetailUiState.Empty, onBack = {}, onStart = {}, onNavigateFault = {
-            _,
-            _,
-        ->
-    })
+    WorkOrderDetailScreen(
+        uiState = WorkOrderDetailUiState.Empty,
+        onBack = {},
+        onStart = {},
+        onNavigateFault = { _, _ -> },
+        onComplete = {},
+    )
 }
 
 @Preview(showBackground = true)
@@ -328,5 +351,6 @@ private fun WorkOrderDetailScreenErrorPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
+        onComplete = {},
     )
 }
