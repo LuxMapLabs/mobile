@@ -142,4 +142,51 @@ class WorkOrderDetailMappingTest {
         assertEquals(null, detail.dueDate)
         assertEquals(null, detail.note)
     }
+
+    @Test
+    fun `maps reviewNote, reportNote and materialsUsed when present`() {
+        val dto =
+            WorkOrderDetailDto(
+                workOrderId = "WO-4",
+                title = "Sửa đèn tuyến D",
+                taskKind = "repair",
+                woStatus = "in_progress",
+                dueDate = null,
+                scheduledDate = null,
+                note = null,
+                reviewNote = "Chưa đủ ảnh sau, bổ sung thêm",
+                reportNote = "Đã thay bóng đèn",
+                materialsUsed = "1 bóng LED 30W",
+                allowedActions = listOf("complete"),
+                faults = emptyList(),
+            )
+
+        val detail = dto.toWorkOrderDetail()
+
+        assertEquals("Chưa đủ ảnh sau, bổ sung thêm", detail.reviewNote)
+        assertEquals("Đã thay bóng đèn", detail.reportNote)
+        assertEquals("1 bóng LED 30W", detail.materialsUsed)
+    }
+
+    @Test
+    fun `reviewNote, reportNote and materialsUsed default to null when absent`() {
+        val dto =
+            WorkOrderDetailDto(
+                workOrderId = "WO-5",
+                title = "Sửa đèn tuyến E",
+                taskKind = "repair",
+                woStatus = "assigned",
+                dueDate = null,
+                scheduledDate = null,
+                note = null,
+                allowedActions = listOf("start"),
+                faults = emptyList(),
+            )
+
+        val detail = dto.toWorkOrderDetail()
+
+        assertEquals(null, detail.reviewNote)
+        assertEquals(null, detail.reportNote)
+        assertEquals(null, detail.materialsUsed)
+    }
 }
