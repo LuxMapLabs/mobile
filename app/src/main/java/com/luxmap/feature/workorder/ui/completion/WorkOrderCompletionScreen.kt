@@ -38,6 +38,7 @@ import com.luxmap.feature.workorder.ui.detail.inspectionOutcomeLabel
 @Composable
 fun WorkOrderCompletionRoute(
     onBack: () -> Unit,
+    onCaptureEvidence: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkOrderCompletionViewModel = hiltViewModel(),
 ) {
@@ -49,6 +50,7 @@ fun WorkOrderCompletionRoute(
         onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
+        onCaptureEvidence = onCaptureEvidence,
         modifier = modifier,
     )
 }
@@ -62,6 +64,7 @@ fun WorkOrderCompletionScreen(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    onCaptureEvidence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -87,6 +90,7 @@ fun WorkOrderCompletionScreen(
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
                         onFaultOutcomeSelected = onFaultOutcomeSelected,
                         onSubmit = onSubmit,
+                        onCaptureEvidence = onCaptureEvidence,
                     )
                 is WorkOrderCompletionUiState.Empty -> MessageState("Không tìm thấy lệnh này")
                 is WorkOrderCompletionUiState.Error -> MessageState(uiState.message)
@@ -102,6 +106,7 @@ private fun WorkOrderCompletionContent(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    onCaptureEvidence: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
@@ -121,6 +126,7 @@ private fun WorkOrderCompletionContent(
                 state = state,
                 onReportNoteChanged = onReportNoteChanged,
                 onMaterialsUsedChanged = onMaterialsUsedChanged,
+                onCaptureEvidence = onCaptureEvidence,
             )
         } else {
             InspectionCompletionSection(
@@ -146,12 +152,14 @@ private fun RepairCompletionSection(
     state: WorkOrderCompletionUiState.Success,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
+    onCaptureEvidence: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        Text(
-            text = if (state.localEvidence != null) "Đã chụp ảnh sau" else "Chưa có ảnh sau",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (state.localEvidence == null) {
+            PrimaryButton(text = "Chụp ảnh sau", onClick = onCaptureEvidence, modifier = Modifier.fillMaxWidth())
+        } else {
+            Text(text = "Đã chụp ảnh sau", style = MaterialTheme.typography.bodyMedium)
+        }
         OutlinedTextField(
             value = state.reportNote,
             onValueChange = onReportNoteChanged,

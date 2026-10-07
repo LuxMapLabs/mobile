@@ -55,6 +55,12 @@ sealed interface Routes {
         fun createRoute(workOrderId: String) = "work-order/$workOrderId/complete"
     }
 
+    data object WorkOrderEvidenceCapture : Routes {
+        override val route = "work-order/{workOrderId}/complete/evidence"
+
+        fun createRoute(workOrderId: String) = "work-order/$workOrderId/complete/evidence"
+    }
+
     data object ReportSubmit : Routes {
         override val route = "report/submit"
     }
