@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.time.Instant
 
@@ -125,5 +126,57 @@ class RealWorkOrderCompletionRepositoryTest {
 
             assertEquals("OP-1", repository.observeEvidence("WO-1").first()?.clientOpId)
             assertEquals("COMP-1", repository.observeCompletion("WO-1").first()?.clientOpId)
+        }
+
+    @Test
+    fun `retakeEvidence deletes the local row and file when the previous capture has not synced yet`() =
+        runTest {
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val tempFile = java.io.File.createTempFile("evidence", ".jpg")
+            val pending =
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = "OP-1",
+                    workOrderId = "WO-1",
+                    kind = "after",
+                    filePath = tempFile.absolutePath,
+                    capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+                    lat = 10.97,
+                    lng = 106.49,
+                    uploadStatus = "pending",
+                )
+            io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
+            io.mockk.coEvery { dao.evidenceByClientOpId("OP-1") } returns pending
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+
+            repository.retakeEvidence("WO-1")
+
+            coVerify { dao.deleteEvidence("OP-1") }
+            assertFalse(tempFile.exists())
+        }
+
+    @Test
+    fun `retakeEvidence leaves the local row and file alone once the previous capture has synced`() =
+        runTest {
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val synced =
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = "OP-1",
+                    workOrderId = "WO-1",
+                    kind = "after",
+                    filePath = "/data/OP-1.jpg",
+                    capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+                    lat = 10.97,
+                    lng = 106.49,
+                    uploadStatus = "synced",
+                )
+            io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
+            io.mockk.coEvery { dao.evidenceByClientOpId("OP-1") } returns synced
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+
+            repository.retakeEvidence("WO-1")
+
+            coVerify(exactly = 0) { dao.deleteEvidence(any()) }
         }
 }

@@ -51,6 +51,7 @@ fun WorkOrderCompletionRoute(
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
         onCaptureEvidence = onCaptureEvidence,
+        onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
         modifier = modifier,
     )
 }
@@ -65,6 +66,7 @@ fun WorkOrderCompletionScreen(
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
     onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -91,6 +93,7 @@ fun WorkOrderCompletionScreen(
                         onFaultOutcomeSelected = onFaultOutcomeSelected,
                         onSubmit = onSubmit,
                         onCaptureEvidence = onCaptureEvidence,
+                        onRetakeEvidence = onRetakeEvidence,
                     )
                 is WorkOrderCompletionUiState.Empty -> MessageState("Không tìm thấy lệnh này")
                 is WorkOrderCompletionUiState.Error -> MessageState(uiState.message)
@@ -107,6 +110,7 @@ private fun WorkOrderCompletionContent(
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
     onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
@@ -127,6 +131,7 @@ private fun WorkOrderCompletionContent(
                 onReportNoteChanged = onReportNoteChanged,
                 onMaterialsUsedChanged = onMaterialsUsedChanged,
                 onCaptureEvidence = onCaptureEvidence,
+                onRetakeEvidence = onRetakeEvidence,
             )
         } else {
             InspectionCompletionSection(
@@ -153,12 +158,14 @@ private fun RepairCompletionSection(
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
     onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         if (state.localEvidence == null) {
             PrimaryButton(text = "Chụp ảnh sau", onClick = onCaptureEvidence, modifier = Modifier.fillMaxWidth())
         } else {
             Text(text = "Đã chụp ảnh sau", style = MaterialTheme.typography.bodyMedium)
+            PrimaryButton(text = "Chụp lại", onClick = onRetakeEvidence, modifier = Modifier.fillMaxWidth())
         }
         OutlinedTextField(
             value = state.reportNote,

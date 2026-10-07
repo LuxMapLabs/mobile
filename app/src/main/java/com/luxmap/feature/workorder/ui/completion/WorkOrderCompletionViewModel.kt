@@ -109,6 +109,13 @@ class WorkOrderCompletionViewModel
             }
         }
 
+        fun retakeEvidence(onReady: () -> Unit) {
+            viewModelScope.launch {
+                completionRepository.retakeEvidence(workOrderId)
+                onReady()
+            }
+        }
+
         private fun updateSuccess(
             transform: (WorkOrderCompletionUiState.Success) -> WorkOrderCompletionUiState.Success,
         ) {

@@ -31,6 +31,9 @@ interface WorkOrderCompletionDao {
         status: String,
     )
 
+    @Query("DELETE FROM local_work_order_evidence WHERE clientOpId = :clientOpId")
+    suspend fun deleteEvidence(clientOpId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrReplaceCompletion(completion: LocalWorkOrderCompletionEntity)
 

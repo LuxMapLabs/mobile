@@ -27,4 +27,6 @@ interface WorkOrderCompletionRepository {
         materialsUsed: String?,
         faultOutcomes: List<FaultOutcome>?,
     )
+
+    suspend fun retakeEvidence(workOrderId: String)
 }

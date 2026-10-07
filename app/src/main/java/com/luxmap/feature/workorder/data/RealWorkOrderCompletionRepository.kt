@@ -10,6 +10,7 @@ import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -80,6 +81,15 @@ class RealWorkOrderCompletionRepository
                 clientOpId = clientOpId,
                 dependsOnClientOpId = dependsOn,
             )
+        }
+
+        override suspend fun retakeEvidence(workOrderId: String) {
+            val clientOpId = dao.latestEvidenceClientOpId(workOrderId) ?: return
+            val evidence = dao.evidenceByClientOpId(clientOpId) ?: return
+            if (evidence.uploadStatus == "pending") {
+                File(evidence.filePath).delete()
+                dao.deleteEvidence(clientOpId)
+            }
         }
 
         private companion object {
