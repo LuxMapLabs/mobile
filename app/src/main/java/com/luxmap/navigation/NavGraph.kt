@@ -41,6 +41,8 @@ import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
+import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
+import com.luxmap.feature.workorder.ui.completion.WorkOrderCompletionRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 
 // The 4 tabs of the main area, in the order given by spec section A5.
@@ -221,8 +223,30 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(
                 route = Routes.WorkOrderDetail.route,
                 arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
+                WorkOrderDetailRoute(
+                    onBack = { navController.popBackStack() },
+                    onComplete = { navController.navigate(Routes.WorkOrderCompletion.createRoute(workOrderId)) },
+                )
+            }
+            composable(
+                route = Routes.WorkOrderCompletion.route,
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
+                WorkOrderCompletionRoute(
+                    onBack = { navController.popBackStack() },
+                    onCaptureEvidence = {
+                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
+                    },
+                )
+            }
+            composable(
+                route = Routes.WorkOrderEvidenceCapture.route,
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
             ) {
-                WorkOrderDetailRoute(onBack = { navController.popBackStack() })
+                EvidenceCaptureRoute(onDone = { navController.popBackStack() })
             }
         }
     }

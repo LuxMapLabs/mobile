@@ -12,6 +12,9 @@ data class WorkOrderDetailDto(
     @SerialName("due_date") val dueDate: String? = null,
     @SerialName("scheduled_date") val scheduledDate: String? = null,
     val note: String? = null,
+    @SerialName("review_note") val reviewNote: String? = null,
+    @SerialName("report_note") val reportNote: String? = null,
+    @SerialName("materials_used") val materialsUsed: String? = null,
     @SerialName("allowed_actions") val allowedActions: List<String> = emptyList(),
     val faults: List<WorkOrderFaultDetailDto> = emptyList(),
 )

@@ -156,6 +156,16 @@ fun SyncStatus.badgeColors(): BadgeColors =
         SyncStatus.DONE -> BadgeColors(Color(0xFFE3F6F1), Color(0xFF1E6B5C))
     }
 
+fun SyncStatus.label(): String =
+    when (this) {
+        SyncStatus.QUEUED_OFFLINE -> "Chờ mạng"
+        SyncStatus.QUEUED_ONLINE -> "Chờ đồng bộ"
+        SyncStatus.SYNCING -> "Đang đồng bộ"
+        SyncStatus.FAILED -> "Đồng bộ lỗi"
+        SyncStatus.CONFLICT -> "Xung đột"
+        SyncStatus.DONE -> "Đã đồng bộ"
+    }
+
 // Component — badge ưu tiên Work Order (mục 2.5), một màu chữ trên nền surface, không có nền riêng
 enum class WorkOrderPriority { LOW, NORMAL, HIGH, URGENT }
 
