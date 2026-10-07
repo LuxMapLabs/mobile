@@ -12,7 +12,9 @@ import com.luxmap.feature.survey.data.FakeSurveyRepository
 import com.luxmap.feature.survey.data.FakeUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.survey.data.UploadRepository
+import com.luxmap.feature.workorder.data.RealWorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderDetailRepository
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import dagger.Binds
 import dagger.Module
@@ -45,4 +47,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindWorkOrderDetailRepository(impl: RealWorkOrderDetailRepository): WorkOrderDetailRepository
+
+    @Binds
+    abstract fun bindWorkOrderCompletionRepository(
+        impl: RealWorkOrderCompletionRepository,
+    ): WorkOrderCompletionRepository
 }
