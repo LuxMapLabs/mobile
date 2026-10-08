@@ -60,7 +60,14 @@ data class FinalizedVideoCapture(
     // Real applied value from the last CaptureResult, not a requested one - LENS_APERTURE is fixed
     // per lens on almost every phone camera (not something LockedCameraProfile locks/requests), but
     // BE's capture_config.json schema still wants the real value reported (survey-ingest-p2a.md §4.2).
-    val aperture: Float,
+    // Null when the device did not report it - never fabricate f/0, a physically impossible value
+    // (review feedback, 2026-10-08).
+    val aperture: Float?,
+    // "portrait" for a 90/270 rotation hint, "landscape" for 0/180 - derived from the same
+    // resolveOrientationHint() the MP4 metadata already uses, not a hardcoded guess (review
+    // feedback, 2026-10-08). The encoder is always a fixed 1920x1080, so this is the only place
+    // that knows whether a clip plays back taller-than-wide or wider-than-tall.
+    val orientation: String,
 )
 
 class VideoCaptureSession
@@ -128,6 +135,10 @@ class VideoCaptureSession
         private var currentMuxerPort: RealMuxerPort? = null
         private var frameIndex = 0
         private var currentSegmentIndex = 0
+
+        // Set once in start(), read again in stop() to report the real orientation in
+        // capture_config.json instead of a hardcoded "portrait" (review feedback, 2026-10-08).
+        private var orientationHintDegrees = 0
 
         // The frame the drain loop is handling right now. Kept here, not only on the port, because
         // a rotation builds a NEW RealMuxerPort in the middle of onEncodedFrame() and writes this
@@ -222,6 +233,7 @@ class VideoCaptureSession
             // because CaptureScreen locks the screen orientation for the whole session. Doing it
             // per segment would just repeat the same work.
             val orientationHint = resolveOrientationHint(cameraManager)
+            orientationHintDegrees = orientationHint
 
             cameraDevice = openCamera(cameraManager, cameraId, handler)
 
@@ -756,7 +768,9 @@ class VideoCaptureSession
                         frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
                         focusDistanceDiopters = result.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: 0f,
                     )
-                val aperture = result.get(CaptureResult.LENS_APERTURE) ?: 0f
+                val aperture = result.get(CaptureResult.LENS_APERTURE)
+                val isPortrait = orientationHintDegrees == 90 || orientationHintDegrees == 270
+                val orientation = if (isPortrait) "portrait" else "landscape"
                 return FinalizedVideoCapture(
                     finalSegment,
                     actualProfile,
@@ -764,6 +778,7 @@ class VideoCaptureSession
                     Build.MODEL,
                     cameraId,
                     aperture,
+                    orientation,
                 )
             } finally {
                 // Runs even when a step above throws, so the camera and the NDJSON tail are never

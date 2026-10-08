@@ -12,7 +12,9 @@ data class CaptureConfig(
     // requested config — BE measured a real mismatch between the two in a reviewed sample.
     val iso: Int,
     val exposureTimeNs: Long,
-    val aperture: Double,
+    // Null when the device did not report LENS_APERTURE - never fabricate f/0, a physically
+    // impossible value (review feedback, 2026-10-08).
+    val aperture: Float?,
     val fps: Int,
     val focusDistanceDiopters: Float,
     val whiteBalanceCctK: Int,
@@ -33,9 +35,9 @@ object CaptureConfigWriter {
         "sensor_timestamp_source":"REALTIME",
         "elapsed_anchor_ns":"${config.elapsedAnchorNs}","utc_anchor":"${config.utcAnchorIso}",
         "utc_uncertainty_ms":${config.utcUncertaintyMs},
-        "camera":{"iso":${config.iso},"exposure_time_ns":"${config.exposureTimeNs}","aperture":${config.aperture},
+        "camera":{"iso":${config.iso},"exposure_time_ns":"${config.exposureTimeNs}","aperture":${config.aperture ?: "null"},
         "fps":${config.fps},"focus_mode":"manual","focus_distance":${config.focusDistanceDiopters},
-        "white_balance_mode":"manual","white_balance_value":{"cct_k":${config.whiteBalanceCctK}},
+        "white_balance_mode":"auto_locked","white_balance_value":{"cct_k":${config.whiteBalanceCctK}},
         "resolution":{"width":${config.widthPx},"height":${config.heightPx}},
         "ae_enabled":false,"eis_enabled":false,"hdr_enabled":false,"night_mode_enabled":false},
         "mount":{"camera_side":"$MOUNT_CAMERA_SIDE","mount_height_m":$MOUNT_HEIGHT_M,

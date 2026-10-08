@@ -44,7 +44,8 @@ class BootSessionProviderTest {
     fun `unreadable BOOT_COUNT always returns null, even if a saved uuid exists`() {
         // Reusing the same uuid forever on a device that cannot read BOOT_COUNT would be worse
         // than losing reboot detection on it - a real reboot would then go undetected forever.
-        val existing = resolveExistingBootSessionId(currentBootCount = null, savedBootCount = null, savedUuid = "stale-uuid")
+        val existing =
+            resolveExistingBootSessionId(currentBootCount = null, savedBootCount = null, savedUuid = "stale-uuid")
         assertNull(existing)
     }
 

@@ -439,8 +439,14 @@ class SurveyCaptureService : Service() {
                         appVersion = BuildConfig.VERSION_NAME,
                         iso = finalized.actualProfile.isoSensitivity,
                         exposureTimeNs = finalized.actualProfile.exposureTimeNs,
-                        aperture = finalized.aperture.toDouble(),
-                        fps = VIDEO_FPS,
+                        aperture = finalized.aperture,
+                        // Derived from the real locked SENSOR_FRAME_DURATION when available, not
+                        // the requested constant (review feedback, 2026-10-08) - falls back to it
+                        // only if the device reported no frame duration at all.
+                        fps =
+                            finalized.actualProfile.frameDurationNs.takeIf { it > 0 }
+                                ?.let { (1_000_000_000L / it).toInt() }
+                                ?: VIDEO_FPS,
                         focusDistanceDiopters = finalized.actualProfile.focusDistanceDiopters,
                         // Camera2 has no CaptureResult key for white balance in Kelvin (only raw
                         // COLOR_CORRECTION_GAINS channel gains, which would need a color-science CCT
@@ -450,7 +456,7 @@ class SurveyCaptureService : Service() {
                         whiteBalanceCctK = 4000,
                         widthPx = VIDEO_WIDTH,
                         heightPx = VIDEO_HEIGHT,
-                        orientation = "portrait",
+                        orientation = finalized.orientation,
                         profileId = 1,
                         moduleFirmwareVersionId = 1,
                     ),
