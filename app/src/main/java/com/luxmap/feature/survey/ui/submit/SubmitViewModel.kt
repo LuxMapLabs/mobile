@@ -33,6 +33,7 @@ class SubmitViewModel
                                     SubmitUiState.Uploading(progress.bytesSent, progress.totalBytes)
                                 is UploadProgress.Done -> SubmitUiState.Done
                                 is UploadProgress.Failed -> SubmitUiState.Error(progress.reason)
+                                is UploadProgress.Conflict -> SubmitUiState.Error(progress.reason)
                             }
                     }
             }

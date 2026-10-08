@@ -22,6 +22,7 @@ class FakeUploadRepositoryTest {
                         }
                         is UploadProgress.Done -> sawDone = true
                         is UploadProgress.Failed -> error("unexpected failure: ${progress.reason}")
+                        is UploadProgress.Conflict -> error("unexpected conflict: ${progress.reason}")
                     }
                 }
                 assertTrue(sawDone)

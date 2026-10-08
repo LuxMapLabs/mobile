@@ -8,6 +8,8 @@ sealed interface UploadProgress {
     data object Done : UploadProgress
 
     data class Failed(val reason: String) : UploadProgress
+
+    data class Conflict(val reason: String) : UploadProgress
 }
 
 // No real endpoint yet (spec §13/§14) — swapped for RealUploadRepository once Backend
