@@ -3,6 +3,7 @@ package com.luxmap.di
 import com.luxmap.core.sync.SyncOpHandler
 import com.luxmap.core.sync.SyncTrigger
 import com.luxmap.core.sync.WorkManagerSyncTrigger
+import com.luxmap.feature.survey.data.sync.CreateSurveySweepSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
 import com.luxmap.feature.workorder.data.sync.UploadWorkOrderEvidenceSyncHandler
 import dagger.Binds
@@ -28,4 +29,8 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindCompleteWorkOrderSyncHandler(impl: CompleteWorkOrderSyncHandler): SyncOpHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindCreateSurveySweepSyncHandler(impl: CreateSurveySweepSyncHandler): SyncOpHandler
 }
