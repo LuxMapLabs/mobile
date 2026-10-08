@@ -1,5 +1,6 @@
 package com.luxmap.core.network
 
+import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.luxmap.core.network.dto.ClipManifestDto
 import com.luxmap.core.network.dto.CreateSweepRequestDto
 import com.luxmap.core.network.dto.SubmitSweepRequestDto
@@ -16,7 +17,6 @@ import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
-import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 class SweepsApiTest {
     private lateinit var server: MockWebServer
