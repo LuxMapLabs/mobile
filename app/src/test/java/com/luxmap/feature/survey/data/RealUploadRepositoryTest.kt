@@ -6,6 +6,7 @@ import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.core.sync.SyncQueueProcessor
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -39,6 +40,18 @@ private fun packagedSession(syncState: String? = null) =
         captureConfigChecksumSha256 = "c",
         createdAt = Instant.parse("2026-10-08T10:00:00Z"),
         updatedAt = Instant.parse("2026-10-08T10:30:00Z"),
+    )
+
+private fun videoSegment(segmentIndex: Int) =
+    LocalSurveyVideoSegmentEntity(
+        segmentId = "SEG-$segmentIndex",
+        sessionId = "SESSION-1",
+        segmentIndex = segmentIndex,
+        filePath = "/x/clip$segmentIndex.mp4",
+        startedAtElapsedNs = 1L,
+        endedAtElapsedNs = 2L,
+        sizeBytes = 1_000L,
+        checksumSha256 = "checksum$segmentIndex",
     )
 
 class RealUploadRepositoryTest {
@@ -80,5 +93,66 @@ class RealUploadRepositoryTest {
                 cancelAndIgnoreRemainingEvents()
             }
             coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `each clip op depends on the immediately preceding op, not on create_sweep directly`() =
+        runTest {
+            val sessionDao = mockk<SurveySessionDao>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
+            coEvery { sessionDao.segmentsFor("SESSION-1") } returns
+                listOf(videoSegment(segmentIndex = 0), videoSegment(segmentIndex = 1))
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val processor = mockk<SyncQueueProcessor>()
+            coEvery { processor.processQueuedOps(any()) } returns false
+            coEvery { syncQueueDao.statusOf(any()) } returns "done"
+            val repository = RealUploadRepository(sessionDao, syncQueueDao, syncQueueManager, processor)
+
+            repository.uploadSession("SESSION-1").test {
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            coVerify {
+                syncQueueManager.enqueue(
+                    opType = "upload_survey_clip",
+                    payloadJson = any(),
+                    clientOpId = "SESSION-1:clip:0",
+                    dependsOnClientOpId = "SESSION-1:create_sweep",
+                )
+            }
+            coVerify {
+                syncQueueManager.enqueue(
+                    opType = "upload_survey_clip",
+                    payloadJson = any(),
+                    clientOpId = "SESSION-1:clip:1",
+                    dependsOnClientOpId = "SESSION-1:clip:0",
+                )
+            }
+        }
+
+    @Test
+    fun `onRowProgress invocations from the processor are forwarded as InProgress`() =
+        runTest {
+            val sessionDao = mockk<SurveySessionDao>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
+            coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val processor = mockk<SyncQueueProcessor>()
+            coEvery { processor.processQueuedOps(any()) } coAnswers {
+                val onRowProgress = firstArg<(String, Long, Long) -> Unit>()
+                onRowProgress("SESSION-1:create_sweep", 50L, 100L)
+                false
+            }
+            coEvery { syncQueueDao.statusOf(any()) } returns "done"
+            val repository = RealUploadRepository(sessionDao, syncQueueDao, syncQueueManager, processor)
+
+            repository.uploadSession("SESSION-1").test {
+                val progress = awaitItem()
+                assertTrue(progress is UploadProgress.InProgress)
+                assertTrue((progress as UploadProgress.InProgress).bytesSent == 50L)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }
