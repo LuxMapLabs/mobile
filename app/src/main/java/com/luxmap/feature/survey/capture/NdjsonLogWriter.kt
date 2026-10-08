@@ -14,9 +14,13 @@ import java.util.TimerTask
 // thread/coroutine — BufferedWriter is not thread-safe, so every write AND every flush must take
 // the same lock, or a flush landing mid-write can persist a torn line. lock (not `this`) is used
 // explicitly so the intent is not hidden behind a bare @Synchronized on a class with a Timer field.
+// headerJson is the exact line to write first, caller-supplied rather than built here (review
+// feedback, 2026-10-08): gps_track.ndjson/lux_log.ndjson need BE's real schema v1 header
+// ("kind"/"boot_session_id"/etc, see survey-ingest-p2a.md §4.1), which only the caller knows how
+// to build, while frame_timestamp_log.ndjson (never uploaded) keeps the old local v0 shape.
 class NdjsonLogWriter(
     file: File,
-    fileRole: String,
+    headerJson: String,
     flushIntervalMs: Long = 1_000L,
 ) {
     private val lock = Any()
@@ -33,7 +37,7 @@ class NdjsonLogWriter(
 
     init {
         synchronized(lock) {
-            writer.write("""{"schema_version":"v0","file_role":"$fileRole"}""")
+            writer.write(headerJson)
             writer.newLine()
             writer.flush()
         }

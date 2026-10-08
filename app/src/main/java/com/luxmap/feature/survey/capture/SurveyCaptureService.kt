@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
@@ -15,6 +16,7 @@ import androidx.core.content.IntentCompat
 import com.luxmap.BuildConfig
 import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.camera.LockedCameraProfile
+import com.luxmap.core.common.BootSessionProvider
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import dagger.hilt.android.AndroidEntryPoint
@@ -66,6 +68,8 @@ class SurveyCaptureService : Service() {
 
     @Inject lateinit var packager: PackageSurveySessionUseCase
 
+    @Inject lateinit var bootSessionProvider: BootSessionProvider
+
     // Last-resort net for anything thrown inside serviceScope. SupervisorJob only keeps one
     // child's failure from cancelling its siblings; without a handler the failure still reaches
     // the thread's default handler, which kills the app. A night survey must not lose the whole
@@ -116,7 +120,6 @@ class SurveyCaptureService : Service() {
     private lateinit var videoCaptureSession: VideoCaptureSession
     private lateinit var luxWriter: NdjsonLogWriter
     private lateinit var gpsWriter: NdjsonLogWriter
-    private lateinit var headingWriter: NdjsonLogWriter
     private lateinit var sessionDir: File
     private var currentSessionId: String = ""
     private var currentSurveySweepId: String = ""
@@ -218,11 +221,10 @@ class SurveyCaptureService : Service() {
                     distanceMeters = null,
                     gpsTrackFilePath = File(sessionDir, "gps_track.ndjson").absolutePath,
                     luxLogFilePath = File(sessionDir, "lux_log.ndjson").absolutePath,
-                    headingLogFilePath = File(sessionDir, "heading_log.ndjson").absolutePath,
                     frameTimestampLogFilePath = File(sessionDir, "frame_timestamp_log.ndjson").absolutePath,
                     captureConfigFilePath = File(sessionDir, "capture_config.json").absolutePath,
                     manifestFilePath = null,
-                    packageSchemaVersion = "v0",
+                    packageSchemaVersion = "v1",
                     // already verified by CheckSurveyReadinessUseCase before F04 was entered
                     timestampSourceRealtime = true,
                     bleGapDetected = false,
@@ -232,44 +234,71 @@ class SurveyCaptureService : Service() {
             )
         }
 
-        luxWriter = NdjsonLogWriter(File(sessionDir, "lux_log.ndjson"), fileRole = "lux_log")
-        gpsWriter = NdjsonLogWriter(File(sessionDir, "gps_track.ndjson"), fileRole = "gps_track")
-        headingWriter = NdjsonLogWriter(File(sessionDir, "heading_log.ndjson"), fileRole = "heading_log")
+        // gps_track.ndjson/lux_log.ndjson both need boot_session_id in their header (BE's schema
+        // v1, survey-ingest-p2a.md §4.1) - currentBootSessionId() is suspend (reads DataStore), so
+        // writer creation and everything that depends on the writers moves into this one coroutine,
+        // instead of staying synchronous like before this fix (review feedback, 2026-10-08).
+        serviceScope.launch {
+            val bootSessionId = bootSessionProvider.currentBootSessionId()
 
-        // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE is
-        // normally already Connected by the time a session starts. Only connect here if that did
-        // NOT happen (for example something else drives this service directly) - calling connect()
-        // again on an already-live connection would tear down and reopen the GATT link right as
-        // recording begins (a real BLE gap at the start of every survey).
-        if (luxClient.connectionState.value != com.luxmap.core.ble.BleConnectionState.Connected) {
-            luxClient.connect(luxDeviceAddress)
-        }
-        jobs +=
-            serviceScope.launch {
-                luxClient.samples.collect { sample ->
-                    luxWriter.appendLine(
-                        """{"seq":${sample.seq},"module_ms":${sample.moduleMs},""" +
-                            """"phone_elapsed_ns":${sample.phoneElapsedNs},"lux":${sample.lux}}""",
-                    )
-                }
+            // sample_no/module_epoch start at 0 for THIS session, not whenever BLE happened to
+            // connect (review feedback, 2026-10-08) - reset here, once, right before the lux
+            // collector below starts writing.
+            luxClient.resetSampleCounters()
+            luxWriter =
+                NdjsonLogWriter(
+                    File(sessionDir, "lux_log.ndjson"),
+                    headerJson =
+                        """{"kind":"lux_log","schema_version":1,"boot_session_id":"$bootSessionId",""" +
+                            """"module_firmware_version_id":1}""",
+                )
+            gpsWriter =
+                NdjsonLogWriter(
+                    File(sessionDir, "gps_track.ndjson"),
+                    headerJson =
+                        """{"kind":"gps_track","schema_version":1,"boot_session_id":"$bootSessionId",""" +
+                            """"time_unit":"ns"}""",
+                )
+
+            // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE
+            // is normally already Connected by the time a session starts. Only connect here if that
+            // did NOT happen (for example something else drives this service directly) - calling
+            // connect() again on an already-live connection would tear down and reopen the GATT
+            // link right as recording begins (a real BLE gap at the start of every survey).
+            if (luxClient.connectionState.value != com.luxmap.core.ble.BleConnectionState.Connected) {
+                luxClient.connect(luxDeviceAddress)
             }
-        var lastConnected = false
-        jobs +=
-            serviceScope.launch {
-                luxClient.connectionState.collect { state ->
-                    val isConnected = state is com.luxmap.core.ble.BleConnectionState.Connected
-                    // Only flag a gap on a Connected -> Disconnected TRANSITION (review feedback) —
-                    // not on the StateFlow's initial Disconnected value before the first connect.
-                    if (lastConnected && !isConnected) {
-                        sessionDao.sessionById(currentSessionId)?.let { session ->
-                            sessionDao.updateSession(session.copy(bleGapDetected = true, updatedAt = Instant.now()))
-                        }
+            jobs +=
+                serviceScope.launch {
+                    luxClient.samples.collect { sample ->
+                        luxWriter.appendLine(
+                            """{"sample_no":${sample.sampleNo},"module_epoch":${sample.moduleEpoch},""" +
+                                """"seq":${sample.sampleNo},"module_ms":"${sample.moduleMs}",""" +
+                                """"lux":${sample.lux},"phone_elapsed_ns":"${sample.phoneElapsedNs}"}""",
+                        )
                     }
-                    lastConnected = isConnected
                 }
-            }
+            var lastConnected = false
+            jobs +=
+                serviceScope.launch {
+                    luxClient.connectionState.collect { state ->
+                        val isConnected = state is com.luxmap.core.ble.BleConnectionState.Connected
+                        // Only flag a gap on a Connected -> Disconnected TRANSITION (review
+                        // feedback) — not on the StateFlow's initial Disconnected value before the
+                        // first connect.
+                        if (lastConnected && !isConnected) {
+                            sessionDao.sessionById(currentSessionId)?.let { session ->
+                                sessionDao.updateSession(
+                                    session.copy(bleGapDetected = true, updatedAt = Instant.now()),
+                                )
+                            }
+                        }
+                        lastConnected = isConnected
+                    }
+                }
 
-        locationHeadingRecorder.start(gpsWriter, headingWriter)
+            locationHeadingRecorder.start(gpsWriter)
+        }
 
         videoStartJob =
             serviceScope.launch {
@@ -337,9 +366,11 @@ class SurveyCaptureService : Service() {
                 jobs.clear()
                 luxClient.disconnect()
                 locationHeadingRecorder.stop()
-                luxWriter.close()
-                gpsWriter.close()
-                headingWriter.close()
+                // luxWriter/gpsWriter are created inside a coroutine now (boot_session_id needs a
+                // suspend DataStore read) - a camera failure fast enough to reach here before that
+                // coroutine finishes would otherwise crash on an uninitialized lateinit property.
+                if (::luxWriter.isInitialized) luxWriter.close()
+                if (::gpsWriter.isInitialized) gpsWriter.close()
 
                 // VideoCaptureSession is single-use and keeps its camera/encoder/muxer in lateinit
                 // fields, so stop() must never run while start() is still setting them up. A quick
@@ -398,23 +429,36 @@ class SurveyCaptureService : Service() {
             captureConfigFile.writeText(
                 CaptureConfigWriter.toJson(
                     CaptureConfig(
-                        utcAnchorIso = utcAnchorIso,
+                        bootSessionId = bootSessionProvider.currentBootSessionId(),
                         elapsedAnchorNs = startedAtElapsedNs,
-                        resolution = "${VIDEO_WIDTH}x$VIDEO_HEIGHT",
-                        fps = VIDEO_FPS,
-                        isoSensitivity = finalized.actualProfile.isoSensitivity,
-                        shutterNs = finalized.actualProfile.exposureTimeNs,
-                        frameDurationNs = finalized.actualProfile.frameDurationNs,
-                        codec = "video/avc",
-                        bitrateBps = VIDEO_BITRATE_BPS,
-                        keyframeIntervalS = VIDEO_KEYFRAME_INTERVAL_S,
-                        segmentDurationS = (SEGMENT_TARGET_DURATION_MS / 1000).toInt(),
-                        cameraManufacturer = finalized.cameraManufacturer,
-                        cameraModel = finalized.cameraModel,
+                        utcAnchorIso = utcAnchorIso,
+                        // System clock, not a GNSS fix - see docs/contract-drift.md's "Mốc UTC" row.
+                        utcUncertaintyMs = UTC_UNCERTAINTY_MS_SYSTEM_CLOCK,
+                        phoneModel = "${Build.MANUFACTURER} ${Build.MODEL}",
                         cameraId = finalized.cameraId,
                         appVersion = BuildConfig.VERSION_NAME,
-                        // real value comes from Bước 0's device pick, wired in Task 18
-                        luxModuleId = "LUX-001",
+                        iso = finalized.actualProfile.isoSensitivity,
+                        exposureTimeNs = finalized.actualProfile.exposureTimeNs,
+                        aperture = finalized.aperture,
+                        // Derived from the real locked SENSOR_FRAME_DURATION when available, not
+                        // the requested constant (review feedback, 2026-10-08) - falls back to it
+                        // only if the device reported no frame duration at all.
+                        fps =
+                            finalized.actualProfile.frameDurationNs.takeIf { it > 0 }
+                                ?.let { (1_000_000_000L / it).toInt() }
+                                ?: VIDEO_FPS,
+                        focusDistanceDiopters = finalized.actualProfile.focusDistanceDiopters,
+                        // Camera2 has no CaptureResult key for white balance in Kelvin (only raw
+                        // COLOR_CORRECTION_GAINS channel gains, which would need a color-science CCT
+                        // estimation formula to convert - out of scope here). Fixed until WP2/WP5/
+                        // project owner decide whether to drop cct_k from the schema or accept an
+                        // estimated value. See docs/contract-drift.md.
+                        whiteBalanceCctK = 4000,
+                        widthPx = VIDEO_WIDTH,
+                        heightPx = VIDEO_HEIGHT,
+                        orientation = finalized.orientation,
+                        profileId = 1,
+                        moduleFirmwareVersionId = 1,
                     ),
                 ),
             )
@@ -515,11 +559,13 @@ class SurveyCaptureService : Service() {
 
         // Finalized against the Task 2 spike's findings — kept in sync with VideoCaptureSession's
         // own private constants; a fast-follow could hoist these into one shared place.
-        private const val SEGMENT_TARGET_DURATION_MS = 180_000L
+        private const val SEGMENT_TARGET_DURATION_MS = 60_000L
         private const val VIDEO_WIDTH = 1920
         private const val VIDEO_HEIGHT = 1080
-        private const val VIDEO_BITRATE_BPS = 8_000_000
         private const val VIDEO_FPS = 30
-        private const val VIDEO_KEYFRAME_INTERVAL_S = 2
+
+        // Instant.now() has no real accuracy bound the way a GNSS fix's own clock does — see
+        // docs/contract-drift.md's "Mốc UTC" row for the BE-recommended alternative (GNSS fix time).
+        private const val UTC_UNCERTAINTY_MS_SYSTEM_CLOCK = 1_000
     }
 }

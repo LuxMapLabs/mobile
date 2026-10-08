@@ -43,6 +43,7 @@ import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.GpsAccuracyIndicator
+import com.luxmap.feature.survey.domain.GpsAccuracyGate
 
 @Composable
 fun CaptureScreen(
@@ -268,7 +269,18 @@ fun CaptureScreen(
                     }
 
                     is CaptureUiState.Ready -> {
-                        Button(onClick = { viewModel.onStartRecording(surveySweepId) }) { Text("Bắt đầu quay") }
+                        if (!state.gpsReadyToRecord) {
+                            val accuracyLabel =
+                                state.gpsAccuracyMeters?.let {
+                                    "Độ chính xác hiện tại: %.0fm (cần ≤%.0fm)"
+                                        .format(it, GpsAccuracyGate.PROPOSED_THRESHOLD_METERS)
+                                } ?: "Đang chờ tín hiệu GPS..."
+                            Text(accuracyLabel, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        Button(
+                            onClick = { viewModel.onStartRecording(surveySweepId) },
+                            enabled = state.gpsReadyToRecord,
+                        ) { Text("Bắt đầu quay") }
                         TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
                     }
 

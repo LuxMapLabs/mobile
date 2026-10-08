@@ -1,22 +1,15 @@
-// app/src/main/java/com/luxmap/feature/survey/capture/LocationHeadingRecorder.kt
 package com.luxmap.feature.survey.capture
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Looper
 import android.os.SystemClock
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.luxmap.core.location.GpsSignalState
-import com.luxmap.core.location.HeadingSensor
 import com.luxmap.core.location.SurveyTrackRecorder
+import com.luxmap.core.location.TrackPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,76 +18,58 @@ import java.util.Timer
 import java.util.TimerTask
 import javax.inject.Inject
 
+// BE asked for raw GNSS fixes (LocationManager.GPS_PROVIDER), not fused/blended location, so a
+// fix indoors or from cell towers never looks like a real on-route position in the track BE
+// matches video frames against.
+fun buildGpsTrackLine(
+    point: TrackPoint,
+    sampleNo: Int,
+): String =
+    """{"sample_no":$sampleNo,"phone_elapsed_ns":"${point.elapsedRealtimeNs}",""" +
+        """"lat":${point.lat},"lng":${point.lng},"accuracy_m":${point.accuracyM},""" +
+        """"heading_deg":${point.gpsBearingDeg ?: "null"},"speed_mps":${point.speedMps ?: "null"},""" +
+        """"provider":"gps"}"""
+
 class LocationHeadingRecorder
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
         private val trackRecorder: SurveyTrackRecorder,
-        private val headingSensor: HeadingSensor,
     ) {
-        private val fusedClient = LocationServices.getFusedLocationProviderClient(context)
-        private val sensorManager = context.getSystemService(SensorManager::class.java)
-        private var locationCallback: LocationCallback? = null
-        private var sensorListener: SensorEventListener? = null
+        private val locationManager = context.getSystemService(LocationManager::class.java)
+        private var locationListener: LocationListener? = null
         private var tickTimer: Timer? = null
+        private var sampleNo = 0
 
         private val _gpsSignalState = MutableStateFlow<GpsSignalState>(GpsSignalState.Ok)
         val gpsSignalState: StateFlow<GpsSignalState> = _gpsSignalState.asStateFlow()
 
-        private val _livePoint = MutableStateFlow<com.luxmap.core.location.TrackPoint?>(null)
-        val livePoint: StateFlow<com.luxmap.core.location.TrackPoint?> = _livePoint.asStateFlow()
+        private val _livePoint = MutableStateFlow<TrackPoint?>(null)
+        val livePoint: StateFlow<TrackPoint?> = _livePoint.asStateFlow()
 
         val distanceMeters: StateFlow<Float> get() = trackRecorder.totalDistanceMeters
 
         @SuppressLint("MissingPermission")
-        fun start(
-            gpsWriter: NdjsonLogWriter,
-            headingWriter: NdjsonLogWriter,
-        ) {
-            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL_MS).build()
-            val callback =
-                object : LocationCallback() {
-                    override fun onLocationResult(result: LocationResult) {
-                        val location = result.lastLocation ?: return
-                        val point = trackRecorder.onLocationUpdate(location)
-                        _livePoint.value = point
-                        val json =
-                            """{"elapsed_realtime_ns":${point.elapsedRealtimeNs},""" +
-                                """"lat":${point.lat},"lng":${point.lng},""" +
-                                """"accuracy_m":${point.accuracyM},""" +
-                                """"gps_bearing_deg":${point.gpsBearingDeg ?: "null"},""" +
-                                """"speed_mps":${point.speedMps ?: "null"}}"""
-                        gpsWriter.appendLine(json)
-                    }
-                }
-            locationCallback = callback
-            fusedClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
-
-            // NOTE for the real-device checklist (spec §16): confirm SensorEvent.timestamp for
-            // TYPE_ROTATION_VECTOR is in the same elapsedRealtimeNanos timebase on every supported
-            // device — documented as true since API 26, but device-specific drivers have been known
-            // to diverge from spec.
-            val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        fun start(gpsWriter: NdjsonLogWriter) {
+            sampleNo = 0
             val listener =
-                object : SensorEventListener {
-                    override fun onSensorChanged(event: SensorEvent) {
-                        val sample = headingSensor.headingFromRotationVector(event.values, event.timestamp)
-                        headingWriter.appendLine(
-                            """{"elapsed_realtime_ns":${sample.elapsedRealtimeNs},""" +
-                                """"heading_deg":${sample.headingDeg}}""",
-                        )
-                    }
-
-                    override fun onAccuracyChanged(
-                        sensor: Sensor,
-                        accuracy: Int,
-                    ) = Unit
+                LocationListener { location: Location ->
+                    val point = trackRecorder.onLocationUpdate(location)
+                    _livePoint.value = point
+                    gpsWriter.appendLine(buildGpsTrackLine(point, sampleNo))
+                    sampleNo++
                 }
-            sensorListener = listener
-            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+            locationListener = listener
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                LOCATION_INTERVAL_MS,
+                0f,
+                listener,
+                Looper.getMainLooper(),
+            )
 
             tickTimer =
-                Timer(true).apply { // isDaemon = true
+                Timer(true).apply {
                     scheduleAtFixedRate(
                         object : TimerTask() {
                             override fun run() {
@@ -108,8 +83,7 @@ class LocationHeadingRecorder
         }
 
         fun stop() {
-            locationCallback?.let { fusedClient.removeLocationUpdates(it) }
-            sensorListener?.let { sensorManager.unregisterListener(it) }
+            locationListener?.let { locationManager.removeUpdates(it) }
             tickTimer?.cancel()
         }
 

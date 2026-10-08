@@ -36,7 +36,6 @@ class SurveySessionDaoTest {
         distanceMeters = null,
         gpsTrackFilePath = null,
         luxLogFilePath = null,
-        headingLogFilePath = null,
         frameTimestampLogFilePath = null,
         captureConfigFilePath = null,
         manifestFilePath = null,

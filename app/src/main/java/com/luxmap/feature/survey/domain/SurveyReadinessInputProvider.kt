@@ -3,8 +3,6 @@ package com.luxmap.feature.survey.domain
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorManager
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CameraMetadata
@@ -63,12 +61,6 @@ class RealSurveyReadinessInputProvider
             val locationManager = context.getSystemService(LocationManager::class.java)
             val gpsProviderEnabled = locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true
 
-            // The rotation vector sensor is used to record heading data during survey, separate from
-            // GPS bearing (spec §8). Not all devices have this sensor.
-            val sensorManager = context.getSystemService(SensorManager::class.java)
-            val rotationVectorSensorAvailable =
-                sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
-
             val batteryManager = context.getSystemService(BatteryManager::class.java)
 
             return SurveyReadinessInput(
@@ -78,7 +70,6 @@ class RealSurveyReadinessInputProvider
                 exposureLockSupported = manualSensorSupported && aeModeOffSupported,
                 timestampSourceRealtime = timestampSourceRealtime,
                 gpsAvailable = locationTracker.hasLocationPermission() && gpsProviderEnabled,
-                headingAvailable = rotationVectorSensorAvailable,
                 freeStorageBytes = storageMonitor.freeBytes(),
                 requiredStorageBytes = estimateRequiredStorageBytes(route),
                 batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),

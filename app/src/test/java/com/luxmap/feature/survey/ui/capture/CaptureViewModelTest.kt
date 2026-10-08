@@ -12,6 +12,7 @@ import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.core.location.TrackPoint
 import com.luxmap.feature.survey.capture.PackageResult
+import com.luxmap.feature.survey.capture.PreRecordGpsAccuracyTracker
 import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import io.mockk.Runs
@@ -63,6 +64,11 @@ class CaptureViewModelTest {
         gpsSignalState: MutableStateFlow<GpsSignalState> = MutableStateFlow(GpsSignalState.Ok),
         recordingStartResult: MutableStateFlow<RecordingStartResult?> = MutableStateFlow(null),
         storageMonitor: StorageMonitor = mockk<StorageMonitor>().also { every { it.freeBytes() } returns 0L },
+        // Defaults to already-ready: most tests here are about other behavior and just need
+        // onStartRecording() to work from Ready, same as before this gate existed. Tests about the
+        // gate itself pass their own MutableStateFlow(false) and flip it explicitly.
+        gpsReadyToRecord: MutableStateFlow<Boolean> = MutableStateFlow(true),
+        gpsAccuracyMeters: MutableStateFlow<Float?> = MutableStateFlow(5f),
     ): Triple<CaptureViewModel, LuxSensorBleClient, SurveyCaptureController> {
         val luxClient = mockk<LuxSensorBleClient>()
         every { luxClient.connectionState } returns connectionState
@@ -83,7 +89,12 @@ class CaptureViewModelTest {
         every { controller.liveGpsPoint } returns MutableStateFlow(null)
         every { controller.distanceMeters } returns MutableStateFlow(0f)
 
-        val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller, storageMonitor)
+        val preRecordGpsAccuracyTracker = mockk<PreRecordGpsAccuracyTracker>(relaxed = true)
+        every { preRecordGpsAccuracyTracker.readyToRecord } returns gpsReadyToRecord
+        every { preRecordGpsAccuracyTracker.accuracyMeters } returns gpsAccuracyMeters
+
+        val viewModel =
+            CaptureViewModel(luxClient, scanner, preferences, controller, storageMonitor, preRecordGpsAccuracyTracker)
         return Triple(viewModel, luxClient, controller)
     }
 
@@ -107,7 +118,7 @@ class CaptureViewModelTest {
                 assertEquals(CaptureUiState.Connecting(SENSOR_2.name), awaitItem())
 
                 connectionState.value = BleConnectionState.Connected
-                assertEquals(CaptureUiState.Ready, awaitItem())
+                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
             }
             verify { luxClient.connect(SENSOR_2.address) }
         }
@@ -144,9 +155,31 @@ class CaptureViewModelTest {
                 assertEquals(CaptureUiState.Scanning(), awaitItem())
                 assertEquals(CaptureUiState.Connecting(SENSOR_1.name), awaitItem())
                 connectionState.value = BleConnectionState.Connected
-                assertEquals(CaptureUiState.Ready, awaitItem())
+                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
             }
             verify { luxClient.connect(SENSOR_1.address) }
+        }
+
+    @Test
+    fun `onStartRecording is a hard no-op while the GPS accuracy gate is not ready`() =
+        runTest {
+            val connectionState = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
+            val (viewModel, _, _) =
+                viewModel(
+                    connectionState = connectionState,
+                    rememberedDevice = SENSOR_1,
+                    gpsReadyToRecord = MutableStateFlow(false),
+                )
+
+            viewModel.uiState.test {
+                assertEquals(CaptureUiState.Scanning(), awaitItem())
+                assertEquals(CaptureUiState.Connecting(SENSOR_1.name), awaitItem())
+                connectionState.value = BleConnectionState.Connected
+                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = false, gpsAccuracyMeters = 5f), awaitItem())
+
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                expectNoEvents()
+            }
         }
 
     @Test
@@ -166,7 +199,18 @@ class CaptureViewModelTest {
             every { controller.recordingStartResult } returns MutableStateFlow(null)
             val storageMonitor = mockk<StorageMonitor>()
             every { storageMonitor.freeBytes() } returns 0L
-            val viewModel = CaptureViewModel(luxClient, scanner, preferences, controller, storageMonitor)
+            val preRecordGpsAccuracyTracker = mockk<PreRecordGpsAccuracyTracker>(relaxed = true)
+            every { preRecordGpsAccuracyTracker.readyToRecord } returns MutableStateFlow(true)
+            every { preRecordGpsAccuracyTracker.accuracyMeters } returns MutableStateFlow(5f)
+            val viewModel =
+                CaptureViewModel(
+                    luxClient,
+                    scanner,
+                    preferences,
+                    controller,
+                    storageMonitor,
+                    preRecordGpsAccuracyTracker,
+                )
 
             viewModel.uiState.test {
                 awaitItem() // Scanning()
@@ -207,7 +251,7 @@ class CaptureViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Scanning() field default, before init checks for a remembered device
                 awaitItem() // Connecting to the remembered device
-                assertEquals(CaptureUiState.Ready, awaitItem())
+                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
 
                 viewModel.onChangeDevice()
                 assertEquals(CaptureUiState.Scanning(), awaitItem())
@@ -232,7 +276,7 @@ class CaptureViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
-                assertEquals(CaptureUiState.Ready, awaitItem())
+                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
 
                 viewModel.onStartRecording(surveySweepId = "SWEEP-1")
                 assertEquals(CaptureUiState.StartingRecording, awaitItem())
@@ -396,7 +440,7 @@ class CaptureViewModelTest {
             every { luxClient.samples } returns samples
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            samples.emit(LuxSample(seq = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
+            samples.emit(LuxSample(sampleNo = 0, moduleEpoch = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
             dispatcher.scheduler.runCurrent()
 
             val state = viewModel.uiState.value

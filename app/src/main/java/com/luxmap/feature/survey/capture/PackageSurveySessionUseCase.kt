@@ -33,7 +33,6 @@ class PackageSurveySessionUseCase
                 listOfNotNull(
                     session.gpsTrackFilePath?.let { Triple(it, "gps_track", null) },
                     session.luxLogFilePath?.let { Triple(it, "lux_log", null) },
-                    session.headingLogFilePath?.let { Triple(it, "heading_log", null) },
                     session.frameTimestampLogFilePath?.let { Triple(it, "frame_timestamp_log", null) },
                     session.captureConfigFilePath?.let { Triple(it, "capture_config", null) },
                 ) + segments.map { Triple(it.filePath, "video_segment", it.segmentIndex) }
@@ -108,7 +107,7 @@ class PackageSurveySessionUseCase
                         """"checksum_sha256":"$checksum","size_bytes":${file.length()}}"""
                 }
             val endedAtField = if (endedAtUtc != null) """"ended_at_utc":"$endedAtUtc"""" else """"ended_at_utc":null"""
-            return """{"schema_version":"v0","session_id":"$sessionId","survey_sweep_id":"$surveySweepId",""" +
+            return """{"schema_version":"v1","session_id":"$sessionId","survey_sweep_id":"$surveySweepId",""" +
                 """"started_at_utc":"$startedAtUtc",$endedAtField,"files":[$filesJson]}"""
         }
     }

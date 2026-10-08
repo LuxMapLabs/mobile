@@ -7,7 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
 // gpsBearingDeg/speedMps share the fix's own elapsedRealtimeNs (spec §8) — they come from the
-// same Location object, unlike heading_log.ndjson which is a fully independent sensor stream.
+// same Location object. This is the only heading source now; the separate rotation-vector
+// HeadingSensor/heading_log.ndjson pipeline was dropped (BE: server derives heading from GPS).
 data class TrackPoint(
     val elapsedRealtimeNs: Long,
     val lat: Double,

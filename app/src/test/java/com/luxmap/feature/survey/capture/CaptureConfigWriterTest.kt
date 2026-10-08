@@ -1,42 +1,81 @@
 package com.luxmap.feature.survey.capture
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CaptureConfigWriterTest {
     @Test
-    fun `serializes every capture_config field as a JSON field, not a header line`() {
+    fun `produces json with the fields BE's schema v1 requires`() {
         val config =
             CaptureConfig(
-                utcAnchorIso = "2026-09-28T20:00:00Z",
-                elapsedAnchorNs = 123_456_789L,
-                resolution = "1920x1080",
-                fps = 30,
-                isoSensitivity = 800,
-                shutterNs = 20_000_000L,
-                frameDurationNs = 33_333_333L,
-                codec = "video/avc",
-                bitrateBps = 8_000_000,
-                keyframeIntervalS = 2,
-                segmentDurationS = 180,
-                cameraManufacturer = "Samsung",
-                cameraModel = "Galaxy A54",
+                bootSessionId = "95b59f63-5083-4e5f-911d-c070e75351d5",
+                elapsedAnchorNs = 112156244127385L,
+                utcAnchorIso = "2026-10-02T15:31:26.432377Z",
+                utcUncertaintyMs = 50,
+                phoneModel = "samsung SM-A075F",
                 cameraId = "0",
                 appVersion = "1.0",
-                luxModuleId = "LUX-001",
+                iso = 1600,
+                exposureTimeNs = 30_004_000L,
+                aperture = 1.8f,
+                fps = 30,
+                focusDistanceDiopters = 0.0f,
+                whiteBalanceCctK = 4000,
+                widthPx = 1920,
+                heightPx = 1080,
+                orientation = "portrait",
+                profileId = 1,
+                moduleFirmwareVersionId = 1,
             )
 
         val json = CaptureConfigWriter.toJson(config)
 
-        assertTrue(json.contains(""""schema_version":"v0""""))
-        assertTrue(json.contains(""""codec":"video/avc""""))
-        assertTrue(json.contains(""""bitrate_bps":8000000"""))
-        assertTrue(json.contains(""""keyframe_interval_s":2"""))
-        assertTrue(json.contains(""""segment_duration_s":180"""))
-        assertTrue(json.contains(""""app_version":"1.0""""))
-        assertTrue(json.contains(""""lux_module_id":"LUX-001""""))
-        assertTrue(json.contains(""""sensor_timestamp_source":"REALTIME""""))
-        // Not a header line like the .ndjson files (spec §8) — schema_version sits inside the object.
-        assertTrue(json.trim().startsWith("{") && json.contains(""""schema_version""""))
+        assertEquals(
+            """{"schema_version":1,"boot_session_id":"95b59f63-5083-4e5f-911d-c070e75351d5",""" +
+                """"profile_id":1,"module_firmware_version_id":1,""" +
+                """"phone_model":"samsung SM-A075F","camera_id":"0","app_version":"1.0",""" +
+                """"sensor_timestamp_source":"REALTIME",""" +
+                """"elapsed_anchor_ns":"112156244127385","utc_anchor":"2026-10-02T15:31:26.432377Z",""" +
+                """"utc_uncertainty_ms":50,""" +
+                """"camera":{"iso":1600,"exposure_time_ns":"30004000","aperture":1.8,""" +
+                """"fps":30,"focus_mode":"manual","focus_distance":0.0,""" +
+                """"white_balance_mode":"auto_locked","white_balance_value":{"cct_k":4000},""" +
+                """"resolution":{"width":1920,"height":1080},""" +
+                """"ae_enabled":false,"eis_enabled":false,"hdr_enabled":false,"night_mode_enabled":false},""" +
+                """"mount":{"camera_side":"front","mount_height_m":1.1,""" +
+                """"angle_deg":10,"sensor_position":"handlebar_top"},""" +
+                """"orientation":"portrait"}""",
+            json,
+        )
+    }
+
+    @Test
+    fun `reports aperture as json null when the device did not provide it, never f-0`() {
+        val config =
+            CaptureConfig(
+                bootSessionId = "boot-1",
+                elapsedAnchorNs = 1L,
+                utcAnchorIso = "2026-10-02T15:31:26.432377Z",
+                utcUncertaintyMs = 50,
+                phoneModel = "test",
+                cameraId = "0",
+                appVersion = "1.0",
+                iso = 1600,
+                exposureTimeNs = 30_004_000L,
+                aperture = null,
+                fps = 30,
+                focusDistanceDiopters = 0.0f,
+                whiteBalanceCctK = 4000,
+                widthPx = 1920,
+                heightPx = 1080,
+                orientation = "portrait",
+                profileId = 1,
+                moduleFirmwareVersionId = 1,
+            )
+
+        val json = CaptureConfigWriter.toJson(config)
+
+        assertTrue(json.contains(""""aperture":null"""))
     }
 }

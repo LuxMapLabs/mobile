@@ -16,7 +16,15 @@ sealed interface CaptureUiState {
     // The scan window ended with an empty list - not the same as still scanning.
     data object ScanTimedOut : CaptureUiState
 
-    data object Ready : CaptureUiState
+    // gpsReadyToRecord starts false every time Ready is (re)entered - PreRecordGpsAccuracyTracker
+    // has to report a fresh fix held steady for GpsAccuracyGate.PROPOSED_HOLD_DURATION_MS before
+    // this flips true (BE's gate, mobile.pdf 2026-10-08), not a one-time "GPS available" check.
+    // gpsAccuracyMeters is the live reading while not yet ready, so the screen can show *why* the
+    // button is still disabled instead of a silent wait (review feedback, 2026-10-08).
+    data class Ready(
+        val gpsReadyToRecord: Boolean = false,
+        val gpsAccuracyMeters: Float? = null,
+    ) : CaptureUiState
 
     // Between pressing "Bat dau quay" and the camera actually being open with a live preview
     // (Cach A, agreed in brainstorming) - CaptureScreen keeps the same TextureView alive through
