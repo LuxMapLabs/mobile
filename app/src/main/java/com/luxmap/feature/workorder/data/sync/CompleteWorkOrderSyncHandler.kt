@@ -21,7 +21,10 @@ class CompleteWorkOrderSyncHandler
     ) : SyncOpHandler {
         override val opType = "complete_work_order"
 
-        override suspend fun handle(payloadJson: String): SyncOpResult {
+        override suspend fun handle(
+            payloadJson: String,
+            onProgress: (Long, Long) -> Unit,
+        ): SyncOpResult {
             val payload = Json.decodeFromString<CompletionSyncPayload>(payloadJson)
             val completion =
                 dao.completionByWorkOrderId(payload.workOrderId)

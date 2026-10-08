@@ -3,7 +3,10 @@ package com.luxmap.core.sync
 interface SyncOpHandler {
     val opType: String
 
-    suspend fun handle(payloadJson: String): SyncOpResult
+    suspend fun handle(
+        payloadJson: String,
+        onProgress: (bytesSent: Long, totalBytes: Long) -> Unit = { _, _ -> },
+    ): SyncOpResult
 }
 
 sealed interface SyncOpResult {

@@ -9,7 +9,9 @@ class SyncQueueProcessor
         private val dao: SyncQueueDao,
         private val handlers: Set<@JvmSuppressWildcards SyncOpHandler>,
     ) {
-        suspend fun processQueuedOps(): Boolean {
+        suspend fun processQueuedOps(
+            onRowProgress: (clientOpId: String, bytesSent: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+        ): Boolean {
             var stillPending = false
             for (row in dao.queuedRows()) {
                 if (row.dependsOnClientOpId != null) {
@@ -33,7 +35,10 @@ class SyncQueueProcessor
                     continue
                 }
 
-                when (val result = handler.handle(row.payloadJson)) {
+                when (
+                    val result =
+                        handler.handle(row.payloadJson) { sent, total -> onRowProgress(row.clientOpId, sent, total) }
+                ) {
                     is SyncOpResult.Done -> dao.updateStatus(row.id, "done", row.attemptCount, null, Instant.now())
                     is SyncOpResult.RetryLater -> {
                         dao.updateStatus(row.id, "queued", row.attemptCount + 1, null, Instant.now())
