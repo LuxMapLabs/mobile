@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.IntentCompat
 import com.luxmap.BuildConfig
 import com.luxmap.core.ble.LuxSensorBleClient
+import com.luxmap.core.common.BootSessionProvider
 import com.luxmap.core.camera.LockedCameraProfile
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
@@ -32,7 +33,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
 
@@ -67,6 +67,8 @@ class SurveyCaptureService : Service() {
     @Inject lateinit var sessionDao: SurveySessionDao
 
     @Inject lateinit var packager: PackageSurveySessionUseCase
+
+    @Inject lateinit var bootSessionProvider: BootSessionProvider
 
     // Last-resort net for anything thrown inside serviceScope. SupervisorJob only keeps one
     // child's failure from cancelling its siblings; without a handler the failure still reaches
@@ -123,10 +125,6 @@ class SurveyCaptureService : Service() {
     private var currentSurveySweepId: String = ""
     private var startedAtElapsedNs: Long = 0L
     private var utcAnchorIso: String = ""
-
-    // Stopgap until Task 8 (BootSessionProvider) lands: a real boot_session_id must stay fixed
-    // for the phone's whole boot (Settings.Global.BOOT_COUNT), not regenerate per service instance.
-    private var currentBootSessionId: String = UUID.randomUUID().toString()
 
     private val _packagingResult = MutableStateFlow<PackageResult?>(null)
     val packagingResult: StateFlow<PackageResult?> = _packagingResult.asStateFlow()
@@ -401,7 +399,7 @@ class SurveyCaptureService : Service() {
             captureConfigFile.writeText(
                 CaptureConfigWriter.toJson(
                     CaptureConfig(
-                        bootSessionId = currentBootSessionId,
+                        bootSessionId = bootSessionProvider.currentBootSessionId(),
                         elapsedAnchorNs = startedAtElapsedNs,
                         utcAnchorIso = utcAnchorIso,
                         // System clock, not a GNSS fix - see docs/contract-drift.md's "Mốc UTC" row.
