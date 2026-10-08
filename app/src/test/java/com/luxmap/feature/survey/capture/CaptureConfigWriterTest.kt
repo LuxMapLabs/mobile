@@ -43,7 +43,7 @@ class CaptureConfigWriterTest {
                 """"white_balance_mode":"auto_locked","white_balance_value":{"cct_k":4000},""" +
                 """"resolution":{"width":1920,"height":1080},""" +
                 """"ae_enabled":false,"eis_enabled":false,"hdr_enabled":false,"night_mode_enabled":false},""" +
-                """"mount":{"camera_side":"front","mount_height_m":1.1,""" +
+                """"mount":{"camera_side":"left","mount_height_m":1.1,""" +
                 """"angle_deg":10,"sensor_position":"handlebar_top"},""" +
                 """"orientation":"portrait"}""",
             json,

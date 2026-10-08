@@ -46,9 +46,10 @@ object CaptureConfigWriter {
         """.trimIndent().replace("\n", "").replace(Regex("""\s+"""), " ").trim()
 
     // Fixed mount values until WP4/project owner confirms per-vehicle mount measurement is needed —
-    // every survey rig today mounts the same way (handlebar, front-facing). Source: mobile.pdf
-    // (leader, 2026-10-08).
-    private const val MOUNT_CAMERA_SIDE = "front"
+    // every survey rig today mounts the same way. Camera is bolted to the left side of the
+    // vehicle, not forward-facing — confirmed with the project owner 2026-10-08 (corrects the
+    // earlier "front" value from mobile.pdf).
+    private const val MOUNT_CAMERA_SIDE = "left"
     private const val MOUNT_HEIGHT_M = 1.1
     private const val MOUNT_ANGLE_DEG = 10
     private const val MOUNT_SENSOR_POSITION = "handlebar_top"
