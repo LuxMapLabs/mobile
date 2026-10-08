@@ -396,7 +396,7 @@ class CaptureViewModelTest {
             every { luxClient.samples } returns samples
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            samples.emit(LuxSample(seq = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
+            samples.emit(LuxSample(sampleNo = 0, moduleEpoch = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
             dispatcher.scheduler.runCurrent()
 
             val state = viewModel.uiState.value

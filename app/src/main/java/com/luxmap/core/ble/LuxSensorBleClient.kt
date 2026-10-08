@@ -70,15 +70,15 @@ class LuxSensorBleClient
         private var lastDeviceAddress: String? = null
         private var userInitiatedDisconnect = false
 
-        // Locally counted per connection - see LuxSample.seq for why this cannot detect a real
-        // dropped reading.
-        private var seq = 0
+        // sample_no/module_epoch are both local to one connection (see LuxPacketCodec) - a fresh
+        // instance per connect() is the same reset the old manually-tracked seq field used to do.
+        private var codec = LuxPacketCodec()
 
         fun connect(deviceAddress: String) {
             synchronized(lock) {
                 userInitiatedDisconnect = false
                 lastDeviceAddress = deviceAddress
-                seq = 0
+                codec = LuxPacketCodec()
                 _connectionState.value = BleConnectionState.Connecting
                 readJob?.cancel()
                 readJob = scope.launch { runConnection(deviceAddress) }
@@ -122,8 +122,7 @@ class LuxSensorBleClient
                         // ordinary disconnect, not an error.
                         val line = reader.readLine() ?: break
                         val now = SystemClock.elapsedRealtimeNanos()
-                        val sample = LuxPacketCodec.decode(line, now, seq) ?: continue
-                        seq++
+                        val sample = codec.decode(line, now) ?: continue
                         _samples.tryEmit(sample)
                     }
                 }
