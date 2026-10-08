@@ -27,6 +27,8 @@ class PackageSurveySessionUseCase
             val session = dao.sessionById(sessionId) ?: return PackageResult.Failure("Session $sessionId not found")
             val segments = dao.segmentsFor(sessionId)
 
+            // (path, role, segmentIndex) - role/segmentIndex are what let the manifest tell a video
+            // segment apart from the four log files (spec section 8's files[] entries).
             val referencedFiles =
                 listOfNotNull(
                     session.gpsTrackFilePath?.let { Triple(it, "gps_track", null) },
@@ -35,6 +37,12 @@ class PackageSurveySessionUseCase
                     session.captureConfigFilePath?.let { Triple(it, "capture_config", null) },
                 ) + segments.map { Triple(it.filePath, "video_segment", it.segmentIndex) }
 
+            // A crash before any recorder ever opened a file (and before any video segment ever
+            // opened) leaves every path field null and segments empty. In normal operation this
+            // does not happen - the foreground service writes all five log/config paths together
+            // in one insertSession call before recording starts - but calling .first() on an
+            // empty list would still crash with NoSuchElementException, so guard it explicitly
+            // instead of relying on that invariant holding forever.
             if (referencedFiles.isEmpty()) {
                 return PackageResult.Failure("Session $sessionId has no referenced files to package")
             }

@@ -123,12 +123,6 @@ class PackageSurveySessionUseCaseTest {
         runTest {
             val tempDir = createTempDir()
             val session = sessionWithFiles(tempDir)
-            session.luxLogFilePath?.let { filePath ->
-                File(filePath).let { file ->
-                    file.parentFile?.mkdirs()
-                    file.writeText("{}\n")
-                }
-            }?.takeIf { false }
             val sessionWithRaw =
                 session.copy(
                     luxLogFilePath = File(tempDir, "lux_log.ndjson").apply { writeText("lux\n") }.absolutePath,
@@ -178,5 +172,75 @@ class PackageSurveySessionUseCaseTest {
             useCase.invoke("SESSION-1")
 
             coVerify { dao.updateSegment(match { it.segmentId == "SEG-1" && it.checksumSha256 != null }) }
+        }
+
+    @Test
+    fun `persists distinct checksums for each video segment with different content`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            val clip1 = File(tempDir, "clip_0.mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val clip2 = File(tempDir, "clip_1.mp4").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session
+            coEvery { dao.segmentsFor("SESSION-1") } returns
+                listOf(
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-0",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 0,
+                        filePath = clip1.absolutePath,
+                        startedAtElapsedNs = 0L,
+                        endedAtElapsedNs = 1L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-1",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 1,
+                        filePath = clip2.absolutePath,
+                        startedAtElapsedNs = 1L,
+                        endedAtElapsedNs = 2L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                )
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            val seg0Checksum = mutableListOf<String?>()
+            val seg1Checksum = mutableListOf<String?>()
+            coVerify {
+                dao.updateSegment(
+                    match {
+                        if (it.segmentId == "SEG-0") {
+                            seg0Checksum.add(it.checksumSha256)
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            coVerify {
+                dao.updateSegment(
+                    match {
+                        if (it.segmentId == "SEG-1") {
+                            seg1Checksum.add(it.checksumSha256)
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            assertTrue("SEG-0 checksum should be non-null", seg0Checksum[0] != null)
+            assertTrue("SEG-1 checksum should be non-null", seg1Checksum[0] != null)
+            assertTrue(
+                "SEG-0 and SEG-1 should have different checksums (different content)",
+                seg0Checksum[0] != seg1Checksum[0],
+            )
         }
 }
