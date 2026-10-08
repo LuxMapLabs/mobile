@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.capture
 
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -115,5 +116,67 @@ class PackageSurveySessionUseCaseTest {
 
             assertTrue(result is PackageResult.Failure)
             coVerify(exactly = 0) { dao.updateSession(match { it.recordingState == "packaged" }) }
+        }
+
+    @Test
+    fun `persists the sha256 checksum onto the session row for each raw file, computed once`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            session.luxLogFilePath?.let { filePath ->
+                File(filePath).let { file ->
+                    file.parentFile?.mkdirs()
+                    file.writeText("{}\n")
+                }
+            }?.takeIf { false }
+            val sessionWithRaw =
+                session.copy(
+                    luxLogFilePath = File(tempDir, "lux_log.ndjson").apply { writeText("lux\n") }.absolutePath,
+                    captureConfigFilePath = File(tempDir, "capture_config.json").apply { writeText("{}") }.absolutePath,
+                )
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns sessionWithRaw
+            coEvery { dao.segmentsFor("SESSION-1") } returns emptyList()
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            coVerify {
+                dao.updateSession(
+                    match {
+                        it.gpsTrackChecksumSha256 != null &&
+                            it.luxLogChecksumSha256 != null &&
+                            it.captureConfigChecksumSha256 != null
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `persists the sha256 checksum onto each video segment row`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            val clip = File(tempDir, "clip_0.mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session
+            coEvery { dao.segmentsFor("SESSION-1") } returns
+                listOf(
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-1",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 0,
+                        filePath = clip.absolutePath,
+                        startedAtElapsedNs = 0L,
+                        endedAtElapsedNs = 1L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                )
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            coVerify { dao.updateSegment(match { it.segmentId == "SEG-1" && it.checksumSha256 != null }) }
         }
 }

@@ -27,8 +27,6 @@ class PackageSurveySessionUseCase
             val session = dao.sessionById(sessionId) ?: return PackageResult.Failure("Session $sessionId not found")
             val segments = dao.segmentsFor(sessionId)
 
-            // (path, role, segmentIndex) - role/segmentIndex are what let the manifest tell a video
-            // segment apart from the four log files (spec section 8's files[] entries).
             val referencedFiles =
                 listOfNotNull(
                     session.gpsTrackFilePath?.let { Triple(it, "gps_track", null) },
@@ -37,12 +35,6 @@ class PackageSurveySessionUseCase
                     session.captureConfigFilePath?.let { Triple(it, "capture_config", null) },
                 ) + segments.map { Triple(it.filePath, "video_segment", it.segmentIndex) }
 
-            // A crash before any recorder ever opened a file (and before any video segment ever
-            // opened) leaves every path field null and segments empty. In normal operation this
-            // does not happen - the foreground service writes all five log/config paths together
-            // in one insertSession call before recording starts - but calling .first() on an
-            // empty list would still crash with NoSuchElementException, so guard it explicitly
-            // instead of relying on that invariant holding forever.
             if (referencedFiles.isEmpty()) {
                 return PackageResult.Failure("Session $sessionId has no referenced files to package")
             }
@@ -54,6 +46,12 @@ class PackageSurveySessionUseCase
 
             referencedFiles.forEach { (path, _, _) -> cleanIfNdjson(File(path)) }
 
+            val checksumsByPath = referencedFiles.associate { (path, _, _) -> path to sha256Of(File(path)) }
+
+            segments.forEach { segment ->
+                dao.updateSegment(segment.copy(checksumSha256 = checksumsByPath.getValue(segment.filePath)))
+            }
+
             val manifestFile = File(File(referencedFiles.first().first).parentFile, "manifest.json")
             manifestFile.writeText(
                 buildManifestJson(
@@ -62,6 +60,7 @@ class PackageSurveySessionUseCase
                     startedAtUtc = session.startedAtUtc.toString(),
                     endedAtUtc = session.endedAtUtc?.toString(),
                     files = referencedFiles,
+                    checksumsByPath = checksumsByPath,
                 ),
             )
 
@@ -69,6 +68,9 @@ class PackageSurveySessionUseCase
                 session.copy(
                     recordingState = "packaged",
                     manifestFilePath = manifestFile.absolutePath,
+                    gpsTrackChecksumSha256 = session.gpsTrackFilePath?.let { checksumsByPath[it] },
+                    luxLogChecksumSha256 = session.luxLogFilePath?.let { checksumsByPath[it] },
+                    captureConfigChecksumSha256 = session.captureConfigFilePath?.let { checksumsByPath[it] },
                     updatedAt = Instant.now(),
                 ),
             )
@@ -97,11 +99,12 @@ class PackageSurveySessionUseCase
             startedAtUtc: String,
             endedAtUtc: String?,
             files: List<Triple<String, String, Int?>>,
+            checksumsByPath: Map<String, String>,
         ): String {
             val filesJson =
                 files.joinToString(",") { (path, role, segmentIndex) ->
                     val file = File(path)
-                    val checksum = sha256Of(file)
+                    val checksum = checksumsByPath.getValue(path)
                     val segmentField = if (segmentIndex != null) ""","segment_index":$segmentIndex""" else ""
                     """{"name":"${file.name}","role":"$role"$segmentField,""" +
                         """"checksum_sha256":"$checksum","size_bytes":${file.length()}}"""
