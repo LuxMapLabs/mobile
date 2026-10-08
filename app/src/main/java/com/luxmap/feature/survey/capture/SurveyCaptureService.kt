@@ -212,6 +212,7 @@ class SurveyCaptureService : Service() {
                 LocalSurveySessionEntity(
                     sessionId = sessionId,
                     surveySweepId = surveySweepId,
+                    workOrderId = "", // Task 2 of this plan replaces this with the real threaded value
                     recordingState = STATE_RECORDING,
                     syncState = null,
                     startedAtUtc = Instant.now(),

@@ -27,7 +27,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
         LocalWorkOrderEvidenceEntity::class,
         LocalWorkOrderCompletionEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)

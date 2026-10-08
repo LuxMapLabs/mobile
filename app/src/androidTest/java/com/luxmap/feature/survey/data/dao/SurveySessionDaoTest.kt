@@ -27,6 +27,7 @@ class SurveySessionDaoTest {
     ) = LocalSurveySessionEntity(
         sessionId = id,
         surveySweepId = "SWEEP-1",
+        workOrderId = "WO-1",
         recordingState = recordingState,
         syncState = null,
         startedAtUtc = Instant.parse("2026-09-28T20:00:00Z"),

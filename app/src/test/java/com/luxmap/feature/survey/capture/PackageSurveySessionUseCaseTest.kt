@@ -18,6 +18,7 @@ class PackageSurveySessionUseCaseTest {
         return LocalSurveySessionEntity(
             sessionId = "SESSION-1",
             surveySweepId = "SWEEP-1",
+            workOrderId = "WO-1",
             recordingState = "stopped",
             syncState = null,
             startedAtUtc = Instant.parse("2026-09-28T20:00:00Z"),
