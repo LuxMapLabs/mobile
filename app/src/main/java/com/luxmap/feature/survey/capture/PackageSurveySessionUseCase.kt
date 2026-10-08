@@ -107,7 +107,7 @@ class PackageSurveySessionUseCase
                         """"checksum_sha256":"$checksum","size_bytes":${file.length()}}"""
                 }
             val endedAtField = if (endedAtUtc != null) """"ended_at_utc":"$endedAtUtc"""" else """"ended_at_utc":null"""
-            return """{"schema_version":"v0","session_id":"$sessionId","survey_sweep_id":"$surveySweepId",""" +
+            return """{"schema_version":"v1","session_id":"$sessionId","survey_sweep_id":"$surveySweepId",""" +
                 """"started_at_utc":"$startedAtUtc",$endedAtField,"files":[$filesJson]}"""
         }
     }

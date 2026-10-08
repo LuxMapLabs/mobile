@@ -224,7 +224,7 @@ class SurveyCaptureService : Service() {
                     frameTimestampLogFilePath = File(sessionDir, "frame_timestamp_log.ndjson").absolutePath,
                     captureConfigFilePath = File(sessionDir, "capture_config.json").absolutePath,
                     manifestFilePath = null,
-                    packageSchemaVersion = "v0",
+                    packageSchemaVersion = "v1",
                     // already verified by CheckSurveyReadinessUseCase before F04 was entered
                     timestampSourceRealtime = true,
                     bleGapDetected = false,
@@ -234,44 +234,71 @@ class SurveyCaptureService : Service() {
             )
         }
 
-        luxWriter = NdjsonLogWriter(File(sessionDir, "lux_log.ndjson"), fileRole = "lux_log")
-        gpsWriter = NdjsonLogWriter(File(sessionDir, "gps_track.ndjson"), fileRole = "gps_track")
+        // gps_track.ndjson/lux_log.ndjson both need boot_session_id in their header (BE's schema
+        // v1, survey-ingest-p2a.md §4.1) - currentBootSessionId() is suspend (reads DataStore), so
+        // writer creation and everything that depends on the writers moves into this one coroutine,
+        // instead of staying synchronous like before this fix (review feedback, 2026-10-08).
+        serviceScope.launch {
+            val bootSessionId = bootSessionProvider.currentBootSessionId()
 
-        // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE is
-        // normally already Connected by the time a session starts. Only connect here if that did
-        // NOT happen (for example something else drives this service directly) - calling connect()
-        // again on an already-live connection would tear down and reopen the GATT link right as
-        // recording begins (a real BLE gap at the start of every survey).
-        if (luxClient.connectionState.value != com.luxmap.core.ble.BleConnectionState.Connected) {
-            luxClient.connect(luxDeviceAddress)
-        }
-        jobs +=
-            serviceScope.launch {
-                luxClient.samples.collect { sample ->
-                    luxWriter.appendLine(
-                        """{"sample_no":${sample.sampleNo},"module_epoch":${sample.moduleEpoch},""" +
-                            """"seq":${sample.sampleNo},"module_ms":"${sample.moduleMs}",""" +
-                            """"lux":${sample.lux},"phone_elapsed_ns":"${sample.phoneElapsedNs}"}""",
-                    )
-                }
+            // sample_no/module_epoch start at 0 for THIS session, not whenever BLE happened to
+            // connect (review feedback, 2026-10-08) - reset here, once, right before the lux
+            // collector below starts writing.
+            luxClient.resetSampleCounters()
+            luxWriter =
+                NdjsonLogWriter(
+                    File(sessionDir, "lux_log.ndjson"),
+                    headerJson =
+                        """{"kind":"lux_log","schema_version":1,"boot_session_id":"$bootSessionId",""" +
+                            """"module_firmware_version_id":1}""",
+                )
+            gpsWriter =
+                NdjsonLogWriter(
+                    File(sessionDir, "gps_track.ndjson"),
+                    headerJson =
+                        """{"kind":"gps_track","schema_version":1,"boot_session_id":"$bootSessionId",""" +
+                            """"time_unit":"ns"}""",
+                )
+
+            // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE
+            // is normally already Connected by the time a session starts. Only connect here if that
+            // did NOT happen (for example something else drives this service directly) - calling
+            // connect() again on an already-live connection would tear down and reopen the GATT
+            // link right as recording begins (a real BLE gap at the start of every survey).
+            if (luxClient.connectionState.value != com.luxmap.core.ble.BleConnectionState.Connected) {
+                luxClient.connect(luxDeviceAddress)
             }
-        var lastConnected = false
-        jobs +=
-            serviceScope.launch {
-                luxClient.connectionState.collect { state ->
-                    val isConnected = state is com.luxmap.core.ble.BleConnectionState.Connected
-                    // Only flag a gap on a Connected -> Disconnected TRANSITION (review feedback) —
-                    // not on the StateFlow's initial Disconnected value before the first connect.
-                    if (lastConnected && !isConnected) {
-                        sessionDao.sessionById(currentSessionId)?.let { session ->
-                            sessionDao.updateSession(session.copy(bleGapDetected = true, updatedAt = Instant.now()))
-                        }
+            jobs +=
+                serviceScope.launch {
+                    luxClient.samples.collect { sample ->
+                        luxWriter.appendLine(
+                            """{"sample_no":${sample.sampleNo},"module_epoch":${sample.moduleEpoch},""" +
+                                """"seq":${sample.sampleNo},"module_ms":"${sample.moduleMs}",""" +
+                                """"lux":${sample.lux},"phone_elapsed_ns":"${sample.phoneElapsedNs}"}""",
+                        )
                     }
-                    lastConnected = isConnected
                 }
-            }
+            var lastConnected = false
+            jobs +=
+                serviceScope.launch {
+                    luxClient.connectionState.collect { state ->
+                        val isConnected = state is com.luxmap.core.ble.BleConnectionState.Connected
+                        // Only flag a gap on a Connected -> Disconnected TRANSITION (review
+                        // feedback) — not on the StateFlow's initial Disconnected value before the
+                        // first connect.
+                        if (lastConnected && !isConnected) {
+                            sessionDao.sessionById(currentSessionId)?.let { session ->
+                                sessionDao.updateSession(
+                                    session.copy(bleGapDetected = true, updatedAt = Instant.now()),
+                                )
+                            }
+                        }
+                        lastConnected = isConnected
+                    }
+                }
 
-        locationHeadingRecorder.start(gpsWriter)
+            locationHeadingRecorder.start(gpsWriter)
+        }
 
         videoStartJob =
             serviceScope.launch {
@@ -339,8 +366,11 @@ class SurveyCaptureService : Service() {
                 jobs.clear()
                 luxClient.disconnect()
                 locationHeadingRecorder.stop()
-                luxWriter.close()
-                gpsWriter.close()
+                // luxWriter/gpsWriter are created inside a coroutine now (boot_session_id needs a
+                // suspend DataStore read) - a camera failure fast enough to reach here before that
+                // coroutine finishes would otherwise crash on an uninitialized lateinit property.
+                if (::luxWriter.isInitialized) luxWriter.close()
+                if (::gpsWriter.isInitialized) gpsWriter.close()
 
                 // VideoCaptureSession is single-use and keeps its camera/encoder/muxer in lateinit
                 // fields, so stop() must never run while start() is still setting them up. A quick

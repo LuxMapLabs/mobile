@@ -65,4 +65,16 @@ class LuxPacketCodecTest {
         val third = codec.decode("2026-09-30 23:32:08 | Light: 1.0 lux", receivedAtElapsedRealtimeNs = 3L)
         assertEquals(1, third?.sampleNo)
     }
+
+    @Test
+    fun `reset restarts sample_no and module_epoch, and clears the backward-jump baseline`() {
+        codec.decode("2026-09-30 23:32:07 | Light: 1.0 lux", receivedAtElapsedRealtimeNs = 1L)
+        codec.decode("2000-01-01 00:00:01 | Light: 1.0 lux", receivedAtElapsedRealtimeNs = 2L)
+
+        codec.reset()
+        val afterReset = codec.decode("2026-09-30 23:32:08 | Light: 1.0 lux", receivedAtElapsedRealtimeNs = 3L)
+
+        assertEquals(0, afterReset?.sampleNo)
+        assertEquals(0, afterReset?.moduleEpoch)
+    }
 }

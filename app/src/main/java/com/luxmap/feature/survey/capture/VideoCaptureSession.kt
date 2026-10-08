@@ -245,7 +245,10 @@ class VideoCaptureSession
                     }
                 }
             frameTimestampWriter =
-                NdjsonLogWriter(File(sessionDir, "frame_timestamp_log.ndjson"), fileRole = "frame_timestamp_log")
+                NdjsonLogWriter(
+                    File(sessionDir, "frame_timestamp_log.ndjson"),
+                    headerJson = """{"schema_version":"v0","file_role":"frame_timestamp_log"}""",
+                )
 
             captureSession = createCaptureSession(cameraDevice, inputSurface, previewSurface, handler)
 

@@ -70,19 +70,30 @@ class LuxSensorBleClient
         private var lastDeviceAddress: String? = null
         private var userInitiatedDisconnect = false
 
-        // sample_no/module_epoch are both local to one connection (see LuxPacketCodec) - a fresh
-        // instance per connect() is the same reset the old manually-tracked seq field used to do.
-        private var codec = LuxPacketCodec()
+        // sample_no/module_epoch must be scoped to one RECORDING SESSION, not one BLE connection
+        // (review feedback, 2026-10-08): CaptureViewModel connects BLE as soon as the screen opens,
+        // well before a session starts, and an in-session reconnect (spec §11 - a BLE drop must not
+        // stop recording) must not restart the counters mid-file either. One long-lived codec
+        // survives connect()/reconnect(); only resetSampleCounters() (called once at session start)
+        // resets it.
+        private val codec = LuxPacketCodec()
 
         fun connect(deviceAddress: String) {
             synchronized(lock) {
                 userInitiatedDisconnect = false
                 lastDeviceAddress = deviceAddress
-                codec = LuxPacketCodec()
                 _connectionState.value = BleConnectionState.Connecting
                 readJob?.cancel()
                 readJob = scope.launch { runConnection(deviceAddress) }
             }
+        }
+
+        // Called once by SurveyCaptureService at the start of a recording session - never by
+        // connect(), which would reset the counters on every BLE reconnect instead of once per
+        // session. Takes the same lock as the read loop's decode() call so a reset can never
+        // interleave with an in-flight decode and corrupt LuxPacketCodec's internal counters.
+        fun resetSampleCounters() {
+            synchronized(lock) { codec.reset() }
         }
 
         fun disconnect() {
@@ -122,7 +133,7 @@ class LuxSensorBleClient
                         // ordinary disconnect, not an error.
                         val line = reader.readLine() ?: break
                         val now = SystemClock.elapsedRealtimeNanos()
-                        val sample = codec.decode(line, now) ?: continue
+                        val sample = synchronized(lock) { codec.decode(line, now) } ?: continue
                         _samples.tryEmit(sample)
                     }
                 }
