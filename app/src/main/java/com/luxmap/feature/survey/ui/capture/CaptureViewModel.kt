@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -98,6 +99,7 @@ class CaptureViewModel
                                 _uiState.value =
                                     CaptureUiState.Ready(
                                         gpsReadyToRecord = preRecordGpsAccuracyTracker.readyToRecord.value,
+                                        gpsAccuracyMeters = preRecordGpsAccuracyTracker.accuracyMeters.value,
                                     )
                             }
 
@@ -188,10 +190,17 @@ class CaptureViewModel
             preRecordGpsAccuracyTracker.start()
             preRecordGpsJob =
                 viewModelScope.launch {
-                    preRecordGpsAccuracyTracker.readyToRecord.collect { ready ->
-                        val current = _uiState.value
-                        if (current is CaptureUiState.Ready) _uiState.value = current.copy(gpsReadyToRecord = ready)
-                    }
+                    combine(
+                        preRecordGpsAccuracyTracker.readyToRecord,
+                        preRecordGpsAccuracyTracker.accuracyMeters,
+                    ) { ready, accuracyMeters -> ready to accuracyMeters }
+                        .collect { (ready, accuracyMeters) ->
+                            val current = _uiState.value
+                            if (current is CaptureUiState.Ready) {
+                                _uiState.value =
+                                    current.copy(gpsReadyToRecord = ready, gpsAccuracyMeters = accuracyMeters)
+                            }
+                        }
                 }
         }
 
