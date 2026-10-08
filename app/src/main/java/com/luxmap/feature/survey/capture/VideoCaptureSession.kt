@@ -57,6 +57,10 @@ data class FinalizedVideoCapture(
     val cameraManufacturer: String,
     val cameraModel: String,
     val cameraId: String,
+    // Real applied value from the last CaptureResult, not a requested one - LENS_APERTURE is fixed
+    // per lens on almost every phone camera (not something LockedCameraProfile locks/requests), but
+    // BE's capture_config.json schema still wants the real value reported (survey-ingest-p2a.md §4.2).
+    val aperture: Float,
 )
 
 class VideoCaptureSession
@@ -249,20 +253,19 @@ class VideoCaptureSession
             // below measure and lock anything - see startLivePreviewWarmup() for why.
             startLivePreviewWarmup(previewSurface, handler)
 
-            // Locking AF_MODE_OFF (below) freezes the lens at whatever LENS_FOCUS_DISTANCE the
-            // profile carries. The caller has no way to know the right distance for the actual
-            // scene, so find it here with a real AF scan before locking - otherwise the profile's
-            // 0-diopter default (infinity focus) locks in and the whole recording comes out
-            // blurry unless the subject really is at infinity.
+            // Focus locks at infinity (0 diopters) always, per BE's survey-rig requirement
+            // (mobile.pdf, 2026-10-08: "nét ở vô cực") - a pole at survey distance is always
+            // effectively at infinity for a phone lens, so there is no scene-dependent focus
+            // decision to make here, unlike exposure below. This replaces an earlier AF-scan-then-
+            // lock approach (confirmed with the user 2026-10-08 before removing it).
             //
-            // The ISO and shutter time the profile carries have the same problem for the same
-            // reason, so a short AE scan measures them here too - see resolveExposure() for why.
-            // Focus first, then exposure, both before the recording request below is built.
-            val resolvedFocusDistance = resolveFocusDistance(cameraManager, profile, previewSurface, handler)
+            // The ISO and shutter time the profile carries still need a real scene measurement -
+            // unlike focus, the right exposure genuinely depends on how dark this specific route is
+            // - so a short AE scan measures them here, see resolveExposure() for why.
             val resolvedExposure = resolveExposure(cameraManager, profile, previewSurface, handler)
             val lockedProfile =
                 profile.copy(
-                    focusDistanceDiopters = resolvedFocusDistance,
+                    focusDistanceDiopters = 0f,
                     isoSensitivity = resolvedExposure.isoSensitivity,
                     exposureTimeNs = resolvedExposure.exposureTimeNs,
                 )
@@ -349,132 +352,12 @@ class VideoCaptureSession
                     set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
                     set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
                 }
-            // No callback: this only needs to put frames on the screen. resolveFocusDistance() and
-            // resolveExposure() measure on their own requests right after. No "stop" step either -
-            // setRepeatingRequest() always replaces the active repeating request, so their own
-            // calls take over cleanly.
+            // No callback: this only needs to put frames on the screen. resolveExposure() measures
+            // on its own request right after. No "stop" step either - setRepeatingRequest() always
+            // replaces the active repeating request, so that call takes over cleanly.
             captureSession.setRepeatingRequest(previewBuilder.build(), null, handler)
             delay(PRE_SCAN_PREVIEW_MS)
         }
-
-        // The Field Engineer points the camera at the actual pole before pressing record, so a
-        // real AF scan converging on whatever is in frame at that moment is the right target
-        // distance - this is primary. LENS_INFO_HYPERFOCAL_DISTANCE is only a fallback for when
-        // the scan itself cannot converge (e.g. a very low-contrast scene): it is a static value
-        // from the device's reported characteristics, not verified against this device's real
-        // optics, and a real-device check found it locking focus far past where it should for a
-        // close, high-contrast test target - so a GENUINE AF lock (CONTROL_AF_STATE_FOCUSED_LOCKED)
-        // always wins over it. Everything else does not count as a real AF result: a timeout and
-        // CONTROL_AF_STATE_NOT_FOCUSED_LOCKED (AF finished, found nothing sharp) both leave the lens
-        // parked wherever the sweep stopped, so both take the hyperfocal fallback.
-        private suspend fun resolveFocusDistance(
-            cameraManager: CameraManager,
-            requestedProfile: LockedCameraProfile,
-            previewSurface: Surface,
-            handler: Handler,
-        ): Float {
-            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-            val minFocusDistance = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
-            // A fixed-focus lens reports 0 here and has no LENS_FOCUS_DISTANCE control at all -
-            // nothing to scan for, keep whatever the caller asked for.
-            if (minFocusDistance == null || minFocusDistance <= 0f) return requestedProfile.focusDistanceDiopters
-
-            // Used whenever the scan below does not end in a real focus lock: it never reaches a
-            // locked AF state (timeout), or it reaches NOT_FOCUSED_LOCKED (AF gave up). Hyperfocal
-            // keeps everything from some near distance out to infinity acceptably sharp, which is
-            // the best guess for the kind of dim, far, low-contrast scene that defeats AF.
-            val fallbackDistance =
-                characteristics.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE)
-                    ?: requestedProfile.focusDistanceDiopters
-            // Diagnostic only, not used for any decision - kept so a real-device test can tell
-            // whether AF truly locked focus or gave up (CONTROL_AF_STATE_NOT_FOCUSED_LOCKED),
-            // something a plain "it recorded a distance" check cannot distinguish on its own.
-            var lastSeenAfState: Int? = null
-            // Diagnostic only too, and for the same reason: it records where the lens really was on
-            // the last capture result, so a log from a blurry recording shows whether the lens was
-            // anywhere near the distance we locked. Never read as a decision input - it is
-            // overwritten by every frame of an in-progress scan, so its value at any given moment is
-            // just wherever the scan happened to be sweeping through.
-            var lastSeenFocusDistance: Float? = null
-
-            // Standard Camera2 "tap to focus" sequence, run once on the preview surface before the
-            // locked recording request is ever submitted: a preview-only repeating request in AUTO
-            // mode, one explicit AF_TRIGGER_START, then back to idle while polling CONTROL_AF_STATE
-            // on the same repeating request until it reaches a locked state (found or not found).
-            // Doing this before the recording request means the recording request is only ever
-            // submitted once here - no later resubmit like the AWB lock needs, so no new risk to
-            // the SENSOR_TIMESTAMP pairing (see takeSensorTimestampFor()).
-
-            // Completed once the AF scan settles. A non-null value means AF really locked onto
-            // something sharp and this is where it locked; null means AF finished without finding
-            // focus, so the caller must use the fallback instead.
-            val converged = CompletableDeferred<Float?>()
-            val afCallback =
-                object : CameraCaptureSession.CaptureCallback() {
-                    override fun onCaptureCompleted(
-                        session: CameraCaptureSession,
-                        request: CaptureRequest,
-                        result: TotalCaptureResult,
-                    ) {
-                        result.get(CaptureResult.LENS_FOCUS_DISTANCE)?.let { lastSeenFocusDistance = it }
-                        val afState = result.get(CaptureResult.CONTROL_AF_STATE)
-                        if (afState != null) lastSeenAfState = afState
-                        when (afState) {
-                            // The only case where the lens position is a real focus decision, so the
-                            // only case we trust it. A device that somehow reports no
-                            // LENS_FOCUS_DISTANCE here completes with null and takes the fallback.
-                            CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED ->
-                                converged.complete(result.get(CaptureResult.LENS_FOCUS_DISTANCE))
-                            // AF finished and found nothing sharp - common for a dim, far,
-                            // low-contrast night scene, which is exactly what a street-light pole
-                            // looks like. The lens just stopped wherever the sweep ended, so that
-                            // position means nothing. Report failure and let the fallback decide.
-                            CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED -> converged.complete(null)
-                            else -> Unit
-                        }
-                    }
-                }
-
-            val meteringBuilder =
-                cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
-                    addTarget(previewSurface)
-                    set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
-                }
-            captureSession.setRepeatingRequest(meteringBuilder.build(), null, handler)
-            meteringBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START)
-            captureSession.capture(meteringBuilder.build(), afCallback, handler)
-            meteringBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_IDLE)
-            captureSession.setRepeatingRequest(meteringBuilder.build(), afCallback, handler)
-
-            // A low-contrast scene (very dark, blank wall) can leave AF_STATE scanning forever -
-            // never block the recording on it, fall back to the hyperfocal distance instead.
-            // Wrapping the awaited value is what keeps the two null cases apart: withTimeoutOrNull()
-            // returns null only when AF never answered, while a wrapper holding null means AF did
-            // answer and the answer was "no focus found".
-            val scanOutcome = withTimeoutOrNull(AF_CONVERGENCE_TIMEOUT_MS) { AfScanOutcome(converged.await()) }
-            val finalFocusDistance = scanOutcome?.focusDistance ?: fallbackDistance
-            val outcomeLabel =
-                when {
-                    scanOutcome?.focusDistance != null -> "AF_LOCKED (scanned distance used)"
-                    scanOutcome != null -> "AF_GAVE_UP (hyperfocal fallback used)"
-                    else -> "AF_TIMED_OUT (hyperfocal fallback used)"
-                }
-            // Kept as a permanent diagnostic log (not a "remove before commit" line): this is the
-            // only way to tell apart a real focus lock from one that only looks locked, across a
-            // real-device test done later. See docs/superpowers plan notes on the night-survey
-            // focus complaint for what outcome=AF_GAVE_UP or outcome=AF_TIMED_OUT would mean.
-            Log.i(
-                TAG,
-                "Focus lock result: outcome=$outcomeLabel afState=${afStateLabel(lastSeenAfState)} " +
-                    "lockedDistance=$finalFocusDistance lastSeenLensDistance=$lastSeenFocusDistance " +
-                    "hyperfocalDistance=$fallbackDistance minFocusDistance=$minFocusDistance",
-            )
-            return finalFocusDistance
-        }
-
-        // Tells "AF answered" apart from "AF never answered" around withTimeoutOrNull(), which
-        // reports a timeout with the same null the AF-failed case already uses. Only resolveFocusDistance() uses it.
-        private data class AfScanOutcome(val focusDistance: Float?)
 
         // Locking CONTROL_AE_MODE_OFF (see ExposureLockController) freezes the recording at whatever
         // ISO and shutter time the profile carries. Those two numbers come from the Task 2 spike,
@@ -483,12 +366,10 @@ class VideoCaptureSession
         // "not validated in actual night/outdoor low-light survey conditions"). A rural road at night
         // is much darker than that, and how dark it is changes from route to route, so one fixed pair
         // cannot be right everywhere. Measure the real scene here with a short AE scan and use what
-        // the sensor actually settled on, the same way resolveFocusDistance() does for focus.
+        // the sensor actually settled on.
         //
-        // This is a separate scan from the AF one on purpose: two short single-purpose requests are
-        // easier to read and to review than one combined AF+AE request, and the focus scan is
-        // already working and reviewed. They run one after the other, both before the recording
-        // request is ever built.
+        // Focus has no equivalent scan: it locks at infinity unconditionally (see the call site),
+        // since a pole at survey distance is always effectively at infinity for a phone lens.
         private suspend fun resolveExposure(
             cameraManager: CameraManager,
             requestedProfile: LockedCameraProfile,
@@ -496,8 +377,7 @@ class VideoCaptureSession
             handler: Handler,
         ): ResolvedExposure {
             // Whatever the caller asked for is the fallback. This function does not care where those
-            // numbers came from, same as resolveFocusDistance() just passing the requested focus
-            // distance back when there is nothing to scan.
+            // numbers came from.
             val fallback = ResolvedExposure(requestedProfile.isoSensitivity, requestedProfile.exposureTimeNs)
 
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
@@ -611,21 +491,6 @@ class VideoCaptureSession
         // reports a timeout with the same null the unreadable-result case already uses. Same reason
         // as AfScanOutcome above. Only resolveExposure() uses it.
         private data class AeScanOutcome(val exposure: ResolvedExposure?)
-
-        // Readable names for CONTROL_AF_STATE, used only by the diagnostic log above - Camera2 has
-        // no built-in toString() for these int constants.
-        private fun afStateLabel(state: Int?): String =
-            when (state) {
-                null -> "null"
-                CaptureResult.CONTROL_AF_STATE_INACTIVE -> "INACTIVE"
-                CaptureResult.CONTROL_AF_STATE_PASSIVE_SCAN -> "PASSIVE_SCAN"
-                CaptureResult.CONTROL_AF_STATE_PASSIVE_FOCUSED -> "PASSIVE_FOCUSED"
-                CaptureResult.CONTROL_AF_STATE_ACTIVE_SCAN -> "ACTIVE_SCAN"
-                CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED -> "FOCUSED_LOCKED"
-                CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED -> "NOT_FOCUSED_LOCKED"
-                CaptureResult.CONTROL_AF_STATE_PASSIVE_UNFOCUSED -> "PASSIVE_UNFOCUSED"
-                else -> "UNKNOWN($state)"
-            }
 
         private val captureCallback =
             object : CameraCaptureSession.CaptureCallback() {
@@ -888,7 +753,15 @@ class VideoCaptureSession
                         frameDurationNs = result.get(CaptureResult.SENSOR_FRAME_DURATION) ?: 0L,
                         focusDistanceDiopters = result.get(CaptureResult.LENS_FOCUS_DISTANCE) ?: 0f,
                     )
-                return FinalizedVideoCapture(finalSegment, actualProfile, Build.MANUFACTURER, Build.MODEL, cameraId)
+                val aperture = result.get(CaptureResult.LENS_APERTURE) ?: 0f
+                return FinalizedVideoCapture(
+                    finalSegment,
+                    actualProfile,
+                    Build.MANUFACTURER,
+                    Build.MODEL,
+                    cameraId,
+                    aperture,
+                )
             } finally {
                 // Runs even when a step above throws, so the camera and the NDJSON tail are never
                 // left behind by a failing stop().
@@ -1081,10 +954,6 @@ class VideoCaptureSession
             // does not think the start button failed. Picked in the middle of that range; adjust
             // after a real-device run if it feels too short or too slow.
             const val PRE_SCAN_PREVIEW_MS = 1_800L
-
-            // Generous for a one-shot AF scan (typically well under 1s) - only exists so a
-            // low-contrast scene that never converges cannot delay the start of a recording for long.
-            const val AF_CONVERGENCE_TIMEOUT_MS = 3_000L
 
             // AE usually settles faster than AF because it has no lens to move, but a very dark
             // scene needs a few long frames to meter, so keep a real window instead of a tight one.

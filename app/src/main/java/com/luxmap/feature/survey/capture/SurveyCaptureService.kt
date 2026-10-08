@@ -15,8 +15,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.IntentCompat
 import com.luxmap.BuildConfig
 import com.luxmap.core.ble.LuxSensorBleClient
-import com.luxmap.core.common.BootSessionProvider
 import com.luxmap.core.camera.LockedCameraProfile
+import com.luxmap.core.common.BootSessionProvider
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import dagger.hilt.android.AndroidEntryPoint
@@ -409,11 +409,14 @@ class SurveyCaptureService : Service() {
                         appVersion = BuildConfig.VERSION_NAME,
                         iso = finalized.actualProfile.isoSensitivity,
                         exposureTimeNs = finalized.actualProfile.exposureTimeNs,
-                        // TODO(Task 7): read the real LENS_APERTURE from CaptureResult instead of this fixed value
-                        aperture = 1.8,
+                        aperture = finalized.aperture.toDouble(),
                         fps = VIDEO_FPS,
                         focusDistanceDiopters = finalized.actualProfile.focusDistanceDiopters,
-                        // TODO(Task 7): read the real white balance CCT from CaptureResult once AWB lock exists
+                        // Camera2 has no CaptureResult key for white balance in Kelvin (only raw
+                        // COLOR_CORRECTION_GAINS channel gains, which would need a color-science CCT
+                        // estimation formula to convert - out of scope here). Fixed until WP2/WP5/
+                        // project owner decide whether to drop cct_k from the schema or accept an
+                        // estimated value. See docs/contract-drift.md.
                         whiteBalanceCctK = 4000,
                         widthPx = VIDEO_WIDTH,
                         heightPx = VIDEO_HEIGHT,
