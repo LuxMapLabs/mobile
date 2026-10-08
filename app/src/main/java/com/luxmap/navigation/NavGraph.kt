@@ -153,17 +153,29 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(Routes.Survey.route) {
                 SurveyPlanScreen(
                     onEnterCaptureMode = { surveySweepId ->
-                        navController.navigate(Routes.SurveyCapture.createRoute(surveySweepId))
+                        // F03's standalone survey-plan entry has no work order in scope at all -
+                        // threading a real workOrderId here is out of scope for this plan (fm-40
+                        // only covers the Work Order "Bắt đầu" entry into capture). Same gap shape
+                        // and same tracking as the onRedo path below.
+                        navController.navigate(
+                            Routes.SurveyCapture.createRoute(workOrderId = "", surveySweepId = surveySweepId),
+                        )
                     },
                 )
             }
             composable(
                 route = Routes.SurveyCapture.route,
-                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("surveySweepId") { type = NavType.StringType },
+                    ),
             ) { backStackEntry ->
+                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
                 CaptureScreen(
                     surveySweepId = surveySweepId,
+                    workOrderId = workOrderId,
                     onSessionPackaged = { sessionId ->
                         navController.navigate(Routes.SurveyReview.createRoute(sessionId)) {
                             popUpTo(Routes.Survey.route)
@@ -183,8 +195,19 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             popUpTo(Routes.Survey.route)
                         }
                     },
+                    // "Redo" re-enters capture for a session that already exists in Room with a
+                    // real workOrderId - CoverageScreen only passes surveySweepId today, so this
+                    // path cannot forward the real value without changing CoverageScreen's own
+                    // callback shape, which is out of scope here (F05 review flow, see the design
+                    // spec's non-goals). SurveyCaptureService only uses workOrderId at session
+                    // CREATION (Task 1/2 of this plan) - redo starts a brand new local session via
+                    // CaptureViewModel, so this empty value is a real gap, not a cosmetic one: a
+                    // session started via "redo" will not be upload-able until this is fixed.
+                    // Tracked in docs/contract-drift.md, not silently left unflagged.
                     onRedo = { surveySweepId ->
-                        navController.navigate(Routes.SurveyCapture.createRoute(surveySweepId)) {
+                        navController.navigate(
+                            Routes.SurveyCapture.createRoute(workOrderId = "", surveySweepId = surveySweepId),
+                        ) {
                             popUpTo(Routes.Survey.route)
                         }
                     },
@@ -228,6 +251,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
                     onComplete = { navController.navigate(Routes.WorkOrderCompletion.createRoute(workOrderId)) },
+                    onStartSurvey = { startedWorkOrderId, surveySweepId ->
+                        navController.navigate(Routes.SurveyCapture.createRoute(startedWorkOrderId, surveySweepId))
+                    },
                 )
             }
             composable(
