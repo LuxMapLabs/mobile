@@ -522,7 +522,7 @@ class SurveyCaptureService : Service() {
 
         // Finalized against the Task 2 spike's findings — kept in sync with VideoCaptureSession's
         // own private constants; a fast-follow could hoist these into one shared place.
-        private const val SEGMENT_TARGET_DURATION_MS = 180_000L
+        private const val SEGMENT_TARGET_DURATION_MS = 60_000L
         private const val VIDEO_WIDTH = 1920
         private const val VIDEO_HEIGHT = 1080
         private const val VIDEO_FPS = 30
