@@ -11,6 +11,7 @@ import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.GpsSignalState
 import com.luxmap.feature.survey.capture.PackageResult
+import com.luxmap.feature.survey.capture.PreRecordGpsAccuracyTracker
 import com.luxmap.feature.survey.capture.RecordingStartResult
 import com.luxmap.feature.survey.capture.SurveyCaptureController
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +37,7 @@ class CaptureViewModel
         private val luxDevicePreferences: LuxDevicePreferences,
         private val captureController: SurveyCaptureController,
         private val storageMonitor: StorageMonitor,
+        private val preRecordGpsAccuracyTracker: PreRecordGpsAccuracyTracker,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<CaptureUiState>(CaptureUiState.Scanning())
         val uiState: StateFlow<CaptureUiState> = _uiState.asStateFlow()
@@ -54,6 +56,7 @@ class CaptureViewModel
         // Connecting. Null while scanning or once a recording starts (nothing new to save then).
         private var pendingDevice: LuxDevice? = null
         private var scanJob: Job? = null
+        private var preRecordGpsJob: Job? = null
 
         // The surveySweepId passed to onStartRecording, held until the preview surface is ready
         // and startSession() can actually be called (Cach A - see the plan this came from).
@@ -88,7 +91,14 @@ class CaptureViewModel
                         is CaptureUiState.Connecting ->
                             if (state == BleConnectionState.Connected) {
                                 pendingDevice?.let { luxDevicePreferences.saveLastDevice(it) }
-                                _uiState.value = CaptureUiState.Ready
+                                startPreRecordGpsTracking()
+                                // Read .value synchronously (not through the collector below) so
+                                // an already-ready tracker does not produce two distinct uiState
+                                // emissions (false then true) for what is really one transition.
+                                _uiState.value =
+                                    CaptureUiState.Ready(
+                                        gpsReadyToRecord = preRecordGpsAccuracyTracker.readyToRecord.value,
+                                    )
                             }
 
                         // Does not regress out of Recording on a mid-session drop (spec §11) — just
@@ -150,6 +160,7 @@ class CaptureViewModel
         // connection then, and CaptureScreen's BackHandler already keeps the user on that screen.
         fun onChangeDevice() {
             if (_uiState.value is CaptureUiState.Recording) return
+            stopPreRecordGpsTracking()
             scanJob?.cancel()
             pendingDevice = null
             luxClient.disconnect()
@@ -161,10 +172,33 @@ class CaptureViewModel
             startScan()
         }
 
+        // Hard block, not just a disabled button (same "chặn cứng, không chỉ nhắc nhở" rule as
+        // F03's exposure lock) - a caller that bypasses the UI must not start a session the live
+        // accuracy gate has not actually cleared yet.
         fun onStartRecording(surveySweepId: String) {
-            if (_uiState.value != CaptureUiState.Ready) return
+            val current = _uiState.value
+            if (current !is CaptureUiState.Ready || !current.gpsReadyToRecord) return
+            stopPreRecordGpsTracking()
             pendingSurveySweepId = surveySweepId
             _uiState.value = CaptureUiState.StartingRecording
+        }
+
+        private fun startPreRecordGpsTracking() {
+            preRecordGpsJob?.cancel()
+            preRecordGpsAccuracyTracker.start()
+            preRecordGpsJob =
+                viewModelScope.launch {
+                    preRecordGpsAccuracyTracker.readyToRecord.collect { ready ->
+                        val current = _uiState.value
+                        if (current is CaptureUiState.Ready) _uiState.value = current.copy(gpsReadyToRecord = ready)
+                    }
+                }
+        }
+
+        private fun stopPreRecordGpsTracking() {
+            preRecordGpsJob?.cancel()
+            preRecordGpsJob = null
+            preRecordGpsAccuracyTracker.stop()
         }
 
         fun onPreviewSurfaceReady(surface: Surface) {
@@ -312,6 +346,7 @@ class CaptureViewModel
         override fun onCleared() {
             if (_uiState.value !is CaptureUiState.Recording) {
                 luxClient.disconnect()
+                stopPreRecordGpsTracking()
             }
         }
     }

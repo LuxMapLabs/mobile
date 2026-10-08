@@ -268,7 +268,16 @@ fun CaptureScreen(
                     }
 
                     is CaptureUiState.Ready -> {
-                        Button(onClick = { viewModel.onStartRecording(surveySweepId) }) { Text("Bắt đầu quay") }
+                        if (!state.gpsReadyToRecord) {
+                            Text(
+                                "Đang chờ định vị GPS ổn định...",
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                        Button(
+                            onClick = { viewModel.onStartRecording(surveySweepId) },
+                            enabled = state.gpsReadyToRecord,
+                        ) { Text("Bắt đầu quay") }
                         TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
                     }
 
