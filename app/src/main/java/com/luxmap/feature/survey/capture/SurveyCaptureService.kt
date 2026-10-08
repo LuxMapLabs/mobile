@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
@@ -31,6 +32,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
 
@@ -121,6 +123,10 @@ class SurveyCaptureService : Service() {
     private var currentSurveySweepId: String = ""
     private var startedAtElapsedNs: Long = 0L
     private var utcAnchorIso: String = ""
+
+    // Stopgap until Task 8 (BootSessionProvider) lands: a real boot_session_id must stay fixed
+    // for the phone's whole boot (Settings.Global.BOOT_COUNT), not regenerate per service instance.
+    private var currentBootSessionId: String = UUID.randomUUID().toString()
 
     private val _packagingResult = MutableStateFlow<PackageResult?>(null)
     val packagingResult: StateFlow<PackageResult?> = _packagingResult.asStateFlow()
@@ -395,23 +401,27 @@ class SurveyCaptureService : Service() {
             captureConfigFile.writeText(
                 CaptureConfigWriter.toJson(
                     CaptureConfig(
-                        utcAnchorIso = utcAnchorIso,
+                        bootSessionId = currentBootSessionId,
                         elapsedAnchorNs = startedAtElapsedNs,
-                        resolution = "${VIDEO_WIDTH}x$VIDEO_HEIGHT",
-                        fps = VIDEO_FPS,
-                        isoSensitivity = finalized.actualProfile.isoSensitivity,
-                        shutterNs = finalized.actualProfile.exposureTimeNs,
-                        frameDurationNs = finalized.actualProfile.frameDurationNs,
-                        codec = "video/avc",
-                        bitrateBps = VIDEO_BITRATE_BPS,
-                        keyframeIntervalS = VIDEO_KEYFRAME_INTERVAL_S,
-                        segmentDurationS = (SEGMENT_TARGET_DURATION_MS / 1000).toInt(),
-                        cameraManufacturer = finalized.cameraManufacturer,
-                        cameraModel = finalized.cameraModel,
+                        utcAnchorIso = utcAnchorIso,
+                        // System clock, not a GNSS fix - see docs/contract-drift.md's "Mốc UTC" row.
+                        utcUncertaintyMs = UTC_UNCERTAINTY_MS_SYSTEM_CLOCK,
+                        phoneModel = "${Build.MANUFACTURER} ${Build.MODEL}",
                         cameraId = finalized.cameraId,
                         appVersion = BuildConfig.VERSION_NAME,
-                        // real value comes from Bước 0's device pick, wired in Task 18
-                        luxModuleId = "LUX-001",
+                        iso = finalized.actualProfile.isoSensitivity,
+                        exposureTimeNs = finalized.actualProfile.exposureTimeNs,
+                        // TODO(Task 7): read the real LENS_APERTURE from CaptureResult instead of this fixed value
+                        aperture = 1.8,
+                        fps = VIDEO_FPS,
+                        focusDistanceDiopters = finalized.actualProfile.focusDistanceDiopters,
+                        // TODO(Task 7): read the real white balance CCT from CaptureResult once AWB lock exists
+                        whiteBalanceCctK = 4000,
+                        widthPx = VIDEO_WIDTH,
+                        heightPx = VIDEO_HEIGHT,
+                        orientation = "portrait",
+                        profileId = 1,
+                        moduleFirmwareVersionId = 1,
                     ),
                 ),
             )
@@ -515,8 +525,10 @@ class SurveyCaptureService : Service() {
         private const val SEGMENT_TARGET_DURATION_MS = 180_000L
         private const val VIDEO_WIDTH = 1920
         private const val VIDEO_HEIGHT = 1080
-        private const val VIDEO_BITRATE_BPS = 8_000_000
         private const val VIDEO_FPS = 30
-        private const val VIDEO_KEYFRAME_INTERVAL_S = 2
+
+        // Instant.now() has no real accuracy bound the way a GNSS fix's own clock does — see
+        // docs/contract-drift.md's "Mốc UTC" row for the BE-recommended alternative (GNSS fix time).
+        private const val UTC_UNCERTAINTY_MS_SYSTEM_CLOCK = 1_000
     }
 }
