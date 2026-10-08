@@ -26,7 +26,6 @@ class SurveySessionRecoveryUseCaseTest {
             distanceMeters = null,
             gpsTrackFilePath = "/data/gps_track.ndjson",
             luxLogFilePath = null,
-            headingLogFilePath = null,
             frameTimestampLogFilePath = null,
             captureConfigFilePath = null,
             manifestFilePath = null,

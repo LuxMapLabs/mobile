@@ -33,7 +33,6 @@ class PackageSurveySessionUseCase
                 listOfNotNull(
                     session.gpsTrackFilePath?.let { Triple(it, "gps_track", null) },
                     session.luxLogFilePath?.let { Triple(it, "lux_log", null) },
-                    session.headingLogFilePath?.let { Triple(it, "heading_log", null) },
                     session.frameTimestampLogFilePath?.let { Triple(it, "frame_timestamp_log", null) },
                     session.captureConfigFilePath?.let { Triple(it, "capture_config", null) },
                 ) + segments.map { Triple(it.filePath, "video_segment", it.segmentIndex) }

@@ -27,7 +27,6 @@ class PackageSurveySessionUseCaseTest {
             distanceMeters = 5_000.0,
             gpsTrackFilePath = gpsTrack.absolutePath,
             luxLogFilePath = null,
-            headingLogFilePath = null,
             frameTimestampLogFilePath = null,
             captureConfigFilePath = null,
             manifestFilePath = null,

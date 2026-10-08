@@ -116,7 +116,6 @@ class SurveyCaptureService : Service() {
     private lateinit var videoCaptureSession: VideoCaptureSession
     private lateinit var luxWriter: NdjsonLogWriter
     private lateinit var gpsWriter: NdjsonLogWriter
-    private lateinit var headingWriter: NdjsonLogWriter
     private lateinit var sessionDir: File
     private var currentSessionId: String = ""
     private var currentSurveySweepId: String = ""
@@ -218,7 +217,6 @@ class SurveyCaptureService : Service() {
                     distanceMeters = null,
                     gpsTrackFilePath = File(sessionDir, "gps_track.ndjson").absolutePath,
                     luxLogFilePath = File(sessionDir, "lux_log.ndjson").absolutePath,
-                    headingLogFilePath = File(sessionDir, "heading_log.ndjson").absolutePath,
                     frameTimestampLogFilePath = File(sessionDir, "frame_timestamp_log.ndjson").absolutePath,
                     captureConfigFilePath = File(sessionDir, "capture_config.json").absolutePath,
                     manifestFilePath = null,
@@ -234,7 +232,6 @@ class SurveyCaptureService : Service() {
 
         luxWriter = NdjsonLogWriter(File(sessionDir, "lux_log.ndjson"), fileRole = "lux_log")
         gpsWriter = NdjsonLogWriter(File(sessionDir, "gps_track.ndjson"), fileRole = "gps_track")
-        headingWriter = NdjsonLogWriter(File(sessionDir, "heading_log.ndjson"), fileRole = "heading_log")
 
         // CaptureViewModel (Task 18) already calls connect() when the screen is entered, so BLE is
         // normally already Connected by the time a session starts. Only connect here if that did
@@ -269,7 +266,7 @@ class SurveyCaptureService : Service() {
                 }
             }
 
-        locationHeadingRecorder.start(gpsWriter, headingWriter)
+        locationHeadingRecorder.start(gpsWriter)
 
         videoStartJob =
             serviceScope.launch {
@@ -339,7 +336,6 @@ class SurveyCaptureService : Service() {
                 locationHeadingRecorder.stop()
                 luxWriter.close()
                 gpsWriter.close()
-                headingWriter.close()
 
                 // VideoCaptureSession is single-use and keeps its camera/encoder/muxer in lateinit
                 // fields, so stop() must never run while start() is still setting them up. A quick

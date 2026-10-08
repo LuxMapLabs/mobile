@@ -21,7 +21,6 @@ data class LocalSurveySessionEntity(
     val distanceMeters: Double?,
     val gpsTrackFilePath: String?,
     val luxLogFilePath: String?,
-    val headingLogFilePath: String?,
     val frameTimestampLogFilePath: String?,
     val captureConfigFilePath: String?,
     val manifestFilePath: String?,
