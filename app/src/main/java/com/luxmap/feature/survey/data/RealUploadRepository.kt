@@ -9,9 +9,8 @@ import com.luxmap.feature.survey.data.sync.CreateSurveySweepPayload
 import com.luxmap.feature.survey.data.sync.SubmitSurveySweepPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyClipPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyRawPayload
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -27,12 +26,11 @@ class RealUploadRepository
         private val syncQueueProcessor: SyncQueueProcessor,
     ) : UploadRepository {
         override fun uploadSession(sessionId: String): Flow<UploadProgress> =
-            callbackFlow {
+            flow {
                 val session = sessionDao.sessionById(sessionId)
                 if (session == null) {
-                    trySend(UploadProgress.Failed("Session $sessionId not found"))
-                    close()
-                    return@callbackFlow
+                    emit(UploadProgress.Failed("Session $sessionId not found"))
+                    return@flow
                 }
                 val segments = sessionDao.segmentsFor(sessionId).sortedBy { it.segmentIndex }
 
@@ -56,7 +54,7 @@ class RealUploadRepository
                     onRowProgress = { clientOpId, sent, _ ->
                         if (clientOpId in opIds) {
                             sentByOp[clientOpId] = sent
-                            trySend(UploadProgress.InProgress(sentByOp.values.sum(), totalBytes))
+                            emit(UploadProgress.InProgress(sentByOp.values.sum(), totalBytes))
                         }
                     },
                 )
@@ -64,13 +62,11 @@ class RealUploadRepository
                 val statuses = opIds.map { syncQueueDao.statusOf(it) }
                 when {
                     statuses.any { it == "conflict" } ->
-                        trySend(UploadProgress.Conflict("Dữ liệu đã thay đổi trên server"))
-                    statuses.any { it == "failed" } -> trySend(UploadProgress.Failed("Nộp thất bại, thử lại sau"))
-                    statuses.all { it == "done" } -> trySend(UploadProgress.Done)
-                    else -> trySend(UploadProgress.InProgress(sentByOp.values.sum(), totalBytes))
+                        emit(UploadProgress.Conflict("Dữ liệu đã thay đổi trên server"))
+                    statuses.any { it == "failed" } -> emit(UploadProgress.Failed("Nộp thất bại, thử lại sau"))
+                    statuses.all { it == "done" } -> emit(UploadProgress.Done)
+                    else -> emit(UploadProgress.InProgress(sentByOp.values.sum(), totalBytes))
                 }
-                close()
-                awaitClose { }
             }
 
         private fun opIdsFor(

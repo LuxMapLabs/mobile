@@ -10,7 +10,7 @@ class SyncQueueProcessor
         private val handlers: Set<@JvmSuppressWildcards SyncOpHandler>,
     ) {
         suspend fun processQueuedOps(
-            onRowProgress: (clientOpId: String, bytesSent: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+            onRowProgress: suspend (clientOpId: String, bytesSent: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
         ): Boolean {
             var stillPending = false
             for (row in dao.queuedRows()) {

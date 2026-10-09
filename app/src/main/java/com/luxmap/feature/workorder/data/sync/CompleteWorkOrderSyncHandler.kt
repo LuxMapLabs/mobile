@@ -23,7 +23,7 @@ class CompleteWorkOrderSyncHandler
 
         override suspend fun handle(
             payloadJson: String,
-            onProgress: (Long, Long) -> Unit,
+            onProgress: suspend (Long, Long) -> Unit,
         ): SyncOpResult {
             val payload = Json.decodeFromString<CompletionSyncPayload>(payloadJson)
             val completion =
