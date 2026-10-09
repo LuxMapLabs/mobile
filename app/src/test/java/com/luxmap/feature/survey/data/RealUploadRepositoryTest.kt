@@ -172,7 +172,7 @@ class RealUploadRepositoryTest {
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } coAnswers {
-                val onRowProgress = firstArg<(String, Long, Long) -> Unit>()
+                val onRowProgress = firstArg<suspend (String, Long, Long) -> Unit>()
                 onRowProgress("SESSION-1:create_sweep", 50L, 100L)
                 false
             }

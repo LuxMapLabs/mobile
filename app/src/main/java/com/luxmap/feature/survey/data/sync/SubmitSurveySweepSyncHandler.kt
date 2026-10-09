@@ -26,7 +26,7 @@ class SubmitSurveySweepSyncHandler
 
         override suspend fun handle(
             payloadJson: String,
-            onProgress: (Long, Long) -> Unit,
+            onProgress: suspend (Long, Long) -> Unit,
         ): SyncOpResult {
             val payload = Json.decodeFromString<SubmitSurveySweepPayload>(payloadJson)
             val session = dao.sessionById(payload.sessionId) ?: return SyncOpResult.Failed("Local session row missing")
@@ -36,6 +36,11 @@ class SubmitSurveySweepSyncHandler
             val configHash =
                 session.captureConfigChecksumSha256 ?: return SyncOpResult.Failed("Missing capture_config checksum")
             val segments = dao.segmentsFor(payload.sessionId)
+            // A session can package with zero video segments (e.g. a crash right after start,
+            // before any segment ever closed - see PackageSurveySessionUseCase). Submitting that
+            // would compute endedElapsedNs as session.startedAtElapsedNs below, implying a
+            // zero-duration sweep that never happened - fail loudly instead of sending that.
+            if (segments.isEmpty()) return SyncOpResult.Failed("No video segments to submit")
             val missingClipChecksum = segments.any { it.checksumSha256 == null }
             if (missingClipChecksum) return SyncOpResult.Failed("A video segment has no checksum yet")
 
@@ -55,12 +60,9 @@ class SubmitSurveySweepSyncHandler
                             // LocalSurveySessionEntity has no endedAtElapsedNs column (only
                             // endedAtUtc: Instant?), so the real elapsed-nanos value at recording
                             // stop is read from the last video segment's endedAtElapsedNs instead,
-                            // which IS persisted.
+                            // which IS persisted. segments is never empty here (checked above).
                             endedElapsedNs =
-                                (
-                                    segments.maxOfOrNull { it.endedAtElapsedNs ?: it.startedAtElapsedNs }
-                                        ?: session.startedAtElapsedNs
-                                ).toString(),
+                                segments.maxOf { it.endedAtElapsedNs ?: it.startedAtElapsedNs }.toString(),
                             manifest =
                                 SweepManifestDto(
                                     clips =

@@ -24,7 +24,7 @@ class UploadSurveyRawSyncHandler
 
         override suspend fun handle(
             payloadJson: String,
-            onProgress: (Long, Long) -> Unit,
+            onProgress: suspend (Long, Long) -> Unit,
         ): SyncOpResult {
             val payload = Json.decodeFromString<UploadSurveyRawPayload>(payloadJson)
             val session = dao.sessionById(payload.sessionId) ?: return SyncOpResult.Failed("Local session row missing")

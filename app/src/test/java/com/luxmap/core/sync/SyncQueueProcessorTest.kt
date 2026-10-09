@@ -37,7 +37,7 @@ private fun handler(
 
     override suspend fun handle(
         payloadJson: String,
-        onProgress: (Long, Long) -> Unit,
+        onProgress: suspend (Long, Long) -> Unit,
     ): SyncOpResult = result
 }
 
@@ -112,7 +112,7 @@ class SyncQueueProcessorTest {
 
                             override suspend fun handle(
                                 payloadJson: String,
-                                onProgress: (Long, Long) -> Unit,
+                                onProgress: suspend (Long, Long) -> Unit,
                             ): SyncOpResult {
                                 handlerCalls += 1
                                 return SyncOpResult.RetryLater
@@ -141,7 +141,7 @@ class SyncQueueProcessorTest {
 
                     override suspend fun handle(
                         payloadJson: String,
-                        onProgress: (Long, Long) -> Unit,
+                        onProgress: suspend (Long, Long) -> Unit,
                     ): SyncOpResult {
                         onProgress(50L, 100L)
                         return SyncOpResult.Done
