@@ -48,6 +48,18 @@ private fun session(serverSweepId: String? = null) =
         updatedAt = Instant.parse("2026-10-08T10:30:00Z"),
     )
 
+private fun videoSegment(segmentIndex: Int) =
+    LocalSurveyVideoSegmentEntity(
+        segmentId = "SEG-$segmentIndex",
+        sessionId = "SESSION-1",
+        segmentIndex = segmentIndex,
+        filePath = "/x/clip_$segmentIndex.mp4",
+        startedAtElapsedNs = 0L,
+        endedAtElapsedNs = 1L,
+        sizeBytes = 1L,
+        checksumSha256 = "clip-hash-$segmentIndex",
+    )
+
 class SubmitSurveySweepSyncHandlerTest {
     @Test
     fun `submits with the persisted checksums and marks the session done`() =
@@ -55,19 +67,7 @@ class SubmitSurveySweepSyncHandlerTest {
             val api = mockk<SweepsApi>()
             val dao = mockk<SurveySessionDao>(relaxed = true)
             coEvery { dao.sessionById("SESSION-1") } returns session(serverSweepId = "SWEEP-SERVER-1")
-            coEvery { dao.segmentsFor("SESSION-1") } returns
-                listOf(
-                    LocalSurveyVideoSegmentEntity(
-                        segmentId = "SEG-1",
-                        sessionId = "SESSION-1",
-                        segmentIndex = 0,
-                        filePath = "/x/clip_0.mp4",
-                        startedAtElapsedNs = 0L,
-                        endedAtElapsedNs = 1L,
-                        sizeBytes = 1L,
-                        checksumSha256 = "clip-hash",
-                    ),
-                )
+            coEvery { dao.segmentsFor("SESSION-1") } returns listOf(videoSegment(segmentIndex = 0))
             coEvery { api.submit("SWEEP-SERVER-1", any()) } returns SweepResponseDto(sweepId = "SWEEP-SERVER-1")
             val handler = SubmitSurveySweepSyncHandler(api, dao)
 
@@ -78,12 +78,27 @@ class SubmitSurveySweepSyncHandlerTest {
         }
 
     @Test
-    fun `generates submitClientOpId once and persists it, a retry reuses the same value`() =
+    fun `fails loudly instead of submitting an implied zero-duration sweep when there are no segments`() =
         runTest {
             val api = mockk<SweepsApi>()
             val dao = mockk<SurveySessionDao>(relaxed = true)
             coEvery { dao.sessionById("SESSION-1") } returns session(serverSweepId = "SWEEP-SERVER-1")
             coEvery { dao.segmentsFor("SESSION-1") } returns emptyList()
+            val handler = SubmitSurveySweepSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(SubmitSurveySweepPayload("SESSION-1")))
+
+            assertTrue(result is SyncOpResult.Failed)
+            coVerify(exactly = 0) { api.submit(any(), any()) }
+        }
+
+    @Test
+    fun `generates submitClientOpId once and persists it, a retry reuses the same value`() =
+        runTest {
+            val api = mockk<SweepsApi>()
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session(serverSweepId = "SWEEP-SERVER-1")
+            coEvery { dao.segmentsFor("SESSION-1") } returns listOf(videoSegment(segmentIndex = 0))
             val clientOpIdSlot = slot<SubmitSweepRequestDto>()
             coEvery { api.submit("SWEEP-SERVER-1", capture(clientOpIdSlot)) } answers {
                 SweepResponseDto(sweepId = "SWEEP-SERVER-1")
