@@ -171,12 +171,13 @@ class SurveyCaptureService : Service() {
                 } else {
                     val sessionId = intent.getStringExtra(EXTRA_SESSION_ID) ?: return START_NOT_STICKY
                     val surveySweepId = intent.getStringExtra(EXTRA_SURVEY_SWEEP_ID) ?: return START_NOT_STICKY
+                    val workOrderId = intent.getStringExtra(EXTRA_WORK_ORDER_ID) ?: return START_NOT_STICKY
                     val luxDeviceAddress = intent.getStringExtra(EXTRA_LUX_DEVICE_ADDRESS) ?: return START_NOT_STICKY
                     val previewSurface =
                         IntentCompat.getParcelableExtra(intent, EXTRA_PREVIEW_SURFACE, Surface::class.java)
                             ?: return START_NOT_STICKY
                     isRecording = true
-                    startSessionInternal(sessionId, surveySweepId, luxDeviceAddress, previewSurface)
+                    startSessionInternal(sessionId, surveySweepId, workOrderId, luxDeviceAddress, previewSurface)
                 }
             }
             ACTION_STOP -> stopSessionInternal()
@@ -187,6 +188,7 @@ class SurveyCaptureService : Service() {
     private fun startSessionInternal(
         sessionId: String,
         surveySweepId: String,
+        workOrderId: String,
         luxDeviceAddress: String,
         previewSurface: Surface,
     ) {
@@ -212,6 +214,7 @@ class SurveyCaptureService : Service() {
                 LocalSurveySessionEntity(
                     sessionId = sessionId,
                     surveySweepId = surveySweepId,
+                    workOrderId = workOrderId,
                     recordingState = STATE_RECORDING,
                     syncState = null,
                     startedAtUtc = Instant.now(),
@@ -554,6 +557,7 @@ class SurveyCaptureService : Service() {
         const val ACTION_STOP = "com.luxmap.survey.action.STOP"
         const val EXTRA_SESSION_ID = "session_id"
         const val EXTRA_SURVEY_SWEEP_ID = "survey_sweep_id"
+        const val EXTRA_WORK_ORDER_ID = "work_order_id"
         const val EXTRA_LUX_DEVICE_ADDRESS = "lux_device_address"
         const val EXTRA_PREVIEW_SURFACE = "preview_surface"
 

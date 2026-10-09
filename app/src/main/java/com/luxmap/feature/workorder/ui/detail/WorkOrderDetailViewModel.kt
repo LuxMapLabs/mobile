@@ -5,13 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
+
+data class SurveySessionStart(val workOrderId: String, val surveySweepId: String)
 
 @HiltViewModel
 class WorkOrderDetailViewModel
@@ -24,6 +30,11 @@ class WorkOrderDetailViewModel
 
         private val _uiState = MutableStateFlow<WorkOrderDetailUiState>(WorkOrderDetailUiState.Loading)
         val uiState: StateFlow<WorkOrderDetailUiState> = _uiState.asStateFlow()
+
+        // One-shot: a survey work order's "Bắt đầu" should navigate into F04 exactly once per tap,
+        // not replay on every recomposition the way a StateFlow would.
+        private val _startedSurveySession = MutableSharedFlow<SurveySessionStart>(extraBufferCapacity = 1)
+        val startedSurveySession: SharedFlow<SurveySessionStart> = _startedSurveySession.asSharedFlow()
 
         init {
             load()
@@ -53,7 +64,17 @@ class WorkOrderDetailViewModel
             _uiState.value = current.copy(isStarting = true, startError = null)
             viewModelScope.launch {
                 repository.start(workOrderId).fold(
-                    onSuccess = { detail -> _uiState.value = WorkOrderDetailUiState.Success(detail = detail) },
+                    onSuccess = { detail ->
+                        _uiState.value = WorkOrderDetailUiState.Success(detail = detail)
+                        if (detail.taskKind == "survey") {
+                            _startedSurveySession.tryEmit(
+                                SurveySessionStart(
+                                    workOrderId = workOrderId,
+                                    surveySweepId = UUID.randomUUID().toString(),
+                                ),
+                            )
+                        }
+                    },
                     onFailure = { e ->
                         val afterFailure = _uiState.value
                         if (afterFailure is WorkOrderDetailUiState.Success) {

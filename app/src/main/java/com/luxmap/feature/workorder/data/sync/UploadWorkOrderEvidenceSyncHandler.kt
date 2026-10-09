@@ -24,7 +24,10 @@ class UploadWorkOrderEvidenceSyncHandler
     ) : SyncOpHandler {
         override val opType = "upload_work_order_evidence"
 
-        override suspend fun handle(payloadJson: String): SyncOpResult {
+        override suspend fun handle(
+            payloadJson: String,
+            onProgress: (Long, Long) -> Unit,
+        ): SyncOpResult {
             val payload = Json.decodeFromString<EvidenceSyncPayload>(payloadJson)
             val evidence =
                 dao.evidenceByClientOpId(payload.clientOpId) ?: return SyncOpResult.Failed("Local evidence row missing")

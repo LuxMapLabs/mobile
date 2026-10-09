@@ -17,6 +17,7 @@ class SurveySessionRecoveryUseCaseTest {
         LocalSurveySessionEntity(
             sessionId = sessionId,
             surveySweepId = "SWEEP-1",
+            workOrderId = "WO-1",
             recordingState = "recording",
             syncState = null,
             startedAtUtc = Instant.parse("2026-09-28T20:00:00Z"),

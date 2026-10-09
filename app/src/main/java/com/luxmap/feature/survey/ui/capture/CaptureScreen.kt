@@ -48,6 +48,7 @@ import com.luxmap.feature.survey.domain.GpsAccuracyGate
 @Composable
 fun CaptureScreen(
     surveySweepId: String,
+    workOrderId: String,
     onSessionPackaged: (sessionId: String) -> Unit,
     viewModel: CaptureViewModel = hiltViewModel(),
 ) {
@@ -278,7 +279,7 @@ fun CaptureScreen(
                             Text(accuracyLabel, style = MaterialTheme.typography.bodyLarge)
                         }
                         Button(
-                            onClick = { viewModel.onStartRecording(surveySweepId) },
+                            onClick = { viewModel.onStartRecording(surveySweepId, workOrderId) },
                             enabled = state.gpsReadyToRecord,
                         ) { Text("Bắt đầu quay") }
                         TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }

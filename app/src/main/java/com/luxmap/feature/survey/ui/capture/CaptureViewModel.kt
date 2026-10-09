@@ -62,6 +62,7 @@ class CaptureViewModel
         // The surveySweepId passed to onStartRecording, held until the preview surface is ready
         // and startSession() can actually be called (Cach A - see the plan this came from).
         private var pendingSurveySweepId: String = ""
+        private var pendingWorkOrderId: String = ""
 
         // onPreviewSurfaceReady can legitimately fire twice in one recording: once to start the
         // session (StartingRecording), and again later if the TextureView's SurfaceTexture is
@@ -177,11 +178,15 @@ class CaptureViewModel
         // Hard block, not just a disabled button (same "chặn cứng, không chỉ nhắc nhở" rule as
         // F03's exposure lock) - a caller that bypasses the UI must not start a session the live
         // accuracy gate has not actually cleared yet.
-        fun onStartRecording(surveySweepId: String) {
+        fun onStartRecording(
+            surveySweepId: String,
+            workOrderId: String,
+        ) {
             val current = _uiState.value
             if (current !is CaptureUiState.Ready || !current.gpsReadyToRecord) return
             stopPreRecordGpsTracking()
             pendingSurveySweepId = surveySweepId
+            pendingWorkOrderId = workOrderId
             _uiState.value = CaptureUiState.StartingRecording
         }
 
@@ -220,7 +225,13 @@ class CaptureViewModel
                     val luxDeviceAddress = pendingDevice?.address ?: return
                     startingSessionRequested = true
                     sessionId = UUID.randomUUID().toString()
-                    captureController.startSession(sessionId, pendingSurveySweepId, luxDeviceAddress, surface)
+                    captureController.startSession(
+                        sessionId,
+                        pendingSurveySweepId,
+                        pendingWorkOrderId,
+                        luxDeviceAddress,
+                        surface,
+                    )
                 }
 
                 // The screen came back after an ordinary Activity stop and the TextureView built a

@@ -41,6 +41,7 @@ interface SurveyCaptureController {
     fun startSession(
         sessionId: String,
         surveySweepId: String,
+        workOrderId: String,
         luxDeviceAddress: String,
         previewSurface: Surface,
     )
@@ -152,6 +153,7 @@ class RealSurveyCaptureController
         override fun startSession(
             sessionId: String,
             surveySweepId: String,
+            workOrderId: String,
             luxDeviceAddress: String,
             previewSurface: Surface,
         ) {
@@ -160,6 +162,7 @@ class RealSurveyCaptureController
                     .setAction(SurveyCaptureService.ACTION_START)
                     .putExtra(SurveyCaptureService.EXTRA_SESSION_ID, sessionId)
                     .putExtra(SurveyCaptureService.EXTRA_SURVEY_SWEEP_ID, surveySweepId)
+                    .putExtra(SurveyCaptureService.EXTRA_WORK_ORDER_ID, workOrderId)
                     .putExtra(SurveyCaptureService.EXTRA_LUX_DEVICE_ADDRESS, luxDeviceAddress)
                     .putExtra(SurveyCaptureService.EXTRA_PREVIEW_SURFACE, previewSurface)
             ContextCompat.startForegroundService(context, intent)

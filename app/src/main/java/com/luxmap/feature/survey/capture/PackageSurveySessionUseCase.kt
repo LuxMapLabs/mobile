@@ -54,6 +54,12 @@ class PackageSurveySessionUseCase
 
             referencedFiles.forEach { (path, _, _) -> cleanIfNdjson(File(path)) }
 
+            val checksumsByPath = referencedFiles.associate { (path, _, _) -> path to sha256Of(File(path)) }
+
+            segments.forEach { segment ->
+                dao.updateSegment(segment.copy(checksumSha256 = checksumsByPath.getValue(segment.filePath)))
+            }
+
             val manifestFile = File(File(referencedFiles.first().first).parentFile, "manifest.json")
             manifestFile.writeText(
                 buildManifestJson(
@@ -62,6 +68,7 @@ class PackageSurveySessionUseCase
                     startedAtUtc = session.startedAtUtc.toString(),
                     endedAtUtc = session.endedAtUtc?.toString(),
                     files = referencedFiles,
+                    checksumsByPath = checksumsByPath,
                 ),
             )
 
@@ -69,6 +76,9 @@ class PackageSurveySessionUseCase
                 session.copy(
                     recordingState = "packaged",
                     manifestFilePath = manifestFile.absolutePath,
+                    gpsTrackChecksumSha256 = session.gpsTrackFilePath?.let { checksumsByPath[it] },
+                    luxLogChecksumSha256 = session.luxLogFilePath?.let { checksumsByPath[it] },
+                    captureConfigChecksumSha256 = session.captureConfigFilePath?.let { checksumsByPath[it] },
                     updatedAt = Instant.now(),
                 ),
             )
@@ -97,11 +107,12 @@ class PackageSurveySessionUseCase
             startedAtUtc: String,
             endedAtUtc: String?,
             files: List<Triple<String, String, Int?>>,
+            checksumsByPath: Map<String, String>,
         ): String {
             val filesJson =
                 files.joinToString(",") { (path, role, segmentIndex) ->
                     val file = File(path)
-                    val checksum = sha256Of(file)
+                    val checksum = checksumsByPath.getValue(path)
                     val segmentField = if (segmentIndex != null) ""","segment_index":$segmentIndex""" else ""
                     """{"name":"${file.name}","role":"$role"$segmentField,""" +
                         """"checksum_sha256":"$checksum","size_bytes":${file.length()}}"""

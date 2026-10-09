@@ -16,9 +16,15 @@ sealed interface Routes {
     }
 
     data object SurveyCapture : Routes {
-        override val route = "survey/capture/{surveySweepId}"
+        // workOrderId is a query param, not a required path segment, because some entry points
+        // (F03 standalone plan, F05 redo) have no work order to pass yet - a required path
+        // segment with an empty value does not match the route pattern and crashes navigate().
+        override val route = "survey/capture/{surveySweepId}?workOrderId={workOrderId}"
 
-        fun createRoute(surveySweepId: String) = "survey/capture/$surveySweepId"
+        fun createRoute(
+            workOrderId: String,
+            surveySweepId: String,
+        ) = "survey/capture/$surveySweepId?workOrderId=$workOrderId"
     }
 
     data object SurveyReview : Routes {

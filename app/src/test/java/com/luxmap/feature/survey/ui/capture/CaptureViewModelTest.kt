@@ -177,7 +177,7 @@ class CaptureViewModelTest {
                 connectionState.value = BleConnectionState.Connected
                 assertEquals(CaptureUiState.Ready(gpsReadyToRecord = false, gpsAccuracyMeters = 5f), awaitItem())
 
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 expectNoEvents()
             }
         }
@@ -278,7 +278,7 @@ class CaptureViewModelTest {
                 awaitItem() // Connecting
                 assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
 
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 assertEquals(CaptureUiState.StartingRecording, awaitItem())
 
                 viewModel.onPreviewSurfaceReady(surface)
@@ -286,7 +286,7 @@ class CaptureViewModelTest {
                 val recording = awaitItem() as CaptureUiState.Recording
                 assertEquals(false, recording.gpsSignalLost)
             }
-            verify { controller.startSession(any(), "SWEEP-1", SENSOR_1.address, surface) }
+            verify { controller.startSession(any(), "SWEEP-1", "WO-1", SENSOR_1.address, surface) }
         }
 
     @Test
@@ -306,7 +306,7 @@ class CaptureViewModelTest {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
                 awaitItem() // Ready
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 awaitItem() // StartingRecording
                 viewModel.onPreviewSurfaceReady(surface)
                 recordingStartResult.value = RecordingStartResult.Failed("camera busy")
@@ -332,7 +332,7 @@ class CaptureViewModelTest {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
                 awaitItem() // Ready
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 awaitItem() // StartingRecording
                 viewModel.onPreviewSurfaceReady(mockk())
                 recordingStartResult.value = RecordingStartResult.Ready
@@ -361,7 +361,7 @@ class CaptureViewModelTest {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
                 awaitItem() // Ready
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 awaitItem() // StartingRecording
                 viewModel.onPreviewSurfaceReady(mockk())
                 recordingStartResult.value = RecordingStartResult.Ready
@@ -391,7 +391,7 @@ class CaptureViewModelTest {
                 awaitItem() // Scanning() field default
                 awaitItem() // Connecting
                 awaitItem() // Ready
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1")
+                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
                 awaitItem() // StartingRecording
                 viewModel.onPreviewSurfaceReady(mockk())
                 recordingStartResult.value = RecordingStartResult.Ready
@@ -419,7 +419,7 @@ class CaptureViewModelTest {
         recordingStartResult: MutableStateFlow<RecordingStartResult?>,
     ) {
         dispatcher.scheduler.advanceUntilIdle() // let the remembered device connect, reaching Ready
-        viewModel.onStartRecording("SWEEP-1")
+        viewModel.onStartRecording("SWEEP-1", "WO-1")
         viewModel.onPreviewSurfaceReady(mockk())
         recordingStartResult.value = RecordingStartResult.Ready
         dispatcher.scheduler.runCurrent()

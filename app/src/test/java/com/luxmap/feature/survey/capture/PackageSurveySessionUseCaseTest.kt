@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.capture
 
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -18,6 +19,7 @@ class PackageSurveySessionUseCaseTest {
         return LocalSurveySessionEntity(
             sessionId = "SESSION-1",
             surveySweepId = "SWEEP-1",
+            workOrderId = "WO-1",
             recordingState = "stopped",
             syncState = null,
             startedAtUtc = Instant.parse("2026-09-28T20:00:00Z"),
@@ -114,5 +116,131 @@ class PackageSurveySessionUseCaseTest {
 
             assertTrue(result is PackageResult.Failure)
             coVerify(exactly = 0) { dao.updateSession(match { it.recordingState == "packaged" }) }
+        }
+
+    @Test
+    fun `persists the sha256 checksum onto the session row for each raw file, computed once`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            val sessionWithRaw =
+                session.copy(
+                    luxLogFilePath = File(tempDir, "lux_log.ndjson").apply { writeText("lux\n") }.absolutePath,
+                    captureConfigFilePath = File(tempDir, "capture_config.json").apply { writeText("{}") }.absolutePath,
+                )
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns sessionWithRaw
+            coEvery { dao.segmentsFor("SESSION-1") } returns emptyList()
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            coVerify {
+                dao.updateSession(
+                    match {
+                        it.gpsTrackChecksumSha256 != null &&
+                            it.luxLogChecksumSha256 != null &&
+                            it.captureConfigChecksumSha256 != null
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun `persists the sha256 checksum onto each video segment row`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            val clip = File(tempDir, "clip_0.mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session
+            coEvery { dao.segmentsFor("SESSION-1") } returns
+                listOf(
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-1",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 0,
+                        filePath = clip.absolutePath,
+                        startedAtElapsedNs = 0L,
+                        endedAtElapsedNs = 1L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                )
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            coVerify { dao.updateSegment(match { it.segmentId == "SEG-1" && it.checksumSha256 != null }) }
+        }
+
+    @Test
+    fun `persists distinct checksums for each video segment with different content`() =
+        runTest {
+            val tempDir = createTempDir()
+            val session = sessionWithFiles(tempDir)
+            val clip1 = File(tempDir, "clip_0.mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val clip2 = File(tempDir, "clip_1.mp4").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+            val dao = mockk<SurveySessionDao>(relaxed = true)
+            coEvery { dao.sessionById("SESSION-1") } returns session
+            coEvery { dao.segmentsFor("SESSION-1") } returns
+                listOf(
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-0",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 0,
+                        filePath = clip1.absolutePath,
+                        startedAtElapsedNs = 0L,
+                        endedAtElapsedNs = 1L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                    LocalSurveyVideoSegmentEntity(
+                        segmentId = "SEG-1",
+                        sessionId = "SESSION-1",
+                        segmentIndex = 1,
+                        filePath = clip2.absolutePath,
+                        startedAtElapsedNs = 1L,
+                        endedAtElapsedNs = 2L,
+                        sizeBytes = 3L,
+                        checksumSha256 = null,
+                    ),
+                )
+            val useCase = PackageSurveySessionUseCase(dao)
+
+            useCase.invoke("SESSION-1")
+
+            val seg0Checksum = mutableListOf<String?>()
+            val seg1Checksum = mutableListOf<String?>()
+            coVerify {
+                dao.updateSegment(
+                    match {
+                        if (it.segmentId == "SEG-0") {
+                            seg0Checksum.add(it.checksumSha256)
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            coVerify {
+                dao.updateSegment(
+                    match {
+                        if (it.segmentId == "SEG-1") {
+                            seg1Checksum.add(it.checksumSha256)
+                            true
+                        } else {
+                            false
+                        }
+                    },
+                )
+            }
+            assertTrue("SEG-0 checksum should be non-null", seg0Checksum[0] != null)
+            assertTrue("SEG-1 checksum should be non-null", seg1Checksum[0] != null)
+            assertTrue(
+                "SEG-0 and SEG-1 should have different checksums (different content)",
+                seg0Checksum[0] != seg1Checksum[0],
+            )
         }
 }

@@ -35,7 +35,10 @@ private fun handler(
 ) = object : SyncOpHandler {
     override val opType = opType
 
-    override suspend fun handle(payloadJson: String): SyncOpResult = result
+    override suspend fun handle(
+        payloadJson: String,
+        onProgress: (Long, Long) -> Unit,
+    ): SyncOpResult = result
 }
 
 class SyncQueueProcessorTest {
@@ -107,7 +110,10 @@ class SyncQueueProcessorTest {
                         object : SyncOpHandler {
                             override val opType = "upload_work_order_evidence"
 
-                            override suspend fun handle(payloadJson: String): SyncOpResult {
+                            override suspend fun handle(
+                                payloadJson: String,
+                                onProgress: (Long, Long) -> Unit,
+                            ): SyncOpResult {
                                 handlerCalls += 1
                                 return SyncOpResult.RetryLater
                             }
@@ -121,5 +127,32 @@ class SyncQueueProcessorTest {
             coVerify {
                 dao.updateStatus(1, "failed", SyncQueueProcessor.MAX_ATTEMPTS, "Exceeded retry attempts", any())
             }
+        }
+
+    @Test
+    fun `onRowProgress is called with the row's own clientOpId while the handler reports progress`() =
+        runTest {
+            val dao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { dao.queuedRows() } returns listOf(row(1, "OP-1"))
+            val reported = mutableListOf<Triple<String, Long, Long>>()
+            val progressHandler =
+                object : SyncOpHandler {
+                    override val opType = "upload_work_order_evidence"
+
+                    override suspend fun handle(
+                        payloadJson: String,
+                        onProgress: (Long, Long) -> Unit,
+                    ): SyncOpResult {
+                        onProgress(50L, 100L)
+                        return SyncOpResult.Done
+                    }
+                }
+            val processor = SyncQueueProcessor(dao, setOf(progressHandler))
+
+            processor.processQueuedOps(
+                onRowProgress = { clientOpId, sent, total -> reported.add(Triple(clientOpId, sent, total)) },
+            )
+
+            assertEquals(listOf(Triple("OP-1", 50L, 100L)), reported)
         }
 }

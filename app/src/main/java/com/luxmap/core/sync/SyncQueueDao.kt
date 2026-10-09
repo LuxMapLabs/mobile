@@ -16,6 +16,17 @@ interface SyncQueueDao {
     @Query("SELECT status FROM sync_queue WHERE clientOpId = :clientOpId LIMIT 1")
     suspend fun statusOf(clientOpId: String): String?
 
+    // Only resets 'failed' rows, never 'conflict' - a conflict must stay for a human to resolve,
+    // not get silently retried.
+    @Query(
+        "UPDATE sync_queue SET status = 'queued', attemptCount = 0, lastError = null, updatedAt = :updatedAt " +
+            "WHERE clientOpId IN (:clientOpIds) AND status = 'failed'",
+    )
+    suspend fun resetFailedOps(
+        clientOpIds: List<String>,
+        updatedAt: Instant,
+    )
+
     @Query(
         "UPDATE sync_queue SET status = :status, attemptCount = :attemptCount, lastError = :lastError, " +
             "updatedAt = :updatedAt WHERE id = :id",

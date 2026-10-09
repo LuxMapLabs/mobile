@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -59,11 +60,19 @@ import com.luxmap.feature.workorder.data.hasLocation
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
     onComplete: () -> Unit,
+    onStartSurvey: (workOrderId: String, surveySweepId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.startedSurveySession.collect { event ->
+            onStartSurvey(event.workOrderId, event.surveySweepId)
+        }
+    }
+
     WorkOrderDetailScreen(
         uiState = uiState,
         onBack = onBack,
