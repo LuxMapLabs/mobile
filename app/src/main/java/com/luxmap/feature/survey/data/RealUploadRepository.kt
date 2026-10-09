@@ -1,5 +1,7 @@
 package com.luxmap.feature.survey.data
 
+import androidx.room.withTransaction
+import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.core.sync.SyncQueueProcessor
@@ -20,6 +22,7 @@ import javax.inject.Inject
 class RealUploadRepository
     @Inject
     constructor(
+        private val database: AppDatabase,
         private val sessionDao: SurveySessionDao,
         private val syncQueueDao: SyncQueueDao,
         private val syncQueueManager: SyncQueueManager,
@@ -35,13 +38,23 @@ class RealUploadRepository
                 val segments = sessionDao.segmentsFor(sessionId).sortedBy { it.segmentIndex }
 
                 val opIds = opIdsFor(session, segments.size)
-                if (session.syncState == null) {
-                    enqueueChain(session, segments.size, opIds)
-                    sessionDao.updateSession(session.copy(syncState = "queued", updatedAt = Instant.now()))
-                } else {
-                    // Retry of an earlier failed attempt: queuedRows() only ever reprocesses rows
-                    // already in 'queued' state, so a 'failed' row needs this reset or it stays
-                    // stuck forever even after the user taps "Nộp lại".
+                // claimForUpload and enqueueChain must commit or roll back together - without
+                // this, a cancellation between the two (user backs out, process dies) leaves the
+                // session claimed with a partial or empty chain, and nothing ever re-claims a
+                // session whose syncState is already non-null.
+                val justClaimed =
+                    database.withTransaction {
+                        val claimed = sessionDao.claimForUpload(sessionId, Instant.now()) == 1
+                        if (claimed) {
+                            enqueueChain(session, segments.size, opIds)
+                        }
+                        claimed
+                    }
+                if (!justClaimed) {
+                    // Either a genuine retry (syncState was already non-null), or this call lost
+                    // a race against a concurrent uploadSession call that claimed the session
+                    // first - either way the chain is already enqueued, only a failed op (if any)
+                    // needs resetting so queuedRows() picks it up again.
                     syncQueueDao.resetFailedOps(opIds, Instant.now())
                 }
 
@@ -49,6 +62,10 @@ class RealUploadRepository
                     segments.sumOf { it.sizeBytes ?: 0L } +
                         listOfNotNull(session.gpsTrackFilePath, session.luxLogFilePath, session.captureConfigFilePath)
                             .sumOf { File(it).length() }
+                // Emitted before processQueuedOps so the screen never looks frozen even if this
+                // call loses the SyncQueueProcessor Mutex to a background SyncWorker that drains
+                // the whole chain before onRowProgress ever fires for this caller.
+                emit(UploadProgress.InProgress(0L, totalBytes))
                 val sentByOp = mutableMapOf<String, Long>()
                 syncQueueProcessor.processQueuedOps(
                     onRowProgress = { clientOpId, sent, _ ->

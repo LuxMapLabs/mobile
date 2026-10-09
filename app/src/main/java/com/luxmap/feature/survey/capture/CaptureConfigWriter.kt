@@ -21,7 +21,7 @@ data class CaptureConfig(
     val widthPx: Int,
     val heightPx: Int,
     val orientation: String,
-    // Tạm để là 1 per BE — no registry exists yet to resolve a real ID (spec: survey-ingest-p2a.md §Tạo phiên)
+    // Hardcoded to 1 per BE - no registry exists yet to resolve a real ID (spec: survey-ingest-p2a.md's session-creation section)
     val profileId: Int,
     val moduleFirmwareVersionId: Int,
 )

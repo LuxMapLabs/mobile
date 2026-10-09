@@ -31,7 +31,7 @@ sealed interface BleConnectionState {
     data object Connected : BleConnectionState
 }
 
-// connect()/disconnect() are separate from `samples` (review feedback) — Bước 0 calls connect()
+// connect()/disconnect() are separate from `samples` (review feedback) - step 0 calls connect()
 // once a device is picked from LuxDeviceScanner; `samples` just keeps emitting for as long as the
 // client is connected, and auto-reconnects on an unexpected drop without the caller doing anything.
 //

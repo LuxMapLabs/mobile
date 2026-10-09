@@ -21,7 +21,7 @@ data class LuxDevice(
     val address: String,
 )
 
-// Replaces Bước 0's old hardcoded device address (spec's own open point) with a real scan the
+// Replaces step 0's old hardcoded device address (spec's own open point) with a real scan the
 // user picks from. Shows every nearby device, not filtered by service - the Field Engineer can
 // tell their own sensor apart by its advertised name.
 //

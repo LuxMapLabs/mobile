@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.luxmap.core.database.AppDatabase
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -138,5 +140,21 @@ class SurveySessionDaoTest {
 
             assertNull(dao.sessionById("SESSION-1"))
             assertEquals(0, dao.segmentsFor("SESSION-1").size)
+        }
+
+    @Test
+    fun claimForUploadOnlyLetsOneConcurrentCallerClaimASession() =
+        runTest {
+            dao.insertSession(session("SESSION-1"))
+
+            val results =
+                listOf(
+                    async { dao.claimForUpload("SESSION-1", Instant.parse("2026-10-09T10:00:00Z")) },
+                    async { dao.claimForUpload("SESSION-1", Instant.parse("2026-10-09T10:00:01Z")) },
+                ).awaitAll()
+
+            assertEquals(1, results.count { it == 1 })
+            assertEquals(1, results.count { it == 0 })
+            assertEquals("queued", dao.sessionById("SESSION-1")?.syncState)
         }
 }

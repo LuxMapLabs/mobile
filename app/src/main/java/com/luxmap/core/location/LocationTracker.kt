@@ -15,9 +15,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
 
-// Fused Location, lấy vị trí hiện tại một lần (không theo dõi liên tục) — đủ cho nút "định vị
-// về vị trí hiện tại" của F12. Theo dõi vị trí liên tục khi khảo sát đêm (F03/F04) là việc
-// khác, chưa tới lượt trong task này.
+// Fused Location, gets the current location once (not continuous tracking) - enough for F12's
+// "locate me" button. Continuous location tracking during night survey (F03/F04) is a
+// different job, not part of this task yet.
 @Singleton
 class LocationTracker
     @Inject
@@ -30,8 +30,8 @@ class LocationTracker
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
 
-        // Trả về null nếu chưa có quyền hoặc không lấy được vị trí — người gọi (ViewModel) tự
-        // quyết định hiển thị gì khi null, không throw exception cho một luồng có thể đoán trước.
+        // Returns null when there is no permission or the location fetch fails - the caller
+        // (ViewModel) decides what to show on null, instead of throwing for a predictable case.
         @SuppressLint("MissingPermission")
         suspend fun getCurrentLocation(): LatLng? {
             if (!hasLocationPermission()) return null

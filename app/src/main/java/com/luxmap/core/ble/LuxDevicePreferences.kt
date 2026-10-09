@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 private val Context.luxDeviceDataStore: DataStore<Preferences> by preferencesDataStore(name = "lux_device")
 
-// Remembers the last BLE lux sensor picked in Bước 0, so a Field Engineer using the same sensor
+// Remembers the last BLE lux sensor picked in step 0, so a Field Engineer using the same sensor
 // every day does not have to scan and pick again on every survey. Not sensitive data, so plain
 // DataStore is enough - unlike TokenStore, no encryption is needed here.
 @Singleton

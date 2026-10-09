@@ -3,6 +3,9 @@ package com.luxmap.core.sync
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -154,5 +157,37 @@ class SyncQueueProcessorTest {
             )
 
             assertEquals(listOf(Triple("OP-1", 50L, 100L)), reported)
+        }
+
+    @Test
+    fun `two concurrent processQueuedOps calls on the same instance never run handler bodies at once`() =
+        runTest {
+            val dao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { dao.queuedRows() } returns listOf(row(1, "OP-1"))
+            var concurrentEntries = 0
+            var maxConcurrentEntries = 0
+            val slowHandler =
+                object : SyncOpHandler {
+                    override val opType = "upload_work_order_evidence"
+
+                    override suspend fun handle(
+                        payloadJson: String,
+                        onProgress: suspend (Long, Long) -> Unit,
+                    ): SyncOpResult {
+                        concurrentEntries += 1
+                        maxConcurrentEntries = maxOf(maxConcurrentEntries, concurrentEntries)
+                        delay(50)
+                        concurrentEntries -= 1
+                        return SyncOpResult.Done
+                    }
+                }
+            val processor = SyncQueueProcessor(dao, setOf(slowHandler))
+
+            coroutineScope {
+                launch { processor.processQueuedOps() }
+                launch { processor.processQueuedOps() }
+            }
+
+            assertEquals(1, maxConcurrentEntries)
         }
 }
