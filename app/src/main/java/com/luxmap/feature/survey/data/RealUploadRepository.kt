@@ -35,13 +35,14 @@ class RealUploadRepository
                 val segments = sessionDao.segmentsFor(sessionId).sortedBy { it.segmentIndex }
 
                 val opIds = opIdsFor(session, segments.size)
-                if (session.syncState == null) {
+                val justClaimed = sessionDao.claimForUpload(sessionId, Instant.now()) == 1
+                if (justClaimed) {
                     enqueueChain(session, segments.size, opIds)
-                    sessionDao.updateSession(session.copy(syncState = "queued", updatedAt = Instant.now()))
                 } else {
-                    // Retry of an earlier failed attempt: queuedRows() only ever reprocesses rows
-                    // already in 'queued' state, so a 'failed' row needs this reset or it stays
-                    // stuck forever even after the user taps "Nộp lại".
+                    // Either a genuine retry (syncState was already non-null), or this call lost
+                    // a race against a concurrent uploadSession call that claimed the session
+                    // first - either way the chain is already enqueued, only a failed op (if any)
+                    // needs resetting so queuedRows() picks it up again.
                     syncQueueDao.resetFailedOps(opIds, Instant.now())
                 }
 

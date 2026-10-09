@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
+import java.time.Instant
 
 @Dao
 interface SurveySessionDao {
@@ -16,6 +17,18 @@ interface SurveySessionDao {
 
     @Update
     suspend fun updateSession(session: LocalSurveySessionEntity)
+
+    // Atomic conditional UPDATE, not a read-then-write from the caller - two callers racing to
+    // upload the same session can both read syncState == null before either writes, but only
+    // one of two concurrent calls to this single SQL statement can match the WHERE clause.
+    @Query(
+        "UPDATE local_survey_session SET syncState = 'queued', updatedAt = :updatedAt " +
+            "WHERE sessionId = :sessionId AND syncState IS NULL",
+    )
+    suspend fun claimForUpload(
+        sessionId: String,
+        updatedAt: Instant,
+    ): Int
 
     @Query("SELECT * FROM local_survey_session WHERE sessionId = :sessionId")
     suspend fun sessionById(sessionId: String): LocalSurveySessionEntity?

@@ -62,6 +62,7 @@ class RealUploadRepositoryTest {
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
             coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
             coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 1
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
@@ -83,6 +84,7 @@ class RealUploadRepositoryTest {
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
             coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession(syncState = "failed")
             coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 0
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
@@ -102,6 +104,7 @@ class RealUploadRepositoryTest {
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
             coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession(syncState = "failed")
             coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 0
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
@@ -134,6 +137,7 @@ class RealUploadRepositoryTest {
             coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
             coEvery { sessionDao.segmentsFor("SESSION-1") } returns
                 listOf(videoSegment(segmentIndex = 0), videoSegment(segmentIndex = 1))
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 1
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
