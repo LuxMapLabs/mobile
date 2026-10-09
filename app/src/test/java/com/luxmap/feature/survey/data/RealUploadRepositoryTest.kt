@@ -96,6 +96,37 @@ class RealUploadRepositoryTest {
         }
 
     @Test
+    fun `a retry resets failed ops back to queued so the processor can pick them up again`() =
+        runTest {
+            val sessionDao = mockk<SurveySessionDao>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession(syncState = "failed")
+            coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val processor = mockk<SyncQueueProcessor>()
+            coEvery { processor.processQueuedOps(any()) } returns false
+            coEvery { syncQueueDao.statusOf(any()) } returns "done"
+            val repository = RealUploadRepository(sessionDao, syncQueueDao, syncQueueManager, processor)
+
+            repository.uploadSession("SESSION-1").test {
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            coVerify(exactly = 1) {
+                syncQueueDao.resetFailedOps(
+                    listOf(
+                        "SESSION-1:create_sweep",
+                        "SESSION-1:raw:gps_track",
+                        "SESSION-1:raw:lux_log",
+                        "SESSION-1:raw:capture_config",
+                        "SESSION-1:submit",
+                    ),
+                    any(),
+                )
+            }
+        }
+
+    @Test
     fun `each clip op depends on the immediately preceding op, not on create_sweep directly`() =
         runTest {
             val sessionDao = mockk<SurveySessionDao>(relaxed = true)

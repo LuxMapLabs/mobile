@@ -40,6 +40,11 @@ class RealUploadRepository
                 if (session.syncState == null) {
                     enqueueChain(session, segments.size, opIds)
                     sessionDao.updateSession(session.copy(syncState = "queued", updatedAt = Instant.now()))
+                } else {
+                    // Retry of an earlier failed attempt: queuedRows() only ever reprocesses rows
+                    // already in 'queued' state, so a 'failed' row needs this reset or it stays
+                    // stuck forever even after the user taps "Nộp lại".
+                    syncQueueDao.resetFailedOps(opIds, Instant.now())
                 }
 
                 val totalBytes =
