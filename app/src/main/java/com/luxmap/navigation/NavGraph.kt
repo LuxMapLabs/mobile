@@ -167,11 +167,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 route = Routes.SurveyCapture.route,
                 arguments =
                     listOf(
-                        navArgument("workOrderId") { type = NavType.StringType },
                         navArgument("surveySweepId") { type = NavType.StringType },
+                        navArgument("workOrderId") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
                     ),
             ) { backStackEntry ->
-                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
+                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: ""
                 val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
                 CaptureScreen(
                     surveySweepId = surveySweepId,
