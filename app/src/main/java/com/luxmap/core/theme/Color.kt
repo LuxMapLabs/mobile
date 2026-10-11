@@ -88,28 +88,28 @@ data class LuxMapSemanticColors(
 
 val LightSemanticColors =
     LuxMapSemanticColors(
-        background = Gray25,
+        background = Paper,
         surface = Color(0xFFFFFFFF),
-        surfaceSubtle = Gray50,
-        textPrimary = Gray900,
-        textSecondary = Gray500,
-        border = Gray200,
-        focus = Blue500,
-        navigationActive = Navy700,
-        navigationInactive = Gray500,
+        surfaceSubtle = LineSoft,
+        textPrimary = Ink,
+        textSecondary = Ink2,
+        border = Line,
+        focus = Lumen,
+        navigationActive = Lumen,
+        navigationInactive = Ink2,
     )
 
 val DarkSemanticColors =
     LuxMapSemanticColors(
-        background = Dark950,
-        surface = Dark800,
-        surfaceSubtle = Dark900,
-        textPrimary = DarkText,
-        textSecondary = DarkMuted,
-        border = Dark700,
-        focus = Green400,
-        navigationActive = Green400,
-        navigationInactive = DarkMuted,
+        background = Night,
+        surface = NightSurf,
+        surfaceSubtle = NightSurf2,
+        textPrimary = NightText,
+        textSecondary = NightText2,
+        border = NightLine,
+        focus = LumenNight,
+        navigationActive = LumenNight,
+        navigationInactive = NightText2,
     )
 
 // Component — badge tình trạng tài sản (mục 2.3), cặp bg/text theo theme, không đổi
