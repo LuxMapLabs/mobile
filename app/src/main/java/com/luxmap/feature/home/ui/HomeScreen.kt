@@ -48,13 +48,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
@@ -62,6 +60,7 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.WorkOrderCard
 import com.luxmap.feature.home.data.HomeData
@@ -476,39 +475,5 @@ private fun BoxScope.ErrorState(
             Spacer(Modifier.width(Spacing.sm))
             Text("Thử lại")
         }
-    }
-}
-
-@Composable
-private fun BoxScope.MessageState(
-    icon: ImageVector,
-    iconColors: BadgeColors,
-    title: String,
-    subtitle: String,
-    action: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier.align(Alignment.Center).fillMaxWidth().padding(Spacing.lg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(72.dp)
-                    .background(iconColors.background, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = iconColors.text, modifier = Modifier.size(34.dp))
-        }
-        Text(text = title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(Spacing.sm))
-        action()
     }
 }
