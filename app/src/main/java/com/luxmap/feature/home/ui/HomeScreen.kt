@@ -3,7 +3,6 @@ package com.luxmap.feature.home.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -11,11 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,13 +21,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -48,13 +44,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
@@ -62,6 +56,7 @@ import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.SyncPill
 import com.luxmap.core.ui.components.WorkOrderCard
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
@@ -118,14 +113,21 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
     ) { contentPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            val heroStats =
+            val metrics =
                 when (uiState) {
-                    is HomeUiState.Loading -> HeroStats.Loading
-                    is HomeUiState.Success -> HeroStats.Known(uiState.data.metrics)
-                    is HomeUiState.Empty -> HeroStats.Known(EMPTY_METRICS)
-                    is HomeUiState.Error -> HeroStats.Unavailable
+                    is HomeUiState.Success -> uiState.data.metrics
+                    is HomeUiState.Empty -> EMPTY_METRICS
+                    is HomeUiState.Loading, is HomeUiState.Error -> null
                 }
-            HomeHeroHeader(stats = heroStats, onRefresh = onRetry)
+            val syncStatus =
+                when (uiState) {
+                    is HomeUiState.Loading -> SyncStatus.SYNCING
+                    is HomeUiState.Success -> if (uiState.isStale) SyncStatus.QUEUED_OFFLINE else SyncStatus.DONE
+                    is HomeUiState.Empty -> SyncStatus.DONE
+                    is HomeUiState.Error -> SyncStatus.FAILED
+                }
+            val lastSyncedAt = (uiState as? HomeUiState.Success)?.lastSyncedAt
+            HomeHeader(metrics = metrics, syncStatus = syncStatus, lastSyncedAt = lastSyncedAt, onRefresh = onRetry)
             Box(modifier = Modifier.fillMaxSize()) {
                 when (uiState) {
                     is HomeUiState.Loading -> LoadingSkeletonState()
@@ -191,17 +193,11 @@ private fun HomeContent(
     }
 }
 
-private sealed interface HeroStats {
-    data object Loading : HeroStats
-
-    data class Known(val metrics: HomeMetrics) : HeroStats
-
-    data object Unavailable : HeroStats
-}
-
 @Composable
-private fun HomeHeroHeader(
-    stats: HeroStats,
+private fun HomeHeader(
+    metrics: HomeMetrics?,
+    syncStatus: SyncStatus,
+    lastSyncedAt: Instant?,
     onRefresh: () -> Unit,
 ) {
     val today =
@@ -210,132 +206,68 @@ private fun HomeHeroHeader(
                 DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi")),
             )
         }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(Spacing.xl),
-    ) {
+    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(Spacing.lg)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(
                     text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.78f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(text = "Việc hôm nay", style = MaterialTheme.typography.displayLarge, color = Color.White)
+                Text(text = "Việc hôm nay", style = DisplayTextStyle, color = MaterialTheme.colorScheme.onSurface)
             }
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .background(Color.White.copy(alpha = 0.12f), CircleShape)
-                        .clickable(onClick = onRefresh),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = Icons.Filled.Sync, contentDescription = null, tint = Color.White)
-            }
+            SyncPill(status = syncStatus, lastSyncedAt = lastSyncedAt, onClick = onRefresh)
         }
         Spacer(Modifier.height(Spacing.lg))
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Dimens.radiusLarge))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(Dimens.radiusLarge))
-                    .padding(vertical = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HeroStat(
-                label = "Được giao",
-                value = stats.valueFor { it.assignedCount },
-                loading = stats is HeroStats.Loading,
-                valueColor = Color.White,
-                modifier = Modifier.weight(1f),
-            )
-            HeroStatDivider()
-            HeroStat(
-                label = "Đang xử lý",
-                value = stats.valueFor { it.inProgressCount },
-                loading = stats is HeroStats.Loading,
-                valueColor = AssetCondition.DIM.badgeColors(isDark = true).text,
-                modifier = Modifier.weight(1f),
-            )
-            HeroStatDivider()
-            HeroStat(
-                label = "Quá hạn",
-                value = stats.valueFor { it.overdueCount },
-                loading = stats is HeroStats.Loading,
-                valueColor = AssetCondition.OUT.badgeColors(isDark = true).text,
-                modifier = Modifier.weight(1f),
-            )
-            HeroStatDivider()
-            HeroStat(
-                label = "Đợt khảo sát",
-                value = stats.valueFor { it.plannedSweepCount },
-                loading = stats is HeroStats.Loading,
-                valueColor = Color.White,
-                modifier = Modifier.weight(1f),
-            )
-        }
+        MetricRow(metrics = metrics)
     }
 }
 
-private fun HeroStats.valueFor(select: (HomeMetrics) -> Int?): Int? =
-    when (this) {
-        is HeroStats.Known -> select(metrics)
-        HeroStats.Loading, HeroStats.Unavailable -> null
+@Composable
+private fun MetricRow(metrics: HomeMetrics?) {
+    val overdueColor =
+        if (metrics != null && metrics.overdueCount > 0) Color(0xFFC53030) else MaterialTheme.colorScheme.onSurface
+    Column {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Metric(label = "Được giao", value = metrics?.assignedCount, modifier = Modifier.weight(1f))
+            VerticalDivider(color = MaterialTheme.colorScheme.outline)
+            Metric(label = "Đang xử lý", value = metrics?.inProgressCount, modifier = Modifier.weight(1f))
+            VerticalDivider(color = MaterialTheme.colorScheme.outline)
+            Metric(
+                label = "Quá hạn",
+                value = metrics?.overdueCount,
+                valueColor = overdueColor,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
+}
 
 @Composable
-private fun HeroStat(
+private fun Metric(
     label: String,
     value: Int?,
-    loading: Boolean,
-    valueColor: Color,
     modifier: Modifier = Modifier,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Column(
-        modifier = modifier,
+        modifier = modifier.padding(vertical = Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        if (loading) {
-            Box(
-                modifier =
-                    Modifier
-                        .width(28.dp)
-                        .height(24.dp)
-                        .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(Dimens.radiusSmall)),
-            )
-        } else {
-            Text(
-                text = value?.toString() ?: "—",
-                style = MaterialTheme.typography.headlineMedium,
-                color = if (value != null) valueColor else Color.White.copy(alpha = 0.5f),
-            )
-        }
+        Text(
+            text = value?.toString() ?: "—",
+            style = MaterialTheme.typography.headlineMedium,
+            color = if (value != null) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.White.copy(alpha = 0.82f),
-            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-}
-
-@Composable
-private fun RowScope.HeroStatDivider() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxHeight()
-                .width(1.dp)
-                .background(Color.White.copy(alpha = 0.14f)),
-    )
 }
 
 @Composable
