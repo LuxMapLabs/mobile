@@ -34,6 +34,31 @@ val Dark700 = Color(0xFF2A2A2A)
 val DarkText = Color(0xFFF5F5F5)
 val DarkMuted = Color(0xFFA0A0A0)
 
+// v2.1 redesign primitives — "Night Ledger" palette, replaces the brand/semantic layer above.
+// Status colors (AssetCondition/SyncStatus/WorkOrderStatus/WorkOrderPriority) are unchanged.
+val Paper = Color(0xFFF5F4F0)
+val Ink = Color(0xFF15171C)
+val Ink2 = Color(0xFF5B5F68)
+val Line = Color(0xFFDEDBD3)
+val LineSoft = Color(0xFFECEAE4)
+val DisabledContainer = Color(0xFFE2E8F0)
+val DisabledContent = Color(0xFF475569)
+val DisabledContainerDark = Color(0xFF2A2A2A)
+val DisabledContentDark = Color(0xFFA0A0A0)
+val Lumen = Color(0xFF3448D6)
+val LumenCont = Color(0xFFE4E7FB)
+val LumenOnCont = Color(0xFF1B2A8F)
+val Night = Color(0xFF0B0C0F)
+val NightSurf = Color(0xFF16181D)
+val NightSurf2 = Color(0xFF1F2128)
+val NightLine = Color(0xFF2C2F38)
+val NightText = Color(0xFFEDEBE6)
+val NightText2 = Color(0xFF9A9DA6)
+val LumenNight = Color(0xFFA3ADFF)
+val LumenNightCont = Color(0xFF262C5E)
+val LumenNightOnCont = Color(0xFFDADEFF)
+val ErrorDark = Color(0xFFFF9A9A)
+
 // Extra primitives — section 3.1 of Global Design System v1.0, needed for the hero gradient
 // (F01 and other hero-style screens). Does not change the meaning of the existing tokens above.
 val Navy900 = Color(0xFF102443)
