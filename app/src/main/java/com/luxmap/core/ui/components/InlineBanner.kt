@@ -1,6 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,6 +21,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BodyTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
@@ -34,15 +37,21 @@ fun InlineBanner(
     tone: InlineBannerTone,
     modifier: Modifier = Modifier,
 ) {
+    val isDark = isSystemInDarkTheme()
     val colors =
         when (tone) {
             InlineBannerTone.OFFLINE -> SyncStatus.QUEUED_OFFLINE.badgeColors()
-            InlineBannerTone.ERROR -> SyncStatus.FAILED.badgeColors()
+            InlineBannerTone.ERROR -> AssetCondition.OUT.badgeColors(isDark)
         }
     val icon =
         when (tone) {
             InlineBannerTone.OFFLINE -> Icons.Filled.CloudOff
             InlineBannerTone.ERROR -> Icons.Filled.ErrorOutline
+        }
+    val textStyle =
+        when (tone) {
+            InlineBannerTone.OFFLINE -> LabelTextStyle
+            InlineBannerTone.ERROR -> BodyTextStyle
         }
     Row(
         modifier =
@@ -55,6 +64,6 @@ fun InlineBanner(
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = colors.text, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(Spacing.sm))
-        Text(text = message, style = LabelTextStyle, color = colors.text)
+        Text(text = message, style = textStyle, color = colors.text)
     }
 }
