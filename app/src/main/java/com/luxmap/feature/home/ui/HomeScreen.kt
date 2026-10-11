@@ -3,6 +3,7 @@ package com.luxmap.feature.home.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Refresh
@@ -49,15 +52,22 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.theme.icon
+import com.luxmap.core.theme.label
+import com.luxmap.core.theme.workOrderStatusFromWire
+import com.luxmap.core.theme.workOrderTaskKindFromWire
+import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.SyncPill
-import com.luxmap.core.ui.components.WorkOrderCard
+import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
@@ -180,8 +190,13 @@ private fun HomeContent(
             }
         }
         data.clusters.forEach { cluster ->
-            item { ClusterHeader(label = cluster.clusterLabel, count = cluster.items.size) }
-            item { ClusterCard(items = cluster.items, onOpenWorkOrder = onOpenWorkOrder) }
+            item {
+                ClusterSection(
+                    label = cluster.clusterLabel,
+                    items = cluster.items,
+                    onOpenWorkOrder = onOpenWorkOrder,
+                )
+            }
         }
         item {
             PrimaryButton(
@@ -271,40 +286,79 @@ private fun Metric(
 }
 
 @Composable
-private fun ClusterHeader(
+private fun ClusterSection(
     label: String,
-    count: Int,
-) {
-    Text(
-        text = "$label ($count)",
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = Spacing.sm),
-    )
-}
-
-@Composable
-private fun ClusterCard(
     items: List<WorkOrderSummaryItem>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    Column(
+    Column {
+        Text(
+            text = "$label (${items.size})",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = Spacing.sm),
+        )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card)),
+        ) {
+            items.forEachIndexed { index, item ->
+                if (index > 0) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        modifier = Modifier.padding(start = 68.dp),
+                    )
+                }
+                TaskRow(item = item, onClick = { onOpenWorkOrder(item.workOrderId) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun TaskRow(
+    item: WorkOrderSummaryItem,
+    onClick: () -> Unit,
+) {
+    val status = workOrderStatusFromWire(item.woStatus)
+    val kind = workOrderTaskKindFromWire(item.taskKind)
+    val due = dueDateLabel(item.dueDate)
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusLarge)),
+                .heightIn(min = Dimens.minTouchTarget)
+                .clickable(onClick = onClick)
+                .padding(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        items.forEachIndexed { index, item ->
-            if (index > 0) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-            WorkOrderCard(
-                workOrderId = item.workOrderId,
-                woStatus = item.woStatus,
-                dueDate = item.dueDate,
-                taskKind = item.taskKind,
-                onClick = { onOpenWorkOrder(item.workOrderId) },
-            )
+        Box(
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(kind.badgeColors().background, RoundedCornerShape(Radius.control)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = kind.icon(), contentDescription = null, tint = kind.badgeColors().text)
         }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(text = item.workOrderId, style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                StatusBadge(text = status.label(), colors = status.badgeColors())
+                Text(
+                    text = due.text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.outline,
+        )
     }
 }
 
