@@ -31,6 +31,10 @@ Bốn vai trò còn lại theo đúng tên trong hồ sơ đăng ký: **Superior
 - **Cảm biến lux qua BLE trong phiên quay khảo sát (F03/F04) — ĐÃ XÁC NHẬN với chủ dự án (2026-09-27), không còn là mâu thuẫn nghiệp vụ:** mâu thuẫn nêu ở bản trước (mobile tự kết nối BLE theo `docs/nghiep_vu_khao_sat_den.docx` so với `iot_node`/`runtime_history` là hạ tầng IoT cố định tự báo cáo lên server theo `docs/Backend_API_Requirements_For_Mobile.docx` mục 2.1) đã được xác nhận: đây là 1 nguồn dữ liệu thứ ba thật — video + track GPS/heading/timestamp (đã có ở mục C6) **cộng thêm** log lux liên tục qua BLE, gán timestamp bằng đồng hồ điện thoại — chứ không phải cách diễn đạt khác của IoT cố định. Luồng đầy đủ (chặn cứng "Bắt đầu quay" tới khi kết nối BLE ổn định → 3 luồng dữ liệu video/GPS/lux chạy song song độc lập trong phiên quay → dừng quay đóng gói video + 1 file log GPS+lux theo thời gian → upload cả bộ lên server, mobile không tự xử lý gì thêm) đã ghi vào mục **C7** của `docs/LuxMap_Mobile_DacTaChiTiet_v2.2.docx`. **Cập nhật 2026-09-28 (mục C8.5 của đặc tả):** phân quyền đặt tên đã chốt — bảng Room cục bộ do WP6 (mobile) tự đặt tên chính thức, không cần chờ WP2/WP5; định dạng file trong "Session package" (log lux, GPS track, log timestamp frame, file cấu hình quay, manifest) do mobile soạn bản đầu (`v0`), WP4 duyệt sau; chỉ endpoint upload và tên field phía server vẫn chờ Backend (WP2/WP5). Mọi tên tạm và điểm lệch được theo dõi ở `docs/contract-drift.md`.
 Xem `docs/contract-drift.md` để biết chính xác tên nào đã chốt, tên nào còn tạm.
 
+- `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` (2026-10-10, copy từ Claude Design project `82538650-3a87-4ecd-8cbc-37aaf17badc1`, bản gốc `LuxMap Redesign.dc.html`) — spec thiết kế lại giao diện ("Night Ledger"), token/component/màn hình chi tiết. **Đã duyệt chuyển token thương hiệu/semantic sang v2.1 (2026-10-11)** — xem mục "Design tokens" dưới đây đã cập nhật theo spec này. Lộ trình triển khai theo từng màn: `docs/superpowers/plans/2026-10-11-luxmap-redesign-roadmap.md`.
+- `docs/LuxMap_Mobile_Design_System_v2.1.md` (đề xuất, phần token đã duyệt 2026-10-11) — bổ sung cho `LuxMap_Mobile_Design_System_v2.0.md`: token `Disabled` mới, typography bổ sung, component mới. Đọc cùng với `LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2 vì 2 file có 1 điểm xung đột giá trị (token `Disabled`) và 1 điểm xung đột màu hero F01 — cả hai được ghi rõ trong roadmap ở trên, chưa tự chọn một bên.
+- `docs/LuxMap_Mobile_Screen_Review_2026-10-11.md` — đối chiếu trực tiếp giữa prototype thiết kế và code/CLAUDE.md hiện tại tại thời điểm viết; dùng để biết phần nào của redesign là style thuần, phần nào đụng vào field/endpoint chưa chốt.
+
 ### Quyết định nghiệp vụ mới đã chốt (2026-09-25) — chưa cập nhật vào đặc tả chi tiết / api-contract v1.1
 
 Đã xác nhận với chủ dự án, thay đổi lớn so với F08–F10 hiện mô tả trong `LuxMap_Mobile_DacTaChiTiet_v2.2.docx` (1 `WorkOrder` liền mạch) và chưa có mục nào tương ứng trong `api-contract-v1.1.md.docx`. **Không code theo enum/model cũ của F08–F10 cho tới khi đặc tả và API contract được cập nhật chính thức** — phần dưới đây là quyết định nghiệp vụ đã chốt, chưa phải tên bảng/field/endpoint thật.
@@ -198,42 +202,56 @@ app/src/main/java/com/luxmap/
 
 Mỗi feature nhỏ hơn (`auth`, `home`, `map`, `notification`, `profile`...) chỉ cần `data/` + `ui/`, không bắt buộc có `domain/` — chỉ thêm `domain/` khi thực sự có logic nghiệp vụ tách riêng được (xem mục Kiến trúc & Design Pattern).
 
-## Design tokens — 3 lớp, lấy đúng từ Design System v2.0, không tự chọn màu khác
+## Design tokens — 3 lớp
 
 Token tổ chức theo 3 lớp: **Primitive** (giá trị gốc) → **Semantic** (ý nghĩa sử dụng, khác nhau theo Light/Dark) → **Component** (giá trị theo component cụ thể).
 
-### Primitive colors
+**Cập nhật 2026-10-11:** lớp brand/semantic (background/surface/text/border/focus/navigation) đã được chủ dự án duyệt chuyển từ Design System v2.0 sang v2.1 ("Night Ledger" redesign, `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2, roadmap `docs/superpowers/plans/2026-10-11-luxmap-redesign-roadmap.md` quyết định #1, đã lên code ở Phase 0). **Lớp status (asset condition/sync/work-order status/priority/task-kind) giữ nguyên từ v2.0, không đổi** — các bảng badge ở dưới vẫn là nguồn đúng. Khi code token mới, lấy đúng từ `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2 + `docs/LuxMap_Mobile_Design_System_v2.1.md`, không tự chọn màu khác.
+
+### Primitive colors — brand/semantic (v2.1, hiện hành trong `Color.kt`)
 
 ```kotlin
-val Navy700 = Color(0xFF1F3864)    // Thương hiệu, CTA Light Mode
-val Blue500 = Color(0xFF3E86C9)    // Link, focus, thông tin
+val Paper  = Color(0xFFF5F4F0)   // Nền Light
+val Ink    = Color(0xFF15171C)   // Chữ chính Light, khối "ink" (NextUpCard...)
+val Ink2   = Color(0xFF5B5F68)   // Chữ phụ Light
+val Line   = Color(0xFFDEDBD3)   // Viền/outline Light
+val Lumen  = Color(0xFF3448D6)   // Thương hiệu, CTA, focus Light
+val Night      = Color(0xFF0B0C0F) // Nền Dark
+val NightText  = Color(0xFFEDEBE6) // Chữ chính Dark
+val NightText2 = Color(0xFF9A9DA6) // Chữ phụ Dark
+val NightLine  = Color(0xFF2C2F38) // Viền/outline Dark
+val LumenNight = Color(0xFFA3ADFF) // Thương hiệu, CTA, focus Dark
+```
+
+Bảng đầy đủ (LineSoft, Disabled*, LumenCont/LumenOnCont, NightSurf/NightSurf2, LumenNightCont/LumenNightOnCont, ErrorDark...) xem `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2.1 và code thật trong `core/theme/Color.kt`.
+
+**Primitive v2.0 vẫn còn sống trong code**, dùng cho phần chưa tới lượt redesign — không xoá khi gặp: `Navy700`/`Navy900`/`Blue600` (`BrandHeroGradient`, chờ Phase 11 quyết màu hero F01 — xem mục "Khoảng trống đã biết" ở trên), `Green400`/`Amber500`/`Rose600`/`Gray500`/`Danger600` (badge trạng thái, bản đồ, chart lux — xem "Primitive colors — status" ngay dưới).
+
+### Primitive colors — status (v2.0, không đổi)
+
+```kotlin
 val Green400 = Color(0xFF5FC4B0)   // Đèn bình thường, điểm nhấn Dark Mode
 val Amber500 = Color(0xFFE9A23B)   // Cảnh báo trung bình
 val Rose600 = Color(0xFFD64545)    // Hỏng/tắt, SLA khẩn
 val Success600 = Color(0xFF059669) // Hoàn tất thành công
 val Danger600 = Color(0xFFDC2626)  // Hành động nguy hiểm
-val Gray25 = Color(0xFFF8FAFC)     // Nền Light
-val Gray900 = Color(0xFF0F172A)    // Chữ chính Light
-val Dark950 = Color(0xFF0D0D0D)    // Nền Dark
-val Dark800 = Color(0xFF1A1A1A)    // Card Dark
-val DarkText = Color(0xFFF5F5F5)   // Chữ chính Dark
 ```
 
 Bảng đầy đủ (gray-50/200/500/700, dark-900/700, dark-muted...) xem mục 2.1 Design System v2.0.
 
-### Semantic colors (Light / Dark)
+### Semantic colors (Light / Dark) — v2.1, hiện hành trong `LuxMapSemanticColors`/`Theme.kt`
 
 | Semantic token | Light | Dark |
 |---|---:|---:|
-| `color.background` | `#F8FAFC` | `#0D0D0D` |
-| `color.surface` | `#FFFFFF` | `#1A1A1A` |
-| `color.text.primary` | `#0F172A` | `#F5F5F5` |
-| `color.text.secondary` | `#64748B` | `#A0A0A0` |
-| `color.border` | `#E2E8F0` | `#2A2A2A` |
-| `color.focus` | `#3E86C9` | `#5FC4B0` |
-| `color.navigation.active` | `#1F3864` | `#5FC4B0` |
+| `color.background` | `#F5F4F0` (Paper) | `#0B0C0F` (Night) |
+| `color.surface` | `#FFFFFF` | `#16181D` (NightSurf) |
+| `color.text.primary` | `#15171C` (Ink) | `#EDEBE6` (NightText) |
+| `color.text.secondary` | `#5B5F68` (Ink2) | `#9A9DA6` (NightText2) |
+| `color.border` / `outline` | `#DEDBD3` (Line) | `#2C2F38` (NightLine) |
+| `color.focus` | `#3448D6` (Lumen) | `#A3ADFF` (LumenNight) |
+| `color.navigation.active` | `#3448D6` (Lumen) | `#A3ADFF` (LumenNight) |
 
-Bảng đầy đủ (surface.subtle, overlay.scrim, disabled.container/content...) xem mục 2.2.
+Bảng đầy đủ (surfaceContainerHigh, primaryContainer, outlineVariant, disabled.container/content...) xem `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2.1 và code thật trong `core/theme/Theme.kt`. **Giá trị `outlineVariant` trong spec gốc (`LineSoft`/`#23262D`) đã sửa thành `Line`/`NightLine` khi code Phase 0** — divider gần như vô hình với giá trị gốc, phát hiện qua code review; xem `docs/contract-drift.md`.
 
 ### Badge trạng thái tài sản (Light / Dark) — dùng đúng cặp, không đổi
 
