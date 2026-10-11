@@ -25,7 +25,7 @@ private val LuxMapLightColorScheme =
         onSurfaceVariant = LightSemanticColors.textSecondary,
         surfaceContainerHigh = LineSoft,
         outline = LightSemanticColors.border,
-        outlineVariant = LineSoft,
+        outlineVariant = Line,
         error = Danger600,
         onError = Color(0xFFFFFFFF),
     )
@@ -48,7 +48,7 @@ private val LuxMapDarkColorScheme =
         onSurfaceVariant = DarkSemanticColors.textSecondary,
         surfaceContainerHigh = NightSurf2,
         outline = DarkSemanticColors.border,
-        outlineVariant = Color(0xFF23262D),
+        outlineVariant = NightLine,
         error = ErrorDark,
         onError = Night,
     )
