@@ -86,3 +86,30 @@ val Typography =
                 lineHeight = 20.sp,
             ),
     )
+
+// v2.1 redesign typography scale — additive TextStyle vals, deliberately NOT remapped onto
+// the Typography object's existing M3 slots (see Phase 0 plan rationale: several slot names
+// here collide with different current meanings, e.g. the existing bodyMedium is 16sp/400 body
+// text while the spec's "label" role is 14sp/500 metadata — redefining the slot in place would
+// silently reskin every current MaterialTheme.typography.bodyMedium call site). Screens migrate
+// to these explicit vals one at a time in their own redesign phase.
+val NumericTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold, fontSize = 44.sp, lineHeight = 48.sp)
+val DisplayTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 36.sp)
+val HeadlineTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp)
+val MetricTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 32.sp)
+val TitleTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, lineHeight = 24.sp)
+val BodyStrongTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp)
+val BodyTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
+val LabelTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
+val OverlineTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp)
+val BadgeTextStyle =
+    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
