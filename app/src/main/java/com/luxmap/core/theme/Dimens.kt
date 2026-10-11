@@ -22,3 +22,21 @@ object Dimens {
     val radiusPill = 999.dp
     val minTouchTarget = 48.dp
 }
+
+// v2.1 redesign radii — additive, existing Dimens.radiusSmall/Medium/Large/Sheet/Pill above
+// are unchanged and still used by existing components until Phase 1 migrates them.
+object Radius {
+    val badge = 6.dp
+    val chip = 10.dp
+    val control = 14.dp
+    val card = 16.dp
+    val block = 20.dp
+    val sheet = 28.dp
+}
+
+// v2.1 redesign layout constants — additive, for new Phase 1+ components.
+val ScreenMargin = 20.dp
+val PrimaryButtonHeight = 56.dp
+val RecordButtonSize = 84.dp
+val TopBarHeight = 64.dp
+val NavBarHeight = 76.dp
