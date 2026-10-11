@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import com.luxmap.core.theme.BadgeTextStyle
 
 data class BottomNavItem(
     val route: String,
@@ -18,8 +19,6 @@ data class BottomNavItem(
 
 // 4 tab: Việc hôm nay · Khảo sát · Bản đồ · Cá nhân (mục A5 đặc tả) — danh sách item
 // do navigation/ truyền vào khi wire thật, tránh đoán trước icon/thứ tự tab ở đây.
-// Colors follow the Design System: the active item uses color.navigation.active (this is the
-// theme's primary: navy in Light, green in Dark) on a normal surface, not a filled navy bar.
 @Composable
 fun BottomNavBar(
     items: List<BottomNavItem>,
@@ -32,12 +31,12 @@ fun BottomNavBar(
                 selected = currentRoute == item.route,
                 onClick = { onItemSelected(item) },
                 icon = { Icon(imageVector = item.icon, contentDescription = null) },
-                label = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(item.label, style = BadgeTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 colors =
                     NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.primary,
-                        selectedTextColor = MaterialTheme.colorScheme.primary,
-                        indicatorColor = MaterialTheme.colorScheme.surfaceVariant,
+                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),

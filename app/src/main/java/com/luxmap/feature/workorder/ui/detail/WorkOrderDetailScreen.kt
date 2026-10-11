@@ -49,8 +49,8 @@ import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.TextOnlyStatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
@@ -227,7 +227,7 @@ private fun FaultCard(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
-        TextOnlyStatusBadge(text = priority.label(), color = priority.color())
+        PriorityDot(text = priority.label(), dotColor = priority.color())
         Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.bodyMedium)
         Text(text = faultStatusLabel(fault.faultStatus), style = MaterialTheme.typography.bodyMedium)
         if (fault.inspectionOutcome != null) {

@@ -1,8 +1,9 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -11,7 +12,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.PrimaryButtonHeight
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 
 // Vùng chạm tối thiểu 48dp — một tay, có thể đeo găng tay (mục 1 Design System v2.0).
@@ -27,7 +29,8 @@ fun PrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.defaultMinSize(minHeight = Dimens.minTouchTarget),
+        modifier = modifier.heightIn(min = PrimaryButtonHeight),
+        shape = RoundedCornerShape(Radius.control),
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
