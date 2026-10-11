@@ -23,10 +23,6 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Spacing
 
-// Shared empty/error-state layout: icon badge + title + subtitle + an action slot (usually a
-// button). Was private to HomeScreen.kt; promoted here so other screens stop hand-rolling a
-// weaker bare-text version of the same pattern (each phase that redesigns one of those screens
-// switches it to this component instead of keeping its own copy).
 @Composable
 fun BoxScope.MessageState(
     icon: ImageVector,

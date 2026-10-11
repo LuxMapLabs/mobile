@@ -41,9 +41,6 @@ fun StatusBadge(
     )
 }
 
-// PriorityDot — 8dp colored dot + onSurface-colored text, replaces TextOnlyStatusBadge.
-// The spec explicitly calls out not using the priority color as text color on a light
-// background (e.g. Amber500 text is ~2.2:1 contrast) — the dot carries the color instead.
 @Composable
 fun PriorityDot(
     text: String,

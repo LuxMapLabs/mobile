@@ -26,11 +26,6 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 
-// Replaces OfflineBanner + ErrorBanner with one component that only differs by tone — the
-// spec's component table (§3, InlineBanner row) describes exactly these two cases (quá hạn /
-// ngoại tuyến) sharing one shape, colored from the existing SyncStatus pairs (FAILED / QUEUED_
-// OFFLINE) instead of generic surfaceVariant or the AssetCondition.OUT pair used before.
-// InlineErrorText (field-level error, a different shape) is not part of this consolidation.
 enum class InlineBannerTone { OFFLINE, ERROR }
 
 @Composable

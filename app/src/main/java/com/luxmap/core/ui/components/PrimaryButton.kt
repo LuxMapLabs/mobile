@@ -1,7 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -29,7 +29,7 @@ fun PrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(PrimaryButtonHeight),
+        modifier = modifier.heightIn(min = PrimaryButtonHeight),
         shape = RoundedCornerShape(Radius.control),
         colors =
             ButtonDefaults.buttonColors(
