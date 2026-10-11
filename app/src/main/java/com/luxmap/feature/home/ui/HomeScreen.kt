@@ -52,6 +52,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
+import com.luxmap.core.theme.HeadlineTextStyle
+import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -173,6 +175,7 @@ private fun HomeContent(
         contentPadding = PaddingValues(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        val nextUp = data.nextUp()
         if (data.metrics.overdueCount > 0) {
             item {
                 InlineBanner(
@@ -189,22 +192,111 @@ private fun HomeContent(
                 )
             }
         }
-        data.clusters.forEach { cluster ->
+        if (nextUp != null) {
+            val clusterLabel =
+                data.clusters
+                    .first { cluster -> cluster.items.any { it.workOrderId == nextUp.workOrderId } }
+                    .clusterLabel
             item {
-                ClusterSection(
-                    label = cluster.clusterLabel,
-                    items = cluster.items,
-                    onOpenWorkOrder = onOpenWorkOrder,
+                NextUpCard(
+                    item = nextUp,
+                    clusterLabel = clusterLabel,
+                    onClick = { onOpenWorkOrder(nextUp.workOrderId) },
                 )
             }
         }
-        item {
-            PrimaryButton(
-                text = "Bắt đầu đợt khảo sát mới",
-                onClick = onStartSurvey,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        if (data.metrics.plannedSweepCount != null && data.metrics.plannedSweepCount > 0) {
+            item {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onStartSurvey)
+                            .padding(vertical = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(text = "Khảo sát tối nay", style = MaterialTheme.typography.titleMedium)
+                    Icon(
+                        imageVector = Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
         }
+        data.clusters.forEach { cluster ->
+            val remaining = cluster.items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
+            if (remaining.isNotEmpty()) {
+                item {
+                    ClusterSection(
+                        label = cluster.clusterLabel,
+                        items = remaining,
+                        onOpenWorkOrder = onOpenWorkOrder,
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Spec order is "overdue > urgent > due today > priority_score", but WorkOrderSummaryItem has
+// no severity/urgent field (only a raw priorityScore) - the urgent tier is dropped, not guessed.
+private fun HomeData.nextUp(): WorkOrderSummaryItem? {
+    val today = LocalDate.now()
+    val all = clusters.flatMap { it.items }
+
+    fun dueDateOf(item: WorkOrderSummaryItem): LocalDate? = item.dueDate?.let(LocalDate::parse)
+    return all.maxWithOrNull(
+        compareBy(
+            { item -> dueDateOf(item)?.let { it < today } == true },
+            { item -> dueDateOf(item)?.let { it == today } == true },
+            { item -> item.priorityScore ?: 0.0 },
+        ),
+    )
+}
+
+@Composable
+private fun NextUpCard(
+    item: WorkOrderSummaryItem,
+    clusterLabel: String,
+    onClick: () -> Unit,
+) {
+    val status = workOrderStatusFromWire(item.woStatus)
+    val kind = workOrderTaskKindFromWire(item.taskKind)
+    val due = dueDateLabel(item.dueDate)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.inverseSurface, RoundedCornerShape(Radius.block))
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(
+            text = "TIẾP THEO",
+            style = OverlineTextStyle,
+            color = MaterialTheme.colorScheme.inverseOnSurface,
+        )
+        Text(
+            text = item.workOrderId,
+            style = HeadlineTextStyle,
+            color = MaterialTheme.colorScheme.inverseOnSurface,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            StatusBadge(text = kind.label(), colors = kind.badgeColors())
+            StatusBadge(text = status.label(), colors = status.badgeColors())
+        }
+        Text(
+            text = "$clusterLabel · ${due.text}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.inverseOnSurface,
+        )
+        PrimaryButton(
+            text = "Xem chi tiết",
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
