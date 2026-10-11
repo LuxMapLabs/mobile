@@ -69,7 +69,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.ErrorBanner
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.InlineErrorText
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.auth.data.LoginFailureReason
@@ -277,7 +278,7 @@ fun LoginScreen(
                 exit = shrinkVertically() + fadeOut(),
             ) {
                 Column {
-                    ErrorBanner(lastBannerMessage.value)
+                    InlineBanner(message = lastBannerMessage.value, tone = InlineBannerTone.ERROR)
                     Spacer(Modifier.height(Spacing.md))
                 }
             }

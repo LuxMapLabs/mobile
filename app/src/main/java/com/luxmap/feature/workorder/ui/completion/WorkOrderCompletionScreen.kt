@@ -29,7 +29,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
-import com.luxmap.core.ui.components.ErrorBanner
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
@@ -141,7 +142,7 @@ private fun WorkOrderCompletionContent(
             )
         }
         if (state.submitError != null) {
-            ErrorBanner(message = state.submitError)
+            InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
         }
         PrimaryButton(
             text = "Nộp",

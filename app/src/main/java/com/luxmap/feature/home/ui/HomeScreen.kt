@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BrandHeroGradient
@@ -59,8 +60,8 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.ui.components.ErrorBanner
-import com.luxmap.core.ui.components.OfflineBanner
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.WorkOrderCard
 import com.luxmap.feature.home.data.HomeData
@@ -163,11 +164,19 @@ private fun HomeContent(
     ) {
         if (data.metrics.overdueCount > 0) {
             item {
-                ErrorBanner(message = "${data.metrics.overdueCount} lệnh đã quá hạn xử lý")
+                InlineBanner(
+                    message = "${data.metrics.overdueCount} lệnh đã quá hạn xử lý",
+                    tone = InlineBannerTone.ERROR,
+                )
             }
         }
         if (isStale) {
-            item { OfflineBanner(lastSyncedAt = lastSyncedAt) }
+            item {
+                InlineBanner(
+                    message = "Đang xem dữ liệu đã lưu, cập nhật lúc ${DateFormatUtils.formatInstant(lastSyncedAt)}",
+                    tone = InlineBannerTone.OFFLINE,
+                )
+            }
         }
         data.clusters.forEach { cluster ->
             item { ClusterHeader(label = cluster.clusterLabel, count = cluster.items.size) }
