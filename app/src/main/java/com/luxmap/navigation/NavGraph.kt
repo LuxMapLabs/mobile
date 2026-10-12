@@ -39,6 +39,7 @@ import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
+import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
@@ -151,6 +152,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Survey.route) {
+                SurveyHubRoute(
+                    onCheckReadiness = { surveySweepId ->
+                        navController.navigate(Routes.SurveyPlan.createRoute(surveySweepId))
+                    },
+                )
+            }
+            composable(
+                route = Routes.SurveyPlan.route,
+                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+            ) {
                 SurveyPlanScreen(
                     onEnterCaptureMode = { surveySweepId ->
                         // F03's standalone survey-plan entry has no work order in scope at all -
