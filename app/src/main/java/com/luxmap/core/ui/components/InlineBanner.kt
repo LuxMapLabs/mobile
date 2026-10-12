@@ -36,8 +36,8 @@ fun InlineBanner(
     message: String,
     tone: InlineBannerTone,
     modifier: Modifier = Modifier,
+    isDark: Boolean = isSystemInDarkTheme(),
 ) {
-    val isDark = isSystemInDarkTheme()
     val colors =
         when (tone) {
             InlineBannerTone.OFFLINE -> SyncStatus.QUEUED_OFFLINE.badgeColors()

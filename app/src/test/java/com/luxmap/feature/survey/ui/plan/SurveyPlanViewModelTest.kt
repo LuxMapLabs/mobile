@@ -92,6 +92,20 @@ class SurveyPlanViewModelTest {
         }
 
     @Test
+    fun `rejectionReason is always null while SHOW_RESURVEY_BANNER is off`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            val viewModel = SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                val success = awaitItem() as SurveyPlanUiState.Success
+                assertEquals(null, success.rejectionReason)
+            }
+        }
+
+    @Test
     fun `selecting a route with a non-REALTIME timestamp source surfaces a not-ready readiness result`() =
         runTest {
             val repository = mockk<SurveyRepository>()

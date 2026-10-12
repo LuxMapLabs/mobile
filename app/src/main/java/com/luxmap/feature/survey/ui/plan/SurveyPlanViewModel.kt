@@ -13,6 +13,13 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+// UI-only, same unconfirmed-sweep-status gap as the Hub's rejected-sweep card (Phase 3) - no
+// real "rejected" status exists on SurveySweepStatus yet. Kept as this package's own flag rather
+// than sharing SurveyHubViewModel's SHOW_UNCONFIRMED_HUB_CARDS (see docs/contract-drift.md).
+internal const val SHOW_RESURVEY_BANNER = false
+
+private const val FAKE_REJECTION_REASON = "Video bị rung mạnh ở đoạn đầu, không đọc được cột đèn"
+
 @HiltViewModel
 class SurveyPlanViewModel
     @Inject
@@ -42,7 +49,14 @@ class SurveyPlanViewModel
                         _uiState.value = SurveyPlanUiState.Error(e.message ?: "Không tải được tuyến khảo sát")
                     }.collect { routes ->
                         _uiState.value =
-                            if (routes.isEmpty()) SurveyPlanUiState.Empty else SurveyPlanUiState.Success(routes)
+                            if (routes.isEmpty()) {
+                                SurveyPlanUiState.Empty
+                            } else {
+                                SurveyPlanUiState.Success(
+                                    routes = routes,
+                                    rejectionReason = if (SHOW_RESURVEY_BANNER) FAKE_REJECTION_REASON else null,
+                                )
+                            }
                     }
             }
         }
