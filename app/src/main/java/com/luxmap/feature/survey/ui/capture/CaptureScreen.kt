@@ -42,7 +42,8 @@ import com.luxmap.core.ble.LuxDevice
 import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.GpsAccuracyIndicator
+import com.luxmap.core.ui.components.HudChip
+import com.luxmap.core.ui.components.gpsAccuracyLabel
 import com.luxmap.feature.survey.domain.GpsAccuracyGate
 
 @Composable
@@ -199,32 +200,27 @@ fun CaptureScreen(
                 )
             }
 
-            // Thin live-status strip at the top, replacing a full Top Bar (Design System §5.1 - F04
-            // uses a minimal overlay instead). Only shown while actually recording, since the other
-            // states (scanning, connecting, packaging) have nothing live to report yet.
-            if (uiState is CaptureUiState.Recording) {
-                val state = uiState as CaptureUiState.Recording
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
-                            .padding(Spacing.md),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    GpsAccuracyIndicator(accuracyMeters = state.gpsAccuracyMeters)
-                    Text(
-                        text = state.latestLuxValue?.let { "%.1f lux".format(it) } ?: "Chưa có dữ liệu lux",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = state.freeStorageBytes?.let { "${it / 1_000_000} MB trống" } ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+            // HUD chips float over the full-bleed preview for every pre-packaging state, not only
+            // while actually recording - Ready already has a live GPS reading worth showing before
+            // the user even presses "Bat dau quay".
+            val showHud =
+                uiState is CaptureUiState.Ready ||
+                    uiState is CaptureUiState.StartingRecording ||
+                    uiState is CaptureUiState.Recording
+            if (showHud) {
+                val (gpsAccuracyMeters, latestLuxValue, freeStorageBytes) =
+                    when (val state = uiState) {
+                        is CaptureUiState.Ready -> Triple(state.gpsAccuracyMeters, null, null)
+                        is CaptureUiState.Recording ->
+                            Triple(state.gpsAccuracyMeters, state.latestLuxValue, state.freeStorageBytes)
+                        else -> Triple(null, null, null)
+                    }
+                CaptureHudRow(
+                    gpsAccuracyMeters = gpsAccuracyMeters,
+                    latestLuxValue = latestLuxValue,
+                    freeStorageBytes = freeStorageBytes,
+                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(Spacing.md),
+                )
             }
 
             // Anchored to the bottom with an opaque scrim behind it, not centered directly over the
@@ -273,8 +269,12 @@ fun CaptureScreen(
                         if (!state.gpsReadyToRecord) {
                             val accuracyLabel =
                                 state.gpsAccuracyMeters?.let {
-                                    "Độ chính xác hiện tại: %.0fm (cần ≤%.0fm)"
-                                        .format(it, GpsAccuracyGate.PROPOSED_THRESHOLD_METERS)
+                                    "Độ chính xác hiện tại: %.0fm (cần ≤%.0fm, giữ ổn định %ds)"
+                                        .format(
+                                            it,
+                                            GpsAccuracyGate.PROPOSED_THRESHOLD_METERS,
+                                            GpsAccuracyGate.PROPOSED_HOLD_DURATION_MS / 1000,
+                                        )
                                 } ?: "Đang chờ tín hiệu GPS..."
                             Text(accuracyLabel, style = MaterialTheme.typography.bodyLarge)
                         }
@@ -352,6 +352,23 @@ fun CaptureScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun CaptureHudRow(
+    gpsAccuracyMeters: Float?,
+    latestLuxValue: Float?,
+    freeStorageBytes: Long?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        HudChip(text = gpsAccuracyLabel(gpsAccuracyMeters))
+        HudChip(text = latestLuxValue?.let { "%.1f lux".format(it) } ?: "Chưa có dữ liệu lux")
+        HudChip(text = freeStorageBytes?.let { "${it / 1_000_000} MB trống" } ?: "— MB trống")
     }
 }
 
