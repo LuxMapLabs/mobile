@@ -12,13 +12,14 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,13 +34,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.SyncStatus
+import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CameraReadinessPanel
+import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.ReadinessCheckItem
 import com.luxmap.core.ui.components.ReadinessCheckStatus
@@ -183,20 +186,25 @@ fun SurveyPlanContent(
             }
 
             is SurveyPlanUiState.Empty ->
-                Box(Modifier.fillMaxSize().padding(Spacing.lg), contentAlignment = Alignment.Center) {
-                    Text(
-                        "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
+                Box(Modifier.fillMaxSize()) {
+                    MessageState(
+                        icon = Icons.Filled.EventAvailable,
+                        iconColors = SyncStatus.DONE.badgeColors(),
+                        title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
+                        subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
+                        action = {},
                     )
                 }
 
             is SurveyPlanUiState.Error ->
-                Box(Modifier.fillMaxSize().padding(Spacing.lg), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(state.message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(Spacing.md))
-                        PrimaryButton(text = "Thử lại", onClick = onRetry)
+                Box(Modifier.fillMaxSize()) {
+                    MessageState(
+                        icon = Icons.Filled.CloudOff,
+                        iconColors = SyncStatus.FAILED.badgeColors(),
+                        title = state.message,
+                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                    ) {
+                        PrimaryButton(text = "Thử lại", onClick = onRetry, modifier = Modifier.fillMaxWidth())
                     }
                 }
         }
