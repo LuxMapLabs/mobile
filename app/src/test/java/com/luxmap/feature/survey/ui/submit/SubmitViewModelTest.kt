@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.submit
 
 import app.cash.turbine.test
 import com.luxmap.core.network.ConnectivityObserver
+import com.luxmap.core.sync.UploadPreferences
 import com.luxmap.feature.survey.data.UploadProgress
 import com.luxmap.feature.survey.data.UploadRepository
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
@@ -12,6 +13,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -48,6 +50,16 @@ private fun session(recordingState: String) =
         updatedAt = Instant.parse("2026-10-08T10:00:00Z"),
     )
 
+private fun stubSummaryAndFileStatuses(repository: UploadRepository) {
+    coEvery { repository.sessionSummary(any()) } returns null
+    every { repository.observeFileStatuses(any()) } returns emptyFlow()
+}
+
+private fun wifiOnlyOffPreferences(): UploadPreferences =
+    mockk<UploadPreferences>().also {
+        every { it.observeWifiOnlyUpload() } returns flowOf(false)
+    }
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class SubmitViewModelTest {
     private val dispatcher = StandardTestDispatcher()
@@ -70,7 +82,8 @@ class SubmitViewModelTest {
             coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "recording")
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+            val viewModel =
+                SubmitViewModel(repository, sessionDao, connectivity, wifiOnlyOffPreferences(), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertTrue(awaitItem() is SubmitUiState.Idle)
@@ -87,9 +100,11 @@ class SubmitViewModelTest {
             val sessionDao = mockk<SurveySessionDao>()
             coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "packaged")
             every { repository.uploadSession("SESSION-1") } returns flowOf(UploadProgress.Conflict("x"))
+            stubSummaryAndFileStatuses(repository)
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+            val viewModel =
+                SubmitViewModel(repository, sessionDao, connectivity, wifiOnlyOffPreferences(), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertTrue(awaitItem() is SubmitUiState.Idle)
@@ -106,9 +121,11 @@ class SubmitViewModelTest {
             coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "packaged")
             every { repository.uploadSession("SESSION-1") } returns
                 flowOf(UploadProgress.InProgress(10_000L, 50_000L), UploadProgress.Done)
+            stubSummaryAndFileStatuses(repository)
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+            val viewModel =
+                SubmitViewModel(repository, sessionDao, connectivity, wifiOnlyOffPreferences(), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertEquals(SubmitUiState.Idle, awaitItem())
@@ -125,9 +142,11 @@ class SubmitViewModelTest {
             val sessionDao = mockk<SurveySessionDao>()
             coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "packaged")
             every { repository.uploadSession("SESSION-1") } returns flowOf(UploadProgress.Failed("boom"))
+            stubSummaryAndFileStatuses(repository)
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+            val viewModel =
+                SubmitViewModel(repository, sessionDao, connectivity, wifiOnlyOffPreferences(), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertTrue(awaitItem() is SubmitUiState.Idle)
@@ -143,9 +162,12 @@ class SubmitViewModelTest {
             val sessionDao = mockk<SurveySessionDao>()
             coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "packaged")
             every { repository.uploadSession("SESSION-1") } returns flowOf(UploadProgress.WaitingForWifi)
+            stubSummaryAndFileStatuses(repository)
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+            val prefs = mockk<UploadPreferences>()
+            every { prefs.observeWifiOnlyUpload() } returns flowOf(true)
+            val viewModel = SubmitViewModel(repository, sessionDao, connectivity, prefs, mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertTrue(awaitItem() is SubmitUiState.Idle)
