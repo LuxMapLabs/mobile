@@ -1,13 +1,18 @@
 package com.luxmap.feature.survey.ui.aiconfirm
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.label
 import com.luxmap.feature.survey.data.LocalAiClassificationReview
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -197,5 +202,100 @@ class AiConfirmationScreenTest {
             }
         }
         composeRule.onNodeWithText("Không tải được kết quả AI").assertExists()
+    }
+
+    @Test
+    fun the_sheet_shows_Luu_thay_doi_disabled_when_a_different_class_is_chosen_without_a_reason() {
+        val target = review(aiClass = AssetCondition.NORMAL)
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState = AiConfirmationUiState.Empty,
+                    sheet = AiReviewSheetState(review = target, chosenClass = AssetCondition.OUT, reason = ""),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Lưu thay đổi").assertIsNotEnabled()
+    }
+
+    @Test
+    fun the_sheet_shows_Luu_thay_doi_enabled_once_a_reason_is_entered() {
+        val target = review(aiClass = AssetCondition.NORMAL)
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState = AiConfirmationUiState.Empty,
+                    sheet = AiReviewSheetState(review = target, chosenClass = AssetCondition.OUT, reason = "tắt hẳn"),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Lưu thay đổi").assertIsEnabled()
+    }
+
+    @Test
+    fun the_sheet_shows_Giu_ket_qua_AI_and_stays_enabled_when_the_ai_class_itself_is_chosen() {
+        val target = review(aiClass = AssetCondition.NORMAL, finalClass = AssetCondition.OUT, overrideReason = "x")
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState = AiConfirmationUiState.Empty,
+                    sheet = AiReviewSheetState(review = target, chosenClass = AssetCondition.NORMAL, reason = "x"),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Giữ kết quả AI").assertIsEnabled()
+    }
+
+    @Test
+    fun choosing_a_condition_in_the_grid_invokes_onConditionChosen() {
+        var chosen: AssetCondition? = null
+        val target = review(aiClass = AssetCondition.NORMAL)
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState = AiConfirmationUiState.Empty,
+                    sheet = AiReviewSheetState(review = target, chosenClass = AssetCondition.NORMAL, reason = ""),
+                    onBack = {},
+                    onConditionChosen = { chosen = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText(AssetCondition.OUT.label()).performClick()
+        assertEquals(AssetCondition.OUT, chosen)
+    }
+
+    @Test
+    fun confirming_the_submit_dialog_invokes_onSubmit_and_shows_the_saved_toast() {
+        var submitted = false
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState =
+                        AiConfirmationUiState.Success(
+                            reviews = listOf(review()),
+                            filter = ReviewFilter.ALL,
+                            normalCount = 1,
+                            dimCount = 0,
+                            outCount = 0,
+                        ),
+                    sheet = null,
+                    onBack = {},
+                    onSubmit = { submitted = true },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Gửi").performClick()
+        composeRule.onNodeWithText("Gửi kết quả xác nhận?").assertExists()
+        composeRule.onAllNodesWithText("Gửi")[1].performClick()
+        assertTrue(submitted)
+        composeRule.onNodeWithText("Đã lưu trên thiết bị · sẽ gửi khi có mạng").assertExists()
     }
 }

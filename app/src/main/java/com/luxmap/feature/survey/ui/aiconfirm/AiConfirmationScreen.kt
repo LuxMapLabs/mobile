@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,19 +21,29 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -46,8 +57,10 @@ import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.LocalAiClassificationReview
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 private const val LOW_CONFIDENCE_THRESHOLD = 85
@@ -68,6 +81,8 @@ fun AiConfirmationScreen(
     onSubmit: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -82,7 +97,7 @@ fun AiConfirmationScreen(
         },
         bottomBar = {
             if (uiState is AiConfirmationUiState.Success) {
-                BottomActionBar(ctaText = "Gửi", onCtaClick = onSubmit, ctaEnabled = true)
+                BottomActionBar(ctaText = "Gửi", onCtaClick = { showSubmitConfirm = true }, ctaEnabled = true)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -120,6 +135,38 @@ fun AiConfirmationScreen(
                     )
             }
         }
+    }
+
+    if (sheet != null) {
+        AiReviewSheet(
+            sheet = sheet,
+            onDismiss = onDismissSheet,
+            onConditionChosen = onConditionChosen,
+            onReasonChanged = onReasonChanged,
+            onSave = onSaveSheet,
+        )
+    }
+
+    if (showSubmitConfirm) {
+        AlertDialog(
+            onDismissRequest = { showSubmitConfirm = false },
+            title = { Text("Gửi kết quả xác nhận?") },
+            text = { Text("Phiên khảo sát $surveySweepId sẽ được gửi lên hệ thống khi có mạng.") },
+            dismissButton = {
+                TextButton(onClick = { showSubmitConfirm = false }) { Text("Huỷ") }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSubmitConfirm = false
+                        onSubmit()
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Đã lưu trên thiết bị · sẽ gửi khi có mạng")
+                        }
+                    },
+                ) { Text("Gửi") }
+            },
+        )
     }
 }
 
@@ -268,5 +315,73 @@ private fun FrameThumbnail(
                     .height(4.dp)
                     .background(finalClass.badgeColors(isDark = false).background),
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AiReviewSheet(
+    sheet: AiReviewSheetState,
+    onDismiss: () -> Unit,
+    onConditionChosen: (AssetCondition) -> Unit,
+    onReasonChanged: (String) -> Unit,
+    onSave: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val isOverride = sheet.chosenClass != sheet.review.aiClass
+    val canSave = !isOverride || sheet.reason.isNotBlank()
+    val saveLabel = if (isOverride) "Lưu thay đổi" else "Giữ kết quả AI"
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.control)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Videocam,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = "AI: ${sheet.review.aiClass.label()} ${sheet.review.aiConfidencePercent}%",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            ConditionOptionGrid(selected = sheet.chosenClass, onSelected = onConditionChosen)
+            if (isOverride) {
+                OutlinedTextField(
+                    value = sheet.reason,
+                    onValueChange = onReasonChanged,
+                    label = { Text("Lý do sửa *") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            PrimaryButton(text = saveLabel, onClick = onSave, enabled = canSave, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConditionOptionGrid(
+    selected: AssetCondition,
+    onSelected: (AssetCondition) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        listOf(AssetCondition.NORMAL, AssetCondition.DIM, AssetCondition.OUT).forEach { condition ->
+            FilterChip(
+                selected = condition == selected,
+                onClick = { onSelected(condition) },
+                label = { Text(condition.label()) },
+            )
+        }
     }
 }
