@@ -6,9 +6,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,7 +114,10 @@ fun SurveyPlanScreenContent(
     onEnterCaptureMode: (String) -> Unit = {},
 ) {
     LaunchedEffect(surveySweepId, state is SurveyPlanUiState.Success) {
-        if (state is SurveyPlanUiState.Success && state.selectedSurveySweepId == null) {
+        if (state is SurveyPlanUiState.Success &&
+            state.selectedSurveySweepId == null &&
+            state.routes.any { it.surveySweepId == surveySweepId }
+        ) {
             onRouteSelected(surveySweepId)
         }
     }
@@ -156,7 +156,12 @@ fun SurveyPlanContent(
 
             is SurveyPlanUiState.Success -> {
                 if (state.rejectionReason != null) {
-                    InlineBanner(message = state.rejectionReason, tone = InlineBannerTone.ERROR)
+                    InlineBanner(
+                        message = state.rejectionReason,
+                        tone = InlineBannerTone.ERROR,
+                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                        isDark = true,
+                    )
                 }
                 // Re-check readiness after the permission prompt closes, no matter the result, so
                 // the checklist shows the real state right away instead of needing the user to
@@ -254,6 +259,7 @@ private fun SurveyRouteCard(
                 onCtaClick = onEnterCaptureMode,
                 ctaEnabled = readiness.isReady && hasBlePermissions,
                 hint = if (!readiness.isReady || !hasBlePermissions) "Còn mục chưa đạt — chưa thể khảo sát" else null,
+                pinned = false,
             )
         }
     }
@@ -296,24 +302,26 @@ private fun ReadinessChecklist(
                 (readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT).toStatus(),
             ),
         )
-    var visibleCount by remember(items) { mutableStateOf(0) }
-    LaunchedEffect(items) {
-        visibleCount = 0
+    var revealedCount by remember { mutableStateOf(0) }
+    var hasRevealedOnce by remember { mutableStateOf(false) }
+    LaunchedEffect(readiness, hasBlePermissions) {
+        if (hasRevealedOnce) {
+            revealedCount = items.size
+            return@LaunchedEffect
+        }
         items.indices.forEach { index ->
-            visibleCount = index + 1
-            delay(CHECKLIST_ROW_DELAY_MS)
+            revealedCount = index + 1
+            if (index < items.lastIndex) delay(CHECKLIST_ROW_DELAY_MS)
         }
+        hasRevealedOnce = true
     }
-    Column {
-        items.take(visibleCount).forEach { item ->
-            AnimatedVisibility(visible = true, enter = fadeIn(animationSpec = tween(CHECKLIST_ROW_FADE_MS))) {
-                CameraReadinessPanel(listOf(item))
-            }
+    val displayedItems =
+        items.mapIndexed { index, item ->
+            if (index < revealedCount) item else item.copy(status = ReadinessCheckStatus.CHECKING, fixHint = null)
         }
-    }
+    CameraReadinessPanel(displayedItems)
 }
 
 private const val CHECKLIST_ROW_DELAY_MS = 350L
-private const val CHECKLIST_ROW_FADE_MS = 400
 
 private fun Boolean.toStatus() = if (this) ReadinessCheckStatus.PASS else ReadinessCheckStatus.FAIL

@@ -1,5 +1,11 @@
 package com.luxmap.feature.survey.ui.plan
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -75,6 +81,68 @@ class SurveyPlanScreenTest {
     }
 
     @Test
+    fun all_7_checklist_rows_exist_immediately_regardless_of_the_reveal_animation() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state =
+                        SurveyPlanUiState.Success(
+                            routes = listOf(route()),
+                            selectedSurveySweepId = route().surveySweepId,
+                            readiness = readyResult(),
+                        ),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        // No waitForIdle/clock advance here on purpose - the staggered reveal only changes each
+        // row's PASS/FAIL/CHECKING status over time, it must never remove a row from the tree.
+        composeRule.onNodeWithText("Quyền camera").assertExists()
+        composeRule.onNodeWithText("Khoá exposure hỗ trợ").assertExists()
+        composeRule.onNodeWithText("Đồng hồ cảm biến REALTIME").assertExists()
+        composeRule.onNodeWithText("GPS").assertExists()
+        composeRule.onNodeWithText("Quyền Bluetooth").assertExists()
+        composeRule.onNodeWithText("Đủ dung lượng trống").assertExists()
+        composeRule.onNodeWithText("Pin đủ (>= 20%)").assertExists()
+    }
+
+    @Test
+    fun ready_state_enables_the_capture_cta() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state =
+                        SurveyPlanUiState.Success(
+                            routes = listOf(route()),
+                            selectedSurveySweepId = route().surveySweepId,
+                            readiness = readyResult(),
+                        ),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Vào chế độ khảo sát").assertIsEnabled()
+    }
+
+    @Test
+    fun a_failed_readiness_check_disables_the_capture_cta() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state =
+                        SurveyPlanUiState.Success(
+                            routes = listOf(route()),
+                            selectedSurveySweepId = route().surveySweepId,
+                            readiness = readyResult().copy(gpsAvailable = false),
+                        ),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Vào chế độ khảo sát").assertIsNotEnabled()
+    }
+
+    @Test
     fun arriving_with_a_surveySweepId_auto_selects_that_route() {
         var selected: String? = null
         composeRule.setContent {
@@ -122,19 +190,25 @@ class SurveyPlanScreenTest {
         val routeB = route().copy(surveySweepId = "SWEEP-2")
         var selected: String? = null
         composeRule.setContent {
+            var state by
+                remember {
+                    mutableStateOf<SurveyPlanUiState>(SurveyPlanUiState.Success(routes = listOf(routeA, routeB)))
+                }
             LuxMapTheme {
                 SurveyPlanScreenContent(
                     surveySweepId = "SWEEP-1",
-                    state =
-                        SurveyPlanUiState.Success(
-                            routes = listOf(routeA, routeB),
-                            selectedSurveySweepId = "SWEEP-1",
-                        ),
-                    onRouteSelected = { selected = it },
+                    state = state,
+                    onRouteSelected = { id ->
+                        selected = id
+                        state = (state as SurveyPlanUiState.Success).copy(selectedSurveySweepId = id, readiness = null)
+                    },
                 )
             }
         }
-        composeRule.onNodeWithText("SWEEP-2").performClick()
+        composeRule.waitForIdle() // auto-select lands on SWEEP-1
+        // Once SWEEP-1 is selected it stops showing its own button, so this now targets SWEEP-2's.
+        composeRule.onNodeWithText("Kiểm tra sẵn sàng").performClick()
+        composeRule.waitForIdle()
         assertEquals("SWEEP-2", selected)
     }
 
