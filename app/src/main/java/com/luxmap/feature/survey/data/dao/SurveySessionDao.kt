@@ -8,6 +8,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
+import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
 @Dao
@@ -32,6 +33,9 @@ interface SurveySessionDao {
 
     @Query("SELECT * FROM local_survey_session WHERE sessionId = :sessionId")
     suspend fun sessionById(sessionId: String): LocalSurveySessionEntity?
+
+    @Query("SELECT * FROM local_survey_session WHERE syncState = :syncState ORDER BY updatedAt DESC")
+    fun observeSessionsBySyncState(syncState: String): Flow<List<LocalSurveySessionEntity>>
 
     @Query("SELECT * FROM local_survey_session WHERE recordingState = 'recording'")
     suspend fun sessionsInRecordingState(): List<LocalSurveySessionEntity>
