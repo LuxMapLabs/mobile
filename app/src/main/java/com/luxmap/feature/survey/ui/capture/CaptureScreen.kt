@@ -9,21 +9,29 @@ import android.view.Surface
 import android.view.TextureView
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,18 +40,36 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.ble.LuxDevice
+import com.luxmap.core.theme.Amber500
 import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.GpsAccuracyIndicator
+import com.luxmap.core.ui.components.CaptureWarning
+import com.luxmap.core.ui.components.HudChip
+import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.gpsAccuracyLabel
 import com.luxmap.feature.survey.domain.GpsAccuracyGate
+import kotlinx.coroutines.launch
+
+private data class CaptureHudValues(
+    val gpsAccuracyMeters: Float?,
+    val gpsSignalLost: Boolean,
+    val latestLuxValue: Float?,
+    val freeStorageBytes: Long?,
+)
 
 @Composable
 fun CaptureScreen(
@@ -199,159 +225,240 @@ fun CaptureScreen(
                 )
             }
 
-            // Thin live-status strip at the top, replacing a full Top Bar (Design System §5.1 - F04
-            // uses a minimal overlay instead). Only shown while actually recording, since the other
-            // states (scanning, connecting, packaging) have nothing live to report yet.
-            if (uiState is CaptureUiState.Recording) {
-                val state = uiState as CaptureUiState.Recording
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
-                            .padding(Spacing.md),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    GpsAccuracyIndicator(accuracyMeters = state.gpsAccuracyMeters)
-                    Text(
-                        text = state.latestLuxValue?.let { "%.1f lux".format(it) } ?: "Chưa có dữ liệu lux",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = state.freeStorageBytes?.let { "${it / 1_000_000} MB trống" } ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+            // HUD chips float over the full-bleed preview for every pre-packaging state, not only
+            // while actually recording - Ready already has a live GPS reading worth showing before
+            // the user even presses "Bat dau quay".
+            val showHud =
+                uiState is CaptureUiState.Ready ||
+                    uiState is CaptureUiState.StartingRecording ||
+                    uiState is CaptureUiState.Recording
+            if (showHud) {
+                val (gpsAccuracyMeters, gpsSignalLost, latestLuxValue, freeStorageBytes) =
+                    when (val state = uiState) {
+                        is CaptureUiState.Ready -> CaptureHudValues(state.gpsAccuracyMeters, false, null, null)
+                        is CaptureUiState.Recording ->
+                            CaptureHudValues(
+                                state.gpsAccuracyMeters,
+                                state.gpsSignalLost,
+                                state.latestLuxValue,
+                                state.freeStorageBytes,
+                            )
+                        else -> CaptureHudValues(null, false, null, null)
+                    }
+                CaptureHudRow(
+                    gpsAccuracyMeters = gpsAccuracyMeters,
+                    gpsSignalLost = gpsSignalLost,
+                    latestLuxValue = latestLuxValue,
+                    freeStorageBytes = freeStorageBytes,
+                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(Spacing.md),
+                )
             }
 
-            // Anchored to the bottom with an opaque scrim behind it, not centered directly over the
-            // live camera feed - a plain Button/Text with no background can end up nearly the same
-            // color as whatever the camera is pointed at (a light pole, a bright wall) and become
-            // hard to read while recording.
-            Column(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.6f))
-                        .padding(Spacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                when (val state = uiState) {
-                    is CaptureUiState.Connecting -> {
-                        val label =
-                            state.deviceName?.let { "Đang kết nối tới $it..." }
-                                ?: "Đang kết nối cảm biến ánh sáng..."
-                        Text(label, style = MaterialTheme.typography.bodyLarge)
-                        TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
-                    }
+            CaptureBottomPanelContent(
+                state = uiState,
+                surveySweepId = surveySweepId,
+                workOrderId = workOrderId,
+                viewModel = viewModel,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+            )
+        }
+    }
+}
 
-                    is CaptureUiState.Scanning ->
-                        if (state.devices.isEmpty()) {
-                            Text("Đang tìm cảm biến ánh sáng gần đây...", style = MaterialTheme.typography.bodyLarge)
-                        } else {
-                            Text("Chọn cảm biến ánh sáng:", style = MaterialTheme.typography.bodyLarge)
-                            LazyColumn {
-                                items(state.devices) { device ->
-                                    DeviceRow(device = device, onClick = { viewModel.onDeviceSelected(device) })
-                                }
-                            }
+// This state is also reached when the camera never started, not only when a real recording
+// failed to package - so PackagingFailed's label does not name the packaging step. Its button is
+// the only way to reach ACTION_STOP on that path, and without it the foreground service would be
+// left running.
+@Composable
+internal fun CaptureBottomPanelContent(
+    state: CaptureUiState,
+    surveySweepId: String,
+    workOrderId: String,
+    viewModel: CaptureViewModel,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .background(
+                    MaterialTheme.colorScheme.background,
+                    RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
+                ).padding(Spacing.lg),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        when (state) {
+            is CaptureUiState.Connecting -> {
+                val label =
+                    state.deviceName?.let { "Đang kết nối tới $it..." }
+                        ?: "Đang kết nối cảm biến ánh sáng..."
+                Text(label, style = MaterialTheme.typography.bodyLarge)
+                TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
+            }
+
+            is CaptureUiState.Scanning ->
+                if (state.devices.isEmpty()) {
+                    Text("Đang tìm cảm biến ánh sáng gần đây...", style = MaterialTheme.typography.bodyLarge)
+                } else {
+                    Text("Chọn cảm biến ánh sáng:", style = MaterialTheme.typography.bodyLarge)
+                    LazyColumn {
+                        items(state.devices) { device ->
+                            DeviceRow(device = device, onClick = { viewModel.onDeviceSelected(device) })
                         }
-
-                    is CaptureUiState.ScanTimedOut -> {
-                        Text(
-                            "Không tìm thấy cảm biến ánh sáng nào gần đây. Kiểm tra pin và khoảng cách rồi thử lại.",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Button(onClick = viewModel::onRetryScan) { Text("Quét lại") }
-                    }
-
-                    is CaptureUiState.Ready -> {
-                        if (!state.gpsReadyToRecord) {
-                            val accuracyLabel =
-                                state.gpsAccuracyMeters?.let {
-                                    "Độ chính xác hiện tại: %.0fm (cần ≤%.0fm)"
-                                        .format(it, GpsAccuracyGate.PROPOSED_THRESHOLD_METERS)
-                                } ?: "Đang chờ tín hiệu GPS..."
-                            Text(accuracyLabel, style = MaterialTheme.typography.bodyLarge)
-                        }
-                        Button(
-                            onClick = { viewModel.onStartRecording(surveySweepId, workOrderId) },
-                            enabled = state.gpsReadyToRecord,
-                        ) { Text("Bắt đầu quay") }
-                        TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
-                    }
-
-                    is CaptureUiState.StartingRecording ->
-                        Text("Đang mở camera...", style = MaterialTheme.typography.bodyLarge)
-
-                    is CaptureUiState.Recording -> {
-                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            Text("● REC", color = Danger600, style = MaterialTheme.typography.labelLarge)
-                            Text(formatDuration(state.durationSeconds), style = MaterialTheme.typography.labelLarge)
-                            Text(
-                                "%.2f km".format(state.distanceMeters / 1000f),
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
-                        if (state.gpsSignalLost) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.WarningAmber,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
-                                Text(
-                                    "Mất tín hiệu GPS",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                        if (state.bleGapDetected) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Filled.WarningAmber,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
-                                Text(
-                                    "Mất kết nối cảm biến ánh sáng — vẫn tiếp tục quay",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                        Button(
-                            onClick = viewModel::onStopRecording,
-                            modifier = Modifier.defaultMinSize(minHeight = 64.dp),
-                        ) { Text("Dừng quay") }
-                    }
-
-                    is CaptureUiState.Packaging ->
-                        Text("Đang đóng gói phiên khảo sát...", style = MaterialTheme.typography.bodyLarge)
-
-                    is CaptureUiState.Packaged ->
-                        Text("Đã đóng gói xong", style = MaterialTheme.typography.bodyLarge)
-
-                    // This state is also reached when the camera never started, not only when a real
-                    // recording failed to package - so the label does not name the packaging step. The
-                    // button is the only way to reach ACTION_STOP on that path, and without it the
-                    // foreground service would be left running.
-                    is CaptureUiState.PackagingFailed -> {
-                        Text(
-                            "Không thể hoàn tất phiên khảo sát: ${state.reason}",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Button(onClick = viewModel::onDismissFailure) { Text("Dừng và đóng phiên") }
                     }
                 }
+
+            is CaptureUiState.ScanTimedOut -> {
+                Text(
+                    "Không tìm thấy cảm biến ánh sáng nào gần đây. Kiểm tra pin và khoảng cách rồi thử lại.",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                PrimaryButton(text = "Quét lại", onClick = viewModel::onRetryScan, modifier = Modifier.fillMaxWidth())
+            }
+
+            is CaptureUiState.Ready -> {
+                if (!state.gpsReadyToRecord) {
+                    val accuracyLabel =
+                        state.gpsAccuracyMeters?.let {
+                            "Độ chính xác hiện tại: %.0fm (cần ≤%.0fm, giữ ổn định %ds)"
+                                .format(
+                                    it,
+                                    GpsAccuracyGate.PROPOSED_THRESHOLD_METERS,
+                                    GpsAccuracyGate.PROPOSED_HOLD_DURATION_MS / 1000,
+                                )
+                        } ?: "Đang chờ tín hiệu GPS..."
+                    Text(accuracyLabel, style = MaterialTheme.typography.bodyLarge)
+                }
+                PrimaryButton(
+                    text = "Bắt đầu quay",
+                    onClick = { viewModel.onStartRecording(surveySweepId, workOrderId) },
+                    enabled = state.gpsReadyToRecord,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(onClick = viewModel::onChangeDevice) { Text("Đổi thiết bị khác") }
+            }
+
+            is CaptureUiState.StartingRecording ->
+                Text("Đang mở camera...", style = MaterialTheme.typography.bodyLarge)
+
+            is CaptureUiState.Recording -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    Text("● REC", color = Danger600, style = MaterialTheme.typography.labelLarge)
+                    Text(formatDuration(state.durationSeconds), style = MaterialTheme.typography.labelLarge)
+                    Text("%.2f km".format(state.distanceMeters / 1000f), style = MaterialTheme.typography.labelLarge)
+                }
+                if (state.gpsSignalLost) {
+                    CaptureWarning(
+                        message = "Mất tín hiệu GPS",
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                    )
+                }
+                if (state.bleGapDetected) {
+                    CaptureWarning(
+                        message = "Mất kết nối cảm biến ánh sáng — vẫn tiếp tục quay",
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                    )
+                }
+                HoldToStopButton(
+                    onHoldComplete = viewModel::onStopRecording,
+                    modifier = Modifier.padding(top = Spacing.md),
+                )
+            }
+
+            is CaptureUiState.Packaging ->
+                Text("Đang đóng gói phiên khảo sát...", style = MaterialTheme.typography.bodyLarge)
+
+            is CaptureUiState.Packaged ->
+                Text("Đã đóng gói xong", style = MaterialTheme.typography.bodyLarge)
+
+            is CaptureUiState.PackagingFailed -> {
+                Text(
+                    "Không thể hoàn tất phiên khảo sát: ${state.reason}",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                PrimaryButton(
+                    text = "Dừng và đóng phiên",
+                    onClick = viewModel::onDismissFailure,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
+    }
+}
+
+internal const val HOLD_TO_STOP_DURATION_MS = 900L
+internal const val HOLD_TO_STOP_BUTTON_TAG = "holdToStopButton"
+
+// Press-and-hold instead of a plain tap (spec §6): avoids triggering a stop from an accidental
+// bump while holding the phone on a moving vehicle. onHoldComplete fires once, exactly when the
+// hold reaches HOLD_TO_STOP_DURATION_MS - releasing early cancels the in-flight animation job and
+// snaps the ring back to empty, so a short tap never leaves the button stuck mid-progress.
+@Composable
+internal fun HoldToStopButton(
+    onHoldComplete: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val progress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val label = if (progress.value > 0f) "Tiếp tục giữ…" else "Nhấn giữ để dừng quay"
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier =
+                modifier
+                    .size(84.dp)
+                    .testTag(HOLD_TO_STOP_BUTTON_TAG)
+                    .pointerInput(onHoldComplete) {
+                        awaitEachGesture {
+                            awaitFirstDown()
+                            val job =
+                                scope.launch {
+                                    progress.animateTo(
+                                        1f,
+                                        animationSpec = tween(HOLD_TO_STOP_DURATION_MS.toInt(), easing = LinearEasing),
+                                    )
+                                    onHoldComplete()
+                                }
+                            waitForUpOrCancellation()
+                            job.cancel()
+                            scope.launch { progress.snapTo(0f) }
+                        }
+                    },
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator(
+                progress = { progress.value },
+                modifier = Modifier.fillMaxSize(),
+                color = Danger600,
+                strokeWidth = 4.dp,
+                trackColor = Danger600.copy(alpha = 0.25f),
+            )
+            val innerCornerRadius by
+                animateDpAsState(targetValue = if (progress.value > 0f) 8.dp else 32.dp, label = "stopShape")
+            Box(modifier = Modifier.size(56.dp).background(Danger600, RoundedCornerShape(innerCornerRadius)))
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+internal fun CaptureHudRow(
+    gpsAccuracyMeters: Float?,
+    latestLuxValue: Float?,
+    freeStorageBytes: Long?,
+    gpsSignalLost: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        HudChip(
+            text = if (gpsSignalLost) "Mất GPS" else gpsAccuracyLabel(gpsAccuracyMeters),
+            textColor = if (gpsSignalLost) Amber500 else Color.White,
+        )
+        HudChip(text = latestLuxValue?.let { "%.1f lux".format(it) } ?: "Chưa có dữ liệu lux")
+        HudChip(text = freeStorageBytes?.let { "${it / 1_000_000} MB trống" } ?: "— MB trống")
     }
 }
 
