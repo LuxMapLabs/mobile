@@ -4,6 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.luxmap.core.database.AppDatabase
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -79,5 +80,17 @@ class SyncQueueDaoTest {
             val rows = dao.queuedRows()
             assertEquals(0, rows.size)
             assertEquals("failed", dao.statusOf("OP-1"))
+        }
+
+    @Test
+    fun observeOpsForSessionOnlyReturnsRowsForThatSession() =
+        runTest {
+            dao.insert(row("SESSION-1:clip:0"))
+            dao.insert(row("SESSION-2:clip:0"))
+
+            val rows = dao.observeOpsForSession("SESSION-1:%").first()
+
+            assertEquals(1, rows.size)
+            assertEquals("SESSION-1:clip:0", rows.first().clientOpId)
         }
 }

@@ -3,6 +3,7 @@ package com.luxmap.core.sync
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
 @Dao
@@ -12,6 +13,9 @@ interface SyncQueueDao {
 
     @Query("SELECT * FROM sync_queue WHERE status = 'queued' ORDER BY createdAt ASC")
     suspend fun queuedRows(): List<SyncQueueEntity>
+
+    @Query("SELECT * FROM sync_queue WHERE clientOpId LIKE :sessionIdPrefix ORDER BY createdAt ASC")
+    fun observeOpsForSession(sessionIdPrefix: String): Flow<List<SyncQueueEntity>>
 
     @Query("SELECT status FROM sync_queue WHERE clientOpId = :clientOpId LIMIT 1")
     suspend fun statusOf(clientOpId: String): String?

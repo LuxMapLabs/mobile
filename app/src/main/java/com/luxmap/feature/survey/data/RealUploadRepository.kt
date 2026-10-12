@@ -16,6 +16,7 @@ import com.luxmap.feature.survey.data.sync.UploadSurveyRawPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -97,6 +98,43 @@ class RealUploadRepository
                     statuses.all { it == "done" } -> emit(UploadProgress.Done)
                     else -> emit(UploadProgress.InProgress(sentByOp.values.sum(), totalBytes))
                 }
+            }
+
+        override fun observeFileStatuses(sessionId: String): Flow<List<SessionFileStatus>> =
+            syncQueueDao.observeOpsForSession("$sessionId:%").map { rows ->
+                rows.map { row ->
+                    SessionFileStatus(label = labelForOp(row.clientOpId, sessionId), status = row.status)
+                }
+            }
+
+        override suspend fun sessionSummary(sessionId: String): SessionUploadSummary? {
+            val session = sessionDao.sessionById(sessionId) ?: return null
+            val segments = sessionDao.segmentsFor(sessionId)
+            val totalBytes =
+                segments.sumOf { it.sizeBytes ?: 0L } +
+                    listOfNotNull(session.gpsTrackFilePath, session.luxLogFilePath, session.captureConfigFilePath)
+                        .sumOf { File(it).length() }
+            return SessionUploadSummary(
+                durationSeconds = session.durationSeconds,
+                distanceMeters = session.distanceMeters,
+                totalBytes = totalBytes,
+                segmentCount = segments.size,
+            )
+        }
+
+        private fun labelForOp(
+            clientOpId: String,
+            sessionId: String,
+        ): String =
+            when (val suffix = clientOpId.removePrefix("$sessionId:")) {
+                "create_sweep" -> "Tạo phiên khảo sát"
+                "submit" -> "Nộp phiên khảo sát"
+                "raw:gps_track" -> "Log GPS"
+                "raw:lux_log" -> "Log lux"
+                "raw:capture_config" -> "Cấu hình quay"
+                else ->
+                    suffix.removePrefix("clip:").toIntOrNull()?.let { "Video đoạn ${it + 1}" }
+                        ?: suffix
             }
 
         private fun opIdsFor(

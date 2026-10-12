@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.data
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,4 +34,14 @@ class FakeUploadRepository
                 }
                 emit(UploadProgress.Done)
             }
+
+        override fun observeFileStatuses(sessionId: String): Flow<List<SessionFileStatus>> = flowOf(emptyList())
+
+        override suspend fun sessionSummary(sessionId: String): SessionUploadSummary? =
+            SessionUploadSummary(
+                durationSeconds = 600L,
+                distanceMeters = 1200.0,
+                totalBytes = totalBytes,
+                segmentCount = 2,
+            )
     }
