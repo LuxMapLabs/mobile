@@ -6,11 +6,13 @@ import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "FakeSurveyRepository"
+private const val UPLOADING_SYNC_STATE = "queued"
 
 @Singleton
 class FakeSurveyRepository
@@ -44,6 +46,11 @@ class FakeSurveyRepository
                         ),
                     ),
                 )
+            }
+
+        override fun observeUploadingSessions(): Flow<List<QueuedUploadSession>> =
+            sessionDao.observeSessionsBySyncState(UPLOADING_SYNC_STATE).map { sessions ->
+                sessions.map { QueuedUploadSession(sessionId = it.sessionId, surveySweepId = it.surveySweepId) }
             }
 
         override suspend fun segmentFilePathsFor(sessionId: String): List<String> =
