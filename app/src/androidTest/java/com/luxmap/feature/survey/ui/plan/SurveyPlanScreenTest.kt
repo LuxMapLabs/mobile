@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.ui.plan
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveySweepStatus
@@ -113,6 +114,28 @@ class SurveyPlanScreenTest {
             }
         }
         composeRule.onNodeWithText("Video bị mờ").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_manual_tap_on_a_different_route_overrides_the_auto_selected_one() {
+        val routeA = route()
+        val routeB = route().copy(surveySweepId = "SWEEP-2")
+        var selected: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanScreenContent(
+                    surveySweepId = "SWEEP-1",
+                    state =
+                        SurveyPlanUiState.Success(
+                            routes = listOf(routeA, routeB),
+                            selectedSurveySweepId = "SWEEP-1",
+                        ),
+                    onRouteSelected = { selected = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText("SWEEP-2").performClick()
+        assertEquals("SWEEP-2", selected)
     }
 
     @Test
