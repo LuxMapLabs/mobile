@@ -6,11 +6,15 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +23,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,12 +38,14 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CameraReadinessPanel
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.ReadinessCheckItem
 import com.luxmap.core.ui.components.ReadinessCheckStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
+import kotlinx.coroutines.delay
 
 // Camera + fine location are the 2 permissions the F03 readiness checklist can fix in-app (see
 // SurveyReadinessInputProvider). Exposure-lock support, storage and battery are device state, not
@@ -77,18 +84,44 @@ private fun hasBlePermissions(context: Context): Boolean =
 // no matter the system setting, same rule as F04 Capture Mode.
 @Composable
 fun SurveyPlanScreen(
+    surveySweepId: String,
     onEnterCaptureMode: (surveySweepId: String) -> Unit,
     viewModel: SurveyPlanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     LuxMapTheme(forceDark = true) {
-        SurveyPlanContent(
+        SurveyPlanScreenContent(
+            surveySweepId = surveySweepId,
             state = uiState,
             onRouteSelected = viewModel::onRouteSelected,
             onRetry = viewModel::onRetry,
             onEnterCaptureMode = onEnterCaptureMode,
         )
     }
+}
+
+// Separated from SurveyPlanScreen only so the auto-select effect below can be driven directly in
+// a Compose UI test, with no ViewModel/Hilt in the loop - same reason SurveyPlanContent itself is
+// already stateless.
+@Composable
+fun SurveyPlanScreenContent(
+    surveySweepId: String,
+    state: SurveyPlanUiState,
+    onRouteSelected: (String) -> Unit,
+    onRetry: () -> Unit = {},
+    onEnterCaptureMode: (String) -> Unit = {},
+) {
+    LaunchedEffect(surveySweepId, state is SurveyPlanUiState.Success) {
+        if (state is SurveyPlanUiState.Success && state.selectedSurveySweepId == null) {
+            onRouteSelected(surveySweepId)
+        }
+    }
+    SurveyPlanContent(
+        state = state,
+        onRouteSelected = onRouteSelected,
+        onRetry = onRetry,
+        onEnterCaptureMode = onEnterCaptureMode,
+    )
 }
 
 // Stateless so UI tests can drive every SurveyPlanUiState branch directly, without a ViewModel or
@@ -190,29 +223,34 @@ private fun SurveyRouteCard(
         } else if (readiness == null) {
             Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
         } else {
-            ReadinessChecklist(readiness)
+            ReadinessChecklist(readiness, hasBlePermissions)
             // Camera, GPS, and (on API 31+) Bluetooth scan/connect are the permissions this screen
             // can fix without leaving the app (spec gap: there was no in-app way to grant them
             // before, so a user who never granted them could never reach F04 at all). Bluetooth is
-            // not part of the readiness checklist model itself (out of scope for this fix), so it
-            // is checked separately here, only to decide whether this button still needs to show.
+            // not part of the readiness checklist domain model itself (out of scope for this fix),
+            // so it is checked separately here, only to decide whether this button still needs to
+            // show - the "Quyền Bluetooth" row above is presentation-only, reading this same value.
             if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable || !hasBlePermissions) {
-                PrimaryButton(text = "Cấp quyền", onClick = onRequestPermissions)
+                PrimaryButton(text = "Cấp quyền", onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth())
             }
             // hasBlePermissions is also required here (not just readiness.isReady), not only shown
             // as a hint through the button above - otherwise a user could enter F04 without it and
             // hit a SecurityException from connectGatt() on API 31+.
-            PrimaryButton(
-                text = "Vào chế độ khảo sát",
-                onClick = onEnterCaptureMode,
-                enabled = readiness.isReady && hasBlePermissions,
+            BottomActionBar(
+                ctaText = "Vào chế độ khảo sát",
+                onCtaClick = onEnterCaptureMode,
+                ctaEnabled = readiness.isReady && hasBlePermissions,
+                hint = if (!readiness.isReady || !hasBlePermissions) "Còn mục chưa đạt — chưa thể khảo sát" else null,
             )
         }
     }
 }
 
 @Composable
-private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
+private fun ReadinessChecklist(
+    readiness: SurveyReadinessResult,
+    hasBlePermissions: Boolean,
+) {
     val items =
         listOf(
             ReadinessCheckItem("Quyền camera", readiness.cameraPermissionGranted.toStatus()),
@@ -232,6 +270,11 @@ private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
             // a missing heading sensor must not block or worry the user at F03 - see the comment on
             // SurveyReadinessResult.isReady for the matching change on the gating side.
             ReadinessCheckItem(
+                "Quyền Bluetooth",
+                hasBlePermissions.toStatus(),
+                fixHint = if (!hasBlePermissions) "Cần quyền Bluetooth để kết nối cảm biến lux" else null,
+            ),
+            ReadinessCheckItem(
                 "Đủ dung lượng trống",
                 (readiness.freeStorageBytes >= readiness.requiredStorageBytes).toStatus(),
             ),
@@ -240,7 +283,24 @@ private fun ReadinessChecklist(readiness: SurveyReadinessResult) {
                 (readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT).toStatus(),
             ),
         )
-    CameraReadinessPanel(items)
+    var visibleCount by remember(items) { mutableStateOf(0) }
+    LaunchedEffect(items) {
+        visibleCount = 0
+        items.indices.forEach { index ->
+            visibleCount = index + 1
+            delay(CHECKLIST_ROW_DELAY_MS)
+        }
+    }
+    Column {
+        items.take(visibleCount).forEach { item ->
+            AnimatedVisibility(visible = true, enter = fadeIn(animationSpec = tween(CHECKLIST_ROW_FADE_MS))) {
+                CameraReadinessPanel(listOf(item))
+            }
+        }
+    }
 }
+
+private const val CHECKLIST_ROW_DELAY_MS = 350L
+private const val CHECKLIST_ROW_FADE_MS = 400
 
 private fun Boolean.toStatus() = if (this) ReadinessCheckStatus.PASS else ReadinessCheckStatus.FAIL

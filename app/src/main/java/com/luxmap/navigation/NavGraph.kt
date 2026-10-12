@@ -161,8 +161,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(
                 route = Routes.SurveyPlan.route,
                 arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
-            ) {
+            ) { backStackEntry ->
+                val planSurveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
                 SurveyPlanScreen(
+                    surveySweepId = planSurveySweepId,
                     onEnterCaptureMode = { surveySweepId ->
                         // F03's standalone survey-plan entry has no work order in scope at all -
                         // threading a real workOrderId here is out of scope for this plan (fm-40

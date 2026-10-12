@@ -6,6 +6,8 @@ import androidx.compose.ui.test.onNodeWithText
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveySweepStatus
+import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -19,6 +21,17 @@ class SurveyPlanScreenTest {
             plannedDate = "2026-10-02",
             status = SurveySweepStatus.PLANNED,
             roadSegments = emptyList(),
+        )
+
+    private fun readyResult() =
+        SurveyReadinessResult(
+            cameraPermissionGranted = true,
+            exposureLockSupported = true,
+            timestampSourceRealtime = true,
+            gpsAvailable = true,
+            freeStorageBytes = 2_000_000_000L,
+            requiredStorageBytes = 1_000_000_000L,
+            batteryPercent = 80,
         )
 
     @Test
@@ -40,6 +53,40 @@ class SurveyPlanScreenTest {
             }
         }
         composeRule.onNodeWithText("SWEEP-1").assertExists()
+    }
+
+    @Test
+    fun success_state_shows_the_bluetooth_permission_row() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state =
+                        SurveyPlanUiState.Success(
+                            routes = listOf(route()),
+                            selectedSurveySweepId = route().surveySweepId,
+                            readiness = readyResult(),
+                        ),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Quyền Bluetooth").assertExists()
+    }
+
+    @Test
+    fun arriving_with_a_surveySweepId_auto_selects_that_route() {
+        var selected: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanScreenContent(
+                    surveySweepId = "SWEEP-1",
+                    state = SurveyPlanUiState.Success(routes = listOf(route())),
+                    onRouteSelected = { selected = it },
+                )
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals("SWEEP-1", selected)
     }
 
     @Test
