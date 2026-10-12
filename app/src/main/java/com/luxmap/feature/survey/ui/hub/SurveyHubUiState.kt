@@ -3,9 +3,6 @@ package com.luxmap.feature.survey.ui.hub
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 
-// Local-only placeholder models, not real backend entities - the "Bị từ chối"/"Chờ xác nhận AI"
-// cards have no confirmed sweep-status schema yet (see docs/contract-drift.md and the redesign
-// roadmap's decision #2). Rewire to real entities once WP2/WP5 confirm the schema.
 data class LocalRejectedSweep(
     val surveySweepId: String,
     val rejectionReason: String,

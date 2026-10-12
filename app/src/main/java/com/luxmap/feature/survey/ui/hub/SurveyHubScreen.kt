@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -44,77 +45,74 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 @Composable
 fun SurveyHubRoute(
     onCheckReadiness: (surveySweepId: String) -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    SurveyHubScreen(
-        state = uiState,
-        onCheckReadiness = onCheckReadiness,
-        onRetry = viewModel::onRetry,
-    )
+    LuxMapTheme(forceDark = true) {
+        SurveyHubScreen(
+            state = uiState,
+            onCheckReadiness = onCheckReadiness,
+            modifier = modifier,
+            onRetry = viewModel::onRetry,
+        )
+    }
 }
 
 @Composable
 fun SurveyHubScreen(
     state: SurveyHubUiState,
     onCheckReadiness: (surveySweepId: String) -> Unit,
+    modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
-    LuxMapTheme(forceDark = true) {
-        Column(modifier = modifier.fillMaxSize()) {
-            Text(
-                text = "Khảo sát",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(Spacing.lg),
-            )
-            Box(Modifier.fillMaxSize()) {
-                when (state) {
-                    is SurveyHubUiState.Loading ->
-                        CircularProgressIndicator(
-                            modifier =
-                                Modifier
-                                    .padding(Spacing.lg)
-                                    .testTag("survey_hub_loading"),
-                        )
+    Column(modifier = modifier.fillMaxSize()) {
+        Text(
+            text = "Khảo sát",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(Spacing.lg),
+        )
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            when (state) {
+                is SurveyHubUiState.Loading ->
+                    CircularProgressIndicator(modifier = Modifier.testTag("survey_hub_loading"))
 
-                    is SurveyHubUiState.Success ->
-                        SurveyHubContent(
-                            state = state,
-                            onCheckReadiness = onCheckReadiness,
-                            onReviewAiConfirmation = onReviewAiConfirmation,
-                            onResurvey = onResurvey,
-                        )
+                is SurveyHubUiState.Success ->
+                    SurveyHubContent(
+                        state = state,
+                        onCheckReadiness = onCheckReadiness,
+                        onReviewAiConfirmation = onReviewAiConfirmation,
+                        onResurvey = onResurvey,
+                    )
 
-                    is SurveyHubUiState.Empty ->
-                        MessageState(
-                            icon = Icons.Filled.EventAvailable,
-                            iconColors = SyncStatus.DONE.badgeColors(),
-                            title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
-                            subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
-                            action = {},
-                        )
+                is SurveyHubUiState.Empty ->
+                    MessageState(
+                        icon = Icons.Filled.EventAvailable,
+                        iconColors = SyncStatus.DONE.badgeColors(),
+                        title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
+                        subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
+                        action = {},
+                    )
 
-                    is SurveyHubUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.CloudOff,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
-                            title = state.message,
-                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                is SurveyHubUiState.Error ->
+                    MessageState(
+                        icon = Icons.Filled.CloudOff,
+                        iconColors = SyncStatus.FAILED.badgeColors(),
+                        title = state.message,
+                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                    ) {
+                        OutlinedButton(
+                            onClick = onRetry,
+                            colors =
+                                ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary,
+                                ),
                         ) {
-                            OutlinedButton(
-                                onClick = onRetry,
-                                colors =
-                                    ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                    ),
-                            ) {
-                                Text("Thử lại")
-                            }
+                            Text("Thử lại")
                         }
-                }
+                    }
             }
         }
     }

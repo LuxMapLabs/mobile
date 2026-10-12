@@ -18,10 +18,17 @@ data class AssignedSurveyRoute(
     val roadSegments: List<AssignedRoadSegment>,
 )
 
+data class QueuedUploadSession(
+    val sessionId: String,
+    val surveySweepId: String,
+)
+
 // Field Engineer never creates/edits a route on mobile (spec §10) — this only observes what
 // "Kỹ sư bảo trì" assigned, from GET /api/v1/survey-sweeps/planned (already used by F02).
 interface SurveyRepository {
     fun observeAssignedRoutes(): Flow<List<AssignedSurveyRoute>>
+
+    fun observeUploadingSessions(): Flow<List<QueuedUploadSession>>
 
     // Pure local data - no network involved, so Fake and Real do the same thing here (see
     // the design spec §3 for why this still lives on the one repository interface).

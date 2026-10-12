@@ -5,10 +5,9 @@ import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.AssignedRoadSegment
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.survey.data.SurveySweepStatus
-import com.luxmap.feature.survey.data.dao.SurveySessionDao
-import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +23,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SurveyHubViewModelTest {
@@ -37,34 +35,11 @@ class SurveyHubViewModelTest {
             status = SurveySweepStatus.PLANNED,
             roadSegments = listOf(AssignedRoadSegment("RS-1", "Đường A", 500.0)),
         )
-
-    private fun queuedSession(sessionId: String) =
-        LocalSurveySessionEntity(
-            sessionId = sessionId,
-            surveySweepId = "SWEEP-2",
-            workOrderId = "WO-1",
-            recordingState = "packaged",
-            syncState = "queued",
-            startedAtUtc = Instant.parse("2026-10-01T20:00:00Z"),
-            startedAtElapsedNs = 0L,
-            endedAtUtc = null,
-            durationSeconds = null,
-            distanceMeters = null,
-            gpsTrackFilePath = null,
-            luxLogFilePath = null,
-            frameTimestampLogFilePath = null,
-            captureConfigFilePath = null,
-            manifestFilePath = null,
-            packageSchemaVersion = "v0",
-            timestampSourceRealtime = true,
-            bleGapDetected = false,
-            createdAt = Instant.parse("2026-10-01T20:00:00Z"),
-            updatedAt = Instant.parse("2026-10-01T20:00:00Z"),
-        )
+    private val queuedSession = QueuedUploadSession(sessionId = "SESSION-1", surveySweepId = "SWEEP-2")
 
     private fun viewModel(
         routes: List<AssignedSurveyRoute> = emptyList(),
-        queuedSessions: List<LocalSurveySessionEntity> = emptyList(),
+        queuedSessions: List<QueuedUploadSession> = emptyList(),
         isOnline: Boolean = true,
         repositoryFlowThrows: Boolean = false,
     ): SurveyHubViewModel {
@@ -75,11 +50,10 @@ class SurveyHubViewModelTest {
             } else {
                 flowOf(routes)
             }
-        val sessionDao = mockk<SurveySessionDao>()
-        every { sessionDao.observeSessionsBySyncState("queued") } returns flowOf(queuedSessions)
+        every { repository.observeUploadingSessions() } returns flowOf(queuedSessions)
         val connectivity = mockk<ConnectivityObserver>()
         every { connectivity.isOnline } returns flowOf(isOnline)
-        return SurveyHubViewModel(repository, sessionDao, connectivity)
+        return SurveyHubViewModel(repository, connectivity)
     }
 
     @Before
@@ -114,7 +88,7 @@ class SurveyHubViewModelTest {
     @Test
     fun `emits Success with an uploading session even when there are no assigned routes`() =
         runTest {
-            viewModel(queuedSessions = listOf(queuedSession("SESSION-1"))).uiState.test {
+            viewModel(queuedSessions = listOf(queuedSession)).uiState.test {
                 awaitItem()
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertTrue(success.assignedRoutes.isEmpty())
@@ -126,7 +100,7 @@ class SurveyHubViewModelTest {
     @Test
     fun `an uploading session is marked QUEUED_OFFLINE when the device is offline`() =
         runTest {
-            viewModel(queuedSessions = listOf(queuedSession("SESSION-1")), isOnline = false).uiState.test {
+            viewModel(queuedSessions = listOf(queuedSession), isOnline = false).uiState.test {
                 awaitItem()
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(SyncStatus.QUEUED_OFFLINE, success.uploadingSessions.first().syncStatus)
@@ -151,6 +125,30 @@ class SurveyHubViewModelTest {
                 awaitItem()
                 val error = awaitItem() as SurveyHubUiState.Error
                 assertEquals("offline", error.message)
+            }
+        }
+
+    @Test
+    fun `onRetry re-loads after an error and can reach Success`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flow { throw IllegalStateException("offline") },
+                    flowOf(listOf(route)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Error
+                viewModel.onRetry()
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(route), success.assignedRoutes)
             }
         }
 }

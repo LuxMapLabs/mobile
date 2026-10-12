@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.SurveyRepository
-import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,11 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-// Keeps the 2 unconfirmed-schema cards off by default - see docs/contract-drift.md and the
-// redesign roadmap's decision #2. No production code path sets this to true today.
 internal const val SHOW_UNCONFIRMED_HUB_CARDS = false
-
-private const val UPLOADING_SYNC_STATE = "queued"
 
 private val FAKE_REJECTED_SWEEPS =
     listOf(
@@ -40,7 +35,6 @@ class SurveyHubViewModel
     @Inject
     constructor(
         private val repository: SurveyRepository,
-        private val sessionDao: SurveySessionDao,
         private val connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<SurveyHubUiState>(SurveyHubUiState.Loading)
@@ -60,7 +54,7 @@ class SurveyHubViewModel
             viewModelScope.launch {
                 combine(
                     repository.observeAssignedRoutes(),
-                    sessionDao.observeSessionsBySyncState(UPLOADING_SYNC_STATE),
+                    repository.observeUploadingSessions(),
                     connectivityObserver.isOnline,
                 ) { routes, queuedSessions, isOnline ->
                     val uploading =
