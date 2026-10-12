@@ -152,15 +152,17 @@ private fun SurveyHubContent(
             }
             items(state.uploadingSessions) { session -> UploadingSessionRow(session) }
         }
-        item {
-            Text(
-                text = "TUYẾN ĐƯỢC GIAO",
-                style = OverlineTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        items(state.assignedRoutes) { route ->
-            AssignedRouteCard(route, onCheckReadiness = { onCheckReadiness(route.surveySweepId) })
+        if (state.assignedRoutes.isNotEmpty()) {
+            item {
+                Text(
+                    text = "TUYẾN ĐƯỢC GIAO",
+                    style = OverlineTextStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(state.assignedRoutes) { route ->
+                AssignedRouteCard(route, onCheckReadiness = { onCheckReadiness(route.surveySweepId) })
+            }
         }
     }
 }
@@ -232,7 +234,7 @@ private fun UploadingSessionRow(session: UploadingSurveySession) {
                 .padding(Spacing.lg),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(text = "Đang tải lên · ${session.surveySweepId}", style = MaterialTheme.typography.bodyMedium)
+        Text(text = "Chờ tải lên · ${session.surveySweepId}", style = MaterialTheme.typography.bodyMedium)
         StatusBadge(text = session.syncStatus.label(), colors = session.syncStatus.badgeColors())
     }
 }

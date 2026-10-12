@@ -1,0 +1,87 @@
+package com.luxmap.feature.survey.ui.hub
+
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.survey.data.SurveySweepStatus
+import org.junit.Rule
+import org.junit.Test
+
+class SurveyHubScreenTest {
+    @get:Rule val composeRule = createComposeRule()
+
+    private fun route() =
+        AssignedSurveyRoute(
+            surveySweepId = "SWEEP-1",
+            assignedByName = "Nguyen Van A",
+            plannedDate = "2026-10-02",
+            status = SurveySweepStatus.PLANNED,
+            roadSegments = emptyList(),
+        )
+
+    private fun uploadingSession() =
+        UploadingSurveySession(
+            sessionId = "SESSION-1",
+            surveySweepId = "SWEEP-2",
+            syncStatus = SyncStatus.QUEUED_ONLINE,
+        )
+
+    @Test
+    fun loading_state_shows_progress_indicator() {
+        composeRule.setContent {
+            SurveyHubScreen(state = SurveyHubUiState.Loading, onCheckReadiness = {})
+        }
+        composeRule.onNodeWithTag("survey_hub_loading").assertExists()
+    }
+
+    @Test
+    fun success_state_with_a_route_shows_the_route_name_and_the_assigned_routes_header() {
+        composeRule.setContent {
+            SurveyHubScreen(
+                state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                onCheckReadiness = {},
+            )
+        }
+        composeRule.onNodeWithText("SWEEP-1").assertExists()
+        composeRule.onNodeWithText("TUYẾN ĐƯỢC GIAO").assertExists()
+    }
+
+    @Test
+    fun success_state_with_no_assigned_routes_hides_the_assigned_routes_header() {
+        composeRule.setContent {
+            SurveyHubScreen(
+                state =
+                    SurveyHubUiState.Success(
+                        assignedRoutes = emptyList(),
+                        uploadingSessions = listOf(uploadingSession()),
+                    ),
+                onCheckReadiness = {},
+            )
+        }
+        composeRule.onNodeWithText("TUYẾN ĐƯỢC GIAO").assertDoesNotExist()
+        composeRule.onNodeWithText("Chờ tải lên · SWEEP-2").assertExists()
+    }
+
+    @Test
+    fun empty_state_shows_the_no_routes_message() {
+        composeRule.setContent {
+            SurveyHubScreen(state = SurveyHubUiState.Empty, onCheckReadiness = {})
+        }
+        composeRule.onNodeWithText("Chưa có tuyến nào được phân công", substring = true).assertExists()
+    }
+
+    @Test
+    fun error_state_shows_the_message_and_a_retry_action() {
+        composeRule.setContent {
+            SurveyHubScreen(
+                state = SurveyHubUiState.Error("Không tải được Khảo sát"),
+                onCheckReadiness = {},
+                onRetry = {},
+            )
+        }
+        composeRule.onNodeWithText("Không tải được Khảo sát").assertExists()
+        composeRule.onNodeWithText("Thử lại").assertExists()
+    }
+}
