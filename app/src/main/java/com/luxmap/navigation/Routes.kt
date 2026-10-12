@@ -45,6 +45,12 @@ sealed interface Routes {
         fun createRoute(sessionId: String) = "survey/submit/$sessionId"
     }
 
+    data object AiConfirmation : Routes {
+        override val route = "survey/ai-confirmation/{surveySweepId}"
+
+        fun createRoute(surveySweepId: String) = "survey/ai-confirmation/$surveySweepId"
+    }
+
     data object Map : Routes {
         override val route = "map"
     }

@@ -38,6 +38,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
@@ -64,6 +68,34 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 private const val LOW_CONFIDENCE_THRESHOLD = 85
+
+@Composable
+fun AiConfirmationRoute(
+    surveySweepId: String,
+    onBack: () -> Unit,
+    viewModel: AiConfirmationViewModel = hiltViewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val sheet by viewModel.sheet.collectAsState()
+
+    LaunchedEffect(surveySweepId) { viewModel.load(surveySweepId) }
+
+    LuxMapTheme {
+        AiConfirmationScreen(
+            surveySweepId = surveySweepId,
+            uiState = uiState,
+            sheet = sheet,
+            onBack = onBack,
+            onFilterSelected = viewModel::onFilterSelected,
+            onReviewSelected = viewModel::onReviewSelected,
+            onDismissSheet = viewModel::onDismissSheet,
+            onConditionChosen = viewModel::onConditionChosen,
+            onReasonChanged = viewModel::onReasonChanged,
+            onSaveSheet = viewModel::onSaveSheet,
+            onSubmit = { viewModel.onSubmit(surveySweepId) },
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
