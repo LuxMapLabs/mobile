@@ -14,7 +14,7 @@ interface SyncQueueDao {
     @Query("SELECT * FROM sync_queue WHERE status = 'queued' ORDER BY createdAt ASC")
     suspend fun queuedRows(): List<SyncQueueEntity>
 
-    @Query("SELECT * FROM sync_queue WHERE clientOpId LIKE :sessionIdPrefix ORDER BY createdAt ASC")
+    @Query("SELECT * FROM sync_queue WHERE clientOpId LIKE :sessionIdPrefix ORDER BY createdAt ASC, id ASC")
     fun observeOpsForSession(sessionIdPrefix: String): Flow<List<SyncQueueEntity>>
 
     @Query("SELECT status FROM sync_queue WHERE clientOpId = :clientOpId LIMIT 1")

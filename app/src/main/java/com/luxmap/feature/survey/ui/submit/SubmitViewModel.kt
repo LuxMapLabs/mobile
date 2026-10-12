@@ -11,6 +11,7 @@ import com.luxmap.feature.survey.data.UploadProgress
 import com.luxmap.feature.survey.data.UploadRepository
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +44,12 @@ class SubmitViewModel
         val wifiOnlyUpload: StateFlow<Boolean> =
             uploadPreferences.observeWifiOnlyUpload().stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+        // observeFileStatuses() is a never-completing Room Flow - tracked here (instead of a
+        // plain nested launch) so a retry (the "Nộp lại" button calling onSubmit again) cancels
+        // the previous session's collector instead of leaking one more live query observer per
+        // retry for the lifetime of the ViewModel.
+        private var fileStatusJob: Job? = null
+
         // Writing the flag alone only affects the next one-time trigger (WorkManagerSyncTrigger
         // reads it fresh every time). The periodic job stays scheduled with whatever NetworkType
         // it started with until something calls reschedulePeriodicSync - this toggle is that
@@ -63,7 +70,11 @@ class SubmitViewModel
                 }
 
                 _summary.value = repository.sessionSummary(sessionId)
-                launch { repository.observeFileStatuses(sessionId).collect { _fileStatuses.value = it } }
+                fileStatusJob?.cancel()
+                fileStatusJob =
+                    viewModelScope.launch {
+                        repository.observeFileStatuses(sessionId).collect { _fileStatuses.value = it }
+                    }
 
                 repository
                     .uploadSession(sessionId)

@@ -13,10 +13,12 @@ import com.luxmap.feature.survey.data.sync.CreateSurveySweepPayload
 import com.luxmap.feature.survey.data.sync.SubmitSurveySweepPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyClipPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyRawPayload
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -111,9 +113,11 @@ class RealUploadRepository
             val session = sessionDao.sessionById(sessionId) ?: return null
             val segments = sessionDao.segmentsFor(sessionId)
             val totalBytes =
-                segments.sumOf { it.sizeBytes ?: 0L } +
-                    listOfNotNull(session.gpsTrackFilePath, session.luxLogFilePath, session.captureConfigFilePath)
-                        .sumOf { File(it).length() }
+                withContext(Dispatchers.IO) {
+                    segments.sumOf { it.sizeBytes ?: 0L } +
+                        listOfNotNull(session.gpsTrackFilePath, session.luxLogFilePath, session.captureConfigFilePath)
+                            .sumOf { File(it).length() }
+                }
             return SessionUploadSummary(
                 durationSeconds = session.durationSeconds,
                 distanceMeters = session.distanceMeters,

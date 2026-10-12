@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -24,6 +26,7 @@ import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.SessionFileStatus
 import com.luxmap.feature.survey.data.SessionUploadSummary
+import java.util.Locale
 
 @Composable
 fun SubmitScreen(
@@ -38,28 +41,42 @@ fun SubmitScreen(
 
     LaunchedEffect(sessionId) { viewModel.onSubmit(sessionId) }
 
-    Column(Modifier.fillMaxSize().padding(Spacing.lg)) {
-        Text(text = "Nộp đợt khảo sát", style = MaterialTheme.typography.titleLarge)
-        SubmitStatusBadge(uiState)
-        summary?.let { SubmitSummaryGrid(it) }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.md),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Chỉ tải lên qua Wi-Fi", style = MaterialTheme.typography.bodyLarge)
-            Switch(checked = wifiOnlyUpload, onCheckedChange = viewModel::onWifiOnlyToggled)
-        }
-        when (val state = uiState) {
-            is SubmitUiState.Uploading -> {
-                val fraction =
-                    if (state.totalBytes == 0L) 0f else state.bytesSent.toFloat() / state.totalBytes.toFloat()
-                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+    // A LazyColumn, not a plain Column: the file row count is 5 + segmentCount, and a session
+    // recorded in 60s clips can easily have 15-35 rows - a plain Column pushed "Về Khảo sát" off
+    // the bottom of the screen with no way to reach it except the OS back gesture.
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(Spacing.lg)) {
+        item { Text(text = "Nộp đợt khảo sát", style = MaterialTheme.typography.titleLarge) }
+        item { SubmitStatusBadge(uiState) }
+        summary?.let { item { SubmitSummaryGrid(it) } }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.md),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Chỉ tải lên qua Wi-Fi", style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = wifiOnlyUpload, onCheckedChange = viewModel::onWifiOnlyToggled)
             }
-            is SubmitUiState.Failed -> PrimaryButton(text = "Nộp lại", onClick = { viewModel.onSubmit(sessionId) })
-            else -> Unit
         }
-        SubmitFileStatusList(fileStatuses)
-        PrimaryButton(text = "Về Khảo sát", onClick = onBackToSurveyHub, modifier = Modifier.fillMaxWidth())
+        item {
+            when (val state = uiState) {
+                is SubmitUiState.Uploading -> {
+                    val fraction =
+                        if (state.totalBytes == 0L) 0f else state.bytesSent.toFloat() / state.totalBytes.toFloat()
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                }
+                is SubmitUiState.Failed, is SubmitUiState.WaitingForWifi ->
+                    PrimaryButton(text = "Nộp lại", onClick = { viewModel.onSubmit(sessionId) })
+                else -> Unit
+            }
+        }
+        items(fileStatuses) { file -> FileStatusRow(file) }
+        item {
+            PrimaryButton(
+                text = "Về Khảo sát",
+                onClick = onBackToSurveyHub,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
+            )
+        }
     }
 }
 
@@ -95,13 +112,25 @@ private fun SubmitStatusBadge(state: SubmitUiState) {
 @Composable
 private fun SubmitSummaryGrid(summary: SessionUploadSummary) {
     Column(Modifier.fillMaxWidth().padding(vertical = Spacing.md)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            SummaryCell("Thời lượng", summary.durationSeconds?.let { "${it / 60} phút" } ?: "—")
-            SummaryCell("Số đoạn video", summary.segmentCount.toString())
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            SummaryCell(
+                "Thời lượng",
+                summary.durationSeconds?.let { "${it / 60} phút" } ?: "—",
+                Modifier.weight(1f),
+            )
+            SummaryCell("Số đoạn video", summary.segmentCount.toString(), Modifier.weight(1f))
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            SummaryCell("Quãng đường", summary.distanceMeters?.let { "%.1f km".format(it / 1000) } ?: "—")
-            SummaryCell("Dung lượng", "${summary.totalBytes / 1_000_000} MB")
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            SummaryCell(
+                "Quãng đường",
+                summary.distanceMeters?.let { "%.1f km".format(Locale.US, it / 1000) } ?: "—",
+                Modifier.weight(1f),
+            )
+            SummaryCell(
+                "Dung lượng",
+                "%.1f MB".format(Locale.US, summary.totalBytes / 1_000_000.0),
+                Modifier.weight(1f),
+            )
         }
     }
 }
@@ -110,8 +139,9 @@ private fun SubmitSummaryGrid(summary: SessionUploadSummary) {
 private fun SummaryCell(
     label: String,
     value: String,
+    modifier: Modifier = Modifier,
 ) {
-    Column(Modifier.padding(Spacing.sm)) {
+    Column(modifier.padding(Spacing.sm)) {
         Text(value, style = MaterialTheme.typography.titleMedium)
         Text(label, style = MaterialTheme.typography.bodySmall)
     }
@@ -120,16 +150,19 @@ private fun SummaryCell(
 @Composable
 internal fun SubmitFileStatusList(files: List<SessionFileStatus>) {
     Column {
-        files.forEach { file ->
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(file.label, style = MaterialTheme.typography.bodyMedium)
-                val syncStatus = syncQueueStatusToSyncStatus(file.status)
-                StatusBadge(text = syncStatus.label(), colors = syncStatus.badgeColors())
-            }
-        }
+        files.forEach { file -> FileStatusRow(file) }
+    }
+}
+
+@Composable
+private fun FileStatusRow(file: SessionFileStatus) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(file.label, style = MaterialTheme.typography.bodyMedium)
+        val syncStatus = syncQueueStatusToSyncStatus(file.status)
+        StatusBadge(text = syncStatus.label(), colors = syncStatus.badgeColors())
     }
 }
 

@@ -57,6 +57,7 @@ class SyncQueueProcessor
                         continue
                     }
 
+                    dao.updateStatus(row.id, "syncing", row.attemptCount, null, Instant.now())
                     when (
                         val result =
                             handler.handle(

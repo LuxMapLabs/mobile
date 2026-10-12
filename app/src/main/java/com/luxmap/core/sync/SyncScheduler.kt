@@ -34,7 +34,17 @@ class SyncScheduler
             workManager.enqueueUniquePeriodicWork(PERIODIC_SYNC_WORK_NAME, policy, request)
         }
 
-        suspend fun reschedulePeriodicSync() = schedulePeriodicSync(policy = ExistingPeriodicWorkPolicy.REPLACE)
+        // A one-time trigger already enqueued with the old NetworkType (e.g. CONNECTED, waiting
+        // out WorkManager's retry backoff) would otherwise keep ExistingWorkPolicy.KEEP from ever
+        // letting the next enqueue()'s triggerNow() install the new constraint - it would just sit
+        // there and eventually drain the queue over the connection the user just opted out of.
+        // Cancelling it here is safe: any op it would have picked up is still in sync_queue, and
+        // the next real enqueue() (or the periodic job, at worst) re-triggers it with the right
+        // constraint.
+        suspend fun reschedulePeriodicSync() {
+            workManager.cancelUniqueWork(WorkManagerSyncTrigger.SYNC_WORK_NAME)
+            schedulePeriodicSync(policy = ExistingPeriodicWorkPolicy.REPLACE)
+        }
 
         companion object {
             const val PERIODIC_SYNC_WORK_NAME = "sync_queue_periodic"
