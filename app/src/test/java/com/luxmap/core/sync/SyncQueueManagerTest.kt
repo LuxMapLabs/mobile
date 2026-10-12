@@ -2,7 +2,6 @@ package com.luxmap.core.sync
 
 import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -28,7 +27,7 @@ class SyncQueueManagerTest {
                     },
                 )
             }
-            verify(exactly = 1) { trigger.triggerNow() }
+            coVerify(exactly = 1) { trigger.triggerNow() }
         }
 
     @Test
