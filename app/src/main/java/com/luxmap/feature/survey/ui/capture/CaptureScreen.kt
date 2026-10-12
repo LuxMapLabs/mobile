@@ -44,12 +44,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.ble.LuxDevice
+import com.luxmap.core.theme.Amber500
 import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Radius
@@ -60,6 +63,13 @@ import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.gpsAccuracyLabel
 import com.luxmap.feature.survey.domain.GpsAccuracyGate
 import kotlinx.coroutines.launch
+
+private data class CaptureHudValues(
+    val gpsAccuracyMeters: Float?,
+    val gpsSignalLost: Boolean,
+    val latestLuxValue: Float?,
+    val freeStorageBytes: Long?,
+)
 
 @Composable
 fun CaptureScreen(
@@ -223,15 +233,21 @@ fun CaptureScreen(
                     uiState is CaptureUiState.StartingRecording ||
                     uiState is CaptureUiState.Recording
             if (showHud) {
-                val (gpsAccuracyMeters, latestLuxValue, freeStorageBytes) =
+                val (gpsAccuracyMeters, gpsSignalLost, latestLuxValue, freeStorageBytes) =
                     when (val state = uiState) {
-                        is CaptureUiState.Ready -> Triple(state.gpsAccuracyMeters, null, null)
+                        is CaptureUiState.Ready -> CaptureHudValues(state.gpsAccuracyMeters, false, null, null)
                         is CaptureUiState.Recording ->
-                            Triple(state.gpsAccuracyMeters, state.latestLuxValue, state.freeStorageBytes)
-                        else -> Triple(null, null, null)
+                            CaptureHudValues(
+                                state.gpsAccuracyMeters,
+                                state.gpsSignalLost,
+                                state.latestLuxValue,
+                                state.freeStorageBytes,
+                            )
+                        else -> CaptureHudValues(null, false, null, null)
                     }
                 CaptureHudRow(
                     gpsAccuracyMeters = gpsAccuracyMeters,
+                    gpsSignalLost = gpsSignalLost,
                     latestLuxValue = latestLuxValue,
                     freeStorageBytes = freeStorageBytes,
                     modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(Spacing.md),
@@ -370,7 +386,8 @@ internal fun CaptureBottomPanelContent(
     }
 }
 
-internal const val HOLD_TO_STOP_DURATION_MS = 1_500L
+internal const val HOLD_TO_STOP_DURATION_MS = 900L
+internal const val HOLD_TO_STOP_BUTTON_TAG = "holdToStopButton"
 
 // Press-and-hold instead of a plain tap (spec §6): avoids triggering a stop from an accidental
 // bump while holding the phone on a moving vehicle. onHoldComplete fires once, exactly when the
@@ -389,6 +406,7 @@ internal fun HoldToStopButton(
             modifier =
                 modifier
                     .size(84.dp)
+                    .testTag(HOLD_TO_STOP_BUTTON_TAG)
                     .pointerInput(onHoldComplete) {
                         awaitEachGesture {
                             awaitFirstDown()
@@ -428,13 +446,17 @@ internal fun CaptureHudRow(
     gpsAccuracyMeters: Float?,
     latestLuxValue: Float?,
     freeStorageBytes: Long?,
+    gpsSignalLost: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        HudChip(text = gpsAccuracyLabel(gpsAccuracyMeters))
+        HudChip(
+            text = if (gpsSignalLost) "Mất GPS" else gpsAccuracyLabel(gpsAccuracyMeters),
+            textColor = if (gpsSignalLost) Amber500 else Color.White,
+        )
         HudChip(text = latestLuxValue?.let { "%.1f lux".format(it) } ?: "Chưa có dữ liệu lux")
         HudChip(text = freeStorageBytes?.let { "${it / 1_000_000} MB trống" } ?: "— MB trống")
     }

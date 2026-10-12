@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.capture
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import com.luxmap.core.ble.LuxDevice
@@ -93,9 +94,9 @@ class CaptureScreenTest {
         }
         composeRule.onNodeWithText("Nhấn giữ để dừng quay").assertExists()
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithText("Nhấn giữ để dừng quay").performTouchInput { down(center) }
+        composeRule.onNodeWithTag(HOLD_TO_STOP_BUTTON_TAG).performTouchInput { down(center) }
         composeRule.mainClock.advanceTimeBy(300L)
-        composeRule.onNodeWithText("Nhấn giữ để dừng quay").performTouchInput { up() }
+        composeRule.onNodeWithTag(HOLD_TO_STOP_BUTTON_TAG).performTouchInput { up() }
         composeRule.mainClock.advanceTimeBy(HOLD_TO_STOP_DURATION_MS)
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
@@ -110,10 +111,25 @@ class CaptureScreenTest {
             LuxMapTheme { HoldToStopButton(onHoldComplete = { completed = true }) }
         }
         composeRule.mainClock.autoAdvance = false
-        composeRule.onNodeWithText("Nhấn giữ để dừng quay").performTouchInput { down(center) }
+        composeRule.onNodeWithTag(HOLD_TO_STOP_BUTTON_TAG).performTouchInput { down(center) }
         composeRule.mainClock.advanceTimeBy(HOLD_TO_STOP_DURATION_MS + 100L)
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
         assertTrue(completed)
+    }
+
+    @Test
+    fun hud_row_shows_mat_gps_in_amber_when_the_gps_signal_is_lost() {
+        composeRule.setContent {
+            LuxMapTheme {
+                CaptureHudRow(
+                    gpsAccuracyMeters = 5f,
+                    latestLuxValue = null,
+                    freeStorageBytes = null,
+                    gpsSignalLost = true,
+                )
+            }
+        }
+        composeRule.onNodeWithText("Mất GPS").assertExists()
     }
 }
