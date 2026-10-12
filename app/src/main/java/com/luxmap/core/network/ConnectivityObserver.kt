@@ -50,10 +50,40 @@ class ConnectivityObserver
                 awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
             }.distinctUntilChanged()
 
+        val isOnWifi: Flow<Boolean> =
+            callbackFlow {
+                val callback =
+                    object : ConnectivityManager.NetworkCallback() {
+                        override fun onAvailable(network: Network) {
+                            trySend(hasWifiTransport())
+                        }
+
+                        override fun onLost(network: Network) {
+                            trySend(hasWifiTransport())
+                        }
+
+                        override fun onCapabilitiesChanged(
+                            network: Network,
+                            networkCapabilities: NetworkCapabilities,
+                        ) {
+                            trySend(hasWifiTransport())
+                        }
+                    }
+                connectivityManager.registerNetworkCallback(NetworkRequest.Builder().build(), callback)
+                trySend(hasWifiTransport())
+                awaitClose { connectivityManager.unregisterNetworkCallback(callback) }
+            }.distinctUntilChanged()
+
         private fun hasInternetCapability(): Boolean {
             val network = connectivityManager.activeNetwork ?: return false
             val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
             return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        }
+
+        private fun hasWifiTransport(): Boolean {
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
         }
     }

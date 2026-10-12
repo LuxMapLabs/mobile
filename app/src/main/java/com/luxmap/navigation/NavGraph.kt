@@ -234,7 +234,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
             ) { backStackEntry ->
                 val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-                SubmitScreen(sessionId = sessionId)
+                SubmitScreen(
+                    sessionId = sessionId,
+                    onBackToSurveyHub = {
+                        navController.navigate(Routes.Survey.route) {
+                            popUpTo(Routes.Survey.route) { inclusive = true }
+                        }
+                    },
+                )
             }
             composable(Routes.Map.route) {
                 MapScreen(

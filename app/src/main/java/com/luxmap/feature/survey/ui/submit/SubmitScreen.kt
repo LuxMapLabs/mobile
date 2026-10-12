@@ -1,76 +1,180 @@
 package com.luxmap.feature.survey.ui.submit
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import com.luxmap.feature.survey.data.SessionFileStatus
+import com.luxmap.feature.survey.data.SessionUploadSummary
+import java.util.Locale
 
 @Composable
 fun SubmitScreen(
     sessionId: String,
+    onBackToSurveyHub: () -> Unit,
     viewModel: SubmitViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val fileStatuses by viewModel.fileStatuses.collectAsState()
+    val summary by viewModel.summary.collectAsState()
+    val wifiOnlyUpload by viewModel.wifiOnlyUpload.collectAsState()
 
     LaunchedEffect(sessionId) { viewModel.onSubmit(sessionId) }
 
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column {
+    // A LazyColumn, not a plain Column: the file row count is 5 + segmentCount, and a session
+    // recorded in 60s clips can easily have 15-35 rows - a plain Column pushed "Về Khảo sát" off
+    // the bottom of the screen with no way to reach it except the OS back gesture.
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(Spacing.lg)) {
+        item { Text(text = "Nộp đợt khảo sát", style = MaterialTheme.typography.titleLarge) }
+        item { SubmitStatusBadge(uiState) }
+        summary?.let { item { SubmitSummaryGrid(it) } }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.md),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Chỉ tải lên qua Wi-Fi", style = MaterialTheme.typography.bodyLarge)
+                Switch(checked = wifiOnlyUpload, onCheckedChange = viewModel::onWifiOnlyToggled)
+            }
+        }
+        item {
             when (val state = uiState) {
-                is SubmitUiState.Idle ->
-                    StatusBadge(
-                        text = SyncStatus.QUEUED_ONLINE.label(),
-                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
-                    )
-
                 is SubmitUiState.Uploading -> {
                     val fraction =
                         if (state.totalBytes == 0L) 0f else state.bytesSent.toFloat() / state.totalBytes.toFloat()
-                    LinearProgressIndicator(progress = { fraction })
-                    Text("${state.bytesSent} / ${state.totalBytes} bytes")
-                    if (state.isOffline) {
-                        StatusBadge(
-                            text = SyncStatus.QUEUED_OFFLINE.label(),
-                            colors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                        )
-                    } else {
-                        StatusBadge(text = SyncStatus.SYNCING.label(), colors = SyncStatus.SYNCING.badgeColors())
-                    }
+                    LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
                 }
-
-                is SubmitUiState.Done -> {
-                    StatusBadge(text = SyncStatus.DONE.label(), colors = SyncStatus.DONE.badgeColors())
-                    Text("Đã nộp thành công", style = MaterialTheme.typography.bodyLarge)
-                }
-
-                is SubmitUiState.Failed -> {
-                    StatusBadge(text = SyncStatus.FAILED.label(), colors = SyncStatus.FAILED.badgeColors())
-                    Text(state.message, style = MaterialTheme.typography.bodyLarge)
+                is SubmitUiState.Failed, is SubmitUiState.WaitingForWifi ->
                     PrimaryButton(text = "Nộp lại", onClick = { viewModel.onSubmit(sessionId) })
-                }
-
-                is SubmitUiState.Conflict -> {
-                    StatusBadge(text = SyncStatus.CONFLICT.label(), colors = SyncStatus.CONFLICT.badgeColors())
-                    Text(state.message, style = MaterialTheme.typography.bodyLarge)
-                }
-
-                is SubmitUiState.NotPackagedYet ->
-                    Text("Phiên khảo sát chưa đóng gói xong, chưa thể nộp", style = MaterialTheme.typography.bodyLarge)
+                else -> Unit
             }
+        }
+        items(fileStatuses) { file -> FileStatusRow(file) }
+        item {
+            PrimaryButton(
+                text = "Về Khảo sát",
+                onClick = onBackToSurveyHub,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.md),
+            )
         }
     }
 }
+
+@Composable
+private fun SubmitStatusBadge(state: SubmitUiState) {
+    when (state) {
+        is SubmitUiState.Idle ->
+            StatusBadge(text = "Đã lưu trên thiết bị", colors = SyncStatus.QUEUED_ONLINE.badgeColors())
+
+        is SubmitUiState.Uploading ->
+            StatusBadge(
+                text = if (state.isOffline) SyncStatus.QUEUED_OFFLINE.label() else SyncStatus.SYNCING.label(),
+                colors =
+                    if (state.isOffline) SyncStatus.QUEUED_OFFLINE.badgeColors() else SyncStatus.SYNCING.badgeColors(),
+            )
+
+        is SubmitUiState.WaitingForWifi ->
+            StatusBadge(text = "Chờ Wi-Fi để tải lên", colors = SyncStatus.QUEUED_OFFLINE.badgeColors())
+
+        is SubmitUiState.Done -> StatusBadge(text = SyncStatus.DONE.label(), colors = SyncStatus.DONE.badgeColors())
+
+        is SubmitUiState.Failed ->
+            StatusBadge(text = SyncStatus.FAILED.label(), colors = SyncStatus.FAILED.badgeColors())
+
+        is SubmitUiState.Conflict ->
+            StatusBadge(text = SyncStatus.CONFLICT.label(), colors = SyncStatus.CONFLICT.badgeColors())
+
+        is SubmitUiState.NotPackagedYet ->
+            Text("Phiên khảo sát chưa đóng gói xong, chưa thể nộp", style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun SubmitSummaryGrid(summary: SessionUploadSummary) {
+    Column(Modifier.fillMaxWidth().padding(vertical = Spacing.md)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            SummaryCell(
+                "Thời lượng",
+                summary.durationSeconds?.let { "${it / 60} phút" } ?: "—",
+                Modifier.weight(1f),
+            )
+            SummaryCell("Số đoạn video", summary.segmentCount.toString(), Modifier.weight(1f))
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            SummaryCell(
+                "Quãng đường",
+                summary.distanceMeters?.let { "%.1f km".format(Locale.US, it / 1000) } ?: "—",
+                Modifier.weight(1f),
+            )
+            SummaryCell(
+                "Dung lượng",
+                "%.1f MB".format(Locale.US, summary.totalBytes / 1_000_000.0),
+                Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SummaryCell(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.padding(Spacing.sm)) {
+        Text(value, style = MaterialTheme.typography.titleMedium)
+        Text(label, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+internal fun SubmitFileStatusList(files: List<SessionFileStatus>) {
+    Column {
+        files.forEach { file -> FileStatusRow(file) }
+    }
+}
+
+@Composable
+private fun FileStatusRow(file: SessionFileStatus) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(file.label, style = MaterialTheme.typography.bodyMedium)
+        val syncStatus = syncQueueStatusToSyncStatus(file.status)
+        StatusBadge(text = syncStatus.label(), colors = syncStatus.badgeColors())
+    }
+}
+
+// A bare "queued" row always resolves to QUEUED_ONLINE, not an online/offline split - the
+// screen's one top-level SubmitStatusBadge already carries that distinction for the whole
+// submission, and duplicating ConnectivityObserver onto every file row was judged not worth the
+// complexity for this phase (see docs/contract-drift.md).
+private fun syncQueueStatusToSyncStatus(status: String): SyncStatus =
+    when (status) {
+        "syncing" -> SyncStatus.SYNCING
+        "failed" -> SyncStatus.FAILED
+        "conflict" -> SyncStatus.CONFLICT
+        "done" -> SyncStatus.DONE
+        else -> SyncStatus.QUEUED_ONLINE
+    }

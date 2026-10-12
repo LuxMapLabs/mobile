@@ -24,7 +24,7 @@ class LuxMapApp : Application(), Configuration.Provider {
         super.onCreate()
         initMapLibre(this)
         CoroutineScope(Dispatchers.Default).launch { surveySessionRecoveryUseCase.recoverAny() }
-        syncScheduler.schedulePeriodicSync()
+        CoroutineScope(Dispatchers.Default).launch { syncScheduler.schedulePeriodicSync() }
     }
 
     override val workManagerConfiguration: Configuration

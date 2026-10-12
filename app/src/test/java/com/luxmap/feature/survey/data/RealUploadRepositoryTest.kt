@@ -3,17 +3,21 @@ package com.luxmap.feature.survey.data
 import androidx.room.withTransaction
 import app.cash.turbine.test
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.core.sync.SyncQueueProcessor
+import com.luxmap.core.sync.UploadPreferences
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -60,6 +64,12 @@ private fun videoSegment(segmentIndex: Int) =
         checksumSha256 = "checksum$segmentIndex",
     )
 
+private fun wifiOnlyOffPreferences(): UploadPreferences {
+    val prefs = mockk<UploadPreferences>()
+    every { prefs.observeWifiOnlyUpload() } returns flowOf(false)
+    return prefs
+}
+
 class RealUploadRepositoryTest {
     // RealUploadRepository.uploadSession runs claimForUpload+enqueueChain through
     // AppDatabase.withTransaction, a top-level Room extension function - mockkStatic is the only
@@ -102,7 +112,16 @@ class RealUploadRepositoryTest {
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
             coEvery { syncQueueDao.statusOf(any()) } returns "done"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 val last = expectMostRecentItem()
@@ -125,7 +144,16 @@ class RealUploadRepositoryTest {
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
             coEvery { syncQueueDao.statusOf(any()) } returns "failed"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 cancelAndIgnoreRemainingEvents()
@@ -146,7 +174,16 @@ class RealUploadRepositoryTest {
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
             coEvery { syncQueueDao.statusOf(any()) } returns "done"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 cancelAndIgnoreRemainingEvents()
@@ -180,7 +217,16 @@ class RealUploadRepositoryTest {
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
             coEvery { syncQueueDao.statusOf(any()) } returns "done"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 cancelAndIgnoreRemainingEvents()
@@ -221,7 +267,16 @@ class RealUploadRepositoryTest {
                 false
             }
             coEvery { syncQueueDao.statusOf(any()) } returns "done"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 awaitItem() // initial InProgress(0, totalBytes) emitted before processing starts
@@ -245,7 +300,16 @@ class RealUploadRepositoryTest {
             val processor = mockk<SyncQueueProcessor>()
             coEvery { processor.processQueuedOps(any()) } returns false
             coEvery { syncQueueDao.statusOf(any()) } returns "done"
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             repository.uploadSession("SESSION-1").test {
                 cancelAndIgnoreRemainingEvents()
@@ -268,7 +332,16 @@ class RealUploadRepositoryTest {
             coEvery { syncQueueManager.enqueue(any(), any(), any(), any()) } throws
                 IllegalStateException("simulated cancellation mid-enqueue")
             val processor = mockk<SyncQueueProcessor>()
-            val repository = RealUploadRepository(database, sessionDao, syncQueueDao, syncQueueManager, processor)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    wifiOnlyOffPreferences(),
+                    mockk<ConnectivityObserver>(),
+                )
 
             // A failure here is exactly what makes Room's real withTransaction roll back the
             // claimForUpload UPDATE too, instead of leaving a claimed session with an empty
@@ -277,5 +350,78 @@ class RealUploadRepositoryTest {
                 val error = awaitError()
                 assertTrue(error is IllegalStateException)
             }
+        }
+
+    @Test
+    fun `wifi-only on and not on wifi emits WaitingForWifi and never starts the processor`() =
+        runTest {
+            val database = fakeDatabase()
+            val sessionDao = mockk<SurveySessionDao>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
+            coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 1
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val processor = mockk<SyncQueueProcessor>()
+            val prefs = mockk<UploadPreferences>()
+            every { prefs.observeWifiOnlyUpload() } returns flowOf(true)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnWifi } returns flowOf(false)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    prefs,
+                    connectivity,
+                )
+
+            repository.uploadSession("SESSION-1").test {
+                assertTrue(awaitItem() is UploadProgress.WaitingForWifi)
+                awaitComplete()
+            }
+            // The background chain must still be enqueued - WaitingForWifi only skips the
+            // foreground drain attempt, not the enqueue that SyncWorker's own wifi-only-aware
+            // constraint will eventually pick up.
+            coVerify(atLeast = 1) { syncQueueManager.enqueue(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { processor.processQueuedOps(any()) }
+        }
+
+    @Test
+    fun `wifi-only on and already on wifi uploads normally instead of waiting`() =
+        runTest {
+            val database = fakeDatabase()
+            val sessionDao = mockk<SurveySessionDao>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { sessionDao.sessionById("SESSION-1") } returns packagedSession()
+            coEvery { sessionDao.segmentsFor("SESSION-1") } returns emptyList()
+            coEvery { sessionDao.claimForUpload(any(), any()) } returns 1
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val processor = mockk<SyncQueueProcessor>()
+            coEvery { processor.processQueuedOps(any()) } returns false
+            coEvery { syncQueueDao.statusOf(any()) } returns "done"
+            val prefs = mockk<UploadPreferences>()
+            every { prefs.observeWifiOnlyUpload() } returns flowOf(true)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnWifi } returns flowOf(true)
+            val repository =
+                RealUploadRepository(
+                    database,
+                    sessionDao,
+                    syncQueueDao,
+                    syncQueueManager,
+                    processor,
+                    prefs,
+                    connectivity,
+                )
+
+            repository.uploadSession("SESSION-1").test {
+                val last = expectMostRecentItem()
+                assertTrue(last is UploadProgress.Done)
+                cancelAndIgnoreRemainingEvents()
+            }
+            coVerify(atLeast = 1) { processor.processQueuedOps(any()) }
         }
 }
