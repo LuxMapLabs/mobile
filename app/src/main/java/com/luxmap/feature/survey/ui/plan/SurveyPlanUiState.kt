@@ -10,6 +10,7 @@ sealed interface SurveyPlanUiState {
         val routes: List<AssignedSurveyRoute>,
         val selectedSurveySweepId: String? = null,
         val readiness: SurveyReadinessResult? = null,
+        val rejectionReason: String? = null,
     ) : SurveyPlanUiState
 
     data object Empty : SurveyPlanUiState

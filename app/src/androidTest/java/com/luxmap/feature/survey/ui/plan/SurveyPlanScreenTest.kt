@@ -90,6 +90,32 @@ class SurveyPlanScreenTest {
     }
 
     @Test
+    fun a_rejection_reason_shows_the_resurvey_banner() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state = SurveyPlanUiState.Success(routes = listOf(route()), rejectionReason = "Video bị mờ"),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Video bị mờ").assertExists()
+    }
+
+    @Test
+    fun no_rejection_reason_means_no_banner() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(
+                    state = SurveyPlanUiState.Success(routes = listOf(route())),
+                    onRouteSelected = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Video bị mờ").assertDoesNotExist()
+    }
+
+    @Test
     fun empty_state_shows_the_no_routes_message() {
         composeRule.setContent {
             LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Empty, onRouteSelected = {}) }

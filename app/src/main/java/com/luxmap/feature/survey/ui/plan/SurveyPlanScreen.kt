@@ -42,6 +42,8 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CameraReadinessPanel
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.ReadinessCheckItem
@@ -153,6 +155,9 @@ fun SurveyPlanContent(
                 ) { CircularProgressIndicator() }
 
             is SurveyPlanUiState.Success -> {
+                if (state.rejectionReason != null) {
+                    InlineBanner(message = state.rejectionReason, tone = InlineBannerTone.ERROR)
+                }
                 // Re-check readiness after the permission prompt closes, no matter the result, so
                 // the checklist shows the real state right away instead of needing the user to
                 // leave and come back to this screen (onRouteSelected already re-runs
