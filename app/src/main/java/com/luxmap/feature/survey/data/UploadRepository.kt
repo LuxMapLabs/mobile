@@ -10,6 +10,8 @@ sealed interface UploadProgress {
     data class Failed(val reason: String) : UploadProgress
 
     data class Conflict(val reason: String) : UploadProgress
+
+    data object WaitingForWifi : UploadProgress
 }
 
 // No real endpoint yet (spec §13/§14) — swapped for RealUploadRepository once Backend

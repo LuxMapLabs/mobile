@@ -12,4 +12,6 @@ sealed interface SubmitUiState {
     data class Conflict(val message: String) : SubmitUiState
 
     data object NotPackagedYet : SubmitUiState
+
+    data object WaitingForWifi : SubmitUiState
 }

@@ -2,9 +2,11 @@ package com.luxmap.feature.survey.data
 
 import androidx.room.withTransaction
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.core.sync.SyncQueueProcessor
+import com.luxmap.core.sync.UploadPreferences
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.sync.CreateSurveySweepPayload
@@ -12,6 +14,7 @@ import com.luxmap.feature.survey.data.sync.SubmitSurveySweepPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyClipPayload
 import com.luxmap.feature.survey.data.sync.UploadSurveyRawPayload
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -27,6 +30,8 @@ class RealUploadRepository
         private val syncQueueDao: SyncQueueDao,
         private val syncQueueManager: SyncQueueManager,
         private val syncQueueProcessor: SyncQueueProcessor,
+        private val uploadPreferences: UploadPreferences,
+        private val connectivityObserver: ConnectivityObserver,
     ) : UploadRepository {
         override fun uploadSession(sessionId: String): Flow<UploadProgress> =
             flow {
@@ -56,6 +61,14 @@ class RealUploadRepository
                     // first - either way the chain is already enqueued, only a failed op (if any)
                     // needs resetting so queuedRows() picks it up again.
                     syncQueueDao.resetFailedOps(opIds, Instant.now())
+                }
+
+                // The chain above is enqueued either way - only this foreground drain attempt is
+                // skipped. SyncQueueManager.enqueue() already triggered the background SyncWorker
+                // (wifi-only-aware itself), which picks this up once a wifi network is available.
+                if (uploadPreferences.observeWifiOnlyUpload().first() && !connectivityObserver.isOnWifi.first()) {
+                    emit(UploadProgress.WaitingForWifi)
+                    return@flow
                 }
 
                 val totalBytes =

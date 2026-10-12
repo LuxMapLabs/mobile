@@ -70,6 +70,9 @@ fun SubmitScreen(
 
                 is SubmitUiState.NotPackagedYet ->
                     Text("Phiên khảo sát chưa đóng gói xong, chưa thể nộp", style = MaterialTheme.typography.bodyLarge)
+
+                is SubmitUiState.WaitingForWifi ->
+                    Text("Đang chờ Wi-Fi để tải lên", style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

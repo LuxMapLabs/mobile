@@ -47,6 +47,7 @@ class SubmitViewModel
                                 is UploadProgress.Done -> SubmitUiState.Done
                                 is UploadProgress.Failed -> SubmitUiState.Failed(progress.reason)
                                 is UploadProgress.Conflict -> SubmitUiState.Conflict(progress.reason)
+                                is UploadProgress.WaitingForWifi -> SubmitUiState.WaitingForWifi
                             }
                     }
             }

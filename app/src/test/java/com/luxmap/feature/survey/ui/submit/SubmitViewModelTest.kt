@@ -135,4 +135,22 @@ class SubmitViewModelTest {
                 assertEquals(SubmitUiState.Failed("boom"), awaitItem())
             }
         }
+
+    @Test
+    fun `wifi-only on and not on wifi reports WaitingForWifi instead of uploading`() =
+        runTest {
+            val repository = mockk<UploadRepository>()
+            val sessionDao = mockk<SurveySessionDao>()
+            coEvery { sessionDao.sessionById("SESSION-1") } returns session(recordingState = "packaged")
+            every { repository.uploadSession("SESSION-1") } returns flowOf(UploadProgress.WaitingForWifi)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SubmitViewModel(repository, sessionDao, connectivity)
+
+            viewModel.uiState.test {
+                assertTrue(awaitItem() is SubmitUiState.Idle)
+                viewModel.onSubmit("SESSION-1")
+                assertTrue(awaitItem() is SubmitUiState.WaitingForWifi)
+            }
+        }
 }
