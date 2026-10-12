@@ -8,6 +8,8 @@ import com.luxmap.feature.map.data.FakeMapRepository
 import com.luxmap.feature.map.data.FakePoleDetailRepository
 import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleDetailRepository
+import com.luxmap.feature.survey.data.AiClassificationRepository
+import com.luxmap.feature.survey.data.FakeAiClassificationRepository
 import com.luxmap.feature.survey.data.FakeSurveyRepository
 import com.luxmap.feature.survey.data.RealUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
@@ -52,4 +54,7 @@ abstract class RepositoryModule {
     abstract fun bindWorkOrderCompletionRepository(
         impl: RealWorkOrderCompletionRepository,
     ): WorkOrderCompletionRepository
+
+    @Binds
+    abstract fun bindAiClassificationRepository(impl: FakeAiClassificationRepository): AiClassificationRepository
 }
