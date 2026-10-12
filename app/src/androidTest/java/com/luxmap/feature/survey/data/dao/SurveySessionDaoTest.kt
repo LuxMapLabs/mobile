@@ -8,6 +8,7 @@ import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -140,6 +141,19 @@ class SurveySessionDaoTest {
 
             assertNull(dao.sessionById("SESSION-1"))
             assertEquals(0, dao.segmentsFor("SESSION-1").size)
+        }
+
+    @Test
+    fun observeSessionsBySyncStateOnlyReturnsSessionsInThatState() =
+        runTest {
+            dao.insertSession(session("SESSION-1").copy(syncState = "queued"))
+            dao.insertSession(session("SESSION-2").copy(syncState = "done"))
+            dao.insertSession(session("SESSION-3").copy(syncState = null))
+
+            val queued = dao.observeSessionsBySyncState("queued").first()
+
+            assertEquals(1, queued.size)
+            assertEquals("SESSION-1", queued.first().sessionId)
         }
 
     @Test
