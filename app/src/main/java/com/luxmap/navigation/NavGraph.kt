@@ -35,8 +35,7 @@ import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
-import com.luxmap.feature.profile.ui.ProfileScreen
-import com.luxmap.feature.profile.ui.ProfileViewModel
+import com.luxmap.feature.profile.ui.ProfileRoute
 import com.luxmap.feature.survey.ui.aiconfirm.AiConfirmationRoute
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
@@ -262,14 +261,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Profile.route) {
-                val profileViewModel: ProfileViewModel = hiltViewModel()
-                val username by profileViewModel.username.collectAsState()
-                ProfileScreen(
-                    // Null only for a session saved before the app kept the username.
-                    username = username ?: "Tài khoản",
-                    isLoggingOut = profileViewModel.isLoggingOut,
-                    onConfirmLogout = profileViewModel::onConfirmLogout,
-                )
+                ProfileRoute()
             }
             composable(
                 route = Routes.PoleDetail.route,
