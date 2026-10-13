@@ -45,6 +45,7 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 @Composable
 fun SurveyHubRoute(
     onCheckReadiness: (surveySweepId: String) -> Unit,
+    onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
 ) {
@@ -55,6 +56,7 @@ fun SurveyHubRoute(
             onCheckReadiness = onCheckReadiness,
             modifier = modifier,
             onRetry = viewModel::onRetry,
+            onReviewAiConfirmation = onReviewAiConfirmation,
         )
     }
 }

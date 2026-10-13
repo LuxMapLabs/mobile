@@ -37,6 +37,7 @@ import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.profile.ui.ProfileScreen
 import com.luxmap.feature.profile.ui.ProfileViewModel
+import com.luxmap.feature.survey.ui.aiconfirm.AiConfirmationRoute
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
@@ -156,7 +157,17 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onCheckReadiness = { surveySweepId ->
                         navController.navigate(Routes.SurveyPlan.createRoute(surveySweepId))
                     },
+                    onReviewAiConfirmation = { surveySweepId ->
+                        navController.navigate(Routes.AiConfirmation.createRoute(surveySweepId))
+                    },
                 )
+            }
+            composable(
+                route = Routes.AiConfirmation.route,
+                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
+                AiConfirmationRoute(surveySweepId = surveySweepId, onBack = { navController.popBackStack() })
             }
             composable(
                 route = Routes.SurveyPlan.route,

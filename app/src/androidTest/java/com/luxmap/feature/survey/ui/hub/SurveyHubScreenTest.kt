@@ -3,10 +3,12 @@ package com.luxmap.feature.survey.ui.hub
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveySweepStatus
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -90,5 +92,33 @@ class SurveyHubScreenTest {
         }
         composeRule.onNodeWithText("Không tải được Khảo sát").assertExists()
         composeRule.onNodeWithText("Thử lại").assertExists()
+    }
+
+    @Test
+    fun tapping_Xem_va_xac_nhan_on_a_pending_ai_card_invokes_onReviewAiConfirmation() {
+        var reviewed: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = emptyList(),
+                            pendingAiConfirmation =
+                                listOf(
+                                    LocalPendingAiConfirmation(
+                                        surveySweepId = "SWEEP-2029",
+                                        normalCount = 11,
+                                        dimCount = 2,
+                                        outCount = 1,
+                                    ),
+                                ),
+                        ),
+                    onCheckReadiness = {},
+                    onReviewAiConfirmation = { reviewed = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Xem & xác nhận").performClick()
+        assertEquals("SWEEP-2029", reviewed)
     }
 }
