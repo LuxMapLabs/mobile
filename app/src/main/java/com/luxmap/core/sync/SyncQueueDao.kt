@@ -14,6 +14,15 @@ interface SyncQueueDao {
     @Query("SELECT * FROM sync_queue WHERE status = 'queued' ORDER BY createdAt ASC")
     suspend fun queuedRows(): List<SyncQueueEntity>
 
+    @Query("SELECT COUNT(*) FROM sync_queue WHERE status IN ('queued', 'syncing')")
+    fun observePendingCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM sync_queue WHERE status IN ('failed', 'conflict')")
+    fun observeErrorCount(): Flow<Int>
+
+    @Query("SELECT MAX(updatedAt) FROM sync_queue WHERE status = 'done'")
+    fun observeLastSyncedAt(): Flow<Instant?>
+
     @Query("SELECT * FROM sync_queue WHERE clientOpId LIKE :sessionIdPrefix ORDER BY createdAt ASC, id ASC")
     fun observeOpsForSession(sessionIdPrefix: String): Flow<List<SyncQueueEntity>>
 
