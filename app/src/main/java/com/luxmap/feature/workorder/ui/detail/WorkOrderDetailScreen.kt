@@ -17,17 +17,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,19 +33,28 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.HeadlineTextStyle
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.SyncStatus
+import com.luxmap.core.theme.WorkOrderStatus
+import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.color
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
+import com.luxmap.core.ui.components.AppTopBar
+import com.luxmap.core.ui.components.LifecycleTracker
+import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.StatusBadge
@@ -83,7 +90,6 @@ fun WorkOrderDetailRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkOrderDetailScreen(
     uiState: WorkOrderDetailUiState,
@@ -93,18 +99,15 @@ fun WorkOrderDetailScreen(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val topBarTitle =
+        if (uiState is WorkOrderDetailUiState.Success) {
+            workOrderDetailTopBarTitle(uiState.detail.taskKind)
+        } else {
+            "Chi tiết lệnh"
+        }
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("Chi tiết lệnh") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
-            )
-        },
+        topBar = { AppTopBar(title = topBarTitle, onBack = onBack) },
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
@@ -116,12 +119,33 @@ fun WorkOrderDetailScreen(
                         onNavigateFault = onNavigateFault,
                         onComplete = onComplete,
                     )
-                is WorkOrderDetailUiState.Empty -> MessageState("Không tìm thấy lệnh này")
-                is WorkOrderDetailUiState.Error -> MessageState(uiState.message)
+                is WorkOrderDetailUiState.Empty ->
+                    MessageState(
+                        icon = Icons.Filled.Assignment,
+                        iconColors = SyncStatus.DONE.badgeColors(),
+                        title = "Không tìm thấy lệnh này",
+                        subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
+                        action = {},
+                    )
+                is WorkOrderDetailUiState.Error ->
+                    MessageState(
+                        icon = Icons.Filled.CloudOff,
+                        iconColors = SyncStatus.FAILED.badgeColors(),
+                        title = uiState.message,
+                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                        action = {},
+                    )
             }
         }
     }
 }
+
+private fun workOrderDetailTopBarTitle(taskKindWire: String): String =
+    when (workOrderTaskKindFromWire(taskKindWire)) {
+        WorkOrderTaskKind.INSPECTION -> "Lệnh kiểm tra"
+        WorkOrderTaskKind.REPAIR -> "Lệnh sửa chữa"
+        WorkOrderTaskKind.SURVEY -> "Lệnh khảo sát"
+    }
 
 @Composable
 private fun WorkOrderDetailContent(
@@ -163,6 +187,17 @@ private fun WorkOrderDetailContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        if (workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE &&
+            "start" !in detail.allowedActions &&
+            "complete" !in detail.allowedActions
+        ) {
+            PrimaryButton(text = "Đã nộp báo cáo", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+            Text(
+                text = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -170,13 +205,15 @@ private fun WorkOrderDetailContent(
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(text = detail.title, style = MaterialTheme.typography.titleLarge)
-        Text(text = detail.workOrderId, style = MaterialTheme.typography.bodyMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (status == WorkOrderStatus.CANCELLED) {
+                StatusBadge(text = kind.label(), colors = kind.badgeColors())
+            }
             StatusBadge(text = status.label(), colors = status.badgeColors())
-            StatusBadge(text = kind.label(), colors = kind.badgeColors())
         }
+        Text(text = detail.title, style = HeadlineTextStyle)
+        Text(text = detail.workOrderId, style = MaterialTheme.typography.bodyMedium)
         Text(text = dueDateLabel(detail.dueDate).text, style = MaterialTheme.typography.bodyMedium)
         if (!detail.scheduledDate.isNullOrBlank()) {
             Text(
@@ -187,6 +224,19 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
         }
         if (!detail.note.isNullOrBlank()) {
             Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (!detail.reviewNote.isNullOrBlank()) {
+            Text(
+                text = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        if (status != WorkOrderStatus.CANCELLED) {
+            LifecycleTracker(
+                steps = workOrderLifecycleSteps(status, kind),
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm),
+            )
         }
     }
 }
@@ -221,8 +271,8 @@ private fun FaultCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -254,12 +304,7 @@ private fun FaultCard(
 
 @Composable
 private fun BoxScope.LoadingState() {
-    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-}
-
-@Composable
-private fun BoxScope.MessageState(text: String) {
-    Text(text = text, modifier = Modifier.align(Alignment.Center).padding(Spacing.lg))
+    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).testTag("work_order_detail_loading"))
 }
 
 private fun sampleRepairWithFaults() =

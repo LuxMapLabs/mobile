@@ -10,31 +10,35 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.AppTopBar
+import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.OutcomeSegment
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.Requirement
+import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
-import com.luxmap.feature.workorder.ui.detail.inspectionOutcomeLabel
 
 @Composable
 fun WorkOrderCompletionRoute(
@@ -57,7 +61,6 @@ fun WorkOrderCompletionRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkOrderCompletionScreen(
     uiState: WorkOrderCompletionUiState,
@@ -72,16 +75,7 @@ fun WorkOrderCompletionScreen(
 ) {
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("Hoàn thành lệnh") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
-            )
-        },
+        topBar = { AppTopBar(title = "Hoàn thành lệnh", onBack = onBack) },
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
@@ -96,8 +90,22 @@ fun WorkOrderCompletionScreen(
                         onCaptureEvidence = onCaptureEvidence,
                         onRetakeEvidence = onRetakeEvidence,
                     )
-                is WorkOrderCompletionUiState.Empty -> MessageState("Không tìm thấy lệnh này")
-                is WorkOrderCompletionUiState.Error -> MessageState(uiState.message)
+                is WorkOrderCompletionUiState.Empty ->
+                    MessageState(
+                        icon = Icons.Filled.Assignment,
+                        iconColors = SyncStatus.DONE.badgeColors(),
+                        title = "Không tìm thấy lệnh này",
+                        subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
+                        action = {},
+                    )
+                is WorkOrderCompletionUiState.Error ->
+                    MessageState(
+                        icon = Icons.Filled.CloudOff,
+                        iconColors = SyncStatus.FAILED.badgeColors(),
+                        title = uiState.message,
+                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                        action = {},
+                    )
             }
         }
     }
@@ -126,20 +134,27 @@ private fun WorkOrderCompletionContent(
         state.syncStatus()?.let { status ->
             StatusBadge(text = status.label(), colors = status.badgeColors())
         }
-        if (state.detail.taskKind == "repair") {
-            RepairCompletionSection(
-                state = state,
-                onReportNoteChanged = onReportNoteChanged,
-                onMaterialsUsedChanged = onMaterialsUsedChanged,
-                onCaptureEvidence = onCaptureEvidence,
-                onRetakeEvidence = onRetakeEvidence,
-            )
-        } else {
-            InspectionCompletionSection(
-                state = state,
-                onReportNoteChanged = onReportNoteChanged,
-                onFaultOutcomeSelected = onFaultOutcomeSelected,
-            )
+        when (state.detail.taskKind) {
+            "repair" ->
+                RepairCompletionSection(
+                    state = state,
+                    onReportNoteChanged = onReportNoteChanged,
+                    onMaterialsUsedChanged = onMaterialsUsedChanged,
+                    onCaptureEvidence = onCaptureEvidence,
+                    onRetakeEvidence = onRetakeEvidence,
+                )
+            "inspection" ->
+                InspectionCompletionSection(
+                    state = state,
+                    onReportNoteChanged = onReportNoteChanged,
+                    onFaultOutcomeSelected = onFaultOutcomeSelected,
+                )
+            else ->
+                Text(
+                    text = "Loại lệnh này chưa hỗ trợ nộp qua ứng dụng",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
         }
         if (state.submitError != null) {
             InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
@@ -161,13 +176,12 @@ private fun RepairCompletionSection(
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
 ) {
+    val hasPhoto = state.localEvidence != null
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        if (state.localEvidence == null) {
-            PrimaryButton(text = "Chụp ảnh sau", onClick = onCaptureEvidence, modifier = Modifier.fillMaxWidth())
-        } else {
-            Text(text = "Đã chụp ảnh sau", style = MaterialTheme.typography.bodyMedium)
-            PrimaryButton(text = "Chụp lại", onClick = onRetakeEvidence, modifier = Modifier.fillMaxWidth())
-        }
+        EvidencePicker(
+            hasPhoto = hasPhoto,
+            onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
+        )
         OutlinedTextField(
             value = state.reportNote,
             onValueChange = onReportNoteChanged,
@@ -180,6 +194,13 @@ private fun RepairCompletionSection(
             label = { Text("Vật tư đã dùng (không bắt buộc)") },
             modifier = Modifier.fillMaxWidth(),
         )
+        RequirementList(
+            items =
+                listOf(
+                    Requirement("Có ảnh sau sửa chữa", met = hasPhoto),
+                    Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
+                ),
+        )
     }
 }
 
@@ -189,9 +210,12 @@ private fun InspectionCompletionSection(
     onReportNoteChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
 ) {
+    val faults = state.detail.faults
+    val recordedCount = faults.count { state.faultOutcomes.containsKey(it.faultId) }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        state.detail.faults.forEach { fault ->
-            FaultOutcomeRow(
+        Text(text = "$recordedCount/${faults.size} cột đã ghi nhận", style = MaterialTheme.typography.bodyMedium)
+        faults.forEach { fault ->
+            FaultOutcomeSection(
                 fault = fault,
                 selected = state.faultOutcomes[fault.faultId],
                 onSelected = onFaultOutcomeSelected,
@@ -203,33 +227,29 @@ private fun InspectionCompletionSection(
             label = { Text("Ghi chú kiểm tra") },
             modifier = Modifier.fillMaxWidth(),
         )
+        RequirementList(
+            items =
+                listOf(
+                    Requirement("Đã ghi nhận đủ kết quả kiểm tra từng cột", met = recordedCount == faults.size),
+                    Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
+                ),
+        )
     }
 }
 
 @Composable
-private fun FaultOutcomeRow(
+private fun FaultOutcomeSection(
     fault: WorkOrderFaultDetail,
     selected: String?,
     onSelected: (String, String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
-        listOf("fault_present", "fault_absent", "inconclusive").forEach { outcome ->
-            PrimaryButton(
-                text = inspectionOutcomeLabel(outcome) + if (selected == outcome) " ✓" else "",
-                onClick = { onSelected(fault.faultId, outcome) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
+        OutcomeSegment(selected = selected, onSelected = { outcome -> onSelected(fault.faultId, outcome) })
     }
 }
 
 @Composable
 private fun BoxScope.LoadingState() {
-    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-}
-
-@Composable
-private fun BoxScope.MessageState(text: String) {
-    Text(text = text, modifier = Modifier.align(Alignment.Center).padding(Spacing.lg))
+    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).testTag("work_order_completion_loading"))
 }
