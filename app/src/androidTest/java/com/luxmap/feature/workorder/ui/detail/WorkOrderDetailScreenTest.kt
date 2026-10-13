@@ -89,6 +89,42 @@ class WorkOrderDetailScreenTest {
         }
         composeRule.onNodeWithText("Đã huỷ").assertExists()
         composeRule.onNodeWithText("Đã nghiệm thu").assertDoesNotExist()
+        composeRule.onNodeWithText("Sửa chữa").assertExists()
+    }
+
+    @Test
+    fun a_review_note_shows_the_managers_request() {
+        val detail = repairDetail().copy(reviewNote = "Chụp thêm ảnh góc rộng")
+        composeRule.setContent {
+            LuxMapTheme {
+                WorkOrderDetailScreen(
+                    uiState = WorkOrderDetailUiState.Success(detail = detail),
+                    onBack = {},
+                    onStart = {},
+                    onNavigateFault = { _, _ -> },
+                    onComplete = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Manager yêu cầu bổ sung: Chụp thêm ảnh góc rộng").assertExists()
+    }
+
+    @Test
+    fun a_done_work_order_with_no_allowed_actions_shows_the_disabled_submitted_hint() {
+        val detail = repairDetail(woStatus = "done").copy(allowedActions = emptyList())
+        composeRule.setContent {
+            LuxMapTheme {
+                WorkOrderDetailScreen(
+                    uiState = WorkOrderDetailUiState.Success(detail = detail),
+                    onBack = {},
+                    onStart = {},
+                    onNavigateFault = { _, _ -> },
+                    onComplete = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt (cổng #2)").assertExists()
     }
 
     @Test

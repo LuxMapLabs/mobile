@@ -148,6 +148,27 @@ class WorkOrderCompletionScreenTest {
     }
 
     @Test
+    fun an_unsupported_task_kind_shows_a_plain_message_instead_of_a_false_checklist() {
+        composeRule.setContent {
+            LuxMapTheme {
+                WorkOrderCompletionScreen(
+                    uiState = successState(repairDetail().copy(taskKind = "survey")),
+                    onBack = {},
+                    onReportNoteChanged = {},
+                    onMaterialsUsedChanged = {},
+                    onFaultOutcomeSelected = { _, _ -> },
+                    onSubmit = {},
+                    onCaptureEvidence = {},
+                    onRetakeEvidence = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Loại lệnh này chưa hỗ trợ nộp qua ứng dụng").assertExists()
+        composeRule.onNodeWithText("Có ảnh sau sửa chữa").assertDoesNotExist()
+        composeRule.onNodeWithText("cột đã ghi nhận", substring = true).assertDoesNotExist()
+    }
+
+    @Test
     fun selecting_an_outcome_invokes_onFaultOutcomeSelected_with_the_fault_and_wire_value() {
         var picked: Pair<String, String>? = null
         composeRule.setContent {

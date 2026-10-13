@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,9 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Spacing
@@ -34,33 +37,45 @@ fun LifecycleTracker(
     steps: List<LifecycleStep>,
     modifier: Modifier = Modifier,
 ) {
+    val doneColor = MaterialTheme.colorScheme.onSurface
+    val futureColor = MaterialTheme.colorScheme.outlineVariant
     Column(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(24.dp)
+                    .drawBehind {
+                        val cellWidth = size.width / steps.size
+                        val y = size.height / 2
+                        for (index in 0 until steps.lastIndex) {
+                            val startX = cellWidth * (index + 0.5f)
+                            val endX = cellWidth * (index + 1.5f)
+                            val color = if (steps[index].state == LifecycleStepState.DONE) doneColor else futureColor
+                            drawLine(
+                                color = color,
+                                start = Offset(startX, y),
+                                end = Offset(endX, y),
+                                strokeWidth = 2.dp.toPx(),
+                            )
+                        }
+                    },
+        ) {
             steps.forEachIndexed { index, step ->
-                StepDot(index = index, state = step.state)
-                if (index != steps.lastIndex) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .height(2.dp)
-                                .background(connectorColor(step.state)),
-                    )
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    StepDot(index = index, state = step.state)
                 }
             }
         }
-        Row(modifier = Modifier.padding(top = Spacing.xs)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)) {
             steps.forEach { step ->
                 Text(
                     text = step.label,
                     style = LabelTextStyle,
                     textAlign = TextAlign.Center,
-                    color =
-                        if (step.state == LifecycleStepState.FUTURE) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (step.state == LifecycleStepState.FUTURE) futureColor else doneColor,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -108,11 +123,3 @@ private fun StepDot(
             )
     }
 }
-
-@Composable
-private fun connectorColor(previousStepState: LifecycleStepState): Color =
-    if (previousStepState == LifecycleStepState.DONE) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }

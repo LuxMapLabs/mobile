@@ -187,6 +187,17 @@ private fun WorkOrderDetailContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+        if (workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE &&
+            "start" !in detail.allowedActions &&
+            "complete" !in detail.allowedActions
+        ) {
+            PrimaryButton(text = "Đã nộp báo cáo", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+            Text(
+                text = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -196,7 +207,9 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StatusBadge(text = kind.label(), colors = kind.badgeColors())
+            if (status == WorkOrderStatus.CANCELLED) {
+                StatusBadge(text = kind.label(), colors = kind.badgeColors())
+            }
             StatusBadge(text = status.label(), colors = status.badgeColors())
         }
         Text(text = detail.title, style = HeadlineTextStyle)
@@ -211,6 +224,13 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
         }
         if (!detail.note.isNullOrBlank()) {
             Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+        }
+        if (!detail.reviewNote.isNullOrBlank()) {
+            Text(
+                text = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
         if (status != WorkOrderStatus.CANCELLED) {
             LifecycleTracker(

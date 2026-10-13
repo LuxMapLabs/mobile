@@ -134,20 +134,27 @@ private fun WorkOrderCompletionContent(
         state.syncStatus()?.let { status ->
             StatusBadge(text = status.label(), colors = status.badgeColors())
         }
-        if (state.detail.taskKind == "repair") {
-            RepairCompletionSection(
-                state = state,
-                onReportNoteChanged = onReportNoteChanged,
-                onMaterialsUsedChanged = onMaterialsUsedChanged,
-                onCaptureEvidence = onCaptureEvidence,
-                onRetakeEvidence = onRetakeEvidence,
-            )
-        } else {
-            InspectionCompletionSection(
-                state = state,
-                onReportNoteChanged = onReportNoteChanged,
-                onFaultOutcomeSelected = onFaultOutcomeSelected,
-            )
+        when (state.detail.taskKind) {
+            "repair" ->
+                RepairCompletionSection(
+                    state = state,
+                    onReportNoteChanged = onReportNoteChanged,
+                    onMaterialsUsedChanged = onMaterialsUsedChanged,
+                    onCaptureEvidence = onCaptureEvidence,
+                    onRetakeEvidence = onRetakeEvidence,
+                )
+            "inspection" ->
+                InspectionCompletionSection(
+                    state = state,
+                    onReportNoteChanged = onReportNoteChanged,
+                    onFaultOutcomeSelected = onFaultOutcomeSelected,
+                )
+            else ->
+                Text(
+                    text = "Loại lệnh này chưa hỗ trợ nộp qua ứng dụng",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
         }
         if (state.submitError != null) {
             InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
