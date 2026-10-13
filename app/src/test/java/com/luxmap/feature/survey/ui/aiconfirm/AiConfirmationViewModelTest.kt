@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -253,5 +254,48 @@ class AiConfirmationViewModelTest {
             advanceUntilIdle()
 
             coVerify { repository.submit("SWEEP-1") }
+        }
+
+    @Test
+    fun `load cancels the previous collector so a stale emission from an old sweep never overwrites newer state`() =
+        runTest {
+            val repository = mockk<AiClassificationRepository>()
+            every { repository.observeReviews("SWEEP-OLD") } returns
+                flow {
+                    delay(1_000)
+                    emit(listOf(review("old", AssetCondition.NORMAL)))
+                }
+            every { repository.observeReviews("SWEEP-NEW") } returns
+                MutableStateFlow(listOf(review("new", AssetCondition.DIM)))
+            val viewModel = AiConfirmationViewModel(repository, mockk())
+
+            viewModel.load("SWEEP-OLD")
+            viewModel.load("SWEEP-NEW")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as AiConfirmationUiState.Success
+            assertEquals(listOf("new"), state.reviews.map { it.reviewId })
+        }
+
+    @Test
+    fun `onRetry reloads using the last surveySweepId`() =
+        runTest {
+            val repository = mockk<AiClassificationRepository>()
+            every { repository.observeReviews("SWEEP-1") } returnsMany
+                listOf(
+                    flow { throw IllegalStateException("boom") },
+                    MutableStateFlow(listOf(review("1", AssetCondition.NORMAL))),
+                )
+            val viewModel = AiConfirmationViewModel(repository, mockk())
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.load("SWEEP-1")
+                assertTrue(awaitItem() is AiConfirmationUiState.Error)
+                viewModel.onRetry()
+                assertEquals(AiConfirmationUiState.Loading, awaitItem())
+                val success = awaitItem() as AiConfirmationUiState.Success
+                assertEquals(listOf("1"), success.reviews.map { it.reviewId })
+            }
         }
 }

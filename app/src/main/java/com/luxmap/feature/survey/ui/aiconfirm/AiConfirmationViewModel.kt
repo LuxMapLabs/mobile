@@ -7,6 +7,7 @@ import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.survey.data.AiClassificationRepository
 import com.luxmap.feature.survey.data.LocalAiClassificationReview
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,24 +32,35 @@ class AiConfirmationViewModel
         private val _sheet = MutableStateFlow<AiReviewSheetState?>(null)
         val sheet: StateFlow<AiReviewSheetState?> = _sheet.asStateFlow()
 
+        private var loadJob: Job? = null
+        private var currentSurveySweepId: String? = null
+
         fun load(surveySweepId: String) {
-            viewModelScope.launch {
-                combine(repository.observeReviews(surveySweepId), filterState) { reviews, filter ->
-                    if (reviews.isEmpty()) {
-                        AiConfirmationUiState.Empty
-                    } else {
-                        AiConfirmationUiState.Success(
-                            reviews = reviews.filter { matchesFilter(it, filter) },
-                            filter = filter,
-                            normalCount = reviews.count { it.finalClass == AssetCondition.NORMAL },
-                            dimCount = reviews.count { it.finalClass == AssetCondition.DIM },
-                            outCount = reviews.count { it.finalClass == AssetCondition.OUT },
-                        )
-                    }
-                }.catch { e ->
-                    _uiState.value = AiConfirmationUiState.Error(e.message ?: "Không tải được kết quả AI")
-                }.collect { state -> _uiState.value = state }
-            }
+            currentSurveySweepId = surveySweepId
+            loadJob?.cancel()
+            _uiState.value = AiConfirmationUiState.Loading
+            loadJob =
+                viewModelScope.launch {
+                    combine(repository.observeReviews(surveySweepId), filterState) { reviews, filter ->
+                        if (reviews.isEmpty()) {
+                            AiConfirmationUiState.Empty
+                        } else {
+                            AiConfirmationUiState.Success(
+                                reviews = reviews.filter { matchesFilter(it, filter) },
+                                filter = filter,
+                                normalCount = reviews.count { it.finalClass == AssetCondition.NORMAL },
+                                dimCount = reviews.count { it.finalClass == AssetCondition.DIM },
+                                outCount = reviews.count { it.finalClass == AssetCondition.OUT },
+                            )
+                        }
+                    }.catch { e ->
+                        _uiState.value = AiConfirmationUiState.Error(e.message ?: "Không tải được kết quả AI")
+                    }.collect { state -> _uiState.value = state }
+                }
+        }
+
+        fun onRetry() {
+            currentSurveySweepId?.let { load(it) }
         }
 
         fun onFilterSelected(filter: ReviewFilter) {

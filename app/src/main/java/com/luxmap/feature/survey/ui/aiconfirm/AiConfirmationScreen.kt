@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.aiconfirm
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -29,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -93,6 +96,7 @@ fun AiConfirmationRoute(
             onReasonChanged = viewModel::onReasonChanged,
             onSaveSheet = viewModel::onSaveSheet,
             onSubmit = { viewModel.onSubmit(surveySweepId) },
+            onRetry = viewModel::onRetry,
         )
     }
 }
@@ -111,6 +115,7 @@ fun AiConfirmationScreen(
     onReasonChanged: (String) -> Unit = {},
     onSaveSheet: () -> Unit = {},
     onSubmit: () -> Unit = {},
+    onRetry: () -> Unit = {},
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -163,8 +168,17 @@ fun AiConfirmationScreen(
                         iconColors = SyncStatus.FAILED.badgeColors(),
                         title = uiState.message,
                         subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                        action = {},
-                    )
+                    ) {
+                        OutlinedButton(
+                            onClick = onRetry,
+                            colors =
+                                ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.primary,
+                                ),
+                        ) {
+                            Text("Thử lại")
+                        }
+                    }
             }
         }
     }
@@ -222,7 +236,17 @@ private fun AiConfirmationContent(
             )
         }
         item { FilterChipRow(selected = state.filter, onFilterSelected = onFilterSelected) }
-        items(state.reviews) { review -> ReviewRow(review, onClick = { onReviewSelected(review) }) }
+        if (state.reviews.isEmpty()) {
+            item {
+                Text(
+                    text = "Không có kết quả khớp bộ lọc này",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            items(state.reviews) { review -> ReviewRow(review, onClick = { onReviewSelected(review) }) }
+        }
     }
 }
 
@@ -288,26 +312,30 @@ private fun ReviewRow(
     review: LocalAiClassificationReview,
     onClick: () -> Unit,
 ) {
+    val isDark = isSystemInDarkTheme()
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = Spacing.sm),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        FrameThumbnail(finalClass = review.finalClass, modifier = Modifier.size(56.dp))
+        FrameThumbnail(finalClass = review.finalClass, isDark = isDark, modifier = Modifier.size(56.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(text = review.poleId, style = MaterialTheme.typography.bodyLarge)
             val distanceText = "%.1f".format(Locale.US, review.distanceKm)
             val base = "$distanceText km · AI ${review.aiConfidencePercent}%"
             val isLowConfidence = review.aiConfidencePercent < LOW_CONFIDENCE_THRESHOLD
-            Text(
-                text = if (isLowConfidence) "$base · tin cậy thấp" else base,
-                style = MaterialTheme.typography.bodySmall,
-                color =
-                    if (isLowConfidence) {
-                        SyncStatus.SYNCING.badgeColors().text
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Text(
+                    text = base,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (isLowConfidence) {
+                    StatusBadge(text = "tin cậy thấp", colors = SyncStatus.SYNCING.badgeColors())
+                }
+            }
             if (review.overrideReason != null) {
                 Text(
                     text = "đã sửa từ ${review.aiClass.label()}",
@@ -316,13 +344,14 @@ private fun ReviewRow(
                 )
             }
         }
-        StatusBadge(text = review.finalClass.label(), colors = review.finalClass.badgeColors(isDark = false))
+        StatusBadge(text = review.finalClass.label(), colors = review.finalClass.badgeColors(isDark = isDark))
     }
 }
 
 @Composable
 private fun FrameThumbnail(
     finalClass: AssetCondition,
+    isDark: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -345,7 +374,7 @@ private fun FrameThumbnail(
                 Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .background(finalClass.badgeColors(isDark = false).background),
+                    .background(finalClass.badgeColors(isDark = isDark).background),
         )
     }
 }

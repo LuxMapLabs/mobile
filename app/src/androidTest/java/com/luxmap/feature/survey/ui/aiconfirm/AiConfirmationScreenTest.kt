@@ -205,6 +205,47 @@ class AiConfirmationScreenTest {
     }
 
     @Test
+    fun error_state_shows_a_retry_button_that_invokes_onRetry() {
+        var retried = false
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState = AiConfirmationUiState.Error("Không tải được kết quả AI"),
+                    sheet = null,
+                    onBack = {},
+                    onRetry = { retried = true },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertTrue(retried)
+    }
+
+    @Test
+    fun a_filter_with_no_matching_reviews_shows_an_inline_empty_message_instead_of_a_blank_list() {
+        composeRule.setContent {
+            LuxMapTheme {
+                AiConfirmationScreen(
+                    surveySweepId = "SWEEP-1",
+                    uiState =
+                        AiConfirmationUiState.Success(
+                            reviews = emptyList(),
+                            filter = ReviewFilter.OVERRIDDEN,
+                            normalCount = 1,
+                            dimCount = 0,
+                            outCount = 0,
+                        ),
+                    sheet = null,
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Không có kết quả khớp bộ lọc này").assertExists()
+        composeRule.onNodeWithText("Đã sửa").assertExists()
+    }
+
+    @Test
     fun the_sheet_shows_Luu_thay_doi_disabled_when_a_different_class_is_chosen_without_a_reason() {
         val target = review(aiClass = AssetCondition.NORMAL)
         composeRule.setContent {
