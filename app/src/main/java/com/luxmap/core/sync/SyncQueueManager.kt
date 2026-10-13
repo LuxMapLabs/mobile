@@ -1,5 +1,6 @@
 package com.luxmap.core.sync
 
+import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -11,6 +12,10 @@ class SyncQueueManager
         private val dao: SyncQueueDao,
         private val syncTrigger: SyncTrigger,
     ) {
+        val pendingCount: Flow<Int> = dao.observePendingCount()
+        val errorCount: Flow<Int> = dao.observeErrorCount()
+        val lastSyncedAt: Flow<Instant?> = dao.observeLastSyncedAt()
+
         suspend fun enqueue(
             opType: String,
             payloadJson: String,
