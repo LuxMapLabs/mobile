@@ -1,5 +1,6 @@
 package com.luxmap.feature.profile.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -72,9 +73,11 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun the_notification_row_says_not_supported_in_this_version() {
+    fun the_notification_and_offline_map_rows_say_not_supported_in_this_version() {
         setContent()
-        composeRule.onNodeWithText("Chưa hỗ trợ trong phiên bản này", substring = true).assertExists()
+        composeRule.onNodeWithText("Thông báo").assertExists()
+        composeRule.onNodeWithText("Bản đồ ngoại tuyến").assertExists()
+        composeRule.onAllNodesWithText("Chưa hỗ trợ trong phiên bản này", substring = true).assertCountEquals(2)
     }
 
     @Test

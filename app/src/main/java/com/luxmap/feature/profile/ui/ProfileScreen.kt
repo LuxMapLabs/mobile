@@ -1,5 +1,6 @@
 package com.luxmap.feature.profile.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -144,6 +145,7 @@ fun ProfileScreen(
             onClick = { showConfirmDialog = true },
             enabled = !isLoggingOut,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
         ) {
             if (isLoggingOut) {
