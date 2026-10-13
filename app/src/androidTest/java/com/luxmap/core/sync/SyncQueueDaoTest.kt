@@ -93,4 +93,43 @@ class SyncQueueDaoTest {
             assertEquals(1, rows.size)
             assertEquals("SESSION-1:clip:0", rows.first().clientOpId)
         }
+
+    @Test
+    fun observePendingCountCountsOnlyQueuedAndSyncingRows() =
+        runTest {
+            dao.insert(row("OP-1", status = "queued"))
+            dao.insert(row("OP-2", status = "syncing"))
+            dao.insert(row("OP-3", status = "done"))
+            dao.insert(row("OP-4", status = "failed"))
+
+            assertEquals(2, dao.observePendingCount().first())
+        }
+
+    @Test
+    fun observeErrorCountCountsOnlyFailedAndConflictRows() =
+        runTest {
+            dao.insert(row("OP-1", status = "failed"))
+            dao.insert(row("OP-2", status = "conflict"))
+            dao.insert(row("OP-3", status = "queued"))
+
+            assertEquals(2, dao.observeErrorCount().first())
+        }
+
+    @Test
+    fun observeLastSyncedAtReturnsTheLatestDoneUpdatedAt() =
+        runTest {
+            dao.insert(row("OP-1", status = "done").copy(updatedAt = Instant.parse("2026-10-06T10:00:00Z")))
+            dao.insert(row("OP-2", status = "done").copy(updatedAt = Instant.parse("2026-10-06T12:00:00Z")))
+            dao.insert(row("OP-3", status = "queued").copy(updatedAt = Instant.parse("2026-10-06T14:00:00Z")))
+
+            assertEquals(Instant.parse("2026-10-06T12:00:00Z"), dao.observeLastSyncedAt().first())
+        }
+
+    @Test
+    fun observeLastSyncedAtReturnsNullWhenNothingIsDone() =
+        runTest {
+            dao.insert(row("OP-1", status = "queued"))
+
+            assertNull(dao.observeLastSyncedAt().first())
+        }
 }
