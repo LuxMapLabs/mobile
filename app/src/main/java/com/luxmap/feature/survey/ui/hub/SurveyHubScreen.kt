@@ -24,12 +24,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
@@ -42,6 +44,8 @@ import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SurveyHubRoute(
@@ -72,11 +76,15 @@ fun SurveyHubScreen(
     onResurvey: (surveySweepId: String) -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Khảo sát",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(Spacing.lg),
-        )
+        Column(modifier = Modifier.padding(Spacing.lg)) {
+            val today = remember { LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) }
+            Text(
+                text = "Ca tối · $today",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = "Khảo sát", style = DisplayTextStyle)
+        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (state) {
                 is SurveyHubUiState.Loading ->
