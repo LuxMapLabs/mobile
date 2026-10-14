@@ -445,7 +445,12 @@ private fun TaskRow(
                 Text(
                     text = due.text,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color =
+                        when {
+                            due.isOverdue -> MaterialTheme.colorScheme.error
+                            due.isToday -> DueTodayColor
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
         }

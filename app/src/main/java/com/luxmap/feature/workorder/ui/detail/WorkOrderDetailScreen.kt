@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -215,7 +216,12 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
         Text(
             text = due.text,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurface,
+            color =
+                when {
+                    due.isOverdue -> MaterialTheme.colorScheme.error
+                    due.isToday -> DueTodayColor
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
         )
         if (!detail.scheduledDate.isNullOrBlank()) {
             Text(
@@ -225,7 +231,14 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
             )
         }
         if (!detail.note.isNullOrBlank()) {
-            Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Icon(
+                    imageVector = Icons.Filled.StickyNote2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         if (!detail.reviewNote.isNullOrBlank()) {
             Text(
@@ -307,9 +320,9 @@ private fun FaultRow(
                     .background(priority.color(), RoundedCornerShape(Radius.badge)),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
+            Text(text = fault.faultId, style = MaterialTheme.typography.titleMedium)
             Text(
-                text = faultTypeLabel(fault.faultType),
+                text = listOfNotNull(fault.poleId, faultTypeLabel(fault.faultType)).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
