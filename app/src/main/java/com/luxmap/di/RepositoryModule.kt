@@ -10,7 +10,7 @@ import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleDetailRepository
 import com.luxmap.feature.survey.data.AiClassificationRepository
 import com.luxmap.feature.survey.data.FakeAiClassificationRepository
-import com.luxmap.feature.survey.data.FakeSurveyRepository
+import com.luxmap.feature.survey.data.RealSurveyRepository
 import com.luxmap.feature.survey.data.RealUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.survey.data.UploadRepository
@@ -42,7 +42,7 @@ abstract class RepositoryModule {
     abstract fun bindHomeRepository(impl: RealHomeRepository): HomeRepository
 
     @Binds
-    abstract fun bindSurveyRepository(impl: FakeSurveyRepository): SurveyRepository
+    abstract fun bindSurveyRepository(impl: RealSurveyRepository): SurveyRepository
 
     @Binds
     abstract fun bindUploadRepository(impl: RealUploadRepository): UploadRepository
