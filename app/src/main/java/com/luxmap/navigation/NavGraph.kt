@@ -112,11 +112,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     items = bottomNavItems,
                     currentRoute = currentRoute,
                     onItemSelected = { item ->
-                        // Home is the root of the main area (Login is removed from the back stack
+                        // Map is the root of the main area (Login is removed from the back stack
                         // after sign-in), so each tab keeps its own state when you come back.
                         if (item.route != currentRoute) {
                             navController.navigate(item.route) {
-                                popUpTo(Routes.Home.route) { saveState = true }
+                                popUpTo(Routes.Map.route) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -138,7 +138,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(Routes.Login.route) {
                 LoginScreen(
                     onLoginSuccess = {
-                        navController.navigate(Routes.Home.route) {
+                        navController.navigate(Routes.Map.route) {
                             popUpTo(Routes.Login.route) { inclusive = true }
                         }
                     },

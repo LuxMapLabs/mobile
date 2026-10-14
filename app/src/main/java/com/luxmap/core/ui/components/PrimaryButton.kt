@@ -2,19 +2,25 @@ package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+
+private val LoadingIndicatorSize = 18.dp
+private val LoadingIndicatorStrokeWidth = 2.dp
 
 // Vùng chạm tối thiểu 48dp — một tay, có thể đeo găng tay (mục 1 Design System v2.0).
 // Màu lấy từ MaterialTheme.colorScheme để tự đổi đúng theo Light/Dark, không hard-code token màu.
@@ -24,6 +30,7 @@ fun PrimaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    isLoading: Boolean = false,
     trailingIcon: ImageVector? = null,
 ) {
     Button(
@@ -38,7 +45,14 @@ fun PrimaryButton(
             ),
     ) {
         Text(text = text)
-        if (trailingIcon != null) {
+        if (isLoading) {
+            Spacer(Modifier.width(Spacing.sm))
+            CircularProgressIndicator(
+                modifier = Modifier.size(LoadingIndicatorSize),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = LoadingIndicatorStrokeWidth,
+            )
+        } else if (trailingIcon != null) {
             Spacer(Modifier.width(Spacing.sm))
             Icon(imageVector = trailingIcon, contentDescription = null)
         }
