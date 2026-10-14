@@ -11,10 +11,6 @@ private val LuxMapLightColorScheme =
     lightColorScheme(
         primary = LightSemanticColors.navigationActive,
         onPrimary = LightSemanticColors.surface,
-        primaryContainer = LumenCont,
-        onPrimaryContainer = LumenOnCont,
-        inverseSurface = Ink,
-        inverseOnSurface = Paper,
         secondary = LightSemanticColors.focus,
         onSecondary = LightSemanticColors.surface,
         tertiary = Green400,
@@ -25,9 +21,7 @@ private val LuxMapLightColorScheme =
         onSurface = LightSemanticColors.textPrimary,
         surfaceVariant = LightSemanticColors.surfaceSubtle,
         onSurfaceVariant = LightSemanticColors.textSecondary,
-        surfaceContainerHigh = LineSoft,
         outline = LightSemanticColors.border,
-        outlineVariant = Line,
         error = Danger600,
         onError = Color(0xFFFFFFFF),
     )
@@ -35,11 +29,9 @@ private val LuxMapLightColorScheme =
 private val LuxMapDarkColorScheme =
     darkColorScheme(
         primary = DarkSemanticColors.navigationActive,
-        onPrimary = Night,
-        primaryContainer = LumenNightCont,
-        onPrimaryContainer = LumenNightOnCont,
+        onPrimary = Dark950,
         secondary = DarkSemanticColors.focus,
-        onSecondary = Night,
+        onSecondary = Dark950,
         tertiary = Green400,
         onTertiary = Dark950,
         background = DarkSemanticColors.background,
@@ -48,11 +40,9 @@ private val LuxMapDarkColorScheme =
         onSurface = DarkSemanticColors.textPrimary,
         surfaceVariant = DarkSemanticColors.surfaceSubtle,
         onSurfaceVariant = DarkSemanticColors.textSecondary,
-        surfaceContainerHigh = NightSurf2,
         outline = DarkSemanticColors.border,
-        outlineVariant = NightLine,
-        error = ErrorDark,
-        onError = Night,
+        error = Danger600,
+        onError = Color(0xFFFFFFFF),
     )
 
 // forceDark: dùng khi màn hình bắt buộc/mặc định dark theo ngữ cảnh (F03, F04, chế độ điều hướng
