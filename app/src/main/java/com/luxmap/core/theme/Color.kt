@@ -34,8 +34,9 @@ val Dark700 = Color(0xFF2A2A2A)
 val DarkText = Color(0xFFF5F5F5)
 val DarkMuted = Color(0xFFA0A0A0)
 
-// v2.1 redesign primitives — "Night Ledger" palette, replaces the brand/semantic layer above.
-// Status colors (AssetCondition/SyncStatus/WorkOrderStatus/WorkOrderPriority) are unchanged.
+// "Night Ledger" palette (v2.1 redesign attempt, rolled back — brand/semantic layer below is
+// v2.0 again). Kept here only because HudChip.kt and LoginScreen.kt still reference a few of
+// these directly; not used by LightSemanticColors/DarkSemanticColors anymore.
 val Paper = Color(0xFFF5F4F0)
 val Ink = Color(0xFF15171C)
 val Ink2 = Color(0xFF5B5F68)
@@ -58,6 +59,9 @@ val LumenNight = Color(0xFFA3ADFF)
 val LumenNightCont = Color(0xFF262C5E)
 val LumenNightOnCont = Color(0xFFDADEFF)
 val ErrorDark = Color(0xFFFF9A9A)
+
+// v2.1 proposed addition on top of v2.0 (dark info/container accent) — no consumer yet.
+val InfoContainerDark = Color(0xFF1C2A44)
 
 // Extra primitives — section 3.1 of Global Design System v1.0, needed for the hero gradient
 // (F01 and other hero-style screens). Does not change the meaning of the existing tokens above.
@@ -88,28 +92,28 @@ data class LuxMapSemanticColors(
 
 val LightSemanticColors =
     LuxMapSemanticColors(
-        background = Paper,
+        background = Gray25,
         surface = Color(0xFFFFFFFF),
-        surfaceSubtle = LineSoft,
-        textPrimary = Ink,
-        textSecondary = Ink2,
-        border = Line,
-        focus = Lumen,
-        navigationActive = Lumen,
-        navigationInactive = Ink2,
+        surfaceSubtle = Gray50,
+        textPrimary = Gray900,
+        textSecondary = Gray500,
+        border = Gray200,
+        focus = Blue500,
+        navigationActive = Navy700,
+        navigationInactive = Gray500,
     )
 
 val DarkSemanticColors =
     LuxMapSemanticColors(
-        background = Night,
-        surface = NightSurf,
-        surfaceSubtle = NightSurf2,
-        textPrimary = NightText,
-        textSecondary = NightText2,
-        border = NightLine,
-        focus = LumenNight,
-        navigationActive = LumenNight,
-        navigationInactive = NightText2,
+        background = Dark950,
+        surface = Dark800,
+        surfaceSubtle = Dark900,
+        textPrimary = DarkText,
+        textSecondary = DarkMuted,
+        border = Dark700,
+        focus = Green400,
+        navigationActive = Green400,
+        navigationInactive = DarkMuted,
     )
 
 // Component — badge tình trạng tài sản (mục 2.3), cặp bg/text theo theme, không đổi
