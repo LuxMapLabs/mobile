@@ -205,6 +205,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 CaptureScreen(
                     surveySweepId = surveySweepId,
                     workOrderId = workOrderId,
+                    onClose = { navController.popBackStack() },
                     onSessionPackaged = { sessionId ->
                         navController.navigate(Routes.SurveyReview.createRoute(sessionId)) {
                             popUpTo(Routes.Survey.route)
