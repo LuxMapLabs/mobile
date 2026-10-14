@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -66,8 +70,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.core.theme.BrandHeroGradient
+import com.luxmap.BuildConfig
+import com.luxmap.core.theme.Amber500
 import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.Green400
+import com.luxmap.core.theme.LumenNight
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
@@ -85,6 +93,7 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val identifierFocusRequester = remember { FocusRequester() }
@@ -118,41 +127,50 @@ fun LoginScreen(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(BrandHeroGradient)
+                    .background(MaterialTheme.colorScheme.inverseSurface)
                     // Background bleeds under the status bar (order matters: background must
                     // come before the inset padding), content stays clear of it.
                     .statusBarsPadding()
                     .padding(Spacing.xl),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LogoMark()
-                Spacer(Modifier.width(Spacing.sm))
-                Column {
-                    Text(
-                        text = "LUXMAP",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                    )
-                    Text(
-                        text = "Vận hành hiện trường",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LogoMark()
+                    Spacer(Modifier.width(Spacing.sm))
+                    Column {
+                        Text(
+                            text = "LUXMAP",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                        )
+                        Text(
+                            text = "Vận hành hiện trường",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HeroSecondaryText,
+                        )
+                    }
                 }
+                NetworkChip(isOnline = isOnline)
             }
             Spacer(Modifier.height(Spacing.lg))
             Text(
                 text = "Chào mừng trở lại",
                 style = MaterialTheme.typography.displayLarge,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
             )
             Spacer(Modifier.height(Spacing.xs))
             Text(
                 text = "Đăng nhập để nhận nhiệm vụ và tiếp tục công việc.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.8f),
+                color = HeroSecondaryText,
             )
+            Spacer(Modifier.height(Spacing.lg))
+            StreetlightSilhouette(modifier = Modifier.fillMaxWidth().height(40.dp))
         }
 
         Column(
@@ -162,7 +180,7 @@ fun LoginScreen(
                     .weight(1f)
                     .background(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(topStart = Dimens.radiusSheet, topEnd = Dimens.radiusSheet),
+                        shape = RoundedCornerShape(topStart = Radius.block, topEnd = Radius.block),
                     )
                     // Background bleeds under the gesture navigation bar, content stops above it.
                     .navigationBarsPadding()
@@ -184,6 +202,14 @@ fun LoginScreen(
             )
             Spacer(Modifier.height(Spacing.lg))
 
+            val fieldShape = RoundedCornerShape(Radius.control)
+            val fieldColors =
+                OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = FieldUnfocusedBackground,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    errorContainerColor = MaterialTheme.colorScheme.surface,
+                )
+
             FieldLabel("Mã nhân viên hoặc số điện thoại")
             OutlinedTextField(
                 value = viewModel.identifier,
@@ -192,6 +218,8 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
+                shape = fieldShape,
+                colors = fieldColors,
                 // Next moves to the password field. The code (for example NV-0125) must not be
                 // changed by auto-correct or auto-capitalization.
                 keyboardOptions =
@@ -221,6 +249,8 @@ fun LoginScreen(
                 leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
+                shape = fieldShape,
+                colors = fieldColors,
                 // Done hides the keyboard and signs in. The isSubmitting check stops a second
                 // request when the user taps Done twice quickly.
                 keyboardOptions =
@@ -283,11 +313,17 @@ fun LoginScreen(
                 }
             }
 
+            val loginButtonText =
+                when (uiState) {
+                    is LoginUiState.LoggingIn -> "Đang đăng nhập…"
+                    is LoginUiState.Prefetching -> "Đã đăng nhập"
+                    else -> "Đăng nhập"
+                }
             PrimaryButton(
-                text = "Đăng nhập",
+                text = loginButtonText,
                 onClick = viewModel::onLoginClick,
                 enabled = !isSubmitting,
-                trailingIcon = Icons.AutoMirrored.Filled.ArrowForward,
+                trailingIcon = if (isSubmitting) null else Icons.AutoMirrored.Filled.ArrowForward,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -299,7 +335,7 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .background(
                                 MaterialTheme.colorScheme.surfaceVariant,
-                                RoundedCornerShape(Dimens.radiusMedium),
+                                RoundedCornerShape(Radius.card),
                             )
                             .padding(Spacing.lg),
                 ) {
@@ -341,7 +377,7 @@ fun LoginScreen(
                 )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(
-                    text = "Kết nối được mã hóa và bảo vệ",
+                    text = "Kết nối được mã hóa và bảo vệ · v${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -358,7 +394,7 @@ private fun LogoMark() {
     Box(
         modifier =
             Modifier
-                .size(44.dp)
+                .size(40.dp)
                 .clip(RoundedCornerShape(Dimens.radiusMedium))
                 .background(Color.White.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center,
@@ -367,6 +403,59 @@ private fun LogoMark() {
             Box(Modifier.size(width = 4.dp, height = 14.dp).background(Color.White, RoundedCornerShape(2.dp)))
             Box(Modifier.size(width = 4.dp, height = 22.dp).background(Color.White, RoundedCornerShape(2.dp)))
             Box(Modifier.size(width = 4.dp, height = 10.dp).background(Color.White, RoundedCornerShape(2.dp)))
+        }
+    }
+}
+
+private val HeroSecondaryText = Color(0xFFB5B8C0)
+private val FieldUnfocusedBackground = Color(0xFFF8F7F4)
+
+@Composable
+private fun NetworkChip(isOnline: Boolean) {
+    val dotColor = if (isOnline) Green400 else Amber500
+    val label = if (isOnline) "Trực tuyến" else "Ngoại tuyến"
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(Dimens.radiusPill))
+                .background(Color.White.copy(alpha = 0.12f))
+                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(dotColor))
+        Spacer(Modifier.width(Spacing.xs))
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = Color.White)
+    }
+}
+
+@Composable
+private fun StreetlightSilhouette(modifier: Modifier = Modifier) {
+    val poleColor = Color(0xFF343842)
+    val headColor = Color(0xFFDDE1FF)
+    val glowColor = LumenNight.copy(alpha = 0.22f)
+    val offColumns = setOf(4, 9)
+    val columnCount = 13
+    Canvas(modifier = modifier) {
+        val columnWidth = size.width / columnCount
+        val poleHeight = size.height * 0.75f
+        val poleTopY = size.height - poleHeight
+        for (column in 1..columnCount) {
+            val x = columnWidth * (column - 1) + columnWidth / 2f
+            val isOn = column !in offColumns
+            drawLine(
+                color = poleColor,
+                start = Offset(x, size.height),
+                end = Offset(x, poleTopY),
+                strokeWidth = 2.dp.toPx(),
+            )
+            if (isOn) {
+                drawCircle(color = glowColor, radius = 9.dp.toPx(), center = Offset(x, poleTopY))
+            }
+            drawCircle(
+                color = if (isOn) headColor else poleColor,
+                radius = 3.dp.toPx(),
+                center = Offset(x, poleTopY),
+            )
         }
     }
 }
@@ -404,11 +493,18 @@ private fun RememberMeRow(
     ) {
         Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
         Spacer(Modifier.width(Spacing.sm))
-        Text(
-            text = "Duy trì đăng nhập trên thiết bị này",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Column {
+            Text(
+                text = "Duy trì đăng nhập trên thiết bị này",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Lần mở sau vào thẳng, kể cả khi offline",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
