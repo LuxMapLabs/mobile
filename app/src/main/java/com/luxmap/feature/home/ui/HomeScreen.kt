@@ -269,19 +269,20 @@ private fun NextUpCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.inverseSurface, RoundedCornerShape(Radius.block))
+                .border(NextUpBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.block))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(
             text = "TIẾP THEO",
             style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.inverseOnSurface,
+            color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = item.workOrderId,
             style = HeadlineTextStyle,
-            color = MaterialTheme.colorScheme.inverseOnSurface,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             StatusBadge(text = kind.label(), colors = kind.badgeColors())
@@ -290,7 +291,7 @@ private fun NextUpCard(
         Text(
             text = "$clusterLabel · ${due.text}",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.inverseOnSurface,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         PrimaryButton(
             text = "Xem chi tiết",
@@ -299,6 +300,8 @@ private fun NextUpCard(
         )
     }
 }
+
+private val NextUpBorderWidth = 2.dp
 
 @Composable
 private fun HomeHeader(
@@ -398,7 +401,7 @@ private fun ClusterSection(
             items.forEachIndexed { index, item ->
                 if (index > 0) {
                     HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
+                        color = MaterialTheme.colorScheme.outline,
                         modifier = Modifier.padding(start = 68.dp),
                     )
                 }
@@ -476,7 +479,7 @@ private fun LoadingSkeletonState() {
         ) {
             repeat(3) { index ->
                 if (index > 0) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }
                 SkeletonRow()
             }
