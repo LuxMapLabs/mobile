@@ -20,6 +20,7 @@ interface WorkOrdersApi {
     @GET("api/v1/work-orders")
     suspend fun list(
         @Query("assigned_to") assignedTo: String,
+        @Query("task_kind") taskKind: String? = null,
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 200,
     ): PagedResultDto<WorkOrderItemDto>
