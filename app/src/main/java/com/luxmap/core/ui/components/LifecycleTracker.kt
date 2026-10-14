@@ -38,7 +38,7 @@ fun LifecycleTracker(
     modifier: Modifier = Modifier,
 ) {
     val doneColor = MaterialTheme.colorScheme.onSurface
-    val futureColor = MaterialTheme.colorScheme.outlineVariant
+    val futureColor = MaterialTheme.colorScheme.outline
     Column(modifier = modifier) {
         Row(
             modifier =
