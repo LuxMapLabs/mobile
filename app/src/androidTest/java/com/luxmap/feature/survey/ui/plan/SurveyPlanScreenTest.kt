@@ -1,19 +1,16 @@
 package com.luxmap.feature.survey.ui.plan
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -44,36 +41,41 @@ class SurveyPlanScreenTest {
     @Test
     fun loading_state_shows_progress_indicator() {
         composeRule.setContent {
-            LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Loading, onRouteSelected = {}) }
+            LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Loading, onBack = {}) }
         }
         composeRule.onNodeWithTag("survey_plan_loading").assertExists()
     }
 
     @Test
-    fun success_state_shows_the_route_name() {
+    fun success_state_shows_the_route_title_and_work_order_id() {
         composeRule.setContent {
             LuxMapTheme {
-                SurveyPlanContent(
-                    state = SurveyPlanUiState.Success(routes = listOf(route())),
-                    onRouteSelected = {},
-                )
+                SurveyPlanContent(state = SurveyPlanUiState.Success(route = route()), onBack = {})
             }
         }
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
+        composeRule.onNodeWithText("WO-1").assertExists()
     }
 
     @Test
-    fun success_state_shows_the_bluetooth_permission_row() {
+    fun tapping_back_invokes_onBack() {
+        var backTapped = false
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyPlanContent(state = SurveyPlanUiState.Success(route = route()), onBack = { backTapped = true })
+            }
+        }
+        composeRule.onNodeWithContentDescription("Quay lại").performClick()
+        assertTrue(backTapped)
+    }
+
+    @Test
+    fun success_state_with_readiness_shows_the_bluetooth_permission_row() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyPlanContent(
-                    state =
-                        SurveyPlanUiState.Success(
-                            routes = listOf(route()),
-                            selectedWorkOrderId = route().workOrderId,
-                            readiness = readyResult(),
-                        ),
-                    onRouteSelected = {},
+                    state = SurveyPlanUiState.Success(route = route(), readiness = readyResult()),
+                    onBack = {},
                 )
             }
         }
@@ -85,13 +87,8 @@ class SurveyPlanScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyPlanContent(
-                    state =
-                        SurveyPlanUiState.Success(
-                            routes = listOf(route()),
-                            selectedWorkOrderId = route().workOrderId,
-                            readiness = readyResult(),
-                        ),
-                    onRouteSelected = {},
+                    state = SurveyPlanUiState.Success(route = route(), readiness = readyResult()),
+                    onBack = {},
                 )
             }
         }
@@ -107,21 +104,17 @@ class SurveyPlanScreenTest {
     }
 
     @Test
-    fun ready_state_enables_the_capture_cta() {
+    fun ready_state_enables_the_capture_cta_and_shows_the_full_pass_count() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyPlanContent(
-                    state =
-                        SurveyPlanUiState.Success(
-                            routes = listOf(route()),
-                            selectedWorkOrderId = route().workOrderId,
-                            readiness = readyResult(),
-                        ),
-                    onRouteSelected = {},
+                    state = SurveyPlanUiState.Success(route = route(), readiness = readyResult()),
+                    onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("Vào chế độ khảo sát").assertIsEnabled()
+        composeRule.onNodeWithText("7/7 đạt").assertExists()
     }
 
     @Test
@@ -131,11 +124,10 @@ class SurveyPlanScreenTest {
                 SurveyPlanContent(
                     state =
                         SurveyPlanUiState.Success(
-                            routes = listOf(route()),
-                            selectedWorkOrderId = route().workOrderId,
+                            route = route(),
                             readiness = readyResult().copy(gpsAvailable = false),
                         ),
-                    onRouteSelected = {},
+                    onBack = {},
                 )
             }
         }
@@ -143,28 +135,12 @@ class SurveyPlanScreenTest {
     }
 
     @Test
-    fun arriving_with_a_workOrderId_auto_selects_that_route() {
-        var selected: String? = null
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyPlanScreenContent(
-                    workOrderId = "WO-1",
-                    state = SurveyPlanUiState.Success(routes = listOf(route())),
-                    onRouteSelected = { selected = it },
-                )
-            }
-        }
-        composeRule.waitForIdle()
-        assertEquals("WO-1", selected)
-    }
-
-    @Test
     fun a_rejection_reason_shows_the_resurvey_banner() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyPlanContent(
-                    state = SurveyPlanUiState.Success(routes = listOf(route()), rejectionReason = "Video bị mờ"),
-                    onRouteSelected = {},
+                    state = SurveyPlanUiState.Success(route = route(), rejectionReason = "Video bị mờ"),
+                    onBack = {},
                 )
             }
         }
@@ -175,61 +151,25 @@ class SurveyPlanScreenTest {
     fun no_rejection_reason_means_no_banner() {
         composeRule.setContent {
             LuxMapTheme {
-                SurveyPlanContent(
-                    state = SurveyPlanUiState.Success(routes = listOf(route())),
-                    onRouteSelected = {},
-                )
+                SurveyPlanContent(state = SurveyPlanUiState.Success(route = route()), onBack = {})
             }
         }
         composeRule.onNodeWithText("Video bị mờ").assertDoesNotExist()
     }
 
     @Test
-    fun a_manual_tap_on_a_different_route_overrides_the_auto_selected_one() {
-        val routeA = route()
-        val routeB = route().copy(workOrderId = "WO-2")
-        var selected: String? = null
-        composeRule.setContent {
-            var state by
-                remember {
-                    mutableStateOf<SurveyPlanUiState>(SurveyPlanUiState.Success(routes = listOf(routeA, routeB)))
-                }
-            LuxMapTheme {
-                SurveyPlanScreenContent(
-                    workOrderId = "WO-1",
-                    state = state,
-                    onRouteSelected = { id ->
-                        selected = id
-                        state = (state as SurveyPlanUiState.Success).copy(selectedWorkOrderId = id, readiness = null)
-                    },
-                )
-            }
-        }
-        composeRule.waitForIdle() // auto-select lands on WO-1
-        // Once WO-1 is selected it stops showing its own button, so this now targets WO-2's.
-        composeRule.onNodeWithText("Kiểm tra sẵn sàng").performClick()
-        composeRule.waitForIdle()
-        assertEquals("WO-2", selected)
-    }
-
-    @Test
     fun empty_state_shows_the_no_routes_message() {
         composeRule.setContent {
-            LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Empty, onRouteSelected = {}) }
+            LuxMapTheme { SurveyPlanContent(state = SurveyPlanUiState.Empty, onBack = {}) }
         }
-        // substring = true because the real Empty state text adds a contact hint after this part
-        // (see SurveyPlanContent) - onNodeWithText needs an exact match otherwise.
-        composeRule.onNodeWithText("Chưa có tuyến nào được phân công", substring = true).assertExists()
+        composeRule.onNodeWithText("Không tìm thấy lệnh khảo sát này").assertExists()
     }
 
     @Test
     fun error_state_shows_the_message_and_a_retry_action() {
         composeRule.setContent {
             LuxMapTheme {
-                SurveyPlanContent(
-                    state = SurveyPlanUiState.Error("Không tải được tuyến khảo sát"),
-                    onRouteSelected = {},
-                )
+                SurveyPlanContent(state = SurveyPlanUiState.Error("Không tải được tuyến khảo sát"), onBack = {})
             }
         }
         composeRule.onNodeWithText("Không tải được tuyến khảo sát").assertExists()

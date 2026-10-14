@@ -175,14 +175,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 val planWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 SurveyPlanScreen(
-                    workOrderId = planWorkOrderId,
-                    onEnterCaptureMode = { workOrderId ->
+                    onBack = { navController.popBackStack() },
+                    onEnterCaptureMode = {
                         // The sweep doesn't exist server-side yet (POST /sweeps isn't wired into
                         // the upload flow - tracked separately in docs/contract-drift.md), so this
                         // id is only a local Room session key, same as the old F09 shortcut used.
                         navController.navigate(
                             Routes.SurveyCapture.createRoute(
-                                workOrderId = workOrderId,
+                                workOrderId = planWorkOrderId,
                                 surveySweepId = UUID.randomUUID().toString(),
                             ),
                         )
