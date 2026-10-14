@@ -1,6 +1,9 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -69,9 +72,12 @@ class WorkOrderDetailScreenTest {
             }
         }
         composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
-        listOf("Mở", "Đã giao", "Sửa chữa", "Hoàn tất", "Đã nghiệm thu").forEach { label ->
+        listOf("Khảo sát", "Duyệt #1", "Kiểm tra", "Duyệt #2").forEach { label ->
             composeRule.onNodeWithText(label).assertExists()
         }
+        // "Sửa chữa" appears twice for a repair order - the kind badge and the current
+        // lifecycle step both use the same real label.
+        composeRule.onAllNodesWithText("Sửa chữa").assertCountEquals(2)
     }
 
     @Test
@@ -141,7 +147,7 @@ class WorkOrderDetailScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Điều hướng").performClick()
+        composeRule.onNodeWithContentDescription("Điều hướng").performClick()
         assertEquals(10.97 to 106.49, navigated)
     }
 

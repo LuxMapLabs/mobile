@@ -1,17 +1,16 @@
 package com.luxmap.feature.workorder.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,9 +20,10 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,10 +53,10 @@ import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.AppTopBar
+import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
@@ -158,10 +158,11 @@ private fun WorkOrderDetailContent(
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         WorkOrderHeaderSection(detail)
-        if (detail.taskKind == "survey") {
+        val kind = workOrderTaskKindFromWire(detail.taskKind)
+        if (kind == WorkOrderTaskKind.SURVEY) {
             Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
         } else {
-            FaultListSection(faults = detail.faults, onNavigateFault = onNavigateFault)
+            FaultListSection(kind = kind, faults = detail.faults, onNavigateFault = onNavigateFault)
         }
         if (state.startError != null) {
             Text(
@@ -205,14 +206,17 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            if (status == WorkOrderStatus.CANCELLED) {
-                StatusBadge(text = kind.label(), colors = kind.badgeColors())
-            }
+            StatusBadge(text = kind.label(), colors = kind.badgeColors())
             StatusBadge(text = status.label(), colors = status.badgeColors())
         }
         Text(text = detail.title, style = HeadlineTextStyle)
         Text(text = detail.workOrderId, style = MaterialTheme.typography.bodyMedium)
-        Text(text = dueDateLabel(detail.dueDate).text, style = MaterialTheme.typography.bodyMedium)
+        val due = dueDateLabel(detail.dueDate)
+        Text(
+            text = due.text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (due.isToday) DueTodayColor else MaterialTheme.colorScheme.onSurface,
+        )
         if (!detail.scheduledDate.isNullOrBlank()) {
             Text(
                 text = "Lịch khảo sát/sửa chữa: ${DateFormatUtils.formatPlainDate(detail.scheduledDate)}",
@@ -239,12 +243,27 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     }
 }
 
+// Header wording/count matches the real screen's faultHeader/faultCount (LuxMap App v3.dc.html,
+// "task" screen) - "Sự cố cần sửa" for a repair order, "Sự cố cần kiểm tra" otherwise.
 @Composable
 private fun FaultListSection(
+    kind: WorkOrderTaskKind,
     faults: List<WorkOrderFaultDetail>,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                text = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "${faults.size} sự cố",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (faults.isEmpty()) {
             Text(
                 text = "Không có sự cố nào trong lệnh này",
@@ -252,43 +271,59 @@ private fun FaultListSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            faults.forEach { fault ->
-                FaultCard(fault = fault, onNavigate = { onNavigateFault(fault.lat, fault.lng) })
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card)),
+            ) {
+                faults.forEachIndexed { index, fault ->
+                    if (index > 0) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    }
+                    FaultRow(fault = fault, onNavigate = { onNavigateFault(fault.lat, fault.lng) })
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FaultCard(
+private fun FaultRow(
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
 ) {
     val priority = severityFromWire(fault.severity)
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
-        PriorityDot(text = priority.label(), dotColor = priority.color())
-        Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.bodyMedium)
-        Text(text = faultStatusLabel(fault.faultStatus), style = MaterialTheme.typography.bodyMedium)
-        if (fault.inspectionOutcome != null) {
-            Text(text = inspectionOutcomeLabel(fault.inspectionOutcome), style = MaterialTheme.typography.bodyMedium)
+        Box(
+            modifier =
+                Modifier
+                    .width(6.dp)
+                    .height(36.dp)
+                    .background(priority.color(), RoundedCornerShape(Radius.badge)),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = faultTypeLabel(fault.faultType),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (fault.inspectionOutcome != null) {
+                Text(
+                    text = inspectionOutcomeLabel(fault.inspectionOutcome),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         if (fault.hasLocation()) {
-            OutlinedButton(
-                onClick = onNavigate,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-            ) {
-                Icon(imageVector = Icons.Filled.Navigation, contentDescription = null)
-                Spacer(Modifier.width(Spacing.sm))
-                Text("Điều hướng")
+            IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
+                Icon(imageVector = Icons.Filled.Navigation, contentDescription = "Điều hướng")
             }
         } else {
             Text(
