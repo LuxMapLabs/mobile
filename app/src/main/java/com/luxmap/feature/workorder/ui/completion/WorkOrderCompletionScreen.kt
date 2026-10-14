@@ -178,6 +178,11 @@ private fun RepairCompletionSection(
 ) {
     val hasPhoto = state.localEvidence != null
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(
+            text = "Nghiệm thu",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         EvidencePicker(
             hasPhoto = hasPhoto,
             onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
@@ -187,6 +192,11 @@ private fun RepairCompletionSection(
             onValueChange = onReportNoteChanged,
             label = { Text("Kết quả sửa chữa") },
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "${state.reportNote.trim().length} ký tự · tối thiểu 10",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedTextField(
             value = state.materialsUsed,
@@ -226,6 +236,11 @@ private fun InspectionCompletionSection(
             onValueChange = onReportNoteChanged,
             label = { Text("Ghi chú kiểm tra") },
             modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "${state.reportNote.trim().length} ký tự · tối thiểu 10",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         RequirementList(
             items =
