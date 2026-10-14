@@ -7,7 +7,6 @@ import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
-import com.luxmap.feature.survey.data.SurveySweepStatus
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -17,11 +16,12 @@ class SurveyHubScreenTest {
 
     private fun route() =
         AssignedSurveyRoute(
-            surveySweepId = "SWEEP-1",
-            assignedByName = "Nguyen Van A",
-            plannedDate = "2026-10-02",
-            status = SurveySweepStatus.PLANNED,
-            roadSegments = emptyList(),
+            workOrderId = "WO-1",
+            title = "Khảo sát đường A",
+            communeId = "COM-001",
+            woStatus = "assigned",
+            dueDate = null,
+            scheduledDate = "2026-10-02",
         )
 
     private fun uploadingSession() =
@@ -49,7 +49,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("SWEEP-1").assertExists()
+        composeRule.onNodeWithText("Khảo sát đường A").assertExists()
         composeRule.onNodeWithText("TUYẾN ĐƯỢC GIAO").assertExists()
     }
 

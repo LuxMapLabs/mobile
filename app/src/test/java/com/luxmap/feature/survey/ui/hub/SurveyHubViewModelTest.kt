@@ -3,11 +3,9 @@ package com.luxmap.feature.survey.ui.hub
 import app.cash.turbine.test
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
-import com.luxmap.feature.survey.data.AssignedRoadSegment
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
-import com.luxmap.feature.survey.data.SurveySweepStatus
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -29,11 +27,12 @@ class SurveyHubViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val route =
         AssignedSurveyRoute(
-            surveySweepId = "SWEEP-1",
-            assignedByName = "Kỹ sư bảo trì A",
-            plannedDate = "2026-10-01",
-            status = SurveySweepStatus.PLANNED,
-            roadSegments = listOf(AssignedRoadSegment("RS-1", "Đường A", 500.0)),
+            workOrderId = "WO-1",
+            title = "Khảo sát đường A",
+            communeId = "COM-001",
+            woStatus = "assigned",
+            dueDate = null,
+            scheduledDate = "2026-10-01",
         )
     private val queuedSession = QueuedUploadSession(sessionId = "SESSION-1", surveySweepId = "SWEEP-2")
 

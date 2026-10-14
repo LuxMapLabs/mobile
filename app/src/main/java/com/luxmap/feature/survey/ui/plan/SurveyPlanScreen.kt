@@ -9,11 +9,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
@@ -37,6 +38,7 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CameraReadinessPanel
 import com.luxmap.core.ui.components.InlineBanner
@@ -45,7 +47,6 @@ import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.ReadinessCheckItem
 import com.luxmap.core.ui.components.ReadinessCheckStatus
-import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 import kotlinx.coroutines.delay
 
@@ -82,51 +83,29 @@ private fun hasBlePermissions(context: Context): Boolean =
                 PackageManager.PERMISSION_GRANTED
         )
 
+private const val TOTAL_READINESS_CHECKS = 7
+
 // F03 is a night-planning screen (Design System v2.0 Dark Mode table), so it forces dark mode
-// no matter the system setting, same rule as F04 Capture Mode.
+// no matter the system setting, same rule as F04 Capture Mode. One work order per screen - this
+// is reached by tapping a single assigned survey work order, not by browsing a list.
 @Composable
 fun SurveyPlanScreen(
-    surveySweepId: String,
-    onEnterCaptureMode: (surveySweepId: String) -> Unit,
+    onBack: () -> Unit,
+    onEnterCaptureMode: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: SurveyPlanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     LuxMapTheme(forceDark = true) {
-        SurveyPlanScreenContent(
-            surveySweepId = surveySweepId,
+        SurveyPlanContent(
             state = uiState,
-            onRouteSelected = viewModel::onRouteSelected,
+            onBack = onBack,
             onRetry = viewModel::onRetry,
+            onPermissionsChecked = viewModel::checkReadiness,
             onEnterCaptureMode = onEnterCaptureMode,
+            modifier = modifier,
         )
     }
-}
-
-// Separated from SurveyPlanScreen only so the auto-select effect below can be driven directly in
-// a Compose UI test, with no ViewModel/Hilt in the loop - same reason SurveyPlanContent itself is
-// already stateless.
-@Composable
-fun SurveyPlanScreenContent(
-    surveySweepId: String,
-    state: SurveyPlanUiState,
-    onRouteSelected: (String) -> Unit,
-    onRetry: () -> Unit = {},
-    onEnterCaptureMode: (String) -> Unit = {},
-) {
-    LaunchedEffect(surveySweepId, state is SurveyPlanUiState.Success) {
-        if (state is SurveyPlanUiState.Success &&
-            state.selectedSurveySweepId == null &&
-            state.routes.any { it.surveySweepId == surveySweepId }
-        ) {
-            onRouteSelected(surveySweepId)
-        }
-    }
-    SurveyPlanContent(
-        state = state,
-        onRouteSelected = onRouteSelected,
-        onRetry = onRetry,
-        onEnterCaptureMode = onEnterCaptureMode,
-    )
 }
 
 // Stateless so UI tests can drive every SurveyPlanUiState branch directly, without a ViewModel or
@@ -134,18 +113,20 @@ fun SurveyPlanScreenContent(
 @Composable
 fun SurveyPlanContent(
     state: SurveyPlanUiState,
-    onRouteSelected: (String) -> Unit,
+    onBack: () -> Unit,
     onRetry: () -> Unit = {},
-    onEnterCaptureMode: (String) -> Unit = {},
+    onPermissionsChecked: () -> Unit = {},
+    onEnterCaptureMode: () -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var hasBlePermissions by remember { mutableStateOf(hasBlePermissions(context)) }
 
-    Column(Modifier.fillMaxSize()) {
-        Text(
-            text = "Tuyến khảo sát được giao",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(Spacing.lg),
+    Column(modifier.fillMaxSize()) {
+        AppTopBar(
+            title = "Chuẩn bị khảo sát",
+            onBack = onBack,
+            subtitle = (state as? SurveyPlanUiState.Success)?.route?.workOrderId,
         )
         when (state) {
             is SurveyPlanUiState.Loading ->
@@ -155,41 +136,70 @@ fun SurveyPlanContent(
                 ) { CircularProgressIndicator() }
 
             is SurveyPlanUiState.Success -> {
-                if (state.rejectionReason != null) {
-                    InlineBanner(
-                        message = state.rejectionReason,
-                        tone = InlineBannerTone.ERROR,
-                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                        isDark = true,
-                    )
-                }
-                // Re-check readiness after the permission prompt closes, no matter the result, so
-                // the checklist shows the real state right away instead of needing the user to
-                // leave and come back to this screen (onRouteSelected already re-runs
-                // SurveyReadinessInputProvider.gather()).
                 val permissionLauncher =
                     rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
                         hasBlePermissions = hasBlePermissions(context)
-                        state.selectedSurveySweepId?.let(onRouteSelected)
+                        onPermissionsChecked()
                     }
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                ) {
-                    items(state.routes) { route ->
-                        SurveyRouteCard(
-                            route = route,
-                            isSelected = route.surveySweepId == state.selectedSurveySweepId,
-                            readiness =
-                                if (route.surveySweepId == state.selectedSurveySweepId) {
-                                    state.readiness
+                Column(Modifier.weight(1f)) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    ) {
+                        if (state.rejectionReason != null) {
+                            InlineBanner(message = state.rejectionReason, tone = InlineBannerTone.ERROR, isDark = true)
+                        }
+                        Column {
+                            Text(state.route.title, style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = "${state.route.communeId} · Dự kiến ${state.route.scheduledDate ?: "chưa có"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        val readiness = state.readiness
+                        if (readiness == null) {
+                            Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
+                        } else {
+                            ReadinessSection(readiness, hasBlePermissions)
+                            // Camera, GPS, and (on API 31+) Bluetooth scan/connect are the
+                            // permissions this screen can fix without leaving the app (spec gap:
+                            // there was no in-app way to grant them before, so a user who never
+                            // granted them could never reach F04 at all).
+                            if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable || !hasBlePermissions) {
+                                PrimaryButton(
+                                    text = "Cấp quyền",
+                                    onClick = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            Text(
+                                text =
+                                    "Exposure được khoá cho cả phiên quay. " +
+                                        "Không thể bắt đầu nếu thiết bị chưa khoá được exposure.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    // hasBlePermissions is also required here (not just readiness.isReady), not
+                    // only shown as a hint through the button above - otherwise a user could enter
+                    // F04 without it and hit a SecurityException from connectGatt() on API 31+.
+                    state.readiness?.let { readiness ->
+                        BottomActionBar(
+                            ctaText = "Vào chế độ khảo sát",
+                            onCtaClick = onEnterCaptureMode,
+                            ctaEnabled = readiness.isReady && hasBlePermissions,
+                            hint =
+                                if (!readiness.isReady || !hasBlePermissions) {
+                                    "Còn mục chưa đạt — chưa thể khảo sát"
                                 } else {
                                     null
                                 },
-                            hasBlePermissions = hasBlePermissions,
-                            onClick = { onRouteSelected(route.surveySweepId) },
-                            onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
-                            onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
                         )
                     }
                 }
@@ -200,8 +210,8 @@ fun SurveyPlanContent(
                     MessageState(
                         icon = Icons.Filled.EventAvailable,
                         iconColors = SyncStatus.DONE.badgeColors(),
-                        title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
-                        subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
+                        title = "Không tìm thấy lệnh khảo sát này",
+                        subtitle = "Lệnh có thể đã được giao lại hoặc huỷ — quay lại danh sách khảo sát.",
                         action = {},
                     )
                 }
@@ -222,51 +232,7 @@ fun SurveyPlanContent(
 }
 
 @Composable
-private fun SurveyRouteCard(
-    route: AssignedSurveyRoute,
-    isSelected: Boolean,
-    readiness: SurveyReadinessResult?,
-    hasBlePermissions: Boolean,
-    onClick: () -> Unit,
-    onEnterCaptureMode: () -> Unit,
-    onRequestPermissions: () -> Unit,
-) {
-    Column(modifier = Modifier.padding(Spacing.md)) {
-        Text(route.surveySweepId, style = MaterialTheme.typography.titleMedium)
-        Text("Giao bởi: ${route.assignedByName}", style = MaterialTheme.typography.bodyMedium)
-        Text("Ngày dự kiến: ${route.plannedDate}", style = MaterialTheme.typography.bodyMedium)
-        Text("${route.roadSegments.size} đoạn đường", style = MaterialTheme.typography.bodySmall)
-        if (!isSelected) {
-            PrimaryButton(text = "Kiểm tra sẵn sàng", onClick = onClick)
-        } else if (readiness == null) {
-            Text("Đang kiểm tra thiết bị...", style = MaterialTheme.typography.bodySmall)
-        } else {
-            ReadinessChecklist(readiness, hasBlePermissions)
-            // Camera, GPS, and (on API 31+) Bluetooth scan/connect are the permissions this screen
-            // can fix without leaving the app (spec gap: there was no in-app way to grant them
-            // before, so a user who never granted them could never reach F04 at all). Bluetooth is
-            // not part of the readiness checklist domain model itself (out of scope for this fix),
-            // so it is checked separately here, only to decide whether this button still needs to
-            // show - the "Quyền Bluetooth" row above is presentation-only, reading this same value.
-            if (!readiness.cameraPermissionGranted || !readiness.gpsAvailable || !hasBlePermissions) {
-                PrimaryButton(text = "Cấp quyền", onClick = onRequestPermissions, modifier = Modifier.fillMaxWidth())
-            }
-            // hasBlePermissions is also required here (not just readiness.isReady), not only shown
-            // as a hint through the button above - otherwise a user could enter F04 without it and
-            // hit a SecurityException from connectGatt() on API 31+.
-            BottomActionBar(
-                ctaText = "Vào chế độ khảo sát",
-                onCtaClick = onEnterCaptureMode,
-                ctaEnabled = readiness.isReady && hasBlePermissions,
-                hint = if (!readiness.isReady || !hasBlePermissions) "Còn mục chưa đạt — chưa thể khảo sát" else null,
-                pinned = false,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ReadinessChecklist(
+private fun ReadinessSection(
     readiness: SurveyReadinessResult,
     hasBlePermissions: Boolean,
 ) {
@@ -302,9 +268,34 @@ private fun ReadinessChecklist(
                 (readiness.batteryPercent >= SurveyReadinessResult.MIN_BATTERY_PERCENT).toStatus(),
             ),
         )
+    val passCount = items.count { it.status == ReadinessCheckStatus.PASS }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                text = "Kiểm tra thiết bị",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "$passCount/$TOTAL_READINESS_CHECKS đạt",
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (passCount == TOTAL_READINESS_CHECKS) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+            )
+        }
+        RevealedReadinessChecklist(items)
+    }
+}
+
+@Composable
+private fun RevealedReadinessChecklist(items: List<ReadinessCheckItem>) {
     var revealedCount by remember { mutableStateOf(0) }
     var hasRevealedOnce by remember { mutableStateOf(false) }
-    LaunchedEffect(readiness, hasBlePermissions) {
+    LaunchedEffect(items) {
         if (hasRevealedOnce) {
             revealedCount = items.size
             return@LaunchedEffect

@@ -14,10 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.io.IOException
-import java.util.UUID
 import javax.inject.Inject
-
-data class SurveySessionStart(val workOrderId: String, val surveySweepId: String)
 
 @HiltViewModel
 class WorkOrderDetailViewModel
@@ -31,10 +28,11 @@ class WorkOrderDetailViewModel
         private val _uiState = MutableStateFlow<WorkOrderDetailUiState>(WorkOrderDetailUiState.Loading)
         val uiState: StateFlow<WorkOrderDetailUiState> = _uiState.asStateFlow()
 
-        // One-shot: a survey work order's "Bắt đầu" should navigate into F04 exactly once per tap,
-        // not replay on every recomposition the way a StateFlow would.
-        private val _startedSurveySession = MutableSharedFlow<SurveySessionStart>(extraBufferCapacity = 1)
-        val startedSurveySession: SharedFlow<SurveySessionStart> = _startedSurveySession.asSharedFlow()
+        // One-shot: a survey work order's "Bắt đầu" should navigate into F03 (readiness check,
+        // mandatory before capture per CLAUDE.md) exactly once per tap, not replay on every
+        // recomposition the way a StateFlow would.
+        private val _startedSurveyWorkOrderId = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val startedSurveyWorkOrderId: SharedFlow<String> = _startedSurveyWorkOrderId.asSharedFlow()
 
         init {
             load()
@@ -67,12 +65,7 @@ class WorkOrderDetailViewModel
                     onSuccess = { detail ->
                         _uiState.value = WorkOrderDetailUiState.Success(detail = detail)
                         if (detail.taskKind == "survey") {
-                            _startedSurveySession.tryEmit(
-                                SurveySessionStart(
-                                    workOrderId = workOrderId,
-                                    surveySweepId = UUID.randomUUID().toString(),
-                                ),
-                            )
+                            _startedSurveyWorkOrderId.tryEmit(workOrderId)
                         }
                     },
                     onFailure = { e ->

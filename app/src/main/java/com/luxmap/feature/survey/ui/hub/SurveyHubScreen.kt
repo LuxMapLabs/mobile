@@ -24,12 +24,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
@@ -37,14 +39,17 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SurveyHubRoute(
-    onCheckReadiness: (surveySweepId: String) -> Unit,
+    onCheckReadiness: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -64,18 +69,22 @@ fun SurveyHubRoute(
 @Composable
 fun SurveyHubScreen(
     state: SurveyHubUiState,
-    onCheckReadiness: (surveySweepId: String) -> Unit,
+    onCheckReadiness: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "Khảo sát",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(Spacing.lg),
-        )
+        Column(modifier = Modifier.padding(Spacing.lg)) {
+            val today = remember { LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) }
+            Text(
+                text = "Ca tối · $today",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = "Khảo sát", style = DisplayTextStyle)
+        }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (state) {
                 is SurveyHubUiState.Loading ->
@@ -123,7 +132,7 @@ fun SurveyHubScreen(
 @Composable
 private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
-    onCheckReadiness: (surveySweepId: String) -> Unit,
+    onCheckReadiness: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
 ) {
@@ -161,7 +170,7 @@ private fun SurveyHubContent(
                 )
             }
             items(state.assignedRoutes) { route ->
-                AssignedRouteCard(route, onCheckReadiness = { onCheckReadiness(route.surveySweepId) })
+                AssignedRouteCard(route, onCheckReadiness = { onCheckReadiness(route.workOrderId) })
             }
         }
     }
@@ -244,13 +253,7 @@ private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     onCheckReadiness: () -> Unit,
 ) {
-    val totalLengthMeters = route.roadSegments.mapNotNull { it.lengthMeters }.sum()
-    val segmentsLabel =
-        if (totalLengthMeters > 0) {
-            "${route.roadSegments.size} đoạn · ${totalLengthMeters.toInt()} m"
-        } else {
-            "${route.roadSegments.size} đoạn"
-        }
+    val status = workOrderStatusFromWire(route.woStatus)
     Column(
         modifier =
             Modifier
@@ -259,14 +262,10 @@ private fun AssignedRouteCard(
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(text = route.surveySweepId, style = MaterialTheme.typography.titleMedium)
+        Text(text = route.title, style = MaterialTheme.typography.titleMedium)
+        StatusBadge(text = status.label(), colors = status.badgeColors())
         Text(
-            text = segmentsLabel,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = "Ngày dự kiến: ${route.plannedDate} · Giao bởi: ${route.assignedByName}",
+            text = "Ngày dự kiến: ${route.scheduledDate ?: "Chưa có"}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

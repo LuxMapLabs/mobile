@@ -1,10 +1,9 @@
 package com.luxmap.feature.survey.ui.plan
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import com.luxmap.feature.survey.data.AssignedRoadSegment
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
-import com.luxmap.feature.survey.data.SurveySweepStatus
 import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
 import com.luxmap.feature.survey.domain.usecase.CheckSurveyReadinessUseCase
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
@@ -30,12 +29,15 @@ class SurveyPlanViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val route =
         AssignedSurveyRoute(
-            surveySweepId = "SWEEP-1",
-            assignedByName = "Kỹ sư bảo trì A",
-            plannedDate = "2026-10-01",
-            status = SurveySweepStatus.PLANNED,
-            roadSegments = listOf(AssignedRoadSegment("RS-1", "Đường A", 500.0)),
+            workOrderId = "WO-1",
+            title = "Khảo sát đường A",
+            communeId = "COM-001",
+            woStatus = "assigned",
+            dueDate = null,
+            scheduledDate = "2026-10-01",
         )
+
+    private fun savedStateHandle(workOrderId: String = "WO-1") = SavedStateHandle(mapOf("workOrderId" to workOrderId))
 
     @Before
     fun setUp() {
@@ -48,12 +50,12 @@ class SurveyPlanViewModelTest {
     }
 
     @Test
-    fun `emits Empty when there are no assigned routes`() =
+    fun `emits Empty when the work order is not among the assigned routes`() =
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(emptyList())
             val viewModel =
-                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+                SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertEquals(SurveyPlanUiState.Loading, awaitItem())
@@ -62,17 +64,17 @@ class SurveyPlanViewModelTest {
         }
 
     @Test
-    fun `emits Success with the assigned routes when there is at least one`() =
+    fun `emits Success with the matching route when found`() =
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
             val viewModel =
-                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+                SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertEquals(SurveyPlanUiState.Loading, awaitItem())
                 val success = awaitItem() as SurveyPlanUiState.Success
-                assertEquals(listOf(route), success.routes)
+                assertEquals(route, success.route)
             }
         }
 
@@ -82,7 +84,7 @@ class SurveyPlanViewModelTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flow { throw IllegalStateException("offline") }
             val viewModel =
-                SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+                SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 assertEquals(SurveyPlanUiState.Loading, awaitItem())
@@ -96,7 +98,8 @@ class SurveyPlanViewModelTest {
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
-            val viewModel = SurveyPlanViewModel(repository, mockk(relaxed = true), mockk(relaxed = true))
+            val viewModel =
+                SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -106,12 +109,12 @@ class SurveyPlanViewModelTest {
         }
 
     @Test
-    fun `selecting a route with a non-REALTIME timestamp source surfaces a not-ready readiness result`() =
+    fun `loading a route with a non-REALTIME timestamp source surfaces a not-ready readiness result`() =
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
             val readinessInputProvider = mockk<SurveyReadinessInputProvider>()
-            coEvery { readinessInputProvider.gather(route) } returns
+            coEvery { readinessInputProvider.gather() } returns
                 SurveyReadinessInput(
                     cameraPermissionGranted = true,
                     exposureLockSupported = true,
@@ -121,14 +124,17 @@ class SurveyPlanViewModelTest {
                     requiredStorageBytes = 1_000_000_000L,
                     batteryPercent = 80,
                 )
-            val viewModel = SurveyPlanViewModel(repository, readinessInputProvider, CheckSurveyReadinessUseCase())
+            val viewModel =
+                SurveyPlanViewModel(
+                    savedStateHandle(),
+                    repository,
+                    readinessInputProvider,
+                    CheckSurveyReadinessUseCase(),
+                )
 
             viewModel.uiState.test {
                 awaitItem() // Loading
-                awaitItem() // Success, no selection yet
-                viewModel.onRouteSelected("SWEEP-1")
-                val selected = awaitItem() as SurveyPlanUiState.Success // selectedSurveySweepId set, readiness null
-                assertEquals("SWEEP-1", selected.selectedSurveySweepId)
+                awaitItem() // Success, readiness null - checkReadiness() runs right after
                 val withReadiness = awaitItem() as SurveyPlanUiState.Success
                 assertFalse(requireNotNull(withReadiness.readiness).isReady)
                 assertFalse(withReadiness.readiness!!.timestampSourceRealtime)

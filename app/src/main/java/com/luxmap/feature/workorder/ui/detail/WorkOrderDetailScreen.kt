@@ -67,7 +67,7 @@ import com.luxmap.feature.workorder.data.hasLocation
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
     onComplete: () -> Unit,
-    onStartSurvey: (workOrderId: String, surveySweepId: String) -> Unit,
+    onStartSurvey: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
 ) {
@@ -75,9 +75,7 @@ fun WorkOrderDetailRoute(
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        viewModel.startedSurveySession.collect { event ->
-            onStartSurvey(event.workOrderId, event.surveySweepId)
-        }
+        viewModel.startedSurveyWorkOrderId.collect { workOrderId -> onStartSurvey(workOrderId) }
     }
 
     WorkOrderDetailScreen(

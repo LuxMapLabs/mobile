@@ -13,7 +13,6 @@ import com.luxmap.core.camera.CameraSelector
 import com.luxmap.core.camera.ExposureLockController
 import com.luxmap.core.common.StorageMonitor
 import com.luxmap.core.location.LocationTracker
-import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -22,7 +21,7 @@ import javax.inject.Inject
 // actual CameraManager/StatFs/BatteryManager calls happen, verified on a real device (spec §16),
 // not unit tested here (there is nothing pure left to assert once real system services are involved).
 interface SurveyReadinessInputProvider {
-    suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput
+    suspend fun gather(): SurveyReadinessInput
 }
 
 class RealSurveyReadinessInputProvider
@@ -33,7 +32,7 @@ class RealSurveyReadinessInputProvider
         private val locationTracker: LocationTracker,
         private val storageMonitor: StorageMonitor,
     ) : SurveyReadinessInputProvider {
-        override suspend fun gather(route: AssignedSurveyRoute): SurveyReadinessInput {
+        override suspend fun gather(): SurveyReadinessInput {
             val cameraManager = context.getSystemService(CameraManager::class.java)
             // Same selection as VideoCaptureSession, so the checklist and the recorder can never
             // mean different cameras.
@@ -71,21 +70,20 @@ class RealSurveyReadinessInputProvider
                 timestampSourceRealtime = timestampSourceRealtime,
                 gpsAvailable = locationTracker.hasLocationPermission() && gpsProviderEnabled,
                 freeStorageBytes = storageMonitor.freeBytes(),
-                requiredStorageBytes = estimateRequiredStorageBytes(route),
+                requiredStorageBytes = estimateRequiredStorageBytes(),
                 batteryPercent = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
             )
         }
 
-        // Rough estimate (average survey speed x an assumed bitrate) — refine both constants
-        // against the Task 2 spike's chosen defaults once real numbers exist.
-        private fun estimateRequiredStorageBytes(route: AssignedSurveyRoute): Long {
-            val totalLengthMeters = route.roadSegments.sumOf { it.lengthMeters ?: 0.0 }
-            val estimatedDurationSeconds = totalLengthMeters / AVERAGE_SPEED_METERS_PER_SECOND
-            return (estimatedDurationSeconds * ASSUMED_BITRATE_BYTES_PER_SECOND).toLong()
-        }
+        // WorkOrderItemDto has no per-segment length (that was a placeholder field from the now-
+        // removed AssignedSurveyRoute.roadSegments), so this assumes a flat default recording
+        // duration instead of guessing a route length. Refine both constants against the Task 2
+        // spike's chosen defaults once real numbers exist.
+        private fun estimateRequiredStorageBytes(): Long =
+            DEFAULT_ESTIMATED_DURATION_SECONDS * ASSUMED_BITRATE_BYTES_PER_SECOND
 
         private companion object {
-            const val AVERAGE_SPEED_METERS_PER_SECOND = 8.3 // ~30 km/h
+            const val DEFAULT_ESTIMATED_DURATION_SECONDS = 30 * 60L // 30 minutes
             const val ASSUMED_BITRATE_BYTES_PER_SECOND = 1_000_000L // 8 Mbps placeholder pending Task 2
         }
     }

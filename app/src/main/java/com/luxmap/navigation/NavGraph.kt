@@ -45,6 +45,7 @@ import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.completion.WorkOrderCompletionRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
+import java.util.UUID
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -170,18 +171,20 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
             composable(
                 route = Routes.SurveyPlan.route,
-                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
             ) { backStackEntry ->
-                val planSurveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
+                val planWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 SurveyPlanScreen(
-                    surveySweepId = planSurveySweepId,
-                    onEnterCaptureMode = { surveySweepId ->
-                        // F03's standalone survey-plan entry has no work order in scope at all -
-                        // threading a real workOrderId here is out of scope for this plan (fm-40
-                        // only covers the Work Order "Bắt đầu" entry into capture). Same gap shape
-                        // and same tracking as the onRedo path below.
+                    onBack = { navController.popBackStack() },
+                    onEnterCaptureMode = {
+                        // The sweep doesn't exist server-side yet (POST /sweeps isn't wired into
+                        // the upload flow - tracked separately in docs/contract-drift.md), so this
+                        // id is only a local Room session key, same as the old F09 shortcut used.
                         navController.navigate(
-                            Routes.SurveyCapture.createRoute(workOrderId = "", surveySweepId = surveySweepId),
+                            Routes.SurveyCapture.createRoute(
+                                workOrderId = planWorkOrderId,
+                                surveySweepId = UUID.randomUUID().toString(),
+                            ),
                         )
                     },
                 )
@@ -202,6 +205,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 CaptureScreen(
                     surveySweepId = surveySweepId,
                     workOrderId = workOrderId,
+                    onClose = { navController.popBackStack() },
                     onSessionPackaged = { sessionId ->
                         navController.navigate(Routes.SurveyReview.createRoute(sessionId)) {
                             popUpTo(Routes.Survey.route)
@@ -277,8 +281,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
                     onComplete = { navController.navigate(Routes.WorkOrderCompletion.createRoute(workOrderId)) },
-                    onStartSurvey = { startedWorkOrderId, surveySweepId ->
-                        navController.navigate(Routes.SurveyCapture.createRoute(startedWorkOrderId, surveySweepId))
+                    onStartSurvey = { startedWorkOrderId ->
+                        // Through F03 first, not straight into capture - the readiness checklist
+                        // (exposure lock/GPS/storage/battery) is a hard gate CLAUDE.md requires
+                        // for every survey entry point, not just the Survey Hub one.
+                        navController.navigate(Routes.SurveyPlan.createRoute(startedWorkOrderId))
                     },
                 )
             }
