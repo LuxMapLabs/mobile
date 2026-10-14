@@ -1,10 +1,8 @@
 package com.luxmap.feature.survey.ui.plan
 
 import app.cash.turbine.test
-import com.luxmap.feature.survey.data.AssignedRoadSegment
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
-import com.luxmap.feature.survey.data.SurveySweepStatus
 import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
 import com.luxmap.feature.survey.domain.usecase.CheckSurveyReadinessUseCase
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessInput
@@ -30,11 +28,12 @@ class SurveyPlanViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val route =
         AssignedSurveyRoute(
-            surveySweepId = "SWEEP-1",
-            assignedByName = "Kỹ sư bảo trì A",
-            plannedDate = "2026-10-01",
-            status = SurveySweepStatus.PLANNED,
-            roadSegments = listOf(AssignedRoadSegment("RS-1", "Đường A", 500.0)),
+            workOrderId = "WO-1",
+            title = "Khảo sát đường A",
+            communeId = "COM-001",
+            woStatus = "assigned",
+            dueDate = null,
+            scheduledDate = "2026-10-01",
         )
 
     @Before
@@ -111,7 +110,7 @@ class SurveyPlanViewModelTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
             val readinessInputProvider = mockk<SurveyReadinessInputProvider>()
-            coEvery { readinessInputProvider.gather(route) } returns
+            coEvery { readinessInputProvider.gather() } returns
                 SurveyReadinessInput(
                     cameraPermissionGranted = true,
                     exposureLockSupported = true,
@@ -126,9 +125,9 @@ class SurveyPlanViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success, no selection yet
-                viewModel.onRouteSelected("SWEEP-1")
-                val selected = awaitItem() as SurveyPlanUiState.Success // selectedSurveySweepId set, readiness null
-                assertEquals("SWEEP-1", selected.selectedSurveySweepId)
+                viewModel.onRouteSelected("WO-1")
+                val selected = awaitItem() as SurveyPlanUiState.Success // selectedWorkOrderId set, readiness null
+                assertEquals("WO-1", selected.selectedWorkOrderId)
                 val withReadiness = awaitItem() as SurveyPlanUiState.Success
                 assertFalse(requireNotNull(withReadiness.readiness).isReady)
                 assertFalse(withReadiness.readiness!!.timestampSourceRealtime)

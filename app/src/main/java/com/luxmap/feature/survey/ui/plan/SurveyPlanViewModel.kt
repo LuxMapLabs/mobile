@@ -61,18 +61,17 @@ class SurveyPlanViewModel
             }
         }
 
-        fun onRouteSelected(surveySweepId: String) {
+        fun onRouteSelected(workOrderId: String) {
             val current = _uiState.value as? SurveyPlanUiState.Success ?: return
-            _uiState.value = current.copy(selectedSurveySweepId = surveySweepId, readiness = null)
+            _uiState.value = current.copy(selectedWorkOrderId = workOrderId, readiness = null)
 
             viewModelScope.launch {
-                val route = current.routes.first { it.surveySweepId == surveySweepId }
-                val input = readinessInputProvider.gather(route)
+                val input = readinessInputProvider.gather()
                 val result = checkSurveyReadinessUseCase(input)
 
                 // Only apply the result if the user has not since picked a different route.
                 val latest = _uiState.value
-                if (latest is SurveyPlanUiState.Success && latest.selectedSurveySweepId == surveySweepId) {
+                if (latest is SurveyPlanUiState.Success && latest.selectedWorkOrderId == workOrderId) {
                     _uiState.value = latest.copy(readiness = result)
                 }
             }

@@ -37,6 +37,8 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.theme.label
+import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CameraReadinessPanel
 import com.luxmap.core.ui.components.InlineBanner
@@ -45,6 +47,7 @@ import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.ReadinessCheckItem
 import com.luxmap.core.ui.components.ReadinessCheckStatus
+import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 import kotlinx.coroutines.delay
@@ -86,14 +89,14 @@ private fun hasBlePermissions(context: Context): Boolean =
 // no matter the system setting, same rule as F04 Capture Mode.
 @Composable
 fun SurveyPlanScreen(
-    surveySweepId: String,
-    onEnterCaptureMode: (surveySweepId: String) -> Unit,
+    workOrderId: String,
+    onEnterCaptureMode: (workOrderId: String) -> Unit,
     viewModel: SurveyPlanViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     LuxMapTheme(forceDark = true) {
         SurveyPlanScreenContent(
-            surveySweepId = surveySweepId,
+            workOrderId = workOrderId,
             state = uiState,
             onRouteSelected = viewModel::onRouteSelected,
             onRetry = viewModel::onRetry,
@@ -107,18 +110,18 @@ fun SurveyPlanScreen(
 // already stateless.
 @Composable
 fun SurveyPlanScreenContent(
-    surveySweepId: String,
+    workOrderId: String,
     state: SurveyPlanUiState,
     onRouteSelected: (String) -> Unit,
     onRetry: () -> Unit = {},
     onEnterCaptureMode: (String) -> Unit = {},
 ) {
-    LaunchedEffect(surveySweepId, state is SurveyPlanUiState.Success) {
+    LaunchedEffect(workOrderId, state is SurveyPlanUiState.Success) {
         if (state is SurveyPlanUiState.Success &&
-            state.selectedSurveySweepId == null &&
-            state.routes.any { it.surveySweepId == surveySweepId }
+            state.selectedWorkOrderId == null &&
+            state.routes.any { it.workOrderId == workOrderId }
         ) {
-            onRouteSelected(surveySweepId)
+            onRouteSelected(workOrderId)
         }
     }
     SurveyPlanContent(
@@ -170,7 +173,7 @@ fun SurveyPlanContent(
                 val permissionLauncher =
                     rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
                         hasBlePermissions = hasBlePermissions(context)
-                        state.selectedSurveySweepId?.let(onRouteSelected)
+                        state.selectedWorkOrderId?.let(onRouteSelected)
                     }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
@@ -179,16 +182,16 @@ fun SurveyPlanContent(
                     items(state.routes) { route ->
                         SurveyRouteCard(
                             route = route,
-                            isSelected = route.surveySweepId == state.selectedSurveySweepId,
+                            isSelected = route.workOrderId == state.selectedWorkOrderId,
                             readiness =
-                                if (route.surveySweepId == state.selectedSurveySweepId) {
+                                if (route.workOrderId == state.selectedWorkOrderId) {
                                     state.readiness
                                 } else {
                                     null
                                 },
                             hasBlePermissions = hasBlePermissions,
-                            onClick = { onRouteSelected(route.surveySweepId) },
-                            onEnterCaptureMode = { onEnterCaptureMode(route.surveySweepId) },
+                            onClick = { onRouteSelected(route.workOrderId) },
+                            onEnterCaptureMode = { onEnterCaptureMode(route.workOrderId) },
                             onRequestPermissions = { permissionLauncher.launch(CAPTURE_PERMISSIONS) },
                         )
                     }
@@ -232,10 +235,15 @@ private fun SurveyRouteCard(
     onRequestPermissions: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(Spacing.md)) {
-        Text(route.surveySweepId, style = MaterialTheme.typography.titleMedium)
-        Text("Giao bởi: ${route.assignedByName}", style = MaterialTheme.typography.bodyMedium)
-        Text("Ngày dự kiến: ${route.plannedDate}", style = MaterialTheme.typography.bodyMedium)
-        Text("${route.roadSegments.size} đoạn đường", style = MaterialTheme.typography.bodySmall)
+        Text(route.title, style = MaterialTheme.typography.titleMedium)
+        StatusBadge(
+            text = workOrderStatusFromWire(route.woStatus).label(),
+            colors = workOrderStatusFromWire(route.woStatus).badgeColors(),
+        )
+        Text(
+            text = "Ngày dự kiến: ${route.scheduledDate ?: "Chưa có"}",
+            style = MaterialTheme.typography.bodyMedium,
+        )
         if (!isSelected) {
             PrimaryButton(text = "Kiểm tra sẵn sàng", onClick = onClick)
         } else if (readiness == null) {

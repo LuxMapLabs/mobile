@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
-import com.luxmap.feature.survey.data.SurveySweepStatus
 import com.luxmap.feature.survey.domain.usecase.SurveyReadinessResult
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -23,11 +22,12 @@ class SurveyPlanScreenTest {
 
     private fun route() =
         AssignedSurveyRoute(
-            surveySweepId = "SWEEP-1",
-            assignedByName = "Nguyen Van A",
-            plannedDate = "2026-10-02",
-            status = SurveySweepStatus.PLANNED,
-            roadSegments = emptyList(),
+            workOrderId = "WO-1",
+            title = "Khảo sát đường A",
+            communeId = "COM-001",
+            woStatus = "assigned",
+            dueDate = null,
+            scheduledDate = "2026-10-02",
         )
 
     private fun readyResult() =
@@ -59,7 +59,7 @@ class SurveyPlanScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("SWEEP-1").assertExists()
+        composeRule.onNodeWithText("Khảo sát đường A").assertExists()
     }
 
     @Test
@@ -70,7 +70,7 @@ class SurveyPlanScreenTest {
                     state =
                         SurveyPlanUiState.Success(
                             routes = listOf(route()),
-                            selectedSurveySweepId = route().surveySweepId,
+                            selectedWorkOrderId = route().workOrderId,
                             readiness = readyResult(),
                         ),
                     onRouteSelected = {},
@@ -88,7 +88,7 @@ class SurveyPlanScreenTest {
                     state =
                         SurveyPlanUiState.Success(
                             routes = listOf(route()),
-                            selectedSurveySweepId = route().surveySweepId,
+                            selectedWorkOrderId = route().workOrderId,
                             readiness = readyResult(),
                         ),
                     onRouteSelected = {},
@@ -114,7 +114,7 @@ class SurveyPlanScreenTest {
                     state =
                         SurveyPlanUiState.Success(
                             routes = listOf(route()),
-                            selectedSurveySweepId = route().surveySweepId,
+                            selectedWorkOrderId = route().workOrderId,
                             readiness = readyResult(),
                         ),
                     onRouteSelected = {},
@@ -132,7 +132,7 @@ class SurveyPlanScreenTest {
                     state =
                         SurveyPlanUiState.Success(
                             routes = listOf(route()),
-                            selectedSurveySweepId = route().surveySweepId,
+                            selectedWorkOrderId = route().workOrderId,
                             readiness = readyResult().copy(gpsAvailable = false),
                         ),
                     onRouteSelected = {},
@@ -143,19 +143,19 @@ class SurveyPlanScreenTest {
     }
 
     @Test
-    fun arriving_with_a_surveySweepId_auto_selects_that_route() {
+    fun arriving_with_a_workOrderId_auto_selects_that_route() {
         var selected: String? = null
         composeRule.setContent {
             LuxMapTheme {
                 SurveyPlanScreenContent(
-                    surveySweepId = "SWEEP-1",
+                    workOrderId = "WO-1",
                     state = SurveyPlanUiState.Success(routes = listOf(route())),
                     onRouteSelected = { selected = it },
                 )
             }
         }
         composeRule.waitForIdle()
-        assertEquals("SWEEP-1", selected)
+        assertEquals("WO-1", selected)
     }
 
     @Test
@@ -187,7 +187,7 @@ class SurveyPlanScreenTest {
     @Test
     fun a_manual_tap_on_a_different_route_overrides_the_auto_selected_one() {
         val routeA = route()
-        val routeB = route().copy(surveySweepId = "SWEEP-2")
+        val routeB = route().copy(workOrderId = "WO-2")
         var selected: String? = null
         composeRule.setContent {
             var state by
@@ -196,20 +196,20 @@ class SurveyPlanScreenTest {
                 }
             LuxMapTheme {
                 SurveyPlanScreenContent(
-                    surveySweepId = "SWEEP-1",
+                    workOrderId = "WO-1",
                     state = state,
                     onRouteSelected = { id ->
                         selected = id
-                        state = (state as SurveyPlanUiState.Success).copy(selectedSurveySweepId = id, readiness = null)
+                        state = (state as SurveyPlanUiState.Success).copy(selectedWorkOrderId = id, readiness = null)
                     },
                 )
             }
         }
-        composeRule.waitForIdle() // auto-select lands on SWEEP-1
-        // Once SWEEP-1 is selected it stops showing its own button, so this now targets SWEEP-2's.
+        composeRule.waitForIdle() // auto-select lands on WO-1
+        // Once WO-1 is selected it stops showing its own button, so this now targets WO-2's.
         composeRule.onNodeWithText("Kiểm tra sẵn sàng").performClick()
         composeRule.waitForIdle()
-        assertEquals("SWEEP-2", selected)
+        assertEquals("WO-2", selected)
     }
 
     @Test

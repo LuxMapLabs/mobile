@@ -10,7 +10,7 @@ import org.junit.Test
 
 class FakeSurveyRepositoryTest {
     @Test
-    fun `emits at least one assigned route with its road segments`() =
+    fun `emits at least one assigned route with a real work order id`() =
         runTest {
             // observeAssignedRoutes does not touch sessionDao/context, so plain mocks are
             // enough here - segmentFilePathsFor/discardSession get their own androidTest
@@ -20,7 +20,7 @@ class FakeSurveyRepositoryTest {
             repository.observeAssignedRoutes().test {
                 val routes = awaitItem()
                 assertTrue(routes.isNotEmpty())
-                assertTrue(routes.first().roadSegments.isNotEmpty())
+                assertTrue(routes.first().workOrderId.isNotEmpty())
                 awaitComplete()
             }
         }

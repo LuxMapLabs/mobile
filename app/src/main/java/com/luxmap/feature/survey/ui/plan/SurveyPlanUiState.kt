@@ -8,7 +8,7 @@ sealed interface SurveyPlanUiState {
 
     data class Success(
         val routes: List<AssignedSurveyRoute>,
-        val selectedSurveySweepId: String? = null,
+        val selectedWorkOrderId: String? = null,
         val readiness: SurveyReadinessResult? = null,
         val rejectionReason: String? = null,
     ) : SurveyPlanUiState
