@@ -11,13 +11,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -38,6 +36,7 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.PrimaryButton
@@ -61,12 +60,7 @@ fun SubmitScreen(
     LaunchedEffect(sessionId) { viewModel.onSubmit(sessionId) }
 
     Column(Modifier.fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBackToSurveyHub) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
-            }
-            Text(text = "Nộp đợt khảo sát", style = MaterialTheme.typography.titleLarge)
-        }
+        AppTopBar(title = "Nộp đợt khảo sát", onBack = onBackToSurveyHub)
         // A LazyColumn, not a plain Column: the file row count is 5 + segmentCount, and a session
         // recorded in 60s clips can easily have 15-35 rows.
         LazyColumn(

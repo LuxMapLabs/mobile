@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Smartphone
@@ -48,6 +47,7 @@ import androidx.media3.ui.PlayerView
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.PrimaryButton
 
 // F05 reinterpreted (see docs/superpowers/specs/2026-10-02-survey-video-review-design.md):
@@ -70,15 +70,8 @@ fun CoverageScreen(
     LaunchedEffect(sessionId) { viewModel.loadSegments(sessionId) }
     LaunchedEffect(Unit) { viewModel.redoCompleted.collect { surveySweepId -> onRedo(surveySweepId) } }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-            Text("Xem lại video", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = sessionId,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+    Column(Modifier.fillMaxSize()) {
+        AppTopBar(title = "Xem lại video", onBack = null, subtitle = sessionId)
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (val state = uiState) {
                 is CoverageUiState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
