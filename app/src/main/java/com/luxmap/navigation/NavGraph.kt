@@ -41,6 +41,7 @@ import com.luxmap.feature.survey.ui.capture.CaptureScreen
 import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
+import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
@@ -159,6 +160,18 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onReviewAiConfirmation = { surveySweepId ->
                         navController.navigate(Routes.AiConfirmation.createRoute(surveySweepId))
                     },
+                    onCapturePolePhotos = { workOrderId ->
+                        navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
+                    },
+                )
+            }
+            composable(
+                route = Routes.PolePhotoList.route,
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+            ) {
+                PoleListRoute(
+                    onCapturePole = { poleId -> },
+                    onDone = { navController.popBackStack() },
                 )
             }
             composable(
