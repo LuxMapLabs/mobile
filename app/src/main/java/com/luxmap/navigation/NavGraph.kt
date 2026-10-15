@@ -42,6 +42,7 @@ import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
+import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
@@ -168,11 +169,24 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(
                 route = Routes.PolePhotoList.route,
                 arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
-            ) {
+            ) { backStackEntry ->
+                val polePhotoWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 PoleListRoute(
-                    onCapturePole = { poleId -> },
+                    onCapturePole = { poleId ->
+                        navController.navigate(Routes.PolePhotoCapture.createRoute(polePhotoWorkOrderId, poleId))
+                    },
                     onDone = { navController.popBackStack() },
                 )
+            }
+            composable(
+                route = Routes.PolePhotoCapture.route,
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("poleId") { type = NavType.StringType },
+                    ),
+            ) {
+                PolePhotoCaptureRoute(onDone = { navController.popBackStack() })
             }
             composable(
                 route = Routes.AiConfirmation.route,

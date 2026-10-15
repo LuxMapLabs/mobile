@@ -57,6 +57,15 @@ sealed interface Routes {
         fun createRoute(workOrderId: String) = "survey/pole-photos/$workOrderId"
     }
 
+    data object PolePhotoCapture : Routes {
+        override val route = "survey/pole-photos/{workOrderId}/capture/{poleId}"
+
+        fun createRoute(
+            workOrderId: String,
+            poleId: String,
+        ) = "survey/pole-photos/$workOrderId/capture/$poleId"
+    }
+
     data object Map : Routes {
         override val route = "map"
     }
