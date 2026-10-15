@@ -13,7 +13,9 @@ At each pole on an assigned survey route, the Field Engineer takes one photo of 
 
 ## 2. Scope (v1)
 
-In scope: pick an assigned survey work order → pick a pole from that work order's pole list → capture one photo for that pole, with exposure locked and a GPS fix attached → save locally and queue for sync → repeat for the next pole → return to the hub when done.
+In scope: pick an assigned survey work order → pick a pole from that work order's pole list → capture one photo for that pole, with a GPS fix attached → save locally → repeat for the next pole → return to the hub when done.
+
+**Known, accepted gap for v1 (confirmed with user 2026-10-15, not an oversight):** the photo is captured with CameraX `ImageCapture` default auto-exposure, **not** a real manual exposure lock. `CLAUDE.md`'s hard rule ("không cho bắt đầu khảo sát nếu chưa khoá exposure thật") stays in force for the existing continuous-video flow, unchanged — this v1 photo flow is a deliberate, recorded exception, because a real lock means writing a manual Camera2 still-capture pipeline on the scale of the 992-line `VideoCaptureSession.kt`, which does not fit the demo timeline. Tracked as technical debt to fix after the demo.
 
 Out of scope (explicitly, so no one assumes it's done):
 - Short video capture (the other half of the mentor's request — separate follow-up task).
@@ -32,49 +34,49 @@ New routes added to `Routes.kt`:
 
 ## 4. Pole Photo Capture screen
 
-Reuses existing, already-tested infrastructure instead of writing new camera code:
-- **`ExposureLockController`** (existing, from `core/camera`) — locks AE/ISO/shutter before the capture button is enabled. Per `CLAUDE.md`'s core rule ("không cho bắt đầu khảo sát nếu chưa khoá exposure thật — ảnh auto-exposure không sửa lại được sau khi chụp"), this is a hard requirement, not a toggle — same as F04's video flow.
-- **`LocationTracker`** (existing, from `core/location`) — takes a single GPS fix at capture time (not a continuous track like F04's video session).
-- **`CaptureMetadataWriter`** (existing) — writes GPS + timestamp EXIF into the JPEG.
+- **Camera:** plain CameraX `ImageCapture` use case bound to the screen's lifecycle, default auto-exposure (see the v1 gap noted in section 2 — this is new code, not a reuse of `VideoCaptureSession.kt`'s manual Camera2 pipeline).
+- **`LocationTracker`** (existing, from `core/location`) — `getCurrentLocation()` takes a single GPS fix at capture time (not a continuous track like F04's video session). Returns `null` on no permission/no fix.
+- **EXIF:** no existing writer to reuse — `CaptureMetadataWriter` from `CLAUDE.md`'s folder sketch was never built (the project dropped standalone-photo capture in the 2026-09-25 decision, before this new exception). New, small `PolePhotoExifWriter` class using `androidx.exifinterface:exifinterface` (already on the approved tech stack, just unused until now): writes `GPSLatitude`/`GPSLongitude`/`GPSTimeStamp` and `DateTimeOriginal` onto the saved JPEG.
 
-Readiness check for this screen is lighter than F03's full checklist (`CheckSurveyReadinessUseCase`): only "exposure locked" and "GPS fix valid" gate the capture button. Storage/battery checks are skipped — a handful of JPEGs, unlike a continuous video session, don't risk running out of space or battery mid-capture.
+Readiness check for this screen: only "GPS fix valid" gates the capture button (no exposure check in v1, per section 2). Storage/battery checks are skipped — a handful of JPEGs, unlike a continuous video session, don't risk running out of space or battery mid-capture.
 
-On capture: write the JPEG to app-specific storage, write a `LocalPolePhoto` Room row, enqueue a sync-queue entry — same pattern as a single `WorkOrder` evidence photo (F10), not the chunked/resumable upload used for the big video sessions in F06.
+On capture: write the JPEG to app-specific storage, write EXIF via `PolePhotoExifWriter`, then write one `LocalPolePhotoEntity` row. No sync-queue entry in v1 — see section 6 for why.
 
 ## 5. Local storage
 
-New Room entity `local_pole_photo` (table name chosen by mobile per `CLAUDE.md`'s C8.5 naming authority — no BE confirmation needed for local-only names):
+New Room entity `local_pole_photo` (table name chosen by mobile per `CLAUDE.md`'s C8.5 naming authority — no BE confirmation needed for local-only names). No `syncStatus` field in v1 — see section 6 for why; a row existing for a `poleId` means "captured and saved", full stop:
 
 ```kotlin
 @Entity(tableName = "local_pole_photo")
-data class LocalPolePhoto(
-    @PrimaryKey val photoId: String,       // client-generated UUID, doubles as client_op_id
+data class LocalPolePhotoEntity(
+    @PrimaryKey val photoId: String,       // client-generated UUID
     val workOrderId: String,
     val poleId: String,
     val filePath: String,                  // app-specific storage, not Room
     val capturedAt: Instant,
     val lat: Double,
     val lng: Double,
-    val syncStatus: SyncStatus,             // reuse the existing enum (queued/syncing/failed/conflict/done)
 )
 ```
 
-A DAO (`PolePhotoDao`) follows the existing pattern used by other local tables: insert, update sync status, query by `workOrderId` (to render the Pole List screen's "đã chụp" marks).
+A DAO (`PolePhotoDao`) follows the existing pattern used by other local tables: insert, query by `workOrderId` (to render the Pole List screen's "đã chụp" marks).
 
 ## 6. Repository — Fake now, Real once BE ships it
+
+**Correction from the first draft of this spec:** the original wording said this photo flow would "enqueue a sync-queue entry". It doesn't, in v1. `SyncQueueProcessor.processQueuedOps()` marks any row with no matching `SyncOpHandler` as `failed` with "No handler for {opType}" on the very next sync cycle — queuing now, before a handler exists, would show the photo as a sync error right after a successful capture, which is worse for a demo than just not claiming cloud sync yet.
 
 `PolePhotoRepository` interface, added under `feature/survey/data/`:
 
 ```kotlin
 interface PolePhotoRepository {
-    fun observePhotos(workOrderId: String): Flow<List<LocalPolePhoto>>
-    suspend fun capture(workOrderId: String, poleId: String, filePath: String, lat: Double, lng: Double): LocalPolePhoto
+    fun observePhotos(workOrderId: String): Flow<List<LocalPolePhotoEntity>>
+    suspend fun capture(workOrderId: String, poleId: String, filePath: String, lat: Double, lng: Double): LocalPolePhotoEntity
 }
 ```
 
-`FakePolePhotoRepository` — writes to Room immediately (real local behavior, not mocked), simulates `queued → syncing → done` over a few seconds like the other Fake repositories, and does not yet surface a classification result (no fake AI result invented for this one — BE hasn't confirmed the response shape, so nothing is shown beyond "đã đồng bộ"/"đồng bộ lỗi").
+`FakePolePhotoRepository` — writes to Room immediately (real local behavior, not mocked). No sync simulation, no AI result: the photo just shows as "đã lưu trên máy" (never "đã đồng bộ" — keeping that distinction from `CLAUDE.md`'s sync badge table honest, since nothing is actually uploaded yet).
 
-`RealPolePhotoRepository` is **not** written yet, not even as a stub — per the project's own rule against half-finished implementations, it gets written only once the BE endpoint exists, then bound in `RepositoryModule` in one line.
+`RealPolePhotoRepository` is **not** written yet, not even as a stub — per the project's own rule against half-finished implementations, it gets written only once the BE endpoint exists. That task also adds a `UploadPolePhotoSyncHandler` (`SyncOpHandler`, `opType = "upload_pole_photo"`) and switches `capture()` to call `SyncQueueManager.enqueue(...)` — that's when this flow actually joins the real offline-first sync queue.
 
 ## 7. Proposed BE endpoint (already sent to BE by the user)
 
@@ -94,14 +96,13 @@ This contract is a mobile-side proposal, not yet BE-confirmed. Field names may c
 
 ## 8. Error handling
 
-- Exposure lock fails to engage → capture button stays disabled, same UX pattern as F04.
-- GPS fix unavailable/stale → capture button stays disabled with a short inline reason, same pattern as F03's GPS check.
-- Local save succeeds, sync fails (offline or BE error) → row stays `queued`/`failed` in Room, retried by the existing `SyncWorker`/`SyncQueueManager` — no special-casing needed, this reuses the existing sync queue machinery.
-- No network at capture time → capture still succeeds locally (offline-first); sync is a background concern, never blocks the capture screen.
+- GPS fix unavailable (no permission) or the fused location call returns `null` → capture button stays disabled with a short inline reason, same pattern as F03's GPS check.
+- `ImageCapture.takePicture()` fails (device/storage error) → show an inline error, let the user retry; nothing is written to Room until the file is confirmed saved.
+- No network at capture time → irrelevant in v1 — capture never touches the network, see section 6.
 
 ## 9. Testing
 
-- Unit: `PolePhotoDao` (Room in-memory, matching the existing DAO test pattern), `FakePolePhotoRepository`'s queued→syncing→done simulation.
+- Unit: `PolePhotoDao` (Room in-memory, matching the existing DAO test pattern), `PolePhotoExifWriter`, `FakePolePhotoRepository.capture()`.
 - No new ViewModel test added to `CaptureViewModelTest` or its suite — this is a new, separate ViewModel, avoiding the pre-existing hang in that test class.
 - Compose UI test for the Pole List screen's "đã chụp" marking, following the project's existing Compose UI Test conventions.
 - No real-device camera/GPS verification is in scope for this spec — same deferred status as the rest of the app's capture screens (tracked in memory, not re-litigated here).

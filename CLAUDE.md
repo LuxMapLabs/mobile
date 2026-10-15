@@ -89,7 +89,10 @@ Quyết định: **thêm 1 luồng khảo sát mới theo từng cột đèn, ch
 - Chưa có endpoint backend nào cho việc upload ảnh/video ngắn theo cột rồi AI quét (đã kiểm tra trực tiếp source code `luxmap_backend` nhánh `dev` ngày 2026-10-15: chỉ có `POST /api/v1/sweeps` nhận 1 video + track GPS/lux cho cả phiên, và `SurveyReviewController` chỉ duyệt/trả cả sweep — không có endpoint nào nhận ảnh/video rời theo từng cột). Cần làm việc với BE để thêm endpoint mới, chưa tự đặt tên field/endpoint.
 - Chưa quyết kiến trúc màn hình: `CaptureScreen`/`feature/survey` hiện giả định 1 phiên quay liên tục cho cả tuyến (`CheckSurveyReadinessUseCase`, khoá exposure áp cho cả phiên) — luồng mới theo từng cột cần 1 entry point khác (có thể là 1 màn/section riêng trong Survey Hub), chưa thiết kế.
 - Chưa có tên bảng Room cục bộ, tên trường DTO, hay đặt tên component cho luồng mới này — không tự đặt tên khi bắt đầu code, viết spec trước (theo đúng cách làm việc từng bước nhỏ ở mục "Nguyên tắc làm việc với Claude Code").
-- Việc chụp ảnh/quay video ngắn này có cần khoá exposure thật như luồng video liên tục không (nguyên tắc "không cho bắt đầu khảo sát nếu chưa khoá exposure thật" áp dụng ra sao cho luồng mới) — chưa xác nhận.
+
+**Đã quyết riêng cho phần chụp ảnh (v1, ưu tiên demo) — 2026-10-15, xem `docs/superpowers/specs/2026-10-15-pole-photo-capture-design.md`:**
+- Khoá exposure thật **KHÔNG áp dụng ở v1** cho màn chụp ảnh theo cột — dùng CameraX `ImageCapture` mặc định (auto-exposure). Đây là **ngoại lệ có chủ đích, đã xác nhận với người dùng**, không phải quên — lý do: khoá exposure thật đòi hỏi viết thêm 1 pipeline Camera2 thủ công như `VideoCaptureSession.kt` (992 dòng), không kịp cho demo ưu tiên tốc độ. **Nợ kỹ thuật cần làm sau demo**, không áp dụng cho luồng video liên tục hiện có (luồng đó vẫn khoá exposure thật, không đổi).
+- Chưa có `SyncOpHandler` cho ảnh cột đèn vì chưa có endpoint BE — ảnh lưu local với trạng thái riêng ("đã lưu máy"), **không đẩy vào `sync_queue` thật** ở v1 (đẩy vào mà không có handler sẽ bị `SyncQueueProcessor` đánh dấu `failed` ngay — xem `SyncQueueProcessor.kt`). Việc này nối vào `sync_queue` thật khi `RealPolePhotoRepository` được viết (sau khi BE xác nhận endpoint).
 
 ## Ngăn xếp công nghệ
 
