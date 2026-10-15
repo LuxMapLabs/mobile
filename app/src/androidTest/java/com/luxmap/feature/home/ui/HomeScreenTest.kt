@@ -30,21 +30,30 @@ class HomeScreenTest {
     }
 
     @Test
-    fun successState_showsMetricsAndClusterLabel() {
+    fun successState_showsWorkOrdersGroupedByTaskKind() {
         val data =
             HomeData(
                 metrics = HomeMetrics(assignedCount = 3, inProgressCount = 1, overdueCount = 0, plannedSweepCount = 2),
                 clusters =
                     listOf(
                         WorkOrderCluster(
-                            clusterLabel = "Xã Đông Thịnh",
+                            clusterLabel = "COM-001",
                             items =
                                 listOf(
+                                    // Highest priority - becomes the "Tiếp theo" card, not a list row.
                                     WorkOrderSummaryItem(
                                         workOrderId = "WO-2031",
                                         woStatus = "assigned",
                                         dueDate = null,
-                                        priorityScore = null,
+                                        priorityScore = 90.0,
+                                        taskKind = "repair",
+                                    ),
+                                    // Stays in the list, under the "Sửa chữa" section.
+                                    WorkOrderSummaryItem(
+                                        workOrderId = "WO-2019",
+                                        woStatus = "assigned",
+                                        dueDate = null,
+                                        priorityScore = 10.0,
                                         taskKind = "repair",
                                     ),
                                 ),
@@ -63,8 +72,9 @@ class HomeScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Xã Đông Thịnh").assertExists()
         composeTestRule.onNodeWithText("WO-2031").assertExists()
+        composeTestRule.onNodeWithText("Sửa chữa").assertExists()
+        composeTestRule.onNodeWithText("WO-2019").assertExists()
     }
 
     @Test

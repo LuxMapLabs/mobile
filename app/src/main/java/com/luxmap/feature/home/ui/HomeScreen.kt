@@ -2,8 +2,8 @@ package com.luxmap.feature.home.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -38,7 +40,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,19 +51,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.theme.Amber500
+import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
+import com.luxmap.core.theme.Green400
 import com.luxmap.core.theme.HeadlineTextStyle
+import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
@@ -149,7 +154,6 @@ fun HomeScreen(
                             isStale = uiState.isStale,
                             lastSyncedAt = uiState.lastSyncedAt,
                             onOpenWorkOrder = onOpenWorkOrder,
-                            onStartSurvey = onStartSurvey,
                         )
                     is HomeUiState.Empty -> EmptyState(onStartSurvey = onStartSurvey)
                     is HomeUiState.Error -> ErrorState(message = uiState.message, onRetry = onRetry)
@@ -168,7 +172,6 @@ private fun HomeContent(
     isStale: Boolean,
     lastSyncedAt: Instant?,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
-    onStartSurvey: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -205,32 +208,12 @@ private fun HomeContent(
                 )
             }
         }
-        if (data.metrics.plannedSweepCount != null && data.metrics.plannedSweepCount > 0) {
-            item {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable(onClick = onStartSurvey)
-                            .padding(vertical = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(text = "Khảo sát tối nay", style = MaterialTheme.typography.titleMedium)
-                    Icon(
-                        imageVector = Icons.Filled.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
-                    )
-                }
-            }
-        }
-        data.clusters.forEach { cluster ->
-            val remaining = cluster.items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
+        data.groupedByTaskKind().forEach { (kind, items) ->
+            val remaining = items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
             if (remaining.isNotEmpty()) {
                 item {
-                    ClusterSection(
-                        label = cluster.clusterLabel,
+                    TaskKindSection(
+                        kind = kind,
                         items = remaining,
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
@@ -256,6 +239,22 @@ private fun HomeData.nextUp(): WorkOrderSummaryItem? {
     )
 }
 
+// Survey work orders are deliberately left out - the dedicated Khảo sát tab (SurveyHubScreen)
+// already lists them with richer, survey-specific actions (readiness check, rejected/AI-pending
+// states) that this plain task row can't offer, so showing them here too would just duplicate it.
+private val TASK_KIND_SECTION_ORDER = listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
+
+private fun HomeData.groupedByTaskKind(): List<Pair<WorkOrderTaskKind, List<WorkOrderSummaryItem>>> {
+    val all = clusters.flatMap { it.items }
+    return TASK_KIND_SECTION_ORDER.mapNotNull { kind ->
+        val items = all.filter { workOrderTaskKindFromWire(it.taskKind) == kind }
+        if (items.isEmpty()) null else kind to items
+    }
+}
+
+// Fixed Navy700 block regardless of Light/Dark theme, same hero-style pattern as
+// BrandHeroGradient on F01 - this card is meant to stand out as the one most urgent item, not
+// blend into the surrounding surface color.
 @Composable
 private fun NextUpCard(
     item: WorkOrderSummaryItem,
@@ -263,45 +262,44 @@ private fun NextUpCard(
     onClick: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(item.woStatus)
-    val kind = workOrderTaskKindFromWire(item.taskKind)
     val due = dueDateLabel(item.dueDate)
+    val mutedWhite = Color.White.copy(alpha = 0.7f)
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .border(NextUpBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.block))
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                .background(Navy700, RoundedCornerShape(Radius.block))
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(
-            text = "TIẾP THEO",
-            style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = item.workOrderId,
-            style = HeadlineTextStyle,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StatusBadge(text = kind.label(), colors = kind.badgeColors())
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(text = "TIẾP THEO", style = OverlineTextStyle, color = mutedWhite)
             StatusBadge(text = status.label(), colors = status.badgeColors())
         }
+        Text(text = item.workOrderId, style = HeadlineTextStyle, color = Color.White)
         Text(
-            text = "$clusterLabel · ${due.text}",
+            text = "Địa bàn $clusterLabel",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = mutedWhite,
         )
-        PrimaryButton(
-            text = "Xem chi tiết",
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Icon(imageVector = Icons.Filled.EventAvailable, contentDescription = null, tint = Amber500)
+            Text(text = due.text, style = MaterialTheme.typography.bodyMedium, color = Amber500)
+        }
+        Button(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
-        )
+            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Navy700),
+        ) {
+            Text(text = "Mở lệnh")
+        }
     }
 }
-
-private val NextUpBorderWidth = 2.dp
 
 @Composable
 private fun HomeHeader(
@@ -317,7 +315,11 @@ private fun HomeHeader(
             )
         }
     Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(Spacing.lg)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
             Column {
                 Text(
                     text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
@@ -333,37 +335,54 @@ private fun HomeHeader(
     }
 }
 
+// 3 separate stat cards instead of 1 divided row - the overdue card gets its own tinted
+// background (reusing the existing AssetCondition.OUT pair, not a new color) only when there is
+// something overdue, so an empty overdue count stays neutral instead of looking alarming.
 @Composable
 private fun MetricRow(metrics: HomeMetrics?) {
-    val overdueColor =
-        if (metrics != null && metrics.overdueCount > 0) Color(0xFFC53030) else MaterialTheme.colorScheme.onSurface
-    Column {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            Metric(label = "Được giao", value = metrics?.assignedCount, modifier = Modifier.weight(1f))
-            VerticalDivider(color = MaterialTheme.colorScheme.outline)
-            Metric(label = "Đang xử lý", value = metrics?.inProgressCount, modifier = Modifier.weight(1f))
-            VerticalDivider(color = MaterialTheme.colorScheme.outline)
-            Metric(
-                label = "Quá hạn",
-                value = metrics?.overdueCount,
-                valueColor = overdueColor,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+    val isDark = isSystemInDarkTheme()
+    val isOverdue = metrics != null && metrics.overdueCount > 0
+    val overdueColors = AssetCondition.OUT.badgeColors(isDark)
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        MetricCard(
+            label = "Được giao",
+            value = metrics?.assignedCount,
+            valueColor = Navy700,
+            modifier = Modifier.weight(1f),
+        )
+        MetricCard(
+            label = "Đang xử lý",
+            value = metrics?.inProgressCount,
+            valueColor = Green400,
+            modifier = Modifier.weight(1f),
+        )
+        MetricCard(
+            label = "Quá hạn",
+            value = metrics?.overdueCount,
+            valueColor = if (isOverdue) overdueColors.text else MaterialTheme.colorScheme.onSurface,
+            containerColor = if (isOverdue) overdueColors.background else MaterialTheme.colorScheme.surface,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
 @Composable
-private fun Metric(
+private fun MetricCard(
     label: String,
     value: Int?,
+    valueColor: Color,
     modifier: Modifier = Modifier,
-    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
 ) {
     Column(
-        modifier = modifier.padding(vertical = Spacing.md),
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .background(containerColor, RoundedCornerShape(Radius.card))
+                .padding(vertical = Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
@@ -381,35 +400,45 @@ private fun Metric(
 }
 
 @Composable
-private fun ClusterSection(
-    label: String,
+private fun TaskKindSection(
+    kind: WorkOrderTaskKind,
     items: List<WorkOrderSummaryItem>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
     Column {
-        Text(
-            text = "$label (${items.size})",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(bottom = Spacing.sm),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card)),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            items.forEachIndexed { index, item ->
-                if (index > 0) {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(start = 68.dp),
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Icon(
+                    imageVector = kind.icon(),
+                    contentDescription = null,
+                    tint = Navy700,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(text = kind.label(), style = MaterialTheme.typography.titleMedium)
+            }
+            Text(
+                text = "${items.size} việc",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            items.forEach { item ->
                 TaskRow(item = item, onClick = { onOpenWorkOrder(item.workOrderId) })
             }
         }
     }
 }
+
+private val TaskRowAccentWidth = 4.dp
+private val TaskRowAccentHeight = 36.dp
 
 @Composable
 private fun TaskRow(
@@ -417,14 +446,13 @@ private fun TaskRow(
     onClick: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(item.woStatus)
-    val kind = workOrderTaskKindFromWire(item.taskKind)
-    val due = dueDateLabel(item.dueDate)
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = Dimens.minTouchTarget)
                 .clickable(onClick = onClick)
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .padding(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -432,27 +460,13 @@ private fun TaskRow(
         Box(
             modifier =
                 Modifier
-                    .size(40.dp)
-                    .background(kind.badgeColors().background, RoundedCornerShape(Radius.control)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = kind.icon(), contentDescription = null, tint = kind.badgeColors().text)
-        }
+                    .width(TaskRowAccentWidth)
+                    .height(TaskRowAccentHeight)
+                    .background(status.badgeColors().text, RoundedCornerShape(Radius.badge)),
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(text = item.workOrderId, style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusBadge(text = status.label(), colors = status.badgeColors())
-                Text(
-                    text = due.text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color =
-                        when {
-                            due.isOverdue -> MaterialTheme.colorScheme.error
-                            due.isToday -> DueTodayColor
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
-            }
+            StatusBadge(text = status.label(), colors = status.badgeColors())
         }
         Icon(
             imageVector = Icons.Filled.ChevronRight,
