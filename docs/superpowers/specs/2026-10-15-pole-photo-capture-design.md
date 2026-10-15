@@ -93,6 +93,8 @@ data class PoleListItemDto(
 
 A small `PoleListRepository` (interface + `RealPoleListRepository`, under `feature/survey/data/`) wraps this call — no Fake needed, the endpoint is real and already shipped on `dev`.
 
+**Known gap, ruled on at the 2026-10-15 code review, not fixed in v1:** this call has no local cache. A failed fetch (no network) lands in `PoleListUiState.Error` with no fallback to a previously-seen list, even though the capture half of this same screen needs zero network. This is a real exception to `CLAUDE.md`'s offline-first principle, scoped to this one screen. Not fixed now because it's net-new scope (a cached `PoleListItem` table + `isStale` plumbing) beyond what was reviewed and approved for the demo-priority v1 — ruled to defer rather than expand scope silently. Before this flow is used anywhere besides a controlled demo with signal, add a Room cache for the fetched pole list per `workOrderId`, served with `isStale = true` on fetch failure.
+
 ## 7. Photo capture repository — Fake now, Real once BE ships it
 
 **Correction from the first draft of this spec:** the original wording said this photo flow would "enqueue a sync-queue entry". It doesn't, in v1. `SyncQueueProcessor.processQueuedOps()` marks any row with no matching `SyncOpHandler` as `failed` with "No handler for {opType}" on the very next sync cycle — queuing now, before a handler exists, would show the photo as a sync error right after a successful capture, which is worse for a demo than just not claiming cloud sync yet.

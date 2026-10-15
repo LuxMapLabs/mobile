@@ -35,13 +35,15 @@ class PolePhotoCaptureViewModel
         ) {
             viewModelScope.launch {
                 val location = locationTracker.getCurrentLocation()
-                repository.capture(
-                    workOrderId = workOrderId,
-                    poleId = poleId,
-                    filePath = file.absolutePath,
-                    lat = location?.latitude ?: 0.0,
-                    lng = location?.longitude ?: 0.0,
-                )
+                runCatching {
+                    repository.capture(
+                        workOrderId = workOrderId,
+                        poleId = poleId,
+                        filePath = file.absolutePath,
+                        lat = location?.latitude ?: 0.0,
+                        lng = location?.longitude ?: 0.0,
+                    )
+                }
                 onDone()
             }
         }

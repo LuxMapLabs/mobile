@@ -91,4 +91,22 @@ class PolePhotoCaptureViewModelTest {
                 )
             }
         }
+
+    @Test
+    fun `onPhotoCaptured still calls onDone when the repository write throws`() =
+        runTest {
+            val repository = mockk<PolePhotoRepository>()
+            coEvery {
+                repository.capture(workOrderId = any(), poleId = any(), filePath = any(), lat = any(), lng = any())
+            } throws RuntimeException("disk full")
+            val locationTracker = mockk<LocationTracker>()
+            coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
+            val vm = PolePhotoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            var done = false
+
+            vm.onPhotoCaptured(File("x.jpg")) { done = true }
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertTrue(done)
+        }
 }
