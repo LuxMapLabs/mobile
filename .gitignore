@@ -49,3 +49,4 @@ migration-preview.sql
 
 # Git worktrees (scratch space for subagent-driven-development)
 .worktrees/
+.superpowers/
