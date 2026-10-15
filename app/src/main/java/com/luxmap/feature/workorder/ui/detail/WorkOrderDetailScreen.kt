@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,10 +20,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
@@ -53,10 +56,18 @@ import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.AppTopBar
+import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.DueTodayColor
+import com.luxmap.core.ui.components.EvidencePicker
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.OutcomeSegment
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.PriorityDot
+import com.luxmap.core.ui.components.Requirement
+import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
@@ -66,7 +77,7 @@ import com.luxmap.feature.workorder.data.hasLocation
 @Composable
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
-    onComplete: () -> Unit,
+    onCaptureEvidence: () -> Unit,
     onStartSurvey: (workOrderId: String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
@@ -83,7 +94,12 @@ fun WorkOrderDetailRoute(
         onBack = onBack,
         onStart = viewModel::start,
         onNavigateFault = { lat, lng -> openInMaps(context, lat, lng) },
-        onComplete = onComplete,
+        onReportNoteChanged = viewModel::onReportNoteChanged,
+        onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
+        onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
+        onSubmit = viewModel::submit,
+        onCaptureEvidence = onCaptureEvidence,
+        onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
         modifier = modifier,
     )
 }
@@ -94,7 +110,12 @@ fun WorkOrderDetailScreen(
     onBack: () -> Unit,
     onStart: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
-    onComplete: () -> Unit,
+    onReportNoteChanged: (String) -> Unit,
+    onMaterialsUsedChanged: (String) -> Unit,
+    onFaultOutcomeSelected: (String, String) -> Unit,
+    onSubmit: () -> Unit,
+    onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val topBarTitle =
@@ -106,6 +127,17 @@ fun WorkOrderDetailScreen(
     Scaffold(
         modifier = modifier,
         topBar = { AppTopBar(title = topBarTitle, onBack = onBack) },
+        bottomBar = {
+            if (uiState is WorkOrderDetailUiState.Success && uiState.showsInspectionBottomBar()) {
+                val recordedCount = uiState.detail.faults.count { uiState.faultOutcomes.containsKey(it.faultId) }
+                BottomActionBar(
+                    ctaText = "Nộp báo cáo kiểm tra",
+                    onCtaClick = onSubmit,
+                    ctaEnabled = uiState.canSubmit() && !uiState.isSubmitting,
+                    progressText = "$recordedCount/${uiState.detail.faults.size} sự cố đã có kết quả",
+                )
+            }
+        },
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
@@ -115,7 +147,12 @@ fun WorkOrderDetailScreen(
                         state = uiState,
                         onStart = onStart,
                         onNavigateFault = onNavigateFault,
-                        onComplete = onComplete,
+                        onReportNoteChanged = onReportNoteChanged,
+                        onMaterialsUsedChanged = onMaterialsUsedChanged,
+                        onFaultOutcomeSelected = onFaultOutcomeSelected,
+                        onSubmit = onSubmit,
+                        onCaptureEvidence = onCaptureEvidence,
+                        onRetakeEvidence = onRetakeEvidence,
                     )
                 is WorkOrderDetailUiState.Empty ->
                     MessageState(
@@ -145,23 +182,61 @@ private fun workOrderDetailTopBarTitle(taskKindWire: String): String =
         WorkOrderTaskKind.SURVEY -> "Lệnh khảo sát"
     }
 
+private fun submitButtonLabel(kind: WorkOrderTaskKind): String =
+    if (kind == WorkOrderTaskKind.INSPECTION) "Nộp báo cáo kiểm tra" else "Hoàn thành lệnh"
+
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
     onStart: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
-    onComplete: () -> Unit,
+    onReportNoteChanged: (String) -> Unit,
+    onMaterialsUsedChanged: (String) -> Unit,
+    onFaultOutcomeSelected: (String, String) -> Unit,
+    onSubmit: () -> Unit,
+    onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
 ) {
     val detail = state.detail
+    val kind = workOrderTaskKindFromWire(detail.taskKind)
+    val canComplete = "complete" in detail.allowedActions
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         WorkOrderHeaderSection(detail)
-        if (detail.taskKind == "survey") {
+        state.syncStatus()?.let { status ->
+            StatusBadge(text = status.label(), colors = status.badgeColors())
+        }
+        if (kind == WorkOrderTaskKind.SURVEY) {
             Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
         } else {
-            FaultListSection(faults = detail.faults, onNavigateFault = onNavigateFault)
+            FaultListSection(
+                kind = kind,
+                faults = detail.faults,
+                onNavigateFault = onNavigateFault,
+                showOutcomePicker = kind == WorkOrderTaskKind.INSPECTION && canComplete,
+                faultOutcomes = state.faultOutcomes,
+                onFaultOutcomeSelected = onFaultOutcomeSelected,
+            )
+            if (canComplete) {
+                when (kind) {
+                    WorkOrderTaskKind.REPAIR ->
+                        RepairCompletionSection(
+                            state = state,
+                            onReportNoteChanged = onReportNoteChanged,
+                            onMaterialsUsedChanged = onMaterialsUsedChanged,
+                            onCaptureEvidence = onCaptureEvidence,
+                            onRetakeEvidence = onRetakeEvidence,
+                        )
+                    WorkOrderTaskKind.INSPECTION ->
+                        InspectionCompletionSection(
+                            state = state,
+                            onReportNoteChanged = onReportNoteChanged,
+                        )
+                    WorkOrderTaskKind.SURVEY -> Unit
+                }
+            }
         }
         if (state.startError != null) {
             Text(
@@ -169,6 +244,9 @@ private fun WorkOrderDetailContent(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
+        }
+        if (state.submitError != null) {
+            InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
         }
         if ("start" in detail.allowedActions) {
             PrimaryButton(
@@ -178,16 +256,17 @@ private fun WorkOrderDetailContent(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        if ("complete" in detail.allowedActions) {
+        if (canComplete && !state.showsInspectionBottomBar()) {
             PrimaryButton(
-                text = "Hoàn thành",
-                onClick = onComplete,
+                text = submitButtonLabel(kind),
+                onClick = onSubmit,
+                enabled = state.canSubmit() && !state.isSubmitting,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         if (workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE &&
             "start" !in detail.allowedActions &&
-            "complete" !in detail.allowedActions
+            !canComplete
         ) {
             PrimaryButton(text = "Đã nộp báo cáo", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
             Text(
@@ -203,16 +282,32 @@ private fun WorkOrderDetailContent(
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
+    // Highest severity among the work order's own faults - severity is set by the Manager
+    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
+    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
+    // order) means no rank to show, so the dot is simply left out.
+    val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            if (status == WorkOrderStatus.CANCELLED) {
-                StatusBadge(text = kind.label(), colors = kind.badgeColors())
-            }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            StatusBadge(text = kind.label(), colors = kind.badgeColors())
             StatusBadge(text = status.label(), colors = status.badgeColors())
+            if (overallPriority != null) {
+                PriorityDot(text = overallPriority.label(), dotColor = overallPriority.color())
+            }
         }
         Text(text = detail.title, style = HeadlineTextStyle)
         Text(text = detail.workOrderId, style = MaterialTheme.typography.bodyMedium)
-        Text(text = dueDateLabel(detail.dueDate).text, style = MaterialTheme.typography.bodyMedium)
+        val due = dueDateLabel(detail.dueDate)
+        Text(
+            text = due.text,
+            style = MaterialTheme.typography.bodyMedium,
+            color =
+                when {
+                    due.isOverdue -> MaterialTheme.colorScheme.error
+                    due.isToday -> DueTodayColor
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+        )
         if (!detail.scheduledDate.isNullOrBlank()) {
             Text(
                 text = "Lịch khảo sát/sửa chữa: ${DateFormatUtils.formatPlainDate(detail.scheduledDate)}",
@@ -221,7 +316,14 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
             )
         }
         if (!detail.note.isNullOrBlank()) {
-            Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Icon(
+                    imageVector = Icons.Filled.StickyNote2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         if (!detail.reviewNote.isNullOrBlank()) {
             Text(
@@ -239,12 +341,32 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     }
 }
 
+// Header wording/count matches the real screen's faultHeader/faultCount (LuxMap App v3.dc.html,
+// "task" screen) - "Sự cố cần sửa" for a repair order, "Sự cố cần kiểm tra" otherwise. While an
+// inspection is being completed, the count on the right switches to the recorded-outcomes
+// progress, matching the real screen's per-fault outcome picker living inline in this list.
 @Composable
 private fun FaultListSection(
+    kind: WorkOrderTaskKind,
     faults: List<WorkOrderFaultDetail>,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
+    showOutcomePicker: Boolean,
+    faultOutcomes: Map<String, String>,
+    onFaultOutcomeSelected: (String, String) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                text = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "${faults.size} sự cố",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (faults.isEmpty()) {
             Text(
                 text = "Không có sự cố nào trong lệnh này",
@@ -252,17 +374,32 @@ private fun FaultListSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            faults.forEach { fault ->
-                FaultCard(fault = fault, onNavigate = { onNavigateFault(fault.lat, fault.lng) })
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                faults.forEach { fault ->
+                    FaultRow(
+                        fault = fault,
+                        onNavigate = { onNavigateFault(fault.lat, fault.lng) },
+                        showOutcomePicker = showOutcomePicker,
+                        selectedOutcome = faultOutcomes[fault.faultId],
+                        onOutcomeSelected = { outcome -> onFaultOutcomeSelected(fault.faultId, outcome) },
+                    )
+                }
             }
         }
     }
 }
 
+private val NavigateDiamondSize = 32.dp
+private val NavigateDiamondRotation = 45f
+private val NavigateIconSize = 18.dp
+
 @Composable
-private fun FaultCard(
+private fun FaultRow(
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
+    showOutcomePicker: Boolean,
+    selectedOutcome: String?,
+    onOutcomeSelected: (String) -> Unit,
 ) {
     val priority = severityFromWire(fault.severity)
     Column(
@@ -270,34 +407,124 @@ private fun FaultCard(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
+                .padding(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(text = fault.poleId ?: fault.faultId, style = MaterialTheme.typography.titleMedium)
-        PriorityDot(text = priority.label(), dotColor = priority.color())
-        Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.bodyMedium)
-        Text(text = faultStatusLabel(fault.faultStatus), style = MaterialTheme.typography.bodyMedium)
-        if (fault.inspectionOutcome != null) {
-            Text(text = inspectionOutcomeLabel(fault.inspectionOutcome), style = MaterialTheme.typography.bodyMedium)
-        }
-        if (fault.hasLocation()) {
-            OutlinedButton(
-                onClick = onNavigate,
-                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-            ) {
-                Icon(imageVector = Icons.Filled.Navigation, contentDescription = null)
-                Spacer(Modifier.width(Spacing.sm))
-                Text("Điều hướng")
-            }
-        } else {
-            Text(
-                text = "Chưa có toạ độ",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .width(6.dp)
+                        .height(36.dp)
+                        .background(priority.color(), RoundedCornerShape(Radius.badge)),
             )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(text = fault.faultId, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = listOfNotNull(fault.poleId, faultTypeLabel(fault.faultType)).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (fault.inspectionOutcome != null) {
+                    Text(
+                        text = inspectionOutcomeLabel(fault.inspectionOutcome),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            if (fault.hasLocation()) {
+                IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(NavigateDiamondSize)
+                                .rotate(NavigateDiamondRotation)
+                                .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.badge)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Navigation,
+                            contentDescription = "Điều hướng",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(NavigateIconSize).rotate(-NavigateDiamondRotation),
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    text = "Chưa có toạ độ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (showOutcomePicker) {
+            OutcomeSegment(selected = selectedOutcome, onSelected = onOutcomeSelected)
         }
     }
+}
+
+@Composable
+private fun RepairCompletionSection(
+    state: WorkOrderDetailUiState.Success,
+    onReportNoteChanged: (String) -> Unit,
+    onMaterialsUsedChanged: (String) -> Unit,
+    onCaptureEvidence: () -> Unit,
+    onRetakeEvidence: () -> Unit,
+) {
+    val hasPhoto = state.localEvidence != null
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(
+            text = "Nghiệm thu",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        EvidencePicker(
+            hasPhoto = hasPhoto,
+            onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
+        )
+        OutlinedTextField(
+            value = state.reportNote,
+            onValueChange = onReportNoteChanged,
+            label = { Text("Kết quả sửa chữa") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = "${state.reportNote.trim().length} ký tự · tối thiểu 10",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = state.materialsUsed,
+            onValueChange = onMaterialsUsedChanged,
+            label = { Text("Vật tư đã dùng (không bắt buộc)") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        RequirementList(
+            items =
+                listOf(
+                    Requirement("Có ảnh sau sửa chữa", met = hasPhoto),
+                    Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
+                ),
+        )
+    }
+}
+
+@Composable
+private fun InspectionCompletionSection(
+    state: WorkOrderDetailUiState.Success,
+    onReportNoteChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = state.reportNote,
+        onValueChange = onReportNoteChanged,
+        label = { Text("Ghi chú kiểm tra") },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -343,7 +570,12 @@ private fun WorkOrderDetailScreenRepairPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }
 
@@ -355,7 +587,12 @@ private fun WorkOrderDetailScreenNoFaultsPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }
 
@@ -367,7 +604,12 @@ private fun WorkOrderDetailScreenSurveyPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }
 
@@ -379,7 +621,12 @@ private fun WorkOrderDetailScreenLoadingPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }
 
@@ -391,7 +638,12 @@ private fun WorkOrderDetailScreenEmptyPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }
 
@@ -403,6 +655,11 @@ private fun WorkOrderDetailScreenErrorPreview() {
         onBack = {},
         onStart = {},
         onNavigateFault = { _, _ -> },
-        onComplete = {},
+        onReportNoteChanged = {},
+        onMaterialsUsedChanged = {},
+        onFaultOutcomeSelected = { _, _ -> },
+        onSubmit = {},
+        onCaptureEvidence = {},
+        onRetakeEvidence = {},
     )
 }

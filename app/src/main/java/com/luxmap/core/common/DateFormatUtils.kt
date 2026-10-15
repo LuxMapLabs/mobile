@@ -11,6 +11,7 @@ object DateFormatUtils {
     private val displayFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     private val isoDisplayFormatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy")
     private val isoDateOnlyFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+    private val timeOnlyFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val plainDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
     fun formatDisplay(dateTime: LocalDateTime): String = dateTime.format(displayFormatter)
@@ -34,6 +35,13 @@ object DateFormatUtils {
     fun formatInstant(instant: Instant?): String {
         if (instant == null) return "Chưa cập nhật"
         return instant.atZone(ZoneId.systemDefault()).format(isoDisplayFormatter)
+    }
+
+    // Time only, no date - for compact spots like the home header's SyncPill where the
+    // surrounding screen already shows today's date.
+    fun formatTimeOnly(instant: Instant?): String {
+        if (instant == null) return "Chưa cập nhật"
+        return instant.atZone(ZoneId.systemDefault()).format(timeOnlyFormatter)
     }
 
     // Same safety as formatIsoInstant, date only — for compact labels like a photo overlay.

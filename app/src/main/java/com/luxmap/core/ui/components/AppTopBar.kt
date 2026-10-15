@@ -21,11 +21,14 @@ import com.luxmap.core.theme.TitleTextStyle
 private val SubtitleTextStyle =
     TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 16.sp)
 
+// onBack is nullable for a screen that intentionally has no way back (e.g. F05 Coverage, which
+// blocks the system back gesture too so a packaged session always gets an explicit decision) -
+// null just omits the navigation icon, it never renders a disabled or no-op one.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -40,8 +43,10 @@ fun AppTopBar(
             }
         },
         navigationIcon = {
-            IconButton(onClick = onBack) {
-                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),

@@ -37,7 +37,9 @@ fun LifecycleTracker(
     steps: List<LifecycleStep>,
     modifier: Modifier = Modifier,
 ) {
-    val doneColor = MaterialTheme.colorScheme.onSurface
+    // Matches the lifecycle's own "navy blue" progress color from the design (its own fixed
+    // brand color, not the generic near-black onSurface text color).
+    val doneColor = MaterialTheme.colorScheme.primary
     val futureColor = MaterialTheme.colorScheme.outline
     Column(modifier = modifier) {
         Row(
@@ -91,7 +93,7 @@ private fun StepDot(
     when (state) {
         LifecycleStepState.DONE ->
             Box(
-                modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface),
+                modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(

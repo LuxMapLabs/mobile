@@ -23,12 +23,16 @@ import com.luxmap.core.theme.Spacing
 // pinned = false drops the nav-bar inset, top divider, and screen margin for a screen that embeds
 // this inline instead of as a real Scaffold(bottomBar = …) - its only consumer today (F03) keeps
 // the surrounding list's own horizontal padding instead of adding a second one on top of it.
+// progressText is a separate, neutral-colored line (e.g. "3/5 đã có kết quả") for a screen that
+// wants to show ongoing progress, not a blocking reason - unlike hint, it is never styled as an
+// error.
 @Composable
 fun BottomActionBar(
     ctaText: String,
     onCtaClick: () -> Unit,
     ctaEnabled: Boolean,
     hint: String? = null,
+    progressText: String? = null,
     modifier: Modifier = Modifier,
     pinned: Boolean = true,
 ) {
@@ -48,6 +52,15 @@ fun BottomActionBar(
                     ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (progressText != null) {
+                Text(
+                    text = progressText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = Spacing.sm),
+                )
+            }
             if (hint != null) {
                 Text(
                     text = hint,

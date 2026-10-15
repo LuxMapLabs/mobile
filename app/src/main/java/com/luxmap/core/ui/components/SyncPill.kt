@@ -42,7 +42,7 @@ fun SyncPill(
             SyncStatus.FAILED, SyncStatus.CONFLICT -> Icons.Filled.ErrorOutline
             SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE -> Icons.Filled.CloudOff
         }
-    val text = if (lastSyncedAt != null) DateFormatUtils.formatInstant(lastSyncedAt) else status.label()
+    val text = if (lastSyncedAt != null) DateFormatUtils.formatTimeOnly(lastSyncedAt) else status.label()
     Row(
         modifier =
             modifier

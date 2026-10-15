@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +10,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -24,15 +28,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
@@ -44,8 +50,6 @@ import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun SurveyHubRoute(
@@ -55,14 +59,26 @@ fun SurveyHubRoute(
     viewModel: SurveyHubViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    LuxMapTheme(forceDark = true) {
-        SurveyHubScreen(
-            state = uiState,
-            onCheckReadiness = onCheckReadiness,
-            modifier = modifier,
-            onRetry = viewModel::onRetry,
-            onReviewAiConfirmation = onReviewAiConfirmation,
-        )
+    // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
+    // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
+    // instead of blending into an all-dark one.
+    LuxMapTheme {
+        // Dark mode's accent token (colorScheme.primary) is Green400, not Navy700 - this screen
+        // wants the same navy accent F02 Việc hôm nay uses, so override just primary/onPrimary
+        // for this subtree instead of changing the app-wide dark palette. Harmless in Light mode
+        // (primary is already Navy700 there), only matters if the device itself is in dark mode.
+        MaterialTheme(
+            colorScheme = MaterialTheme.colorScheme.copy(primary = Navy700, onPrimary = Color.White),
+            typography = MaterialTheme.typography,
+        ) {
+            SurveyHubScreen(
+                state = uiState,
+                onCheckReadiness = onCheckReadiness,
+                modifier = modifier,
+                onRetry = viewModel::onRetry,
+                onReviewAiConfirmation = onReviewAiConfirmation,
+            )
+        }
     }
 }
 
@@ -75,15 +91,9 @@ fun SurveyHubScreen(
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-            val today = remember { LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) }
-            Text(
-                text = "Ca tối · $today",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(text = "Khảo sát", style = DisplayTextStyle)
+    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.statusBarsPadding().padding(Spacing.lg)) {
+            Text(text = "Khảo sát", style = DisplayTextStyle, color = MaterialTheme.colorScheme.onBackground)
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (state) {
@@ -181,17 +191,22 @@ private fun RejectedSweepCard(
     sweep: LocalRejectedSweep,
     onResurvey: () -> Unit,
 ) {
-    val colors = AssetCondition.OUT.badgeColors(isDark = true)
+    val colors = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme())
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .border(1.dp, colors.background, RoundedCornerShape(Radius.card))
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Text(text = "BỊ TỪ CHỐI · ${sweep.surveySweepId}", style = OverlineTextStyle, color = colors.text)
-        Text(text = sweep.rejectionReason, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = sweep.rejectionReason,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         Text(
             text = "Bởi ${sweep.rejectedByName}",
             style = MaterialTheme.typography.bodySmall,
@@ -206,6 +221,7 @@ private fun AiPendingCard(
     pending: LocalPendingAiConfirmation,
     onReview: () -> Unit,
 ) {
+    val isDark = isSystemInDarkTheme()
     Column(
         modifier =
             Modifier
@@ -214,19 +230,23 @@ private fun AiPendingCard(
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(text = "CHỜ XÁC NHẬN AI · ${pending.surveySweepId}", style = OverlineTextStyle)
+        Text(
+            text = "CHỜ XÁC NHẬN AI · ${pending.surveySweepId}",
+            style = OverlineTextStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             StatusBadge(
                 text = "${AssetCondition.NORMAL.label()} ${pending.normalCount}",
-                colors = AssetCondition.NORMAL.badgeColors(isDark = true),
+                colors = AssetCondition.NORMAL.badgeColors(isDark = isDark),
             )
             StatusBadge(
                 text = "${AssetCondition.DIM.label()} ${pending.dimCount}",
-                colors = AssetCondition.DIM.badgeColors(isDark = true),
+                colors = AssetCondition.DIM.badgeColors(isDark = isDark),
             )
             StatusBadge(
                 text = "${AssetCondition.OUT.label()} ${pending.outCount}",
-                colors = AssetCondition.OUT.badgeColors(isDark = true),
+                colors = AssetCondition.OUT.badgeColors(isDark = isDark),
             )
         }
         PrimaryButton(text = "Xem & xác nhận", onClick = onReview, modifier = Modifier.fillMaxWidth())
@@ -243,7 +263,11 @@ private fun UploadingSessionRow(session: UploadingSurveySession) {
                 .padding(Spacing.lg),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(text = "Chờ tải lên · ${session.surveySweepId}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = "Chờ tải lên · ${session.surveySweepId}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
         StatusBadge(text = session.syncStatus.label(), colors = session.syncStatus.badgeColors())
     }
 }
@@ -253,22 +277,33 @@ private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     onCheckReadiness: () -> Unit,
 ) {
+    // Fixed Navy700 block, same hero-card treatment as F02's NextUpCard - a white button on a
+    // navy PrimaryButton would have no contrast, so this uses its own white/Navy700 button
+    // instead of the shared PrimaryButton (which follows colorScheme.primary).
     val status = workOrderStatusFromWire(route.woStatus)
+    val mutedWhite = Color.White.copy(alpha = 0.7f)
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .background(Navy700, RoundedCornerShape(Radius.card))
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(text = route.title, style = MaterialTheme.typography.titleMedium)
         StatusBadge(text = status.label(), colors = status.badgeColors())
+        Text(text = route.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
         Text(
             text = "Ngày dự kiến: ${route.scheduledDate ?: "Chưa có"}",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = mutedWhite,
         )
-        PrimaryButton(text = "Kiểm tra sẵn sàng", onClick = onCheckReadiness, modifier = Modifier.fillMaxWidth())
+        Button(
+            onClick = onCheckReadiness,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Navy700),
+        ) {
+            Text(text = "Kiểm tra sẵn sàng")
+        }
     }
 }
