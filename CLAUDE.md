@@ -75,6 +75,22 @@ Hai điểm tác động trực tiếp tới mô hình dữ liệu và kiến tr
 
 **Trước khi code lại phần xử lý kết quả phân loại AI trong `survey` (điểm 1 ở trên):** vẫn cần xác nhận field/entity/endpoint thật với WP2/WP5 — điểm này **chưa** được xác nhận, không tự đặt tên khi code, dừng lại hỏi nếu cần bắt đầu trước khi tài liệu được cập nhật. Điểm 2 (F08–F10/`WorkOrder`) đã xác nhận xong theo mục trên, code được ngay.
 
+### Quyết định nghiệp vụ mới đã chốt (2026-10-15) — chụp ảnh/video ngắn theo từng cột đèn, ưu tiên làm, chưa có đặc tả/API
+
+Đã xác nhận trong cuộc trao đổi với chủ dự án (truyền đạt qua mentor đồ án/GVHD, 2026-10-15) — **mentor đồ án được coi là chủ dự án** cho quyết định này. Mentor yêu cầu **ưu tiên làm** phần này trước các việc khác.
+
+Quyết định: **thêm 1 luồng khảo sát mới theo từng cột đèn, chạy SONG SONG với luồng quay video liên tục toàn tuyến hiện có (luồng cũ ở mục "Quyết định nghiệp vụ mới đã chốt (2026-09-25)" phía trên — giữ nguyên, không xoá, không thay thế).**
+
+- Khi Field Engineer đã được giao tuyến khảo sát, tại **từng cột đèn** trên tuyến: FE có thể **chụp 1 ảnh HOẶC quay 1 video ngắn** cho cột đó (không bắt buộc cả hai, không phải chụp ảnh rồi mới được quay video — xác nhận lại 2026-10-15, khác với câu chữ "chụp ảnh rồi gửi lên AI quét, sau đó là 1 video ngắn" nêu ban đầu).
+- Ảnh/video ngắn này được tải lên để **AI quét/phân loại** cột đèn đó — mobile không tự xử lý ảnh/video, chỉ tải lên.
+- Đây là lựa chọn/bước **khác**, tách biệt khỏi luồng quay video liên tục toàn tuyến đã chốt 2026-09-25 — không gộp, không sửa logic của luồng cũ.
+
+**Chưa chốt — dừng lại hỏi, không tự đoán khi code:**
+- Chưa có endpoint backend nào cho việc upload ảnh/video ngắn theo cột rồi AI quét (đã kiểm tra trực tiếp source code `luxmap_backend` nhánh `dev` ngày 2026-10-15: chỉ có `POST /api/v1/sweeps` nhận 1 video + track GPS/lux cho cả phiên, và `SurveyReviewController` chỉ duyệt/trả cả sweep — không có endpoint nào nhận ảnh/video rời theo từng cột). Cần làm việc với BE để thêm endpoint mới, chưa tự đặt tên field/endpoint.
+- Chưa quyết kiến trúc màn hình: `CaptureScreen`/`feature/survey` hiện giả định 1 phiên quay liên tục cho cả tuyến (`CheckSurveyReadinessUseCase`, khoá exposure áp cho cả phiên) — luồng mới theo từng cột cần 1 entry point khác (có thể là 1 màn/section riêng trong Survey Hub), chưa thiết kế.
+- Chưa có tên bảng Room cục bộ, tên trường DTO, hay đặt tên component cho luồng mới này — không tự đặt tên khi bắt đầu code, viết spec trước (theo đúng cách làm việc từng bước nhỏ ở mục "Nguyên tắc làm việc với Claude Code").
+- Việc chụp ảnh/quay video ngắn này có cần khoá exposure thật như luồng video liên tục không (nguyên tắc "không cho bắt đầu khảo sát nếu chưa khoá exposure thật" áp dụng ra sao cho luồng mới) — chưa xác nhận.
+
 ## Ngăn xếp công nghệ
 
 - Kotlin, Jetpack Compose, Material 3 (không dùng XML View)
