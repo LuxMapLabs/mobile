@@ -11,7 +11,9 @@ import com.luxmap.feature.map.data.PoleDetailRepository
 import com.luxmap.feature.survey.data.AiClassificationRepository
 import com.luxmap.feature.survey.data.FakeAiClassificationRepository
 import com.luxmap.feature.survey.data.FakePolePhotoRepository
+import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
+import com.luxmap.feature.survey.data.RealPoleListRepository
 import com.luxmap.feature.survey.data.RealSurveyRepository
 import com.luxmap.feature.survey.data.RealUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
@@ -62,4 +64,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindPolePhotoRepository(impl: FakePolePhotoRepository): PolePhotoRepository
+
+    @Binds
+    abstract fun bindPoleListRepository(impl: RealPoleListRepository): PoleListRepository
 }
