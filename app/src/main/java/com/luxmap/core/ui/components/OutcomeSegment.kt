@@ -1,7 +1,10 @@
 package com.luxmap.core.ui.components
 
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -26,7 +29,10 @@ fun OutcomeSegment(
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
+    // IntrinsicSize.Min on the row + fillMaxHeight on each button makes every button match the
+    // tallest one - without it, "Chưa xác định" wraps to 2 lines while the other two stay on 1,
+    // leaving the row looking uneven.
+    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         OUTCOME_OPTIONS.forEachIndexed { index, (value, text) ->
             SegmentedButton(
                 selected = selected == value,
@@ -37,7 +43,7 @@ fun OutcomeSegment(
                         activeContainerColor = MaterialTheme.colorScheme.onSurface,
                         activeContentColor = MaterialTheme.colorScheme.surface,
                     ),
-                modifier = Modifier.defaultMinSize(minHeight = 48.dp),
+                modifier = Modifier.fillMaxHeight().defaultMinSize(minHeight = 48.dp),
             ) {
                 Text(text = text)
             }

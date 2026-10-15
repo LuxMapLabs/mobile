@@ -43,7 +43,6 @@ import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
-import com.luxmap.feature.workorder.ui.completion.WorkOrderCompletionRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 import java.util.UUID
 
@@ -280,24 +279,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
-                    onComplete = { navController.navigate(Routes.WorkOrderCompletion.createRoute(workOrderId)) },
+                    onCaptureEvidence = {
+                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
+                    },
                     onStartSurvey = { startedWorkOrderId ->
                         // Through F03 first, not straight into capture - the readiness checklist
                         // (exposure lock/GPS/storage/battery) is a hard gate CLAUDE.md requires
                         // for every survey entry point, not just the Survey Hub one.
                         navController.navigate(Routes.SurveyPlan.createRoute(startedWorkOrderId))
-                    },
-                )
-            }
-            composable(
-                route = Routes.WorkOrderCompletion.route,
-                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
-                WorkOrderCompletionRoute(
-                    onBack = { navController.popBackStack() },
-                    onCaptureEvidence = {
-                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
                     },
                 )
             }
