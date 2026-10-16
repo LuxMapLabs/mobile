@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 interface PolePhotoRepository {
     fun observePhotos(workOrderId: String): Flow<List<LocalPolePhotoEntity>>
 
+    fun observeUploadStatuses(photoIds: List<String>): Flow<Map<String, String>>
+
     suspend fun capture(
         workOrderId: String,
         poleId: String,

@@ -132,4 +132,16 @@ class SyncQueueDaoTest {
 
             assertNull(dao.observeLastSyncedAt().first())
         }
+
+    @Test
+    fun observeStatusesForOnlyReturnsRowsMatchingTheGivenIds() =
+        runTest {
+            dao.insert(row("OP-1", status = "done"))
+            dao.insert(row("OP-2", status = "failed"))
+            dao.insert(row("OP-3", status = "queued"))
+
+            val rows = dao.observeStatusesFor(listOf("OP-1", "OP-2")).first()
+
+            assertEquals(setOf("OP-1", "OP-2"), rows.map { it.clientOpId }.toSet())
+        }
 }
