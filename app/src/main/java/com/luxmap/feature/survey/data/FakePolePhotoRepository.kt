@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.data
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -16,6 +17,8 @@ class FakePolePhotoRepository
     ) : PolePhotoRepository {
         override fun observePhotos(workOrderId: String): Flow<List<LocalPolePhotoEntity>> =
             dao.observeByWorkOrder(workOrderId)
+
+        override fun observeUploadStatuses(photoIds: List<String>): Flow<Map<String, String>> = flowOf(emptyMap())
 
         override suspend fun capture(
             workOrderId: String,

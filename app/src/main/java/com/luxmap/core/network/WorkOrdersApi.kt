@@ -2,6 +2,7 @@ package com.luxmap.core.network
 
 import com.luxmap.core.network.dto.PagedResultDto
 import com.luxmap.feature.survey.data.dto.PoleListItemDto
+import com.luxmap.feature.survey.data.dto.PolePhotoUploadResponseDto
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.EvidenceItemDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
@@ -60,4 +61,16 @@ interface WorkOrdersApi {
         @Part("lng") lng: RequestBody,
         @Part("client_op_id") clientOpId: RequestBody,
     ): EvidenceItemDto
+
+    @Multipart
+    @POST("api/v1/work-orders/{id}/pole-photos")
+    suspend fun uploadPolePhoto(
+        @Path("id") id: String,
+        @Part("pole_id") poleId: RequestBody,
+        @Part photo: MultipartBody.Part,
+        @Part("captured_at") capturedAt: RequestBody,
+        @Part("lat") lat: RequestBody,
+        @Part("lng") lng: RequestBody,
+        @Part("client_op_id") clientOpId: RequestBody,
+    ): PolePhotoUploadResponseDto
 }

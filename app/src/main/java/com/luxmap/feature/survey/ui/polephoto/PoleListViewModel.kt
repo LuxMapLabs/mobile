@@ -3,16 +3,21 @@ package com.luxmap.feature.survey.ui.polephoto
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class PoleListViewModel
     @Inject
@@ -44,9 +49,17 @@ class PoleListViewModel
                         }
                         polePhotoRepository
                             .observePhotos(workOrderId)
+                            .flatMapLatest { photos ->
+                                val latestByPole = photos.groupBy { it.poleId }.mapValues { it.value.first() }
+                                polePhotoRepository
+                                    .observeUploadStatuses(latestByPole.values.map { it.photoId })
+                                    .map {
+                                            statuses ->
+                                        latestByPole.mapValues { (_, photo) -> statuses[photo.photoId] }
+                                    }
+                            }
                             .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi") }
-                            .collect { photos ->
-                                val capturedIds = photos.map { it.poleId }.toSet()
+                            .collect { statusByPole ->
                                 _uiState.value =
                                     PoleListUiState.Success(
                                         poles.map { pole ->
@@ -54,7 +67,7 @@ class PoleListViewModel
                                                 poleId = pole.poleId,
                                                 position = pole.position,
                                                 fixtureStatus = pole.fixtureStatus,
-                                                isCaptured = pole.poleId in capturedIds,
+                                                syncStatus = statusByPole[pole.poleId]?.let(::toSyncStatus),
                                             )
                                         },
                                     )
@@ -66,6 +79,15 @@ class PoleListViewModel
                 )
             }
         }
+
+        private fun toSyncStatus(status: String): SyncStatus =
+            when (status) {
+                "syncing" -> SyncStatus.SYNCING
+                "failed" -> SyncStatus.FAILED
+                "conflict" -> SyncStatus.CONFLICT
+                "done" -> SyncStatus.DONE
+                else -> SyncStatus.QUEUED_ONLINE
+            }
 
         companion object {
             const val WORK_ORDER_ID_ARG = "workOrderId"

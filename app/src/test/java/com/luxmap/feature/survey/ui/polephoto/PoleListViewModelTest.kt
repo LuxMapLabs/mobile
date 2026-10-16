@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
@@ -52,7 +53,7 @@ class PoleListViewModelTest {
     }
 
     @Test
-    fun `emits Loading then Success with isCaptured true only for poles already photographed`() =
+    fun `emits Loading then Success with the sync status of each pole's latest photo`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -64,6 +65,8 @@ class PoleListViewModelTest {
                     ),
                 )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(listOf(photo("POLE-1")))
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done"))
             val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
 
             vm.uiState.test {
@@ -71,8 +74,8 @@ class PoleListViewModelTest {
                 val success = awaitItem() as PoleListUiState.Success
                 assertEquals(
                     listOf(
-                        PoleListRowState("POLE-1", 1, "normal", isCaptured = true),
-                        PoleListRowState("POLE-2", 2, "dim", isCaptured = false),
+                        PoleListRowState("POLE-1", 1, "normal", syncStatus = SyncStatus.DONE),
+                        PoleListRowState("POLE-2", 2, "dim", syncStatus = null),
                     ),
                     success.poles,
                 )

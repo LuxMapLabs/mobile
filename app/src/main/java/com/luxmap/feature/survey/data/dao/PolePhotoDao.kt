@@ -14,4 +14,7 @@ interface PolePhotoDao {
 
     @Query("SELECT * FROM local_pole_photo WHERE workOrderId = :workOrderId ORDER BY capturedAt DESC")
     fun observeByWorkOrder(workOrderId: String): Flow<List<LocalPolePhotoEntity>>
+
+    @Query("SELECT * FROM local_pole_photo WHERE photoId = :photoId LIMIT 1")
+    suspend fun byId(photoId: String): LocalPolePhotoEntity?
 }

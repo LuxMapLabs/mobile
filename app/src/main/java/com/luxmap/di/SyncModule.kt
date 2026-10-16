@@ -5,6 +5,7 @@ import com.luxmap.core.sync.SyncTrigger
 import com.luxmap.core.sync.WorkManagerSyncTrigger
 import com.luxmap.feature.survey.data.sync.CreateSurveySweepSyncHandler
 import com.luxmap.feature.survey.data.sync.SubmitSurveySweepSyncHandler
+import com.luxmap.feature.survey.data.sync.UploadPolePhotoSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadSurveyClipSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadSurveyRawSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
@@ -48,4 +49,8 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindSubmitSurveySweepSyncHandler(impl: SubmitSurveySweepSyncHandler): SyncOpHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindUploadPolePhotoSyncHandler(impl: UploadPolePhotoSyncHandler): SyncOpHandler
 }
