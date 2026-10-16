@@ -54,6 +54,7 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 @Composable
 fun SurveyHubRoute(
     onCheckReadiness: (workOrderId: String) -> Unit,
+    onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -74,6 +75,7 @@ fun SurveyHubRoute(
             SurveyHubScreen(
                 state = uiState,
                 onCheckReadiness = onCheckReadiness,
+                onCapturePolePhotos = onCapturePolePhotos,
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
                 onReviewAiConfirmation = onReviewAiConfirmation,
@@ -86,6 +88,7 @@ fun SurveyHubRoute(
 fun SurveyHubScreen(
     state: SurveyHubUiState,
     onCheckReadiness: (workOrderId: String) -> Unit,
+    onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
@@ -104,6 +107,7 @@ fun SurveyHubScreen(
                     SurveyHubContent(
                         state = state,
                         onCheckReadiness = onCheckReadiness,
+                        onCapturePolePhotos = onCapturePolePhotos,
                         onReviewAiConfirmation = onReviewAiConfirmation,
                         onResurvey = onResurvey,
                     )
@@ -143,6 +147,7 @@ fun SurveyHubScreen(
 private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCheckReadiness: (workOrderId: String) -> Unit,
+    onCapturePolePhotos: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
 ) {
@@ -180,7 +185,11 @@ private fun SurveyHubContent(
                 )
             }
             items(state.assignedRoutes) { route ->
-                AssignedRouteCard(route, onCheckReadiness = { onCheckReadiness(route.workOrderId) })
+                AssignedRouteCard(
+                    route,
+                    onCheckReadiness = { onCheckReadiness(route.workOrderId) },
+                    onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
+                )
             }
         }
     }
@@ -276,6 +285,7 @@ private fun UploadingSessionRow(session: UploadingSurveySession) {
 private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     onCheckReadiness: () -> Unit,
+    onCapturePolePhotos: () -> Unit,
 ) {
     // Fixed Navy700 block, same hero-card treatment as F02's NextUpCard - a white button on a
     // navy PrimaryButton would have no contrast, so this uses its own white/Navy700 button
@@ -304,6 +314,14 @@ private fun AssignedRouteCard(
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Navy700),
         ) {
             Text(text = "Kiểm tra sẵn sàng")
+        }
+        OutlinedButton(
+            onClick = onCapturePolePhotos,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        ) {
+            Text(text = "Chụp ảnh cột đèn")
         }
     }
 }

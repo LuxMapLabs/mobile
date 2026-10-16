@@ -1,6 +1,7 @@
 package com.luxmap.core.network
 
 import com.luxmap.core.network.dto.PagedResultDto
+import com.luxmap.feature.survey.data.dto.PoleListItemDto
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.EvidenceItemDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
@@ -40,6 +41,13 @@ interface WorkOrdersApi {
         @Path("id") id: String,
         @Body body: CompleteWorkOrderRequestDto,
     ): WorkOrderDetailDto
+
+    @GET("api/v1/work-orders/{id}/poles")
+    suspend fun poles(
+        @Path("id") id: String,
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 200,
+    ): PagedResultDto<PoleListItemDto>
 
     @Multipart
     @POST("api/v1/work-orders/{id}/evidence")

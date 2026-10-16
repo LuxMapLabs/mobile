@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueDao
+import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import dagger.Module
@@ -44,4 +45,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideWorkOrderCompletionDao(db: AppDatabase): WorkOrderCompletionDao = db.workOrderCompletionDao()
+
+    @Provides
+    @Singleton
+    fun providePolePhotoDao(db: AppDatabase): PolePhotoDao = db.polePhotoDao()
 }
