@@ -112,21 +112,32 @@ interface PolePhotoRepository {
 
 `RealPolePhotoRepository` is **not** written yet, not even as a stub — per the project's own rule against half-finished implementations, it gets written only once the BE endpoint exists. That task also adds a `UploadPolePhotoSyncHandler` (`SyncOpHandler`, `opType = "upload_pole_photo"`) and switches `capture()` to call `SyncQueueManager.enqueue(...)` — that's when this flow actually joins the real offline-first sync queue.
 
-## 8. Proposed BE endpoint (already sent to BE by the user)
+## 8. BE endpoint — fully resolved (2026-10-16)
+
+Proposed by mobile 2026-10-15, described by BE lead in chat, then **confirmed by reading `luxmap_backend` dev branch source directly** (`WorkOrderPolePhotosController.cs`/`WorkOrderPolePhotoService.cs`/`WorkOrderPolePhotoContracts.cs` — already merged, PR #151/#153). Full field-by-field contract is in `docs/contract-drift.md` (the "Pole photo endpoints" rows); summary:
 
 ```
-POST /api/v1/work-orders/{work_order_id}/pole-photos
-multipart/form-data:
-  pole_id        required
-  photo          required, JPEG, same 16MB ceiling as AiController.MaxUploadBytes
-  captured_at    required, ISO 8601 UTC
-  lat, lng       required, EPSG:4326
-  client_op_id   required, UUID, idempotency key (existing pattern across the API)
+POST /api/v1/work-orders/{id}/pole-photos        (ExecuteWorkOrders, assignee only, wo_status=in_progress)
+multipart/form-data, exactly these 5 fields + 1 file named "photo":
+  pole_id, photo (JPEG <=16MB), captured_at (ISO-8601), lat, lng, client_op_id (UUID)
+-> 201 (new) or 200 (idempotent replay) with a PolePhotoItem body (snake_case):
+   photo_id, work_order_id, pole_id, data_source, captured_at, lat, lng,
+   uploaded_by, uploaded_at, ai_status, cv_state, confidence, model_version,
+   artifact_version, analyzed_at, decision, decided_by, decided_at, decision_note,
+   status_applied, status_reason, thumbnail_url, original_url
+-> 409 IDEMPOTENCY_CONFLICT if the same client_op_id is reused with different content
+
+GET /api/v1/work-orders/{id}/pole-photos                      (ReadWorkOrders) -> {page, page_size, total, items: PolePhotoItem[]}
+GET /api/v1/work-orders/{id}/pole-photos/{photo_id}            (ReadWorkOrders) -> PolePhotoItem
+GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail  (ReadWorkOrders) -> image/jpeg
+GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/original   (ReadWorkOrders) -> image/jpeg
+
+POST .../pole-photos/{photo_id}/decision  (ReviewSurveys policy = Manager, OUT OF MOBILE SCOPE)
 ```
 
-Expected response: the AI classification result for that pole, persisted (unlike the existing `/api/v1/ai/detect`, which is Manager-only and doesn't save anything), tied to `pole_id` and `work_order_id` so it can support RQ1 accuracy comparison later and eventually surface in a results screen.
+`thumbnail_url`/`original_url` are relative paths — prepend the API base URL. `ai_status` is `"unavailable"` (not an error) when the AI model itself fails; the photo still saves as 201. `cv_state` is one of `on`/`off`/`inconclusive`.
 
-This contract is a mobile-side proposal, not yet BE-confirmed. Field names may change once BE replies — do not hardcode a `RealPolePhotoRepository` against this shape until BE confirms it in `docs/contract-drift.md` or the API contract doc.
+`RealPolePhotoRepository` can now be written against this exact shape — no more open questions on this contract.
 
 ## 9. Error handling
 
