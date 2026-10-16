@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.CircularProgressIndicator
@@ -136,12 +135,8 @@ private fun PoleRow(
             Text(text = "Cột #${pole.position} — ${pole.poleId}", style = MaterialTheme.typography.titleMedium)
             StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
         }
-        if (pole.isCaptured) {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Đã chụp",
-                tint = MaterialTheme.colorScheme.primary,
-            )
+        if (pole.syncStatus != null) {
+            StatusBadge(text = pole.syncStatus.label(), colors = pole.syncStatus.badgeColors())
         } else {
             Icon(
                 imageVector = Icons.Filled.CameraAlt,

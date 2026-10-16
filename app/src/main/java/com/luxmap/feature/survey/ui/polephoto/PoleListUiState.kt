@@ -1,10 +1,12 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import com.luxmap.core.theme.SyncStatus
+
 data class PoleListRowState(
     val poleId: String,
     val position: Int,
     val fixtureStatus: String,
-    val isCaptured: Boolean,
+    val syncStatus: SyncStatus?,
 )
 
 sealed interface PoleListUiState {
