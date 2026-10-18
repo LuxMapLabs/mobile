@@ -30,6 +30,9 @@ class PoleListViewModel
         private val _uiState = MutableStateFlow<PoleListUiState>(PoleListUiState.Loading)
         val uiState: StateFlow<PoleListUiState> = _uiState.asStateFlow()
 
+        private val _aiResultState = MutableStateFlow<PolePhotoResultUiState?>(null)
+        val aiResultState: StateFlow<PolePhotoResultUiState?> = _aiResultState.asStateFlow()
+
         init {
             load()
         }
@@ -37,6 +40,38 @@ class PoleListViewModel
         fun onRetry() {
             _uiState.value = PoleListUiState.Loading
             load()
+        }
+
+        fun onViewAiResult(photoId: String) {
+            _aiResultState.value = PolePhotoResultUiState.Loading
+            viewModelScope.launch {
+                polePhotoRepository.fetchResult(workOrderId, photoId).fold(
+                    onSuccess = { photo ->
+                        _aiResultState.value =
+                            if (photo.aiStatus == "available") {
+                                PolePhotoResultUiState.Success(
+                                    cvState = photo.cvState ?: "inconclusive",
+                                    confidence = photo.confidence,
+                                    modelVersion = photo.modelVersion,
+                                    analyzedAt = photo.analyzedAt,
+                                    decision = photo.decision,
+                                    decisionNote = photo.decisionNote,
+                                    decidedBy = photo.decidedBy,
+                                    decidedAt = photo.decidedAt,
+                                )
+                            } else {
+                                PolePhotoResultUiState.Empty
+                            }
+                    },
+                    onFailure = { e ->
+                        _aiResultState.value = PolePhotoResultUiState.Error(e.message ?: "Không tải được kết quả AI")
+                    },
+                )
+            }
+        }
+
+        fun onDismissAiResult() {
+            _aiResultState.value = null
         }
 
         private fun load() {
@@ -55,19 +90,23 @@ class PoleListViewModel
                                     .observeUploadStatuses(latestByPole.values.map { it.photoId })
                                     .map {
                                             statuses ->
-                                        latestByPole.mapValues { (_, photo) -> statuses[photo.photoId] }
+                                        latestByPole.mapValues { (_, photo) ->
+                                            photo.photoId to statuses[photo.photoId]
+                                        }
                                     }
                             }
                             .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi") }
-                            .collect { statusByPole ->
+                            .collect { infoByPole ->
                                 _uiState.value =
                                     PoleListUiState.Success(
                                         poles.map { pole ->
+                                            val (photoId, status) = infoByPole[pole.poleId] ?: (null to null)
                                             PoleListRowState(
                                                 poleId = pole.poleId,
                                                 position = pole.position,
                                                 fixtureStatus = pole.fixtureStatus,
-                                                syncStatus = statusByPole[pole.poleId]?.let(::toSyncStatus),
+                                                photoId = photoId,
+                                                syncStatus = status?.let(::toSyncStatus),
                                             )
                                         },
                                     )
