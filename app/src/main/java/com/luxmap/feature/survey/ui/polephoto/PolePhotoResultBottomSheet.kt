@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
@@ -20,6 +21,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
@@ -52,7 +54,8 @@ fun PolePhotoResultBottomSheet(
             when (state) {
                 is PolePhotoResultUiState.Loading ->
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(StatePlaceholderHeight),
+                        modifier =
+                            Modifier.fillMaxWidth().height(StatePlaceholderHeight).testTag("pole_photo_result_loading"),
                         contentAlignment = Alignment.Center,
                     ) {
                         CircularProgressIndicator()
@@ -60,8 +63,11 @@ fun PolePhotoResultBottomSheet(
 
                 is PolePhotoResultUiState.Success -> PolePhotoResultContent(state)
 
+                // heightIn (not a fixed height) - MessageState's action button (Error) makes this
+                // content taller than the Loading spinner needs, and a fixed height here clipped
+                // the button outside the touchable area.
                 is PolePhotoResultUiState.Empty ->
-                    Box(modifier = Modifier.fillMaxWidth().height(StatePlaceholderHeight)) {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
                         MessageState(
                             icon = Icons.Filled.SmartToy,
                             iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
@@ -72,7 +78,7 @@ fun PolePhotoResultBottomSheet(
                     }
 
                 is PolePhotoResultUiState.Error ->
-                    Box(modifier = Modifier.fillMaxWidth().height(StatePlaceholderHeight)) {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
                         MessageState(
                             icon = Icons.Filled.CloudOff,
                             iconColors = SyncStatus.FAILED.badgeColors(),

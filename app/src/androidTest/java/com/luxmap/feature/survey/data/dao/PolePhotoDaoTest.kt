@@ -83,4 +83,55 @@ class PolePhotoDaoTest {
                 assertEquals(setOf("POLE-1"), rows.map { it.poleId }.toSet())
             }
         }
+
+    @Test
+    fun byServerPhotoIdReturnsTheMatchingRow() =
+        runTest {
+            dao.insert(photo("PH-1"))
+            dao.updateServerPhotoId("PH-1", "PPH-000001")
+
+            val row = dao.byServerPhotoId("PPH-000001")
+
+            assertEquals("PH-1", row?.photoId)
+        }
+
+    @Test
+    fun byServerPhotoIdReturnsNullWhenNoRowMatches() =
+        runTest {
+            dao.insert(photo("PH-1"))
+
+            assertEquals(null, dao.byServerPhotoId("PPH-DOES-NOT-EXIST"))
+        }
+
+    @Test
+    fun updateAiResultSetsAllAiFieldsOnTheMatchingRow() =
+        runTest {
+            dao.insert(photo("PH-1"))
+            val analyzedAt = Instant.parse("2026-10-16T10:00:10Z")
+            val decidedAt = Instant.parse("2026-10-16T11:00:00Z")
+
+            dao.updateAiResult(
+                photoId = "PH-1",
+                aiStatus = "available",
+                cvState = "on",
+                confidence = 0.92,
+                modelVersion = "cv-v1",
+                analyzedAt = analyzedAt,
+                decision = "confirm",
+                decisionNote = "Đã kiểm tra thực tế",
+                decidedBy = "U-9",
+                decidedAt = decidedAt,
+            )
+
+            val row = dao.byId("PH-1")
+            assertEquals("available", row?.aiStatus)
+            assertEquals("on", row?.cvState)
+            assertEquals(0.92, row?.confidence)
+            assertEquals("cv-v1", row?.modelVersion)
+            assertEquals(analyzedAt, row?.analyzedAt)
+            assertEquals("confirm", row?.decision)
+            assertEquals("Đã kiểm tra thực tế", row?.decisionNote)
+            assertEquals("U-9", row?.decidedBy)
+            assertEquals(decidedAt, row?.decidedAt)
+        }
 }
