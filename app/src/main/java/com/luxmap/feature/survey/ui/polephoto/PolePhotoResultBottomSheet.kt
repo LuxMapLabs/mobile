@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.SmartToy
@@ -21,10 +22,14 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
+import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
@@ -33,7 +38,10 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import java.io.File
 import kotlin.math.roundToInt
+
+private val PhotoPreviewHeight = 180.dp
 
 private val StatePlaceholderHeight = 160.dp
 
@@ -96,6 +104,18 @@ fun PolePhotoResultBottomSheet(
 
 @Composable
 private fun PolePhotoResultContent(state: PolePhotoResultUiState.Success) {
+    AsyncImage(
+        model = File(state.filePath),
+        contentDescription = "Ảnh cột đèn đã chụp",
+        contentScale = ContentScale.Crop,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(PhotoPreviewHeight)
+                .clip(RoundedCornerShape(Radius.card)),
+    )
+    Spacer(Modifier.height(Spacing.md))
+
     if (state.isStale) {
         InlineBanner(
             message = "Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất",

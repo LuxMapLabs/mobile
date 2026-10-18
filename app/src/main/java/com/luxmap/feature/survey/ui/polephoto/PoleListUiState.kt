@@ -33,6 +33,9 @@ sealed interface PolePhotoResultUiState {
     data object Loading : PolePhotoResultUiState
 
     data class Success(
+        // Local file path (LocalPolePhotoEntity.filePath) - the photo was captured on this
+        // device, so it's shown straight from disk, no network/auth needed.
+        val filePath: String,
         val cvState: String,
         val confidence: Double?,
         val modelVersion: String?,
