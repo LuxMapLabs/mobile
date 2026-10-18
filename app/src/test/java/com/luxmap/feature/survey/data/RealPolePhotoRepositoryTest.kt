@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.data
 
+import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
@@ -33,10 +34,11 @@ class RealPolePhotoRepositoryTest {
     @Test
     fun `capture writes the local row then enqueues an upload op keyed by the photo id`() =
         runTest {
+            val api = mockk<WorkOrdersApi>(relaxed = true)
             val dao = mockk<PolePhotoDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
-            val repository = RealPolePhotoRepository(dao, syncQueueManager, syncQueueDao)
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
 
             val result =
                 repository.capture(
@@ -67,12 +69,13 @@ class RealPolePhotoRepositoryTest {
     @Test
     fun `observeUploadStatuses maps sync_queue rows by clientOpId`() =
         runTest {
+            val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
             val syncQueueManager = mockk<SyncQueueManager>()
             val syncQueueDao = mockk<SyncQueueDao>()
             every { syncQueueDao.observeStatusesFor(listOf("PHOTO-1", "PHOTO-2")) } returns
                 flowOf(listOf(queueRow("PHOTO-1", "done"), queueRow("PHOTO-2", "failed")))
-            val repository = RealPolePhotoRepository(dao, syncQueueManager, syncQueueDao)
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
 
             val result = repository.observeUploadStatuses(listOf("PHOTO-1", "PHOTO-2"))
 
@@ -82,10 +85,11 @@ class RealPolePhotoRepositoryTest {
     @Test
     fun `observeUploadStatuses returns an empty map without querying when given no ids`() =
         runTest {
+            val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
             val syncQueueManager = mockk<SyncQueueManager>()
             val syncQueueDao = mockk<SyncQueueDao>()
-            val repository = RealPolePhotoRepository(dao, syncQueueManager, syncQueueDao)
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
 
             val result = repository.observeUploadStatuses(emptyList())
 

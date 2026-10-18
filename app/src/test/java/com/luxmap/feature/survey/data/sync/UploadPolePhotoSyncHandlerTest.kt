@@ -6,6 +6,8 @@ import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoUploadResponseDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import io.mockk.coEvery
+import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
@@ -50,12 +52,14 @@ class UploadPolePhotoSyncHandlerTest {
             val dao = mockk<PolePhotoDao>()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
-                PolePhotoUploadResponseDto(photoId = "PHOTO-1")
+                PolePhotoUploadResponseDto(photoId = "PPH-000001")
+            coJustRun { dao.updateServerPhotoId("PHOTO-1", "PPH-000001") }
             val handler = UploadPolePhotoSyncHandler(api, dao)
 
             val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
 
             assertTrue(result is SyncOpResult.Done)
+            coVerify { dao.updateServerPhotoId("PHOTO-1", "PPH-000001") }
         }
 
     @Test
