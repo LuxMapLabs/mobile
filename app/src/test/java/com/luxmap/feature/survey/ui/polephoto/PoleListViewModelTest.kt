@@ -30,6 +30,8 @@ private fun savedStateHandle() = SavedStateHandle(mapOf(PoleListViewModel.WORK_O
 private fun photo(
     poleId: String,
     serverPhotoId: String? = null,
+    aiStatus: String? = null,
+    cvState: String? = null,
 ) = LocalPolePhotoEntity(
     photoId = "PH-$poleId",
     workOrderId = WORK_ORDER_ID,
@@ -39,6 +41,8 @@ private fun photo(
     lat = 10.0,
     lng = 106.0,
     serverPhotoId = serverPhotoId,
+    aiStatus = aiStatus,
+    cvState = cvState,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -119,6 +123,74 @@ class PoleListViewModelTest {
                 assertEquals(PoleListUiState.Loading, awaitItem())
                 val error = awaitItem() as PoleListUiState.Error
                 assertEquals("network down", error.message)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult shows Loading then the fetched result when nothing is cached yet`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on"))
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                assertEquals(PolePhotoResultUiState.Loading, awaitItem())
+                val result = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("on", result.cvState)
+                assertEquals(false, result.isStale)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult replaces the stale cache with the fresh result on success`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns
+                photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "off")
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on"))
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                val stale = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("off", stale.cvState)
+                assertEquals(true, stale.isStale)
+                val fresh = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("on", fresh.cvState)
+                assertEquals(false, fresh.isStale)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult keeps the stale cached result instead of Error when the refresh fails`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns
+                photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "off")
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.failure(IllegalStateException("network down"))
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                // Only one emission: the failed refresh re-assigns the same cached value, which
+                // StateFlow conflates away (no distinct second emission to await).
+                val stale = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("off", stale.cvState)
+                assertEquals(true, stale.isStale)
             }
         }
 }

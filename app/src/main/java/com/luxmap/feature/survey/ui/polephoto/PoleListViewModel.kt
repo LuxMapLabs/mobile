@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
+import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,32 +44,44 @@ class PoleListViewModel
         }
 
         fun onViewAiResult(serverPhotoId: String) {
-            _aiResultState.value = PolePhotoResultUiState.Loading
             viewModelScope.launch {
+                // Offline-first: show whatever is already cached in Room immediately (marked
+                // stale), instead of a Loading spinner - only fall back to Loading when there is
+                // nothing cached yet. A failed refresh then keeps the stale cache on screen
+                // rather than replacing it with an error.
+                val cached = polePhotoRepository.cachedResult(serverPhotoId)?.toResultUiState(isStale = true)
+                _aiResultState.value = cached ?: PolePhotoResultUiState.Loading
+
                 polePhotoRepository.fetchResult(workOrderId, serverPhotoId).fold(
                     onSuccess = { photo ->
-                        _aiResultState.value =
-                            if (photo.aiStatus == "available") {
-                                PolePhotoResultUiState.Success(
-                                    cvState = photo.cvState ?: "inconclusive",
-                                    confidence = photo.confidence,
-                                    modelVersion = photo.modelVersion,
-                                    analyzedAt = photo.analyzedAt,
-                                    decision = photo.decision,
-                                    decisionNote = photo.decisionNote,
-                                    decidedBy = photo.decidedBy,
-                                    decidedAt = photo.decidedAt,
-                                )
-                            } else {
-                                PolePhotoResultUiState.Empty
-                            }
+                        _aiResultState.value = photo.toResultUiState(isStale = false) ?: PolePhotoResultUiState.Empty
                     },
                     onFailure = { e ->
-                        _aiResultState.value = PolePhotoResultUiState.Error(e.message ?: "Không tải được kết quả AI")
+                        _aiResultState.value =
+                            cached ?: PolePhotoResultUiState.Error(e.message ?: "Không tải được kết quả AI")
                     },
                 )
             }
         }
+
+        // null means no usable cached AI result yet (aiStatus itself is null - never fetched).
+        private fun LocalPolePhotoEntity.toResultUiState(isStale: Boolean): PolePhotoResultUiState? =
+            when (aiStatus) {
+                null -> null
+                "available" ->
+                    PolePhotoResultUiState.Success(
+                        cvState = cvState ?: "inconclusive",
+                        confidence = confidence,
+                        modelVersion = modelVersion,
+                        analyzedAt = analyzedAt,
+                        decision = decision,
+                        decisionNote = decisionNote,
+                        decidedBy = decidedBy,
+                        decidedAt = decidedAt,
+                        isStale = isStale,
+                    )
+                else -> PolePhotoResultUiState.Empty
+            }
 
         fun onDismissAiResult() {
             _aiResultState.value = null

@@ -24,4 +24,8 @@ interface PolePhotoRepository {
         workOrderId: String,
         serverPhotoId: String,
     ): Result<LocalPolePhotoEntity>
+
+    // Room-only read, no network - lets the caller show an already-fetched AI result
+    // immediately (offline-first) before/instead of waiting on fetchResult.
+    suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity?
 }

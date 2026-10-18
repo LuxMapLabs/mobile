@@ -37,6 +37,9 @@ sealed interface PolePhotoResultUiState {
         val decisionNote: String?,
         val decidedBy: String?,
         val decidedAt: Instant?,
+        // True while showing a cached Room value and a network refresh hasn't confirmed it yet
+        // (offline-first: shown immediately instead of a Loading spinner when a cache exists).
+        val isStale: Boolean = false,
     ) : PolePhotoResultUiState
 
     // ai_status = "unavailable" - the AI model itself failed, not a network/fetch error.
