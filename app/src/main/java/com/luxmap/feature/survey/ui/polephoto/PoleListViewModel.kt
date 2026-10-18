@@ -70,6 +70,7 @@ class PoleListViewModel
                 null -> null
                 "available" ->
                     PolePhotoResultUiState.Success(
+                        filePath = filePath,
                         cvState = cvState ?: "inconclusive",
                         confidence = confidence,
                         modelVersion = modelVersion,

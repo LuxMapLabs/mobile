@@ -17,6 +17,7 @@ private fun successState(
     decisionNote: String? = null,
     isStale: Boolean = false,
 ) = PolePhotoResultUiState.Success(
+    filePath = "/data/pole-photo.jpg",
     cvState = cvState,
     confidence = confidence,
     modelVersion = "cv-v1",
