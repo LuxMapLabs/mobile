@@ -8,7 +8,9 @@ import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveyPlanDao
+import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
+import com.luxmap.feature.survey.data.entity.LocalAssignedSurveyRouteEntity
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import com.luxmap.feature.survey.data.entity.LocalRoadSegmentEntity
@@ -32,8 +34,9 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
         LocalWorkOrderCompletionEntity::class,
         LocalPolePhotoEntity::class,
         LocalPoleListItemEntity::class,
+        LocalAssignedSurveyRouteEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
@@ -49,4 +52,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun polePhotoDao(): PolePhotoDao
 
     abstract fun poleListCacheDao(): PoleListCacheDao
+
+    abstract fun surveyRouteCacheDao(): SurveyRouteCacheDao
 }

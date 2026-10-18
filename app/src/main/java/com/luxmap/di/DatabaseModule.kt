@@ -6,6 +6,7 @@ import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
+import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import dagger.Module
@@ -54,4 +55,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePoleListCacheDao(db: AppDatabase): PoleListCacheDao = db.poleListCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideSurveyRouteCacheDao(db: AppDatabase): SurveyRouteCacheDao = db.surveyRouteCacheDao()
 }

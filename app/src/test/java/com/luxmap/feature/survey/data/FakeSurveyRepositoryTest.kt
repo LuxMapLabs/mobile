@@ -18,9 +18,9 @@ class FakeSurveyRepositoryTest {
             val repository = FakeSurveyRepository(mockk<SurveySessionDao>(), mockk<Context>())
 
             repository.observeAssignedRoutes().test {
-                val routes = awaitItem()
-                assertTrue(routes.isNotEmpty())
-                assertTrue(routes.first().workOrderId.isNotEmpty())
+                val result = awaitItem()
+                assertTrue(result.routes.isNotEmpty())
+                assertTrue(result.routes.first().workOrderId.isNotEmpty())
                 awaitComplete()
             }
         }

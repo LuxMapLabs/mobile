@@ -30,6 +30,8 @@ sealed interface SurveyHubUiState {
         val uploadingSessions: List<UploadingSurveySession> = emptyList(),
         val rejectedSweeps: List<LocalRejectedSweep> = emptyList(),
         val pendingAiConfirmation: List<LocalPendingAiConfirmation> = emptyList(),
+        // True when assignedRoutes came from the local cache after a failed fetch.
+        val isStale: Boolean = false,
     ) : SurveyHubUiState
 
     data object Empty : SurveyHubUiState

@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.plan
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.survey.domain.SurveyReadinessInputProvider
@@ -53,7 +54,8 @@ class SurveyPlanViewModelTest {
     fun `emits Empty when the work order is not among the assigned routes`() =
         runTest {
             val repository = mockk<SurveyRepository>()
-            every { repository.observeAssignedRoutes() } returns flowOf(emptyList())
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(emptyList(), isStale = false))
             val viewModel =
                 SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
@@ -67,7 +69,8 @@ class SurveyPlanViewModelTest {
     fun `emits Success with the matching route when found`() =
         runTest {
             val repository = mockk<SurveyRepository>()
-            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(listOf(route), isStale = false))
             val viewModel =
                 SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
@@ -75,6 +78,9 @@ class SurveyPlanViewModelTest {
                 assertEquals(SurveyPlanUiState.Loading, awaitItem())
                 val success = awaitItem() as SurveyPlanUiState.Success
                 assertEquals(route, success.route)
+                // checkReadiness() fires its own coroutine right after Success and will emit
+                // again (readiness filled in) - not what this test is about, so don't assert on it.
+                cancelAndIgnoreRemainingEvents()
             }
         }
 
@@ -97,7 +103,8 @@ class SurveyPlanViewModelTest {
     fun `rejectionReason is always null while SHOW_RESURVEY_BANNER is off`() =
         runTest {
             val repository = mockk<SurveyRepository>()
-            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(listOf(route), isStale = false))
             val viewModel =
                 SurveyPlanViewModel(savedStateHandle(), repository, mockk(relaxed = true), mockk(relaxed = true))
 
@@ -105,6 +112,9 @@ class SurveyPlanViewModelTest {
                 awaitItem() // Loading
                 val success = awaitItem() as SurveyPlanUiState.Success
                 assertEquals(null, success.rejectionReason)
+                // checkReadiness() fires its own coroutine right after Success and will emit
+                // again (readiness filled in) - not what this test is about, so don't assert on it.
+                cancelAndIgnoreRemainingEvents()
             }
         }
 
@@ -112,7 +122,8 @@ class SurveyPlanViewModelTest {
     fun `loading a route with a non-REALTIME timestamp source surfaces a not-ready readiness result`() =
         runTest {
             val repository = mockk<SurveyRepository>()
-            every { repository.observeAssignedRoutes() } returns flowOf(listOf(route))
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(listOf(route), isStale = false))
             val readinessInputProvider = mockk<SurveyReadinessInputProvider>()
             coEvery { readinessInputProvider.gather() } returns
                 SurveyReadinessInput(

@@ -46,6 +46,8 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -160,6 +162,14 @@ private fun SurveyHubContent(
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        if (state.isStale) {
+            item {
+                InlineBanner(
+                    message = "Đang xem danh sách tuyến đã lưu trên máy, có thể chưa phải bản mới nhất",
+                    tone = InlineBannerTone.OFFLINE,
+                )
+            }
+        }
         if (hasAttentionCards) {
             item {
                 Text(

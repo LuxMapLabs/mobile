@@ -56,7 +56,7 @@ class SurveyHubViewModel
                     repository.observeAssignedRoutes(),
                     repository.observeUploadingSessions(),
                     connectivityObserver.isOnline,
-                ) { routes, queuedSessions, isOnline ->
+                ) { routesResult, queuedSessions, isOnline ->
                     val uploading =
                         queuedSessions.map { session ->
                             UploadingSurveySession(
@@ -67,14 +67,17 @@ class SurveyHubViewModel
                         }
                     val rejected = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_REJECTED_SWEEPS else emptyList()
                     val pending = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_PENDING_AI_CONFIRMATION else emptyList()
-                    if (routes.isEmpty() && uploading.isEmpty() && rejected.isEmpty() && pending.isEmpty()) {
+                    val hasNothing =
+                        routesResult.routes.isEmpty() && uploading.isEmpty() && rejected.isEmpty() && pending.isEmpty()
+                    if (hasNothing) {
                         SurveyHubUiState.Empty
                     } else {
                         SurveyHubUiState.Success(
-                            assignedRoutes = routes,
+                            assignedRoutes = routesResult.routes,
                             uploadingSessions = uploading,
                             rejectedSweeps = rejected,
                             pendingAiConfirmation = pending,
+                            isStale = routesResult.isStale,
                         )
                     }
                 }.catch { e ->
