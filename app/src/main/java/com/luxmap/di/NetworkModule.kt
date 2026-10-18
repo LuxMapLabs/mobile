@@ -3,6 +3,7 @@ package com.luxmap.di
 import com.luxmap.core.network.ApiClient
 import com.luxmap.core.network.AuthApi
 import com.luxmap.core.network.AuthHeaderInterceptor
+import com.luxmap.core.network.NotificationsApi
 import com.luxmap.core.network.SweepsApi
 import com.luxmap.core.network.TokenAuthenticator
 import com.luxmap.core.network.UserApi
@@ -80,4 +81,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSweepsApi(retrofit: Retrofit): SweepsApi = retrofit.create(SweepsApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideNotificationsApi(retrofit: Retrofit): NotificationsApi = retrofit.create(NotificationsApi::class.java)
 }
