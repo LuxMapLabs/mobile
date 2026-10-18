@@ -29,7 +29,7 @@ fun EvidenceCaptureRoute(
 ) {
     val context = LocalContext.current
     var pendingFile by remember { mutableStateOf<File?>(null) }
-    var hasRequestedLocationPermission by rememberSaveable { mutableStateOf(false) }
+    var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
 
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -48,18 +48,32 @@ fun EvidenceCaptureRoute(
         takePictureLauncher.launch(uri)
     }
 
-    val locationPermissionLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { launchCamera() }
+    // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
+    // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
+    // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
+    // stays best-effort like before (missing GPS is not fatal, just means lat/lng 0,0).
+    val permissionsLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            if (result[Manifest.permission.CAMERA] == true) {
+                launchCamera()
+            } else {
+                onDone()
+            }
+        }
 
     LaunchedEffect(Unit) {
-        val granted =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+        val cameraGranted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
-        if (granted || hasRequestedLocationPermission) {
-            launchCamera()
-        } else {
-            hasRequestedLocationPermission = true
-            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        when {
+            cameraGranted -> launchCamera()
+            hasRequestedPermissions -> onDone()
+            else -> {
+                hasRequestedPermissions = true
+                permissionsLauncher.launch(
+                    arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
+                )
+            }
         }
     }
 
