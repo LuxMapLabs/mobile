@@ -23,7 +23,12 @@ class RealNotificationRepository
 
         override suspend fun unreadCount(): Result<Int> = runCatching { api.unreadCount().unreadCount }
 
-        override suspend fun markRead(notificationId: String): Result<Unit> = runCatching { api.markRead(notificationId) }
+        override suspend fun markRead(notificationId: String): Result<Unit> =
+            runCatching {
+                api.markRead(
+                    notificationId,
+                )
+            }
 
         override suspend fun markAllRead(): Result<Unit> = runCatching { api.markAllRead() }
 

@@ -22,7 +22,16 @@ private fun item(
     id: String,
     entityType: String = "work_order",
     readAt: String? = null,
-) = NotificationItem(id, "work_order_assigned", "Title $id", "Body $id", entityType, "WO-1", "2026-10-18T08:00:00Z", readAt)
+) = NotificationItem(
+    id,
+    "work_order_assigned",
+    "Title $id",
+    "Body $id",
+    entityType,
+    "WO-1",
+    "2026-10-18T08:00:00Z",
+    readAt,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotificationListViewModelTest {
@@ -59,7 +68,8 @@ class NotificationListViewModelTest {
     fun `emits Empty when there are no notifications`() =
         runTest {
             val repository = mockk<NotificationRepository>()
-            coEvery { repository.list() } returns Result.success(NotificationPage(emptyList(), total = 0, unreadCount = 0))
+            coEvery { repository.list() } returns
+                Result.success(NotificationPage(emptyList(), total = 0, unreadCount = 0))
             val vm = NotificationListViewModel(repository)
 
             vm.uiState.test {

@@ -62,12 +62,22 @@ class NotificationListViewModel
                             }
                     },
                     onFailure = { e ->
-                        _uiState.value = NotificationListUiState.Error(e.message ?: "Không tải được danh sách thông báo")
+                        _uiState.value =
+                            NotificationListUiState.Error(e.message ?: "Không tải được danh sách thông báo")
                     },
                 )
             }
         }
 
         private fun NotificationItem.toRowState() =
-            NotificationListRowState(notificationId, type, title, body, entityType, entityId, createdAt, isRead = readAt != null)
+            NotificationListRowState(
+                notificationId,
+                type,
+                title,
+                body,
+                entityType,
+                entityId,
+                createdAt,
+                isRead = readAt != null,
+            )
     }
