@@ -241,26 +241,29 @@ Mỗi feature nhỏ hơn (`auth`, `home`, `map`, `notification`, `profile`...) c
 
 Token tổ chức theo 3 lớp: **Primitive** (giá trị gốc) → **Semantic** (ý nghĩa sử dụng, khác nhau theo Light/Dark) → **Component** (giá trị theo component cụ thể).
 
-**Cập nhật 2026-10-11:** lớp brand/semantic (background/surface/text/border/focus/navigation) đã được chủ dự án duyệt chuyển từ Design System v2.0 sang v2.1 ("Night Ledger" redesign, `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2, roadmap `docs/superpowers/plans/2026-10-11-luxmap-redesign-roadmap.md` quyết định #1, đã lên code ở Phase 0). **Lớp status (asset condition/sync/work-order status/priority/task-kind) giữ nguyên từ v2.0, không đổi** — các bảng badge ở dưới vẫn là nguồn đúng. Khi code token mới, lấy đúng từ `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2 + `docs/LuxMap_Mobile_Design_System_v2.1.md`, không tự chọn màu khác.
+**Cập nhật 2026-10-11:** lớp brand/semantic (background/surface/text/border/focus/navigation) từng được chủ dự án duyệt chuyển từ Design System v2.0 sang v2.1 ("Night Ledger" redesign, `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2, roadmap `docs/superpowers/plans/2026-10-11-luxmap-redesign-roadmap.md` quyết định #1, đã lên code ở Phase 0).
 
-### Primitive colors — brand/semantic (v2.1, hiện hành trong `Color.kt`)
+**Cập nhật 2026-10-14 — ĐÃ ROLLBACK, mục trên đã lỗi thời.** Quyết định sản phẩm đổi ý: "Claude Design project turn 3 (Đồng bộ toàn bộ giao diện theo Design System v2.0)" yêu cầu bỏ bảng màu Night Ledger, trả lớp brand/semantic về đúng Design System v2.0 — đã code xong (PR #66 `style/redesign-rollback-tokens-v2.0`, theo sau là PR #65 `style/redesign-phase11-login` và PR #67 `style/redesign-phase2-home-v2.0` chỉnh 2 màn còn dính token v2.1), merge vào `dev` ngày 2026-10-14. `LightSemanticColors`/`DarkSemanticColors` và M3 color scheme (`Theme.kt`) hiện trỏ lại `Navy700`/`Blue500`/`Gray*`/`Dark*` — **không còn dùng** `Paper`/`Ink`/`Lumen`/`Night*`. Theo đó: màn Đăng nhập (F01) dùng hero `navy-700`/`BrandHeroGradient` (không phải hero `inverseSurface`/Ink như spec v2.1), và đích sau đăng nhập là `Routes.Map` (không phải `Routes.Home`) — 2 điểm roadmap từng đánh dấu "cần quyết định sản phẩm" nay đã chốt theo hướng này. Token v2.1 (Paper/Ink/Lumen/Night*...) **vẫn còn khai báo trong `Color.kt`** (không dùng ở đâu khác trong code, xác nhận bằng grep toàn bộ `app/src/main/java/com/luxmap` ngày 2026-10-18) — giữ lại để tham khảo lịch sử, không phải nguồn token khi code mới, có thể dọn sau nếu muốn. **Lớp status (asset condition/sync/work-order status/priority/task-kind) không bị ảnh hưởng, vẫn là v2.0 như trước giờ** — các bảng badge ở dưới vẫn là nguồn đúng. Khi code token brand/semantic mới, lấy đúng từ mục 2.1 Design System v2.0 + code thật trong `core/theme/Color.kt`/`Theme.kt` — **không dùng** `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` hay `docs/LuxMap_Mobile_Design_System_v2.1.md` cho lớp này nữa (2 file đó vẫn còn trong `docs/`, không xoá, nhưng đã bị quyết định 2026-10-14 vượt qua).
+
+### Primitive colors — brand/semantic (v2.0, hiện hành trong `Color.kt`)
 
 ```kotlin
-val Paper  = Color(0xFFF5F4F0)   // Nền Light
-val Ink    = Color(0xFF15171C)   // Chữ chính Light, khối "ink" (NextUpCard...)
-val Ink2   = Color(0xFF5B5F68)   // Chữ phụ Light
-val Line   = Color(0xFFDEDBD3)   // Viền/outline Light
-val Lumen  = Color(0xFF3448D6)   // Thương hiệu, CTA, focus Light
-val Night      = Color(0xFF0B0C0F) // Nền Dark
-val NightText  = Color(0xFFEDEBE6) // Chữ chính Dark
-val NightText2 = Color(0xFF9A9DA6) // Chữ phụ Dark
-val NightLine  = Color(0xFF2C2F38) // Viền/outline Dark
-val LumenNight = Color(0xFFA3ADFF) // Thương hiệu, CTA, focus Dark
+val Navy700 = Color(0xFF1F3864)  // Thương hiệu, điều hướng active Light
+val Blue500 = Color(0xFF3E86C9)  // Focus Light
+val Gray25  = Color(0xFFF8FAFC)  // Nền Light
+val Gray50  = Color(0xFFF1F5F9)  // Surface phụ Light
+val Gray200 = Color(0xFFE2E8F0)  // Viền/outline Light
+val Gray500 = Color(0xFF64748B)  // Chữ phụ Light, điều hướng inactive
+val Gray900 = Color(0xFF0F172A)  // Chữ chính Light
+val Dark950 = Color(0xFF0D0D0D)  // Nền Dark
+val Dark900 = Color(0xFF121212)  // Surface phụ Dark
+val Dark800 = Color(0xFF1A1A1A)  // Surface Dark
+val Dark700 = Color(0xFF2A2A2A)  // Viền/outline Dark
+val DarkText  = Color(0xFFF5F5F5) // Chữ chính Dark
+val DarkMuted = Color(0xFFA0A0A0) // Chữ phụ Dark, điều hướng inactive Dark
 ```
 
-Bảng đầy đủ (LineSoft, Disabled*, LumenCont/LumenOnCont, NightSurf/NightSurf2, LumenNightCont/LumenNightOnCont, ErrorDark...) xem `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2.1 và code thật trong `core/theme/Color.kt`.
-
-**Primitive v2.0 vẫn còn sống trong code**, dùng cho phần chưa tới lượt redesign — không xoá khi gặp: `Navy700`/`Navy900`/`Blue600` (`BrandHeroGradient`, chờ Phase 11 quyết màu hero F01 — xem mục "Khoảng trống đã biết" ở trên), `Green400`/`Amber500`/`Rose600`/`Gray500`/`Danger600` (badge trạng thái, bản đồ, chart lux — xem "Primitive colors — status" ngay dưới).
+Bảng đầy đủ xem mục 2.1 Design System v2.0 và code thật trong `core/theme/Color.kt`. `Navy900`/`Blue600` (thêm từ Global Design System v1.0 mục 3.1) chỉ dùng cho `BrandHeroGradient` ở hero F01, không phải token semantic chung.
 
 ### Primitive colors — status (v2.0, không đổi)
 
@@ -274,19 +277,21 @@ val Danger600 = Color(0xFFDC2626)  // Hành động nguy hiểm
 
 Bảng đầy đủ (gray-50/200/500/700, dark-900/700, dark-muted...) xem mục 2.1 Design System v2.0.
 
-### Semantic colors (Light / Dark) — v2.1, hiện hành trong `LuxMapSemanticColors`/`Theme.kt`
+### Semantic colors (Light / Dark) — v2.0, hiện hành trong `LuxMapSemanticColors`/`Theme.kt`
 
 | Semantic token | Light | Dark |
 |---|---:|---:|
-| `color.background` | `#F5F4F0` (Paper) | `#0B0C0F` (Night) |
-| `color.surface` | `#FFFFFF` | `#16181D` (NightSurf) |
-| `color.text.primary` | `#15171C` (Ink) | `#EDEBE6` (NightText) |
-| `color.text.secondary` | `#5B5F68` (Ink2) | `#9A9DA6` (NightText2) |
-| `color.border` / `outline` | `#DEDBD3` (Line) | `#2C2F38` (NightLine) |
-| `color.focus` | `#3448D6` (Lumen) | `#A3ADFF` (LumenNight) |
-| `color.navigation.active` | `#3448D6` (Lumen) | `#A3ADFF` (LumenNight) |
+| `color.background` | `#F8FAFC` (Gray25) | `#0D0D0D` (Dark950) |
+| `color.surface` | `#FFFFFF` | `#1A1A1A` (Dark800) |
+| `color.surface.subtle` | `#F1F5F9` (Gray50) | `#121212` (Dark900) |
+| `color.text.primary` | `#0F172A` (Gray900) | `#F5F5F5` (DarkText) |
+| `color.text.secondary` | `#64748B` (Gray500) | `#A0A0A0` (DarkMuted) |
+| `color.border` / `outline` | `#E2E8F0` (Gray200) | `#2A2A2A` (Dark700) |
+| `color.focus` | `#3E86C9` (Blue500) | `#5FC4B0` (Green400) |
+| `color.navigation.active` | `#1F3864` (Navy700) | `#5FC4B0` (Green400) |
+| `color.navigation.inactive` | `#64748B` (Gray500) | `#A0A0A0` (DarkMuted) |
 
-Bảng đầy đủ (surfaceContainerHigh, primaryContainer, outlineVariant, disabled.container/content...) xem `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2.1 và code thật trong `core/theme/Theme.kt`. **Giá trị `outlineVariant` trong spec gốc (`LineSoft`/`#23262D`) đã sửa thành `Line`/`NightLine` khi code Phase 0** — divider gần như vô hình với giá trị gốc, phát hiện qua code review; xem `docs/contract-drift.md`.
+Bảng đầy đủ xem mục 2.1 Design System v2.0 và code thật trong `core/theme/Theme.kt`. M3 `ColorScheme` ở đây chỉ dùng các role cơ bản (`primary/onPrimary/secondary/.../outline/error`) — các role từng thêm cho redesign v2.1 (`primaryContainer`, `inverseSurface`, `surfaceContainerHigh`, `outlineVariant`) đã bị bỏ cùng đợt rollback 2026-10-14, không phải chỉ đổi giá trị như ghi chú `contract-drift.md` cũ (mục đó giờ chỉ còn giá trị lịch sử).
 
 ### Badge trạng thái tài sản (Light / Dark) — dùng đúng cặp, không đổi
 
