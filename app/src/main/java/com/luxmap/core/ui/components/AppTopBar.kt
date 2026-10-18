@@ -1,6 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +32,7 @@ fun AppTopBar(
     onBack: (() -> Unit)?,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
 ) {
     TopAppBar(
         modifier = modifier,
@@ -49,6 +51,7 @@ fun AppTopBar(
                 }
             }
         },
+        actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
     )
 }

@@ -78,6 +78,7 @@ import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.TopBarHeight
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
@@ -484,6 +485,11 @@ fun MapScreen(
                     Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
+                        // Extra top space to clear NotificationBellBar, which floats over this
+                        // screen from NavGraph.kt's Scaffold instead of reserving its own layout
+                        // space (see that file's comment) - without this, the search bar's filter
+                        // icon sat under the bell and lost part of its tap target.
+                        .padding(top = TopBarHeight)
                         .padding(Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {

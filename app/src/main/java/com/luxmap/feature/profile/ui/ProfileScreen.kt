@@ -135,7 +135,7 @@ fun ProfileScreen(
 
         SettingsGroup(title = "ỨNG DỤNG") {
             SettingsRow(label = "Giao diện", value = "Theo hệ thống")
-            SettingsRow(label = "Thông báo", value = "Chưa hỗ trợ trong phiên bản này")
+            SettingsRow(label = "Thông báo", value = "Xem ở biểu tượng chuông phía trên")
             SettingsRow(label = "Phiên bản", value = appVersion)
         }
 

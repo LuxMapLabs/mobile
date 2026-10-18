@@ -15,11 +15,15 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -30,11 +34,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
+import com.luxmap.core.ui.components.NotificationBellBar
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
+import com.luxmap.feature.notification.ui.NotificationBadgeViewModel
+import com.luxmap.feature.notification.ui.NotificationListRoute
 import com.luxmap.feature.profile.ui.ProfileRoute
 import com.luxmap.feature.survey.ui.aiconfirm.AiConfirmationRoute
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
@@ -46,6 +53,8 @@ import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import java.util.UUID
 
 // The 4 tabs of the main area, in the order given by spec section A5.
@@ -67,6 +76,7 @@ private val bottomNavItems =
 // it) would show through for that time. Fades are only used between the other screens.
 private const val FADE_OUT_MS = 90
 private const val FADE_IN_MS = 210
+private const val NOTIFICATION_POLL_INTERVAL_MS = 45_000L
 
 private fun NavBackStackEntry.isMap() = destination.route == Routes.Map.route
 
@@ -104,10 +114,41 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         }
     }
 
+    val notificationBadgeViewModel: NotificationBadgeViewModel = hiltViewModel()
+    val unreadNotificationCount by notificationBadgeViewModel.unreadCount.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    // Gated on isLoggedIn, not just the Activity lifecycle: without this, the loop would poll an
+    // authenticated endpoint with no token while the user sits on Login (risking a spurious
+    // forceLogout from TokenAuthenticator), and the badge would keep showing the PREVIOUS
+    // account's count for up to one tick after a different user signs in. reset() on logout
+    // clears it immediately instead of leaving a stale number on screen.
+    LaunchedEffect(lifecycleOwner, isLoggedIn) {
+        if (isLoggedIn != true) {
+            notificationBadgeViewModel.reset()
+            return@LaunchedEffect
+        }
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                notificationBadgeViewModel.refresh()
+                delay(NOTIFICATION_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     Scaffold(
         // Each screen handles its own status/navigation bar insets (see MainActivity), so the
-        // Scaffold must only add the height of the bottom bar to innerPadding.
+        // Scaffold must only add the height of the bottom bar to innerPadding - the bell bar
+        // below floats over content and pads itself (see NotificationBellBar), it does not
+        // reserve top space the way a real topBar normally would.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            if (showBottomBar) {
+                NotificationBellBar(
+                    unreadCount = unreadNotificationCount,
+                    onClick = { navController.navigate(Routes.Notification.route) },
+                )
+            }
+        },
         bottomBar = {
             if (showBottomBar) {
                 BottomNavBar(
@@ -131,7 +172,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         NavHost(
             navController = navController,
             startDestination = Routes.Login.route,
-            modifier = Modifier.padding(innerPadding),
+            // Only the bottom inset (bottomBar height) is applied here - see the Scaffold's own
+            // comment above on why the top inset (bell bar) is deliberately left out.
+            modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding()),
             enterTransition = { screenEnter() },
             exitTransition = { screenExit() },
             popEnterTransition = { screenEnter() },
@@ -292,6 +335,20 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
             composable(Routes.Profile.route) {
                 ProfileRoute()
+            }
+            composable(Routes.Notification.route) {
+                // Refreshes the shared badge on ANY way this destination leaves composition - the
+                // explicit back arrow, the system Back gesture/button, or navigating onward to a
+                // work order - not just the arrow's onClick, which the system gesture never calls.
+                DisposableEffect(Unit) {
+                    onDispose { notificationBadgeViewModel.refresh() }
+                }
+                NotificationListRoute(
+                    onBack = { navController.popBackStack() },
+                    onOpenWorkOrder = { workOrderId ->
+                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
+                    },
+                )
             }
             composable(
                 route = Routes.PoleDetail.route,
