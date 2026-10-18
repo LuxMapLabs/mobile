@@ -21,18 +21,22 @@ class FakeSurveyRepository
         private val sessionDao: SurveySessionDao,
         @ApplicationContext private val context: Context,
     ) : SurveyRepository {
-        override fun observeAssignedRoutes(): Flow<List<AssignedSurveyRoute>> =
+        override fun observeAssignedRoutes(): Flow<AssignedRoutesResult> =
             flow {
                 emit(
-                    listOf(
-                        AssignedSurveyRoute(
-                            workOrderId = "WO-2031",
-                            title = "Khảo sát đường liên thôn 3-4",
-                            communeId = "COM-001",
-                            woStatus = "assigned",
-                            dueDate = null,
-                            scheduledDate = "2026-10-01",
-                        ),
+                    AssignedRoutesResult(
+                        routes =
+                            listOf(
+                                AssignedSurveyRoute(
+                                    workOrderId = "WO-2031",
+                                    title = "Khảo sát đường liên thôn 3-4",
+                                    communeId = "COM-001",
+                                    woStatus = "assigned",
+                                    dueDate = null,
+                                    scheduledDate = "2026-10-01",
+                                ),
+                            ),
+                        isStale = false,
                     ),
                 )
             }

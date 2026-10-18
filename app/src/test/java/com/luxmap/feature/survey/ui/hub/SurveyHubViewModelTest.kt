@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.ui.hub
 import app.cash.turbine.test
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
@@ -38,6 +39,7 @@ class SurveyHubViewModelTest {
 
     private fun viewModel(
         routes: List<AssignedSurveyRoute> = emptyList(),
+        isStale: Boolean = false,
         queuedSessions: List<QueuedUploadSession> = emptyList(),
         isOnline: Boolean = true,
         repositoryFlowThrows: Boolean = false,
@@ -47,7 +49,7 @@ class SurveyHubViewModelTest {
             if (repositoryFlowThrows) {
                 flow { throw IllegalStateException("offline") }
             } else {
-                flowOf(routes)
+                flowOf(AssignedRoutesResult(routes, isStale))
             }
         every { repository.observeUploadingSessions() } returns flowOf(queuedSessions)
         val connectivity = mockk<ConnectivityObserver>()
@@ -118,6 +120,16 @@ class SurveyHubViewModelTest {
         }
 
     @Test
+    fun `emits Success with isStale when the repository falls back to its cache`() =
+        runTest {
+            viewModel(routes = listOf(route), isStale = true).uiState.test {
+                awaitItem()
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertTrue(success.isStale)
+            }
+        }
+
+    @Test
     fun `emits Error when the assigned-routes flow fails`() =
         runTest {
             viewModel(repositoryFlowThrows = true).uiState.test {
@@ -134,7 +146,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedRoutes() } returnsMany
                 listOf(
                     flow { throw IllegalStateException("offline") },
-                    flowOf(listOf(route)),
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                 )
             every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             val connectivity = mockk<ConnectivityObserver>()

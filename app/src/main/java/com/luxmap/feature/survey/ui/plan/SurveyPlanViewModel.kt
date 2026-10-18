@@ -51,8 +51,8 @@ class SurveyPlanViewModel
                     .observeAssignedRoutes()
                     .catch { e ->
                         _uiState.value = SurveyPlanUiState.Error(e.message ?: "Không tải được tuyến khảo sát")
-                    }.collect { routes ->
-                        val route = routes.firstOrNull { it.workOrderId == workOrderId }
+                    }.collect { routesResult ->
+                        val route = routesResult.routes.firstOrNull { it.workOrderId == workOrderId }
                         if (route == null) {
                             _uiState.value = SurveyPlanUiState.Empty
                         } else {

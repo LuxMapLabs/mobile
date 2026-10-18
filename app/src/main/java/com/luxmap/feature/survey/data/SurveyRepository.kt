@@ -20,12 +20,18 @@ data class QueuedUploadSession(
     val surveySweepId: String,
 )
 
+data class AssignedRoutesResult(
+    val routes: List<AssignedSurveyRoute>,
+    // True when this came from the local cache after a failed fetch, not the live backend.
+    val isStale: Boolean,
+)
+
 // Field Engineer never creates/edits a route on mobile (spec §10) — this only observes what
 // "Kỹ sư bảo trì" assigned: a WorkOrder with task_kind=survey, same GET /api/v1/work-orders
 // endpoint Home (F02) already uses, filtered to task_kind=survey (confirmed against
 // luxmap_backend source 2026-10-14 - there is no separate survey-sweeps endpoint).
 interface SurveyRepository {
-    fun observeAssignedRoutes(): Flow<List<AssignedSurveyRoute>>
+    fun observeAssignedRoutes(): Flow<AssignedRoutesResult>
 
     fun observeUploadingSessions(): Flow<List<QueuedUploadSession>>
 
