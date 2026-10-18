@@ -90,7 +90,8 @@ class PoleListViewModel
         private fun load() {
             viewModelScope.launch {
                 poleListRepository.poles(workOrderId).fold(
-                    onSuccess = { poles ->
+                    onSuccess = { result ->
+                        val poles = result.poles
                         if (poles.isEmpty()) {
                             _uiState.value = PoleListUiState.Empty
                             return@launch
@@ -114,16 +115,18 @@ class PoleListViewModel
                             .collect { infoByPole ->
                                 _uiState.value =
                                     PoleListUiState.Success(
-                                        poles.map { pole ->
-                                            val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
-                                            PoleListRowState(
-                                                poleId = pole.poleId,
-                                                position = pole.position,
-                                                fixtureStatus = pole.fixtureStatus,
-                                                serverPhotoId = serverPhotoId,
-                                                syncStatus = status?.let(::toSyncStatus),
-                                            )
-                                        },
+                                        poles =
+                                            poles.map { pole ->
+                                                val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
+                                                PoleListRowState(
+                                                    poleId = pole.poleId,
+                                                    position = pole.position,
+                                                    fixtureStatus = pole.fixtureStatus,
+                                                    serverPhotoId = serverPhotoId,
+                                                    syncStatus = status?.let(::toSyncStatus),
+                                                )
+                                            },
+                                        isStale = result.isStale,
                                     )
                             }
                     },

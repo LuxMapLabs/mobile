@@ -16,7 +16,11 @@ data class PoleListRowState(
 sealed interface PoleListUiState {
     data object Loading : PoleListUiState
 
-    data class Success(val poles: List<PoleListRowState>) : PoleListUiState
+    data class Success(
+        val poles: List<PoleListRowState>,
+        // True when showing the cached pole list because the live fetch just failed.
+        val isStale: Boolean = false,
+    ) : PoleListUiState
 
     data object Empty : PoleListUiState
 

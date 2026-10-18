@@ -42,6 +42,8 @@ import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -102,6 +104,14 @@ fun PoleListScreen(
                         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
+                        if (state.isStale) {
+                            item {
+                                InlineBanner(
+                                    message = "Đang xem danh sách cột đã lưu trên máy, có thể chưa phải bản mới nhất",
+                                    tone = InlineBannerTone.OFFLINE,
+                                )
+                            }
+                        }
                         items(state.poles) { pole ->
                             PoleRow(
                                 pole = pole,
