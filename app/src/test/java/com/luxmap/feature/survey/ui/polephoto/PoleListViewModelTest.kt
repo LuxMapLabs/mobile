@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.survey.data.PoleListRepository
+import com.luxmap.feature.survey.data.PoleListResult
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import io.mockk.coEvery
@@ -66,9 +67,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(
-                    listOf(
-                        PoleListItem("POLE-1", 1, "normal"),
-                        PoleListItem("POLE-2", 2, "dim"),
+                    PoleListResult(
+                        listOf(
+                            PoleListItem("POLE-1", 1, "normal"),
+                            PoleListItem("POLE-2", 2, "dim"),
+                        ),
+                        isStale = false,
                     ),
                 )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
@@ -93,6 +97,25 @@ class PoleListViewModelTest {
                     ),
                     success.poles,
                 )
+                assertEquals(false, success.isStale)
+            }
+        }
+
+    @Test
+    fun `emits Success with isStale when the repository falls back to its cache`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = true))
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.uiState.test {
+                assertEquals(PoleListUiState.Loading, awaitItem())
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(true, success.isStale)
             }
         }
 
@@ -101,7 +124,8 @@ class PoleListViewModelTest {
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
-            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
             val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
 
             vm.uiState.test {
@@ -131,7 +155,8 @@ class PoleListViewModelTest {
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
-            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
             coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
             coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
                 Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on"))
@@ -152,7 +177,8 @@ class PoleListViewModelTest {
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
-            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
             coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns
                 photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "off")
             coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
@@ -176,7 +202,8 @@ class PoleListViewModelTest {
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
-            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.success(emptyList())
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
             coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns
                 photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "off")
             coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
