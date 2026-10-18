@@ -72,4 +72,20 @@ class NotificationBadgeViewModelTest {
             }
             assertEquals(3, vm.unreadCount.value)
         }
+
+    @Test
+    fun `reset clears the count back to zero`() =
+        runTest {
+            val repository = mockk<NotificationRepository>()
+            coEvery { repository.unreadCount() } returns Result.success(9)
+            val vm = NotificationBadgeViewModel(repository)
+
+            vm.unreadCount.test {
+                assertEquals(0, awaitItem())
+                vm.refresh()
+                assertEquals(9, awaitItem())
+                vm.reset()
+                assertEquals(0, awaitItem())
+            }
+        }
 }

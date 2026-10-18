@@ -67,10 +67,7 @@ fun NotificationListRoute(
         onMarkAllRead = viewModel::onMarkAllRead,
         onItemClick = { row ->
             viewModel.onMarkRead(row.notificationId)
-            // Only entity_type = work_order has a real destination today - see CLAUDE.md's F14
-            // "Khoảng trống đã biết" entry and the design spec section 6 for why survey_sweep/
-            // fault/citizen_report are deliberately not navigable in v1.
-            if (row.entityType == "work_order") onOpenWorkOrder(row.entityId)
+            notificationNavigationTarget(row)?.let(onOpenWorkOrder)
         },
     )
 }
@@ -109,6 +106,24 @@ fun NotificationListScreen(
                     ) {
                         items(state.items) { row ->
                             NotificationRow(row = row, onClick = { onItemClick(row) })
+                        }
+                        // v1 has no load-more (see CLAUDE.md F14 scope) - when the account has
+                        // more than the single page fetched (page_size=50), say so instead of
+                        // silently hiding older notifications with no indication anything is
+                        // missing.
+                        if (state.items.size < state.total) {
+                            item {
+                                Text(
+                                    text = "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(Spacing.md)
+                                            .testTag("notification_list_more_footer"),
+                                )
+                            }
                         }
                     }
 

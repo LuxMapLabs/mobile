@@ -62,6 +62,7 @@ import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.core.theme.TopBarHeight
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
@@ -314,7 +315,18 @@ private fun HomeHeader(
                 DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi")),
             )
         }
-    Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(Spacing.lg)) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                // Extra top space to clear NotificationBellBar, which floats over this screen
+                // from NavGraph.kt's Scaffold instead of reserving its own layout space (see that
+                // file's comment) - without this, SyncPill below sat directly under the bell and
+                // lost its tap target.
+                .padding(top = TopBarHeight)
+                .padding(Spacing.lg),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

@@ -65,6 +65,21 @@ class NotificationListViewModelTest {
         }
 
     @Test
+    fun `emits Success carrying the real total from the page, even when fewer items load than total`() =
+        runTest {
+            val repository = mockk<NotificationRepository>()
+            coEvery { repository.list() } returns
+                Result.success(NotificationPage(listOf(item("NTF-1")), total = 60, unreadCount = 1))
+            val vm = NotificationListViewModel(repository)
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as NotificationListUiState.Success
+                assertEquals(60, success.total)
+            }
+        }
+
+    @Test
     fun `emits Empty when there are no notifications`() =
         runTest {
             val repository = mockk<NotificationRepository>()

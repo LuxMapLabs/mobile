@@ -28,4 +28,11 @@ class NotificationBadgeViewModel
                 repository.unreadCount().onSuccess { _unreadCount.value = it }
             }
         }
+
+        // Called when the session ends (NavGraph.kt) - this ViewModel is Activity-scoped and
+        // survives login/logout, so without this a signed-out-then-back-in-as-someone-else user
+        // would see the PREVIOUS account's unread count until the next poll tick.
+        fun reset() {
+            _unreadCount.value = 0
+        }
     }

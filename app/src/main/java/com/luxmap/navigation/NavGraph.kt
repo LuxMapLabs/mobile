@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -116,7 +117,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
     val notificationBadgeViewModel: NotificationBadgeViewModel = hiltViewModel()
     val unreadNotificationCount by notificationBadgeViewModel.unreadCount.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    // Gated on isLoggedIn, not just the Activity lifecycle: without this, the loop would poll an
+    // authenticated endpoint with no token while the user sits on Login (risking a spurious
+    // forceLogout from TokenAuthenticator), and the badge would keep showing the PREVIOUS
+    // account's count for up to one tick after a different user signs in. reset() on logout
+    // clears it immediately instead of leaving a stale number on screen.
+    LaunchedEffect(lifecycleOwner, isLoggedIn) {
+        if (isLoggedIn != true) {
+            notificationBadgeViewModel.reset()
+            return@LaunchedEffect
+        }
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (isActive) {
                 notificationBadgeViewModel.refresh()
@@ -327,11 +337,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 ProfileRoute()
             }
             composable(Routes.Notification.route) {
+                // Refreshes the shared badge on ANY way this destination leaves composition - the
+                // explicit back arrow, the system Back gesture/button, or navigating onward to a
+                // work order - not just the arrow's onClick, which the system gesture never calls.
+                DisposableEffect(Unit) {
+                    onDispose { notificationBadgeViewModel.refresh() }
+                }
                 NotificationListRoute(
-                    onBack = {
-                        notificationBadgeViewModel.refresh()
-                        navController.popBackStack()
-                    },
+                    onBack = { navController.popBackStack() },
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },

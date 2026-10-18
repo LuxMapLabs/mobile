@@ -135,4 +135,30 @@ class NotificationListScreenTest {
         // the row's own text still renders, per Review Focus item 1.
         composeRule.onNodeWithText("Bạn được giao phiếu WO-1001").assertExists()
     }
+
+    @Test
+    fun success_state_shows_a_more_footer_when_fewer_items_loaded_than_total() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state = NotificationListUiState.Success(listOf(row()), total = 60),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("notification_list_more_footer").assertExists()
+    }
+
+    @Test
+    fun success_state_hides_the_more_footer_when_every_notification_is_loaded() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state = NotificationListUiState.Success(listOf(row()), total = 1),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("notification_list_more_footer").assertDoesNotExist()
+    }
 }

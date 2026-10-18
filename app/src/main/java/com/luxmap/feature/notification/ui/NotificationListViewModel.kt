@@ -58,7 +58,7 @@ class NotificationListViewModel
                             if (page.items.isEmpty()) {
                                 NotificationListUiState.Empty
                             } else {
-                                NotificationListUiState.Success(page.items.map { it.toRowState() })
+                                NotificationListUiState.Success(page.items.map { it.toRowState() }, total = page.total)
                             }
                     },
                     onFailure = { e ->
