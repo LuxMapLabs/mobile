@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Radius
@@ -96,7 +97,8 @@ fun PoleListScreen(
     ) { contentPadding ->
         Box(Modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
             when (state) {
-                is PoleListUiState.Loading -> CircularProgressIndicator()
+                is PoleListUiState.Loading ->
+                    CircularProgressIndicator(modifier = Modifier.testTag("pole_list_loading"))
 
                 is PoleListUiState.Success ->
                     LazyColumn(
