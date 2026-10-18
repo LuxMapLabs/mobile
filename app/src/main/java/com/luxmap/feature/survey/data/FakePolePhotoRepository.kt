@@ -60,4 +60,6 @@ class FakePolePhotoRepository
                 )
                 dao.byId(serverPhotoId) ?: error("Local pole photo row missing after AI result update")
             }
+
+        override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? = dao.byId(serverPhotoId)
     }

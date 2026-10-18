@@ -85,6 +85,9 @@ class RealPolePhotoRepository
                 dao.byId(localPhotoId) ?: error("Local pole photo row missing after AI result update")
             }
 
+        override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? =
+            dao.byServerPhotoId(serverPhotoId)
+
         private companion object {
             val json = Json { ignoreUnknownKeys = true }
         }

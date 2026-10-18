@@ -26,6 +26,8 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.InlineBanner
+import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -88,6 +90,14 @@ fun PolePhotoResultBottomSheet(
 
 @Composable
 private fun PolePhotoResultContent(state: PolePhotoResultUiState.Success) {
+    if (state.isStale) {
+        InlineBanner(
+            message = "Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất",
+            tone = InlineBannerTone.OFFLINE,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+    }
+
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         StatusBadge(text = cvStateLabel(state.cvState), colors = cvStateBadgeColors(state.cvState))
         if (state.confidence != null) {
