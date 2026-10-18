@@ -39,15 +39,19 @@ class UploadPolePhotoSyncHandler
                         file.name,
                         file.asRequestBody("image/jpeg".toMediaType()),
                     )
-                api.uploadPolePhoto(
-                    id = photo.workOrderId,
-                    poleId = photo.poleId.toRequestBody(),
-                    photo = photoPart,
-                    capturedAt = photo.capturedAt.toString().toRequestBody(),
-                    lat = photo.lat.toString().toRequestBody(),
-                    lng = photo.lng.toString().toRequestBody(),
-                    clientOpId = photo.photoId.toRequestBody(),
-                )
+                val response =
+                    api.uploadPolePhoto(
+                        id = photo.workOrderId,
+                        poleId = photo.poleId.toRequestBody(),
+                        photo = photoPart,
+                        capturedAt = photo.capturedAt.toString().toRequestBody(),
+                        lat = photo.lat.toString().toRequestBody(),
+                        lng = photo.lng.toString().toRequestBody(),
+                        clientOpId = photo.photoId.toRequestBody(),
+                    )
+                // Server assigns its own photo_id (WorkOrderPolePhotoService.cs), different from
+                // client_op_id above - must be saved to look up the AI result later.
+                dao.updateServerPhotoId(photo.photoId, response.photoId)
                 SyncOpResult.Done
             } catch (e: HttpException) {
                 when (e.code()) {

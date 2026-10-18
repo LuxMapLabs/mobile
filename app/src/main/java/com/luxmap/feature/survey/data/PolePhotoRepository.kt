@@ -18,8 +18,10 @@ interface PolePhotoRepository {
 
     // Fetches the AI classification result for an already-uploaded photo and persists it
     // into Room, so it is still visible offline next time this photo is viewed.
+    // serverPhotoId is the real backend photo_id (LocalPolePhotoEntity.serverPhotoId), NOT the
+    // local row's own photoId (that is just this device's client_op_id).
     suspend fun fetchResult(
         workOrderId: String,
-        photoId: String,
+        serverPhotoId: String,
     ): Result<LocalPolePhotoEntity>
 }

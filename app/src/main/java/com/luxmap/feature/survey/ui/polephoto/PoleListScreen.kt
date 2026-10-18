@@ -56,7 +56,7 @@ fun PoleListRoute(
     val aiResultState by viewModel.aiResultState.collectAsState()
     // Remembered so the bottom sheet's "Thử lại" button can re-fetch the same photo on error -
     // the sheet itself only knows the current PolePhotoResultUiState, not which photo it's for.
-    var lastViewedPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastViewedServerPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
 
     PoleListScreen(
         state = uiState,
@@ -64,12 +64,12 @@ fun PoleListRoute(
         onCapturePole = onCapturePole,
         onDone = onDone,
         onRetry = viewModel::onRetry,
-        onViewAiResult = { photoId ->
-            lastViewedPhotoId = photoId
-            viewModel.onViewAiResult(photoId)
+        onViewAiResult = { serverPhotoId ->
+            lastViewedServerPhotoId = serverPhotoId
+            viewModel.onViewAiResult(serverPhotoId)
         },
         onDismissAiResult = viewModel::onDismissAiResult,
-        onRetryAiResult = { lastViewedPhotoId?.let(viewModel::onViewAiResult) },
+        onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
     )
 }
 
@@ -80,7 +80,7 @@ fun PoleListScreen(
     onDone: () -> Unit,
     onRetry: () -> Unit = {},
     aiResultState: PolePhotoResultUiState? = null,
-    onViewAiResult: (photoId: String) -> Unit = {},
+    onViewAiResult: (serverPhotoId: String) -> Unit = {},
     onDismissAiResult: () -> Unit = {},
     onRetryAiResult: () -> Unit = {},
 ) {
@@ -106,7 +106,7 @@ fun PoleListScreen(
                             PoleRow(
                                 pole = pole,
                                 onClick = { onCapturePole(pole.poleId) },
-                                onViewAiResult = { pole.photoId?.let(onViewAiResult) },
+                                onViewAiResult = { pole.serverPhotoId?.let(onViewAiResult) },
                             )
                         }
                     }
@@ -170,7 +170,7 @@ private fun PoleRow(
             StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (pole.syncStatus == SyncStatus.DONE && pole.photoId != null) {
+            if (pole.syncStatus == SyncStatus.DONE && pole.serverPhotoId != null) {
                 IconButton(onClick = onViewAiResult) {
                     Icon(
                         imageVector = Icons.Filled.SmartToy,

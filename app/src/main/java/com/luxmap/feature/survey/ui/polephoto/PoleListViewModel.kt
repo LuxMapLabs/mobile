@@ -42,10 +42,10 @@ class PoleListViewModel
             load()
         }
 
-        fun onViewAiResult(photoId: String) {
+        fun onViewAiResult(serverPhotoId: String) {
             _aiResultState.value = PolePhotoResultUiState.Loading
             viewModelScope.launch {
-                polePhotoRepository.fetchResult(workOrderId, photoId).fold(
+                polePhotoRepository.fetchResult(workOrderId, serverPhotoId).fold(
                     onSuccess = { photo ->
                         _aiResultState.value =
                             if (photo.aiStatus == "available") {
@@ -90,8 +90,10 @@ class PoleListViewModel
                                     .observeUploadStatuses(latestByPole.values.map { it.photoId })
                                     .map {
                                             statuses ->
+                                        // Keyed by local photoId (sync_queue.client_op_id) to look up status, but
+                                        // the row only needs serverPhotoId - the local id is never shown in the UI.
                                         latestByPole.mapValues { (_, photo) ->
-                                            photo.photoId to statuses[photo.photoId]
+                                            photo.serverPhotoId to statuses[photo.photoId]
                                         }
                                     }
                             }
@@ -100,12 +102,12 @@ class PoleListViewModel
                                 _uiState.value =
                                     PoleListUiState.Success(
                                         poles.map { pole ->
-                                            val (photoId, status) = infoByPole[pole.poleId] ?: (null to null)
+                                            val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
                                             PoleListRowState(
                                                 poleId = pole.poleId,
                                                 position = pole.position,
                                                 fixtureStatus = pole.fixtureStatus,
-                                                photoId = photoId,
+                                                serverPhotoId = serverPhotoId,
                                                 syncStatus = status?.let(::toSyncStatus),
                                             )
                                         },
