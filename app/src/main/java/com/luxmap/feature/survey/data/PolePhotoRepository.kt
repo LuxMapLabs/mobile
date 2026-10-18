@@ -15,4 +15,11 @@ interface PolePhotoRepository {
         lat: Double,
         lng: Double,
     ): LocalPolePhotoEntity
+
+    // Fetches the AI classification result for an already-uploaded photo and persists it
+    // into Room, so it is still visible offline next time this photo is viewed.
+    suspend fun fetchResult(
+        workOrderId: String,
+        photoId: String,
+    ): Result<LocalPolePhotoEntity>
 }

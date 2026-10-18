@@ -40,4 +40,24 @@ class FakePolePhotoRepository
             dao.insert(entity)
             return entity
         }
+
+        override suspend fun fetchResult(
+            workOrderId: String,
+            photoId: String,
+        ): Result<LocalPolePhotoEntity> =
+            runCatching {
+                dao.updateAiResult(
+                    photoId = photoId,
+                    aiStatus = "available",
+                    cvState = "on",
+                    confidence = 0.92,
+                    modelVersion = "fake-model-v0",
+                    analyzedAt = Instant.now(),
+                    decision = null,
+                    decisionNote = null,
+                    decidedBy = null,
+                    decidedAt = null,
+                )
+                dao.byId(photoId) ?: error("Local pole photo row missing after AI result update")
+            }
     }

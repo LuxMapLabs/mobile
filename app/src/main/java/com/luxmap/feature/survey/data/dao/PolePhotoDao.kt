@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 @Dao
 interface PolePhotoDao {
@@ -17,4 +18,32 @@ interface PolePhotoDao {
 
     @Query("SELECT * FROM local_pole_photo WHERE photoId = :photoId LIMIT 1")
     suspend fun byId(photoId: String): LocalPolePhotoEntity?
+
+    @Query(
+        """
+        UPDATE local_pole_photo SET
+            aiStatus = :aiStatus,
+            cvState = :cvState,
+            confidence = :confidence,
+            modelVersion = :modelVersion,
+            analyzedAt = :analyzedAt,
+            decision = :decision,
+            decisionNote = :decisionNote,
+            decidedBy = :decidedBy,
+            decidedAt = :decidedAt
+        WHERE photoId = :photoId
+        """,
+    )
+    suspend fun updateAiResult(
+        photoId: String,
+        aiStatus: String,
+        cvState: String?,
+        confidence: Double?,
+        modelVersion: String?,
+        analyzedAt: Instant?,
+        decision: String?,
+        decisionNote: String?,
+        decidedBy: String?,
+        decidedAt: Instant?,
+    )
 }
