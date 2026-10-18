@@ -18,14 +18,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -48,11 +53,23 @@ fun PoleListRoute(
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val aiResultState by viewModel.aiResultState.collectAsState()
+    // Remembered so the bottom sheet's "Thử lại" button can re-fetch the same photo on error -
+    // the sheet itself only knows the current PolePhotoResultUiState, not which photo it's for.
+    var lastViewedPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
+
     PoleListScreen(
         state = uiState,
+        aiResultState = aiResultState,
         onCapturePole = onCapturePole,
         onDone = onDone,
         onRetry = viewModel::onRetry,
+        onViewAiResult = { photoId ->
+            lastViewedPhotoId = photoId
+            viewModel.onViewAiResult(photoId)
+        },
+        onDismissAiResult = viewModel::onDismissAiResult,
+        onRetryAiResult = { lastViewedPhotoId?.let(viewModel::onViewAiResult) },
     )
 }
 
@@ -62,6 +79,10 @@ fun PoleListScreen(
     onCapturePole: (poleId: String) -> Unit,
     onDone: () -> Unit,
     onRetry: () -> Unit = {},
+    aiResultState: PolePhotoResultUiState? = null,
+    onViewAiResult: (photoId: String) -> Unit = {},
+    onDismissAiResult: () -> Unit = {},
+    onRetryAiResult: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { AppTopBar(title = "Chụp ảnh cột đèn", onBack = onDone) },
@@ -82,7 +103,11 @@ fun PoleListScreen(
                         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
                         items(state.poles) { pole ->
-                            PoleRow(pole = pole, onClick = { onCapturePole(pole.poleId) })
+                            PoleRow(
+                                pole = pole,
+                                onClick = { onCapturePole(pole.poleId) },
+                                onViewAiResult = { pole.photoId?.let(onViewAiResult) },
+                            )
                         }
                     }
 
@@ -106,12 +131,21 @@ fun PoleListScreen(
             }
         }
     }
+
+    if (aiResultState != null) {
+        PolePhotoResultBottomSheet(
+            state = aiResultState,
+            onDismiss = onDismissAiResult,
+            onRetry = onRetryAiResult,
+        )
+    }
 }
 
 @Composable
 private fun PoleRow(
     pole: PoleListRowState,
     onClick: () -> Unit,
+    onViewAiResult: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val condition =
@@ -135,15 +169,26 @@ private fun PoleRow(
             Text(text = "Cột #${pole.position} — ${pole.poleId}", style = MaterialTheme.typography.titleMedium)
             StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
         }
-        if (pole.syncStatus != null) {
-            StatusBadge(text = pole.syncStatus.label(), colors = pole.syncStatus.badgeColors())
-        } else {
-            Icon(
-                imageVector = Icons.Filled.CameraAlt,
-                contentDescription = "Chụp ảnh",
-                modifier = Modifier.padding(Spacing.sm),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (pole.syncStatus == SyncStatus.DONE && pole.photoId != null) {
+                IconButton(onClick = onViewAiResult) {
+                    Icon(
+                        imageVector = Icons.Filled.SmartToy,
+                        contentDescription = "Xem kết quả AI",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            if (pole.syncStatus != null) {
+                StatusBadge(text = pole.syncStatus.label(), colors = pole.syncStatus.badgeColors())
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.CameraAlt,
+                    contentDescription = "Chụp ảnh",
+                    modifier = Modifier.padding(Spacing.sm),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
