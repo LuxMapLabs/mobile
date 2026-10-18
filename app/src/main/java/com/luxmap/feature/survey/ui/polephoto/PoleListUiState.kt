@@ -7,7 +7,9 @@ data class PoleListRowState(
     val poleId: String,
     val position: Int,
     val fixtureStatus: String,
-    val photoId: String?,
+    // The real backend photo_id, only known once UploadPolePhotoSyncHandler captures it from
+    // the upload response - not the local row's own id. Null until then.
+    val serverPhotoId: String?,
     val syncStatus: SyncStatus?,
 )
 

@@ -19,6 +19,15 @@ interface PolePhotoDao {
     @Query("SELECT * FROM local_pole_photo WHERE photoId = :photoId LIMIT 1")
     suspend fun byId(photoId: String): LocalPolePhotoEntity?
 
+    @Query("SELECT * FROM local_pole_photo WHERE serverPhotoId = :serverPhotoId LIMIT 1")
+    suspend fun byServerPhotoId(serverPhotoId: String): LocalPolePhotoEntity?
+
+    @Query("UPDATE local_pole_photo SET serverPhotoId = :serverPhotoId WHERE photoId = :photoId")
+    suspend fun updateServerPhotoId(
+        photoId: String,
+        serverPhotoId: String,
+    )
+
     @Query(
         """
         UPDATE local_pole_photo SET

@@ -63,12 +63,15 @@ class RealPolePhotoRepository
 
         override suspend fun fetchResult(
             workOrderId: String,
-            photoId: String,
+            serverPhotoId: String,
         ): Result<LocalPolePhotoEntity> =
             runCatching {
-                val item = api.polePhotoDetail(workOrderId, photoId)
+                val item = api.polePhotoDetail(workOrderId, serverPhotoId)
+                val localPhotoId =
+                    dao.byServerPhotoId(serverPhotoId)?.photoId
+                        ?: error("Local pole photo row missing for server photo $serverPhotoId")
                 dao.updateAiResult(
-                    photoId = photoId,
+                    photoId = localPhotoId,
                     aiStatus = item.aiStatus,
                     cvState = item.cvState,
                     confidence = item.confidence,
@@ -79,7 +82,7 @@ class RealPolePhotoRepository
                     decidedBy = item.decidedBy,
                     decidedAt = item.decidedAt?.let(Instant::parse),
                 )
-                dao.byId(photoId) ?: error("Local pole photo row missing after AI result update")
+                dao.byId(localPhotoId) ?: error("Local pole photo row missing after AI result update")
             }
 
         private companion object {

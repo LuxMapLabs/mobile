@@ -43,11 +43,11 @@ class FakePolePhotoRepository
 
         override suspend fun fetchResult(
             workOrderId: String,
-            photoId: String,
+            serverPhotoId: String,
         ): Result<LocalPolePhotoEntity> =
             runCatching {
                 dao.updateAiResult(
-                    photoId = photoId,
+                    photoId = serverPhotoId,
                     aiStatus = "available",
                     cvState = "on",
                     confidence = 0.92,
@@ -58,6 +58,6 @@ class FakePolePhotoRepository
                     decidedBy = null,
                     decidedAt = null,
                 )
-                dao.byId(photoId) ?: error("Local pole photo row missing after AI result update")
+                dao.byId(serverPhotoId) ?: error("Local pole photo row missing after AI result update")
             }
     }

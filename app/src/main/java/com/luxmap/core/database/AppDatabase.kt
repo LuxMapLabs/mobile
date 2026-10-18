@@ -30,7 +30,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
         LocalWorkOrderCompletionEntity::class,
         LocalPolePhotoEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
