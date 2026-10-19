@@ -2,8 +2,8 @@ package com.luxmap.feature.home.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -52,11 +52,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.Amber500
-import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
+import com.luxmap.core.theme.ErrorDark
 import com.luxmap.core.theme.Green400
 import com.luxmap.core.theme.HeadlineTextStyle
+import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.MetricTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
@@ -302,6 +305,8 @@ private fun NextUpCard(
     }
 }
 
+// Fixed Navy700-gradient hero regardless of Light/Dark theme, same BrandHeroGradient as F01 -
+// this block is meant to read as a distinct brand surface, not blend into colorScheme.background.
 @Composable
 private fun HomeHeader(
     metrics: HomeMetrics?,
@@ -319,95 +324,75 @@ private fun HomeHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .background(BrandHeroGradient)
                 .statusBarsPadding()
                 // Extra top space to clear NotificationBellBar, which floats over this screen
                 // from NavGraph.kt's Scaffold instead of reserving its own layout space (see that
                 // file's comment) - without this, SyncPill below sat directly under the bell and
                 // lost its tap target.
                 .padding(top = TopBarHeight)
-                .padding(Spacing.lg),
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xxxl),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column {
-                Text(
-                    text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(text = "Việc hôm nay", style = DisplayTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            }
-            SyncPill(status = syncStatus, lastSyncedAt = lastSyncedAt, onClick = onRefresh)
-        }
+        Text(
+            text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
+            style = LabelTextStyle,
+            color = Color.White.copy(alpha = 0.75f),
+        )
+        Text(text = "Việc hôm nay", style = DisplayTextStyle, color = Color.White)
+        Spacer(Modifier.height(Spacing.md))
+        SyncPill(status = syncStatus, lastSyncedAt = lastSyncedAt, onClick = onRefresh, onDarkHero = true)
         Spacer(Modifier.height(Spacing.lg))
         MetricRow(metrics = metrics)
     }
 }
 
-// 3 separate stat cards instead of 1 divided row - the overdue card gets its own tinted
-// background (reusing the existing AssetCondition.OUT pair, not a new color) only when there is
-// something overdue, so an empty overdue count stays neutral instead of looking alarming.
+// 1 combined translucent block with 3 columns divided by hairlines, instead of 3 separate
+// cards - matches the F02 redesign mockup. No per-column tinted background for overdue
+// anymore (the mockup only differs by text color, not container color).
 @Composable
 private fun MetricRow(metrics: HomeMetrics?) {
-    val isDark = isSystemInDarkTheme()
-    val isOverdue = metrics != null && metrics.overdueCount > 0
-    val overdueColors = AssetCondition.OUT.badgeColors(isDark)
+    val dividerColor = Color.White.copy(alpha = 0.12f)
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
+                .border(1.dp, dividerColor, RoundedCornerShape(Radius.card)),
     ) {
-        MetricCard(
-            label = "Được giao",
-            value = metrics?.assignedCount,
-            valueColor = Navy700,
-            modifier = Modifier.weight(1f),
-        )
-        MetricCard(
-            label = "Đang xử lý",
-            value = metrics?.inProgressCount,
-            valueColor = Green400,
-            modifier = Modifier.weight(1f),
-        )
-        MetricCard(
-            label = "Quá hạn",
-            value = metrics?.overdueCount,
-            valueColor = if (isOverdue) overdueColors.text else MaterialTheme.colorScheme.onSurface,
-            containerColor = if (isOverdue) overdueColors.background else MaterialTheme.colorScheme.surface,
-            modifier = Modifier.weight(1f),
-        )
+        val cells =
+            listOf(
+                Triple("Được giao", metrics?.assignedCount, Color.White),
+                Triple("Đang xử lý", metrics?.inProgressCount, Green400),
+                Triple("Quá hạn", metrics?.overdueCount, ErrorDark),
+            )
+        cells.forEachIndexed { index, (label, value, valueColor) ->
+            if (index > 0) {
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(dividerColor))
+            }
+            MetricCell(label = label, value = value, valueColor = valueColor, modifier = Modifier.weight(1f))
+        }
     }
 }
 
 @Composable
-private fun MetricCard(
+private fun MetricCell(
     label: String,
     value: Int?,
     valueColor: Color,
     modifier: Modifier = Modifier,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
 ) {
     Column(
-        modifier =
-            modifier
-                .fillMaxHeight()
-                .background(containerColor, RoundedCornerShape(Radius.card))
-                .padding(vertical = Spacing.md),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier = modifier.padding(vertical = Spacing.md, horizontal = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
             text = value?.toString() ?: "—",
-            style = MaterialTheme.typography.headlineMedium,
-            color = if (value != null) valueColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MetricTextStyle,
+            color = if (value != null) valueColor else Color.White.copy(alpha = 0.5f),
         )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.75f))
     }
 }
 
