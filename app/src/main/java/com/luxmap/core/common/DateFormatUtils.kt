@@ -54,6 +54,18 @@ object DateFormatUtils {
         }
     }
 
+    // Same safety as formatIsoInstant, time only — for a row already grouped under its own day
+    // label (e.g. notification rows under "Hôm nay"/"Hôm qua"), where repeating the date would
+    // be redundant.
+    fun formatIsoTimeOnly(iso: String?): String {
+        if (iso.isNullOrBlank()) return "Chưa cập nhật"
+        return try {
+            Instant.parse(iso).atZone(ZoneId.systemDefault()).format(timeOnlyFormatter)
+        } catch (e: DateTimeParseException) {
+            "Chưa cập nhật"
+        }
+    }
+
     // For plain date fields with no time/timezone component ("2028-01-04" — install_date,
     // warranty_expiry) — parsing these with Instant.parse would throw, they need LocalDate.
     fun formatPlainDate(date: String?): String {

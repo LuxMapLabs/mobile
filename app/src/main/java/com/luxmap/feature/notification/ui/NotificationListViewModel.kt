@@ -39,6 +39,13 @@ class NotificationListViewModel
             viewModelScope.launch { repository.markAllRead() }
         }
 
+        fun onFilterSelected(filter: NotificationFilter) {
+            val current = _uiState.value
+            if (current is NotificationListUiState.Success) {
+                _uiState.value = current.copy(filter = filter)
+            }
+        }
+
         // Optimistic UI (CLAUDE.md offline-first spirit): flips the row(s) immediately instead of
         // waiting for the 204 - the mark-read calls above are fire-and-forget, matching the
         // idempotent, side-effect-only nature of those two endpoints.
