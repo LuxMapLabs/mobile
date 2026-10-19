@@ -146,6 +146,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 NotificationBellBar(
                     unreadCount = unreadNotificationCount,
                     onClick = { navController.navigate(Routes.Notification.route) },
+                    onDarkHero = currentRoute == Routes.Home.route,
                 )
             }
         },
