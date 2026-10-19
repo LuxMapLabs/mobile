@@ -244,8 +244,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navArgument("workOrderId") { type = NavType.StringType },
                         navArgument("poleId") { type = NavType.StringType },
                     ),
-            ) {
-                PolePhotoCaptureRoute(onDone = { navController.popBackStack() })
+            ) { backStackEntry ->
+                val capturePoleId = backStackEntry.arguments?.getString("poleId") ?: return@composable
+                PolePhotoCaptureRoute(poleId = capturePoleId, onDone = { navController.popBackStack() })
             }
             composable(
                 route = Routes.AiConfirmation.route,
