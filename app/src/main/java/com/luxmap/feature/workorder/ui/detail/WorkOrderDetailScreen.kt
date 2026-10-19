@@ -23,11 +23,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -53,6 +60,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
@@ -80,7 +88,6 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.OutcomeSegment
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.RequirementList
@@ -145,14 +152,18 @@ fun WorkOrderDetailScreen(
             }
         },
         bottomBar = {
-            if (uiState is WorkOrderDetailUiState.Success && uiState.showsInspectionBottomBar()) {
-                val recordedCount = uiState.detail.faults.count { uiState.faultOutcomes.containsKey(it.faultId) }
-                BottomActionBar(
-                    ctaText = "Nộp báo cáo kiểm tra",
-                    onCtaClick = onSubmit,
-                    ctaEnabled = uiState.canSubmit() && !uiState.isSubmitting,
-                    progressText = "$recordedCount/${uiState.detail.faults.size} sự cố đã có kết quả",
-                )
+            if (uiState is WorkOrderDetailUiState.Success) {
+                val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
+                if (cta != null) {
+                    BottomActionBar(
+                        ctaText = cta.text,
+                        ctaIcon = cta.icon,
+                        onCtaClick = cta.onClick,
+                        ctaEnabled = cta.enabled,
+                        hint = cta.hint,
+                        progressText = cta.progressText,
+                    )
+                }
             }
         },
     ) { contentPadding ->
@@ -163,12 +174,10 @@ fun WorkOrderDetailScreen(
                     WorkOrderDetailContent(
                         state = uiState,
                         onBack = onBack,
-                        onStart = onStart,
                         onNavigateFault = onNavigateFault,
                         onReportNoteChanged = onReportNoteChanged,
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
                         onFaultOutcomeSelected = onFaultOutcomeSelected,
-                        onSubmit = onSubmit,
                         onCaptureEvidence = onCaptureEvidence,
                         onRetakeEvidence = onRetakeEvidence,
                     )
@@ -200,19 +209,86 @@ private fun workOrderDetailTopBarTitle(taskKindWire: String): String =
         WorkOrderTaskKind.SURVEY -> "Lệnh khảo sát"
     }
 
-private fun submitButtonLabel(kind: WorkOrderTaskKind): String =
-    if (kind == WorkOrderTaskKind.INSPECTION) "Nộp báo cáo kiểm tra" else "Hoàn thành lệnh"
+private data class WorkOrderCtaState(
+    val text: String,
+    val icon: ImageVector,
+    val enabled: Boolean,
+    val onClick: () -> Unit,
+    val hint: String? = null,
+    val progressText: String? = null,
+)
+
+// Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
+// redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
+// the old layout's separate inline buttons for each case.
+private fun workOrderCtaState(
+    state: WorkOrderDetailUiState.Success,
+    onStart: () -> Unit,
+    onSubmit: () -> Unit,
+): WorkOrderCtaState? {
+    val detail = state.detail
+    val kind = workOrderTaskKindFromWire(detail.taskKind)
+    val canSubmitNow = state.canSubmit() && !state.isSubmitting
+    return when {
+        "start" in detail.allowedActions ->
+            WorkOrderCtaState(
+                text = "Bắt đầu",
+                icon = Icons.Filled.PlayArrow,
+                enabled = !state.isStarting,
+                onClick = onStart,
+            )
+        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.REPAIR ->
+            WorkOrderCtaState(
+                text = "Hoàn thành lệnh",
+                icon = if (canSubmitNow) Icons.Filled.Check else Icons.Filled.Lock,
+                enabled = canSubmitNow,
+                onClick = onSubmit,
+                hint = missingRequirementsHint(repairRequirements(state)),
+            )
+        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
+            val recordedCount = detail.faults.count { state.faultOutcomes.containsKey(it.faultId) }
+            WorkOrderCtaState(
+                text = "Nộp báo cáo kiểm tra",
+                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
+                enabled = canSubmitNow,
+                onClick = onSubmit,
+                progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
+            )
+        }
+        workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
+            WorkOrderCtaState(
+                text = "Đã nộp báo cáo",
+                icon = Icons.Filled.HourglassTop,
+                enabled = false,
+                onClick = {},
+                hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+            )
+        else -> null
+    }
+}
+
+// Same 2 requirements RequirementList shows in the "Nghiệm thu" card, reused here to build the
+// "Cần ..." lock hint instead of duplicating the wording in 2 places.
+private fun repairRequirements(state: WorkOrderDetailUiState.Success): List<Requirement> =
+    listOf(
+        Requirement("Có ít nhất 1 ảnh sau sửa chữa", met = state.localEvidence != null),
+        Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
+    )
+
+private fun missingRequirementsHint(requirements: List<Requirement>): String? {
+    val missing = requirements.filterNot { it.met }
+    if (missing.isEmpty()) return null
+    return "Cần " + missing.joinToString(" và ") { it.label.lowercase() }
+}
 
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
     onBack: () -> Unit,
-    onStart: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
-    onSubmit: () -> Unit,
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
 ) {
@@ -277,38 +353,6 @@ private fun WorkOrderDetailContent(
             }
             if (state.submitError != null) {
                 InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
-            }
-            if ("start" in detail.allowedActions) {
-                PrimaryButton(
-                    text = "Bắt đầu",
-                    onClick = onStart,
-                    enabled = !state.isStarting,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (canComplete && !state.showsInspectionBottomBar()) {
-                PrimaryButton(
-                    text = submitButtonLabel(kind),
-                    onClick = onSubmit,
-                    enabled = state.canSubmit() && !state.isSubmitting,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            if (workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE &&
-                "start" !in detail.allowedActions &&
-                !canComplete
-            ) {
-                PrimaryButton(
-                    text = "Đã nộp báo cáo",
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
@@ -505,36 +549,12 @@ private fun FaultListSection(
             WorkOrderStatus.ASSIGNED.badgeColors()
         }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(FaultSectionAvatarSize)
-                            .background(Navy700, RoundedCornerShape(Radius.chip)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ReportProblem,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(
-                    text = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            StatusBadge(text = pillText, colors = pillColors)
-        }
+        CompletionSectionHeader(
+            icon = Icons.Filled.ReportProblem,
+            title = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
+            pillText = pillText,
+            pillColors = pillColors,
+        )
         if (faults.isEmpty()) {
             Text(
                 text = "Không có sự cố nào trong lệnh này",
@@ -646,40 +666,88 @@ private fun RepairCompletionSection(
     onRetakeEvidence: () -> Unit,
 ) {
     val hasPhoto = state.localEvidence != null
+    val requirements = repairRequirements(state)
+    val metCount = requirements.count { it.met }
+    val pillColors =
+        if (metCount == requirements.size) {
+            WorkOrderStatus.VERIFIED.badgeColors()
+        } else {
+            WorkOrderStatus.ASSIGNED.badgeColors()
+        }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        Text(
-            text = "Nghiệm thu",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        CompletionSectionHeader(
+            icon = Icons.Filled.FactCheck,
+            title = "Nghiệm thu",
+            pillText = "$metCount/${requirements.size} yêu cầu",
+            pillColors = pillColors,
         )
-        EvidencePicker(
-            hasPhoto = hasPhoto,
-            onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
-        )
-        OutlinedTextField(
-            value = state.reportNote,
-            onValueChange = onReportNoteChanged,
-            label = { Text("Kết quả sửa chữa") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Text(
-            text = "${state.reportNote.trim().length} ký tự · tối thiểu 10",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        OutlinedTextField(
-            value = state.materialsUsed,
-            onValueChange = onMaterialsUsedChanged,
-            label = { Text("Vật tư đã dùng (không bắt buộc)") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        RequirementList(
-            items =
-                listOf(
-                    Requirement("Có ảnh sau sửa chữa", met = hasPhoto),
-                    Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
-                ),
-        )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .padding(Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            EvidencePicker(
+                hasPhoto = hasPhoto,
+                onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
+            )
+            OutlinedTextField(
+                value = state.reportNote,
+                onValueChange = onReportNoteChanged,
+                label = { Text("Kết quả sửa chữa") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "${state.reportNote.trim().length} ký tự · tối thiểu 10",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = state.materialsUsed,
+                onValueChange = onMaterialsUsedChanged,
+                label = { Text("Vật tư đã dùng (không bắt buộc)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            RequirementList(items = requirements)
+        }
+    }
+}
+
+// Shared by RepairCompletionSection ("Nghiệm thu") and InspectionCompletionSection ("Ghi chú
+// kiểm tra") - same icon-avatar + title + requirement-count pill header FaultListSection uses.
+@Composable
+private fun CompletionSectionHeader(
+    icon: ImageVector,
+    title: String,
+    pillText: String? = null,
+    pillColors: BadgeColors? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(FaultSectionAvatarSize)
+                        .background(Navy700, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+        }
+        if (pillText != null && pillColors != null) {
+            StatusBadge(text = pillText, colors = pillColors)
+        }
     }
 }
 
@@ -688,12 +756,15 @@ private fun InspectionCompletionSection(
     state: WorkOrderDetailUiState.Success,
     onReportNoteChanged: (String) -> Unit,
 ) {
-    OutlinedTextField(
-        value = state.reportNote,
-        onValueChange = onReportNoteChanged,
-        label = { Text("Ghi chú kiểm tra") },
-        modifier = Modifier.fillMaxWidth(),
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        CompletionSectionHeader(icon = Icons.Filled.EditNote, title = "Ghi chú kiểm tra")
+        OutlinedTextField(
+            value = state.reportNote,
+            onValueChange = onReportNoteChanged,
+            label = { Text("Ghi chú kiểm tra") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 @Composable

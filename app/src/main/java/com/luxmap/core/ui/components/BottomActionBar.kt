@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -25,7 +26,7 @@ import com.luxmap.core.theme.Spacing
 // the surrounding list's own horizontal padding instead of adding a second one on top of it.
 // progressText is a separate, neutral-colored line (e.g. "3/5 đã có kết quả") for a screen that
 // wants to show ongoing progress, not a blocking reason - unlike hint, it is never styled as an
-// error.
+// error. ctaIcon is optional (defaults to null, no icon) so existing callers are unaffected.
 @Composable
 fun BottomActionBar(
     ctaText: String,
@@ -33,6 +34,7 @@ fun BottomActionBar(
     ctaEnabled: Boolean,
     hint: String? = null,
     progressText: String? = null,
+    ctaIcon: ImageVector? = null,
     modifier: Modifier = Modifier,
     pinned: Boolean = true,
 ) {
@@ -77,6 +79,7 @@ fun BottomActionBar(
                 text = ctaText,
                 onClick = onCtaClick,
                 enabled = ctaEnabled,
+                trailingIcon = ctaIcon,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
