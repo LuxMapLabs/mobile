@@ -1,6 +1,7 @@
 package com.luxmap.feature.notification.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,17 +10,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Notifications
@@ -28,20 +33,27 @@ import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.theme.BadgeTextStyle
+import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.HeadlineTextStyle
+import com.luxmap.core.theme.Navy700
+import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -81,16 +93,13 @@ fun NotificationListScreen(
     onItemClick: (NotificationListRowState) -> Unit = {},
 ) {
     Scaffold(
+        // Success renders its own navy hero with an embedded back button and "Đọc tất cả"
+        // pill (see NotificationHeroSection) instead of this plain top bar - the other 3
+        // states have no unread count to show a mark-all action for, so they keep it.
         topBar = {
-            AppTopBar(
-                title = "Thông báo",
-                onBack = onBack,
-                actions = {
-                    if (state is NotificationListUiState.Success) {
-                        TextButton(onClick = onMarkAllRead) { Text("Đánh dấu tất cả đã đọc") }
-                    }
-                },
-            )
+            if (state !is NotificationListUiState.Success) {
+                AppTopBar(title = "Thông báo", onBack = onBack)
+            }
         },
     ) { contentPadding ->
         Box(Modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
@@ -99,30 +108,38 @@ fun NotificationListScreen(
                     CircularProgressIndicator(modifier = Modifier.testTag("notification_list_loading"))
 
                 is NotificationListUiState.Success ->
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        items(state.items) { row ->
-                            NotificationRow(row = row, onClick = { onItemClick(row) })
-                        }
-                        // v1 has no load-more (see CLAUDE.md F14 scope) - when the account has
-                        // more than the single page fetched (page_size=50), say so instead of
-                        // silently hiding older notifications with no indication anything is
-                        // missing.
-                        if (state.items.size < state.total) {
-                            item {
-                                Text(
-                                    text = "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(Spacing.md)
-                                            .testTag("notification_list_more_footer"),
-                                )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        val unreadCount = state.items.count { !it.isRead }
+                        NotificationHeroSection(
+                            unreadCount = unreadCount,
+                            onBack = onBack,
+                            onMarkAllRead = onMarkAllRead,
+                        )
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        ) {
+                            items(state.items) { row ->
+                                NotificationRow(row = row, onClick = { onItemClick(row) })
+                            }
+                            // v1 has no load-more (see CLAUDE.md F14 scope) - when the account has
+                            // more than the single page fetched (page_size=50), say so instead of
+                            // silently hiding older notifications with no indication anything is
+                            // missing.
+                            if (state.items.size < state.total) {
+                                item {
+                                    Text(
+                                        text = "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(Spacing.md)
+                                                .testTag("notification_list_more_footer"),
+                                    )
+                                }
                             }
                         }
                     }
@@ -144,6 +161,61 @@ fun NotificationListScreen(
                         subtitle = state.message,
                         action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
                     )
+            }
+        }
+    }
+}
+
+// 2-stop navy gradient (Navy900 -> Navy700), distinct from the 3-stop BrandHeroGradient F02/F09
+// use - this screen's own mockup only has 2 stops, no Blue600 tail. Reuses the same primitives,
+// just a different composition for this screen.
+private val NotificationHeroGradient = Brush.verticalGradient(0f to Navy900, 1f to Navy700)
+
+@Composable
+private fun NotificationHeroSection(
+    unreadCount: Int,
+    onBack: () -> Unit,
+    onMarkAllRead: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(NotificationHeroGradient)
+                .statusBarsPadding()
+                .padding(horizontal = Spacing.lg)
+                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+        }
+        Text(
+            text = "Thông báo",
+            style = HeadlineTextStyle,
+            color = Color.White,
+            modifier = Modifier.weight(1f),
+        )
+        if (unreadCount > 0) {
+            Row(
+                modifier =
+                    Modifier
+                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(Radius.control))
+                        .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(Radius.control))
+                        .clickable(onClick = onMarkAllRead)
+                        .padding(horizontal = Spacing.md)
+                        .heightIn(min = Dimens.minTouchTarget),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DoneAll,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(text = "Đọc tất cả", style = BadgeTextStyle, color = Color.White)
             }
         }
     }

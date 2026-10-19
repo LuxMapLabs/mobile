@@ -75,7 +75,7 @@ class NotificationListScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đánh dấu tất cả đã đọc").performClick()
+        composeRule.onNodeWithText("Đọc tất cả").performClick()
         assertEquals(true, marked)
     }
 
