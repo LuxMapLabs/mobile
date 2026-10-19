@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -38,7 +39,6 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,7 +75,6 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
@@ -116,160 +115,219 @@ fun NotificationListScreen(
     onFilterSelected: (NotificationFilter) -> Unit = {},
     onItemClick: (NotificationListRowState) -> Unit = {},
 ) {
-    Scaffold(
-        // Success renders its own navy hero with an embedded back button and "Đọc tất cả"
-        // pill (see NotificationHeroSection) instead of this plain top bar - the other 3
-        // states have no unread count to show a mark-all action for, so they keep it.
-        topBar = {
-            if (state !is NotificationListUiState.Success) {
-                AppTopBar(title = "Thông báo", onBack = onBack)
-            }
-        },
-    ) { contentPadding ->
-        Box(Modifier.fillMaxSize().padding(contentPadding), contentAlignment = Alignment.Center) {
-            when (state) {
-                is NotificationListUiState.Loading ->
-                    CircularProgressIndicator(modifier = Modifier.testTag("notification_list_loading"))
+    // The hero (back button, title, conditional "Đọc tất cả") is always shown, same as the
+    // mockup's own structure - it sits outside every sc-if branch there, not just the Success
+    // one. unreadCount is 0 for the other 3 states, which already hides the mark-all pill.
+    val unreadCount = (state as? NotificationListUiState.Success)?.items?.count { !it.isRead } ?: 0
+    Scaffold { contentPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            NotificationHeroSection(unreadCount = unreadCount, onBack = onBack, onMarkAllRead = onMarkAllRead)
+            // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top technique
+            // F02/F09 use, so this sheet reads as floating over the navy hero instead of a hard
+            // seam - shared by every state, not just Success.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .offset(y = -Spacing.xl)
+                        .background(
+                            MaterialTheme.colorScheme.background,
+                            RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
+                        ),
+            ) {
+                when (state) {
+                    is NotificationListUiState.Loading -> NotificationSkeletonList()
 
-                is NotificationListUiState.Success ->
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        val unreadCount = state.items.count { !it.isRead }
-                        NotificationHeroSection(
-                            unreadCount = unreadCount,
-                            onBack = onBack,
-                            onMarkAllRead = onMarkAllRead,
+                    is NotificationListUiState.Success ->
+                        NotificationSuccessContent(
+                            state = state,
+                            onFilterSelected = onFilterSelected,
+                            onItemClick = onItemClick,
                         )
-                        // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top
-                        // technique F02/F09 use, so this sheet reads as floating over the navy
-                        // hero instead of a hard seam. Holds both the filter row (fixed) and the
-                        // scrollable list, so both share the one rounded-top background.
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .offset(y = -Spacing.xl)
-                                    .background(
-                                        MaterialTheme.colorScheme.background,
-                                        RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-                                    ),
-                        ) {
-                            NotificationFilterRow(
-                                filter = state.filter,
-                                allCount = state.items.size,
-                                unreadCount = unreadCount,
-                                onFilterSelected = onFilterSelected,
-                                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+
+                    is NotificationListUiState.Empty ->
+                        MessageState(
+                            icon = Icons.Filled.EventAvailable,
+                            iconColors = SyncStatus.DONE.badgeColors(),
+                            title = "Chưa có thông báo nào",
+                            subtitle = "Thông báo về việc được giao, khảo sát và sự cố sẽ xuất hiện ở đây.",
+                            action = {},
+                        )
+
+                    is NotificationListUiState.Error ->
+                        MessageState(
+                            icon = Icons.Filled.ErrorOutline,
+                            iconColors =
+                                BadgeColors(
+                                    AssetCondition.OUT.badgeColors(isDark = false).background,
+                                    Danger600,
+                                ),
+                            title = "Không tải được danh sách thông báo",
+                            subtitle = state.message,
+                            action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                        )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationSuccessContent(
+    state: NotificationListUiState.Success,
+    onFilterSelected: (NotificationFilter) -> Unit,
+    onItemClick: (NotificationListRowState) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        val unreadCount = state.items.count { !it.isRead }
+        NotificationFilterRow(
+            filter = state.filter,
+            allCount = state.items.size,
+            unreadCount = unreadCount,
+            onFilterSelected = onFilterSelected,
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
+        val filteredItems =
+            if (state.filter == NotificationFilter.UNREAD) {
+                state.items.filter { !it.isRead }
+            } else {
+                state.items
+            }
+        if (filteredItems.isEmpty()) {
+            // Only reachable with "Chưa đọc" selected and nothing unread left - the whole-screen
+            // Empty state is for "no notifications at all", this is "no notifications match
+            // this filter".
+            Column(
+                modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.DoneAll,
+                    contentDescription = null,
+                    tint = SyncStatus.DONE.badgeColors().text,
+                    modifier = Modifier.size(32.dp),
+                )
+                Text(
+                    text = "Đã đọc hết thông báo",
+                    style = BodyStrongTextStyle,
+                    modifier = Modifier.padding(top = Spacing.sm),
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            ) {
+                groupByDay(filteredItems).forEach { (dayLabel, rows) ->
+                    item(key = "group_$dayLabel") {
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            Text(
+                                text = dayLabel,
+                                style = LabelTextStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = Spacing.xs),
                             )
-                            val filteredItems =
-                                if (state.filter == NotificationFilter.UNREAD) {
-                                    state.items.filter { !it.isRead }
-                                } else {
-                                    state.items
-                                }
-                            if (filteredItems.isEmpty()) {
-                                // Only reachable with "Chưa đọc" selected and nothing unread left -
-                                // the whole-screen Empty state above is for "no notifications at
-                                // all", this is "no notifications match this filter".
-                                Column(
-                                    modifier = Modifier.fillMaxSize().padding(Spacing.xl),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.DoneAll,
-                                        contentDescription = null,
-                                        tint = SyncStatus.DONE.badgeColors().text,
-                                        modifier = Modifier.size(32.dp),
-                                    )
-                                    Text(
-                                        text = "Đã đọc hết thông báo",
-                                        style = BodyStrongTextStyle,
-                                        modifier = Modifier.padding(top = Spacing.sm),
-                                    )
-                                }
-                            } else {
-                                LazyColumn(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-                                ) {
-                                    groupByDay(filteredItems).forEach { (dayLabel, rows) ->
-                                        item(key = "group_$dayLabel") {
-                                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                                Text(
-                                                    text = dayLabel,
-                                                    style = LabelTextStyle,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.padding(horizontal = Spacing.xs),
-                                                )
-                                                Column(
-                                                    modifier =
-                                                        Modifier
-                                                            .fillMaxWidth()
-                                                            .background(
-                                                                MaterialTheme.colorScheme.surface,
-                                                                RoundedCornerShape(Radius.block),
-                                                            ).border(
-                                                                1.dp,
-                                                                MaterialTheme.colorScheme.outline,
-                                                                RoundedCornerShape(Radius.block),
-                                                            ),
-                                                ) {
-                                                    rows.forEachIndexed { index, row ->
-                                                        if (index > 0) {
-                                                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                                                        }
-                                                        NotificationRow(
-                                                            row = row,
-                                                            dayLabel = dayLabel,
-                                                            onClick = { onItemClick(row) },
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            MaterialTheme.colorScheme.surface,
+                                            RoundedCornerShape(Radius.block),
+                                        ).border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline,
+                                            RoundedCornerShape(Radius.block),
+                                        ),
+                            ) {
+                                rows.forEachIndexed { index, row ->
+                                    if (index > 0) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                                     }
-                                    // v1 has no load-more (see CLAUDE.md F14 scope) - when the
-                                    // account has more than the single page fetched
-                                    // (page_size=50), say so instead of silently hiding older
-                                    // notifications with no indication anything is missing.
-                                    if (state.items.size < state.total) {
-                                        item {
-                                            Text(
-                                                text =
-                                                    "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier =
-                                                    Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(Spacing.md)
-                                                        .testTag("notification_list_more_footer"),
-                                            )
-                                        }
-                                    }
+                                    NotificationRow(
+                                        row = row,
+                                        dayLabel = dayLabel,
+                                        onClick = { onItemClick(row) },
+                                    )
                                 }
                             }
                         }
                     }
+                }
+                // v1 has no load-more (see CLAUDE.md F14 scope) - when the account has more
+                // than the single page fetched (page_size=50), say so instead of silently
+                // hiding older notifications with no indication anything is missing.
+                if (state.items.size < state.total) {
+                    item {
+                        Text(
+                            text = "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(Spacing.md)
+                                    .testTag("notification_list_more_footer"),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
 
-                is NotificationListUiState.Empty ->
-                    MessageState(
-                        icon = Icons.Filled.EventAvailable,
-                        iconColors = SyncStatus.DONE.badgeColors(),
-                        title = "Chưa có thông báo nào",
-                        subtitle = "Thông báo về việc được giao, khảo sát và sự cố sẽ xuất hiện ở đây.",
-                        action = {},
-                    )
+private val NotificationSkeletonTileCorner = Radius.chip
 
-                is NotificationListUiState.Error ->
-                    MessageState(
-                        icon = Icons.Filled.ErrorOutline,
-                        iconColors = SyncStatus.FAILED.badgeColors(),
-                        title = "Không tải được danh sách thông báo",
-                        subtitle = state.message,
-                        action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+@Composable
+private fun NotificationSkeletonList() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.lg).testTag("notification_list_loading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        repeat(5) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                        .padding(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(NotificationTileSize)
+                            .background(
+                                MaterialTheme.colorScheme.outline,
+                                RoundedCornerShape(NotificationSkeletonTileCorner),
+                            ),
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.4f)
+                                .height(10.dp)
+                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(5.dp)),
                     )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.9f)
+                                .height(12.dp)
+                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
+                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth(0.7f)
+                                .height(12.dp)
+                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
+                    )
+                }
             }
         }
     }
@@ -330,6 +388,8 @@ private fun NotificationHeroSection(
     }
 }
 
+private val NotificationTileSize = 40.dp
+
 @Composable
 private fun NotificationFilterRow(
     filter: NotificationFilter,
@@ -387,8 +447,6 @@ private fun NotificationFilterChip(
         }
     }
 }
-
-private val NotificationTileSize = 40.dp
 
 @Composable
 private fun NotificationRow(
