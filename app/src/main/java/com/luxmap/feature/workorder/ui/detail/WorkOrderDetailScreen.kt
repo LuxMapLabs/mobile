@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.CircularProgressIndicator
@@ -57,6 +58,7 @@ import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -487,18 +489,51 @@ private fun FaultListSection(
     faultOutcomes: Map<String, String>,
     onFaultOutcomeSelected: (String, String) -> Unit,
 ) {
+    val recordedCount = faults.count { faultOutcomes.containsKey(it.faultId) }
+    val allRecorded = faults.isNotEmpty() && recordedCount == faults.size
+    val pillText =
+        when {
+            !showOutcomePicker -> "${faults.size} sự cố"
+            else -> "$recordedCount/${faults.size}"
+        }
+    // Same green-vs-navy pill convention the "Nghiệm thu" requirement count uses - green only
+    // once every fault has a recorded outcome, navy otherwise.
+    val pillColors =
+        if (showOutcomePicker && allRecorded) {
+            WorkOrderStatus.VERIFIED.badgeColors()
+        } else {
+            WorkOrderStatus.ASSIGNED.badgeColors()
+        }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                text = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "${faults.size} sự cố",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(FaultSectionAvatarSize)
+                            .background(Navy700, RoundedCornerShape(Radius.chip)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.ReportProblem,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Text(
+                    text = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            StatusBadge(text = pillText, colors = pillColors)
         }
         if (faults.isEmpty()) {
             Text(
@@ -522,6 +557,7 @@ private fun FaultListSection(
     }
 }
 
+private val FaultSectionAvatarSize = 32.dp
 private val NavigateDiamondSize = 32.dp
 private val NavigateDiamondRotation = 45f
 private val NavigateIconSize = 18.dp
