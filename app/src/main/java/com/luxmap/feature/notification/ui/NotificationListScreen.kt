@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -115,8 +116,18 @@ fun NotificationListScreen(
                             onBack = onBack,
                             onMarkAllRead = onMarkAllRead,
                         )
+                        // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top
+                        // technique F02/F09 use, so this sheet reads as floating over the navy
+                        // hero instead of a hard seam.
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .offset(y = -Spacing.xl)
+                                    .background(
+                                        MaterialTheme.colorScheme.background,
+                                        RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
+                                    ),
                             contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
                             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                         ) {
