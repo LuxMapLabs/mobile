@@ -1,6 +1,7 @@
 package com.luxmap.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -141,8 +142,17 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         // below floats over content and pads itself (see NotificationBellBar), it does not
         // reserve top space the way a real topBar normally would.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // Fades in/out with the same durations as the content transition (screenEnter/screenExit
+        // above) instead of popping instantly - showBottomBar flips the moment the back stack's
+        // current entry changes, which happens before the NavHost's own crossfade finishes, so an
+        // un-animated "if" here made the bell/bottom bar flash in while the old screen was still
+        // fading out underneath it.
         topBar = {
-            if (showBottomBar) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = fadeIn(animationSpec = tween(FADE_IN_MS)),
+                exit = fadeOut(animationSpec = tween(FADE_OUT_MS)),
+            ) {
                 NotificationBellBar(
                     unreadCount = unreadNotificationCount,
                     onClick = { navController.navigate(Routes.Notification.route) },
@@ -151,7 +161,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
         },
         bottomBar = {
-            if (showBottomBar) {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = fadeIn(animationSpec = tween(FADE_IN_MS)),
+                exit = fadeOut(animationSpec = tween(FADE_OUT_MS)),
+            ) {
                 BottomNavBar(
                     items = bottomNavItems,
                     currentRoute = currentRoute,
