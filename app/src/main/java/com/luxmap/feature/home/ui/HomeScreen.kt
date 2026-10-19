@@ -35,7 +35,6 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -52,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
@@ -538,66 +538,71 @@ private fun TaskRow(
     }
 }
 
+// Shaped like the real content below it (NextUpCardSkeleton + 3 TaskRowSkeleton) instead of 3
+// generic rows, so the loading state does not jump/resize once real data replaces it.
 @Composable
 private fun LoadingSkeletonState() {
     Column(
         modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .padding(top = Spacing.sm)
-                    .width(96.dp)
-                    .height(14.dp)
-                    .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusSmall)),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusLarge)),
-        ) {
-            repeat(3) { index ->
-                if (index > 0) {
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                }
-                SkeletonRow()
-            }
-        }
+        SkeletonBar(width = 96.dp, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+        NextUpCardSkeleton()
+        repeat(3) { TaskRowSkeleton() }
     }
 }
 
 @Composable
-private fun SkeletonRow() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+private fun NextUpCardSkeleton() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                .padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusMedium)),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(14.dp)
-                        .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusSmall)),
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.85f)
-                        .height(12.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusSmall)),
-            )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            SkeletonBar(width = 84.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+            SkeletonBar(width = 64.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
         }
+        SkeletonBar(widthFraction = 0.6f, height = 24.dp, color = MaterialTheme.colorScheme.outline)
+        SkeletonBar(widthFraction = 0.85f, height = 14.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        SkeletonBar(
+            widthFraction = 1f,
+            height = Dimens.minTouchTarget,
+            color = WorkOrderStatus.ASSIGNED.badgeColors().background,
+            shape = RoundedCornerShape(Radius.control),
+        )
     }
+}
+
+@Composable
+private fun TaskRowSkeleton() {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        SkeletonBar(widthFraction = 0.4f, height = 16.dp, color = MaterialTheme.colorScheme.outline)
+        SkeletonBar(widthFraction = 0.7f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+    }
+}
+
+@Composable
+private fun SkeletonBar(
+    height: Dp,
+    color: Color,
+    width: Dp? = null,
+    widthFraction: Float? = null,
+    shape: RoundedCornerShape = RoundedCornerShape(Dimens.radiusSmall),
+) {
+    val widthModifier = if (width != null) Modifier.width(width) else Modifier.fillMaxWidth(widthFraction ?: 1f)
+    Box(modifier = widthModifier.height(height).background(color, shape))
 }
 
 @Composable
