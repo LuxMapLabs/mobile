@@ -584,7 +584,10 @@ private fun AssignedRouteCard(
             onClick = onCapturePolePhotos,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
             shape = RoundedCornerShape(Radius.control),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Navy700),
+            // Not Navy700 - that's a fixed dark color, unreadable against the card's dark-mode
+            // surface (near-black). onSurface flips Gray900/DarkText with the theme, same as
+            // every other text in this card, so it stays legible in both modes.
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         ) {
             Text(text = "Chụp ảnh cột đèn")
         }
