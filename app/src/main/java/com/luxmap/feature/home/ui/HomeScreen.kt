@@ -27,9 +27,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,11 +50,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.Amber500
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
@@ -73,6 +75,7 @@ import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
+import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
@@ -270,9 +273,9 @@ private fun HomeData.groupedByTaskKind(): List<Pair<WorkOrderTaskKind, List<Work
     }
 }
 
-// Fixed Navy700 block regardless of Light/Dark theme, same hero-style pattern as
-// BrandHeroGradient on F01 - this card is meant to stand out as the one most urgent item, not
-// blend into the surrounding surface color.
+// White elevated card (theme-aware surface, not a fixed navy block anymore) - the F02 redesign
+// mockup moved the "TIẾP THEO" eyebrow outside the card as its own section label, and the card
+// itself now matches the look of a normal elevated card like the rest of the list.
 @Composable
 private fun NextUpCard(
     item: WorkOrderSummaryItem,
@@ -280,44 +283,79 @@ private fun NextUpCard(
     onClick: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(item.woStatus)
+    val kind = workOrderTaskKindFromWire(item.taskKind)
     val due = dueDateLabel(item.dueDate)
-    val mutedWhite = Color.White.copy(alpha = 0.7f)
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(Navy700, RoundedCornerShape(Radius.block))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(text = "TIẾP THEO", style = OverlineTextStyle, color = mutedWhite)
-            StatusBadge(text = status.label(), colors = status.badgeColors())
+    // Same 3-tier convention WorkOrderDetailScreen.kt already uses for due-date color, reused
+    // here instead of inventing a separate rule for this card.
+    val dueColor =
+        when {
+            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isToday -> DueTodayColor
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
-        Text(text = item.workOrderId, style = HeadlineTextStyle, color = Color.White)
-        Text(
-            text = "Địa bàn $clusterLabel",
-            style = MaterialTheme.typography.bodyMedium,
-            color = mutedWhite,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Icon(imageVector = Icons.Filled.EventAvailable, contentDescription = null, tint = Amber500)
-            Text(text = due.text, style = MaterialTheme.typography.bodyMedium, color = Amber500)
-        }
-        Button(
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Navy700),
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Text(text = "TIẾP THEO", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .shadow(elevation = NextUpCardElevation, shape = RoundedCornerShape(Radius.block), clip = false)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text(text = "Mở lệnh")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
+                StatusBadge(text = status.label(), colors = status.badgeColors())
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(text = item.workOrderId, style = HeadlineTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Place,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = "Địa bàn $clusterLabel",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    Icon(imageVector = Icons.Filled.EventAvailable, contentDescription = null, tint = dueColor)
+                    Text(text = due.text, style = MaterialTheme.typography.bodyMedium, color = dueColor)
+                }
+            }
+            Button(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+            ) {
+                Text(text = "Mở lệnh")
+                Spacer(Modifier.width(Spacing.sm))
+                Icon(
+                    imageVector = Icons.Filled.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
+
+private val NextUpCardElevation = 6.dp
 
 // Fixed Navy700-gradient hero regardless of Light/Dark theme, same BrandHeroGradient as F01 -
 // this block is meant to read as a distinct brand surface, not blend into colorScheme.background.
