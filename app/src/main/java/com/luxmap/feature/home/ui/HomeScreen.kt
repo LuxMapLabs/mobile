@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -149,7 +150,20 @@ fun HomeScreen(
                 }
             val lastSyncedAt = (uiState as? HomeUiState.Success)?.lastSyncedAt
             HomeHeader(metrics = metrics, syncStatus = syncStatus, lastSyncedAt = lastSyncedAt, onRefresh = onRetry)
-            Box(modifier = Modifier.fillMaxSize()) {
+            // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top the mockup
+            // uses, so the rounded top corners read as a sheet floating over the navy hero
+            // instead of a hard seam. Needs its own opaque background (not just Scaffold's) so
+            // the overlap actually occludes the hero gradient underneath it.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .offset(y = -Spacing.xl)
+                        .background(
+                            MaterialTheme.colorScheme.background,
+                            RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
+                        ),
+            ) {
                 when (uiState) {
                     is HomeUiState.Loading -> LoadingSkeletonState()
                     is HomeUiState.Success ->
