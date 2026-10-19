@@ -99,6 +99,7 @@ fun NotificationListRoute(
         onBack = onBack,
         onRetry = viewModel::onRetry,
         onMarkAllRead = viewModel::onMarkAllRead,
+        onFilterSelected = viewModel::onFilterSelected,
         onItemClick = { row ->
             viewModel.onMarkRead(row.notificationId)
             notificationNavigationTarget(row)?.let(onOpenWorkOrder)
@@ -112,6 +113,7 @@ fun NotificationListScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit = {},
     onMarkAllRead: () -> Unit = {},
+    onFilterSelected: (NotificationFilter) -> Unit = {},
     onItemClick: (NotificationListRowState) -> Unit = {},
 ) {
     Scaffold(
@@ -139,8 +141,9 @@ fun NotificationListScreen(
                         )
                         // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top
                         // technique F02/F09 use, so this sheet reads as floating over the navy
-                        // hero instead of a hard seam.
-                        LazyColumn(
+                        // hero instead of a hard seam. Holds both the filter row (fixed) and the
+                        // scrollable list, so both share the one rounded-top background.
+                        Column(
                             modifier =
                                 Modifier
                                     .fillMaxSize()
@@ -149,61 +152,102 @@ fun NotificationListScreen(
                                         MaterialTheme.colorScheme.background,
                                         RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
                                     ),
-                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
                         ) {
-                            groupByDay(state.items).forEach { (dayLabel, rows) ->
-                                item(key = "group_$dayLabel") {
-                                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                        Text(
-                                            text = dayLabel,
-                                            style = LabelTextStyle,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = Spacing.xs),
-                                        )
-                                        Column(
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .background(
-                                                        MaterialTheme.colorScheme.surface,
-                                                        RoundedCornerShape(Radius.block),
-                                                    ).border(
-                                                        1.dp,
-                                                        MaterialTheme.colorScheme.outline,
-                                                        RoundedCornerShape(Radius.block),
-                                                    ),
-                                        ) {
-                                            rows.forEachIndexed { index, row ->
-                                                if (index > 0) {
-                                                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-                                                }
-                                                NotificationRow(
-                                                    row = row,
-                                                    dayLabel = dayLabel,
-                                                    onClick = { onItemClick(row) },
+                            NotificationFilterRow(
+                                filter = state.filter,
+                                allCount = state.items.size,
+                                unreadCount = unreadCount,
+                                onFilterSelected = onFilterSelected,
+                                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            )
+                            val filteredItems =
+                                if (state.filter == NotificationFilter.UNREAD) {
+                                    state.items.filter { !it.isRead }
+                                } else {
+                                    state.items
+                                }
+                            if (filteredItems.isEmpty()) {
+                                // Only reachable with "Chưa đọc" selected and nothing unread left -
+                                // the whole-screen Empty state above is for "no notifications at
+                                // all", this is "no notifications match this filter".
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(Spacing.xl),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.DoneAll,
+                                        contentDescription = null,
+                                        tint = SyncStatus.DONE.badgeColors().text,
+                                        modifier = Modifier.size(32.dp),
+                                    )
+                                    Text(
+                                        text = "Đã đọc hết thông báo",
+                                        style = BodyStrongTextStyle,
+                                        modifier = Modifier.padding(top = Spacing.sm),
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                                ) {
+                                    groupByDay(filteredItems).forEach { (dayLabel, rows) ->
+                                        item(key = "group_$dayLabel") {
+                                            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                                                Text(
+                                                    text = dayLabel,
+                                                    style = LabelTextStyle,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(horizontal = Spacing.xs),
                                                 )
+                                                Column(
+                                                    modifier =
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .background(
+                                                                MaterialTheme.colorScheme.surface,
+                                                                RoundedCornerShape(Radius.block),
+                                                            ).border(
+                                                                1.dp,
+                                                                MaterialTheme.colorScheme.outline,
+                                                                RoundedCornerShape(Radius.block),
+                                                            ),
+                                                ) {
+                                                    rows.forEachIndexed { index, row ->
+                                                        if (index > 0) {
+                                                            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                                                        }
+                                                        NotificationRow(
+                                                            row = row,
+                                                            dayLabel = dayLabel,
+                                                            onClick = { onItemClick(row) },
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            }
-                            // v1 has no load-more (see CLAUDE.md F14 scope) - when the account has
-                            // more than the single page fetched (page_size=50), say so instead of
-                            // silently hiding older notifications with no indication anything is
-                            // missing.
-                            if (state.items.size < state.total) {
-                                item {
-                                    Text(
-                                        text = "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(Spacing.md)
-                                                .testTag("notification_list_more_footer"),
-                                    )
+                                    // v1 has no load-more (see CLAUDE.md F14 scope) - when the
+                                    // account has more than the single page fetched
+                                    // (page_size=50), say so instead of silently hiding older
+                                    // notifications with no indication anything is missing.
+                                    if (state.items.size < state.total) {
+                                        item {
+                                            Text(
+                                                text =
+                                                    "Đang hiện ${state.items.size}/${state.total} thông báo gần nhất",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(Spacing.md)
+                                                        .testTag("notification_list_more_footer"),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -282,6 +326,64 @@ private fun NotificationHeroSection(
                 )
                 Text(text = "Đọc tất cả", style = BadgeTextStyle, color = Color.White)
             }
+        }
+    }
+}
+
+@Composable
+private fun NotificationFilterRow(
+    filter: NotificationFilter,
+    allCount: Int,
+    unreadCount: Int,
+    onFilterSelected: (NotificationFilter) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        NotificationFilterChip(
+            label = "Tất cả",
+            count = allCount,
+            selected = filter == NotificationFilter.ALL,
+            onClick = { onFilterSelected(NotificationFilter.ALL) },
+        )
+        NotificationFilterChip(
+            label = "Chưa đọc",
+            count = unreadCount,
+            selected = filter == NotificationFilter.UNREAD,
+            onClick = { onFilterSelected(NotificationFilter.UNREAD) },
+        )
+    }
+}
+
+@Composable
+private fun NotificationFilterChip(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val containerColor = if (selected) Navy700 else MaterialTheme.colorScheme.surface
+    val contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = if (selected) Navy700 else MaterialTheme.colorScheme.outline
+    val badgeBg = if (selected) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
+    Row(
+        modifier =
+            Modifier
+                .heightIn(min = Dimens.minTouchTarget)
+                .background(containerColor, RoundedCornerShape(Dimens.radiusPill))
+                .border(1.dp, borderColor, RoundedCornerShape(Dimens.radiusPill))
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Text(text = label, style = BodyStrongTextStyle, color = contentColor)
+        Box(
+            modifier =
+                Modifier
+                    .background(badgeBg, CircleShape)
+                    .padding(horizontal = Spacing.xs, vertical = 1.dp),
+        ) {
+            Text(text = count.toString(), style = BadgeTextStyle, color = contentColor)
         }
     }
 }

@@ -1,5 +1,9 @@
 package com.luxmap.feature.notification.ui
 
+// Client-side only (mockup section 6a's own filter state) - both counts come from the single
+// already-loaded page, no second repository call for "Chưa đọc".
+enum class NotificationFilter { ALL, UNREAD }
+
 data class NotificationListRowState(
     val notificationId: String,
     // Raw wire value (e.g. "work_order_assigned") - mapped to an icon via
@@ -23,6 +27,7 @@ sealed interface NotificationListUiState {
     data class Success(
         val items: List<NotificationListRowState>,
         val total: Int = items.size,
+        val filter: NotificationFilter = NotificationFilter.ALL,
     ) : NotificationListUiState
 
     data object Empty : NotificationListUiState
