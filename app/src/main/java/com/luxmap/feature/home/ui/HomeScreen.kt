@@ -68,7 +68,6 @@ import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.TopBarHeight
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
@@ -379,13 +378,12 @@ private fun HomeHeader(
                 .fillMaxWidth()
                 .background(BrandHeroGradient)
                 .statusBarsPadding()
-                // Extra top space to clear NotificationBellBar, which floats over this screen
-                // from NavGraph.kt's Scaffold instead of reserving its own layout space (see that
-                // file's comment) - without this, SyncPill below sat directly under the bell and
-                // lost its tap target.
-                .padding(top = TopBarHeight)
                 .padding(horizontal = Spacing.lg)
-                .padding(bottom = Spacing.xxxl),
+                // Top padding matches NotificationBellBar's own top offset (statusBarsPadding +
+                // Spacing.xs) so the title lines up level with the floating bell, same
+                // align-items:flex-start row the mockup uses - SyncPill moved below the title in
+                // a separate row, so nothing here needs extra clearance from the bell anymore.
+                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
     ) {
         Text(
             text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
