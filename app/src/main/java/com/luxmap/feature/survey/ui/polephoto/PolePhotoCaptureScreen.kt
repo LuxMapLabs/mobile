@@ -2,11 +2,22 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,10 +27,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import com.luxmap.core.theme.PrimaryButtonHeight
+import com.luxmap.core.theme.Radius
+import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.PrimaryButton
 import java.io.File
 
 @Composable
@@ -29,17 +47,29 @@ fun PolePhotoCaptureRoute(
 ) {
     val context = LocalContext.current
     var pendingFile by remember { mutableStateOf<File?>(null) }
+    var previewFile by remember { mutableStateOf<File?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
 
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val file = pendingFile
             if (success && file != null) {
-                viewModel.onPhotoCaptured(file, onDone)
+                // Show the photo back to the field engineer first instead of saving right away -
+                // a bad shot (blur, wrong pole, auto-exposure washed it out) should not go to
+                // Room/sync_queue at all, so retake can simply overwrite this file.
+                previewFile = file
             } else {
                 onDone()
             }
         }
+
+    if (previewFile != null) {
+        BackHandler {
+            previewFile?.delete()
+            onDone()
+        }
+    }
 
     fun launchCamera() {
         val file = viewModel.outputFile(context.filesDir)
@@ -77,7 +107,64 @@ fun PolePhotoCaptureRoute(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+    val fileToPreview = previewFile
+    if (fileToPreview != null) {
+        PolePhotoPreview(
+            file = fileToPreview,
+            isSaving = isSaving,
+            onConfirm = {
+                isSaving = true
+                viewModel.onPhotoCaptured(fileToPreview, onDone)
+            },
+            onRetake = {
+                fileToPreview.delete()
+                previewFile = null
+                launchCamera()
+            },
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        }
+    }
+}
+
+@Composable
+private fun PolePhotoPreview(
+    file: File,
+    isSaving: Boolean,
+    onConfirm: () -> Unit,
+    onRetake: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().padding(Spacing.lg)) {
+        AsyncImage(
+            model = file,
+            contentDescription = "Ảnh cột đèn vừa chụp",
+            contentScale = ContentScale.Crop,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(3f / 4f)
+                    .clip(RoundedCornerShape(Radius.card)),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            OutlinedButton(
+                onClick = onRetake,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f).heightIn(min = PrimaryButtonHeight),
+            ) {
+                Text("Chụp lại")
+            }
+            PrimaryButton(
+                text = "Dùng ảnh này",
+                onClick = onConfirm,
+                isLoading = isSaving,
+                enabled = !isSaving,
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
