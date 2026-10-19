@@ -6,9 +6,14 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -193,6 +198,15 @@ fun SyncStatus.label(): String =
         SyncStatus.FAILED -> "Đồng bộ lỗi"
         SyncStatus.CONFLICT -> "Xung đột"
         SyncStatus.DONE -> "Đã đồng bộ"
+    }
+
+fun SyncStatus.icon(): ImageVector =
+    when (this) {
+        SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE -> Icons.Filled.Schedule
+        SyncStatus.SYNCING -> Icons.Filled.Sync
+        SyncStatus.FAILED -> Icons.Filled.ErrorOutline
+        SyncStatus.CONFLICT -> Icons.Filled.Warning
+        SyncStatus.DONE -> Icons.Filled.CloudDone
     }
 
 // Component — badge ưu tiên Work Order (mục 2.5), một màu chữ trên nền surface, không có nền riêng

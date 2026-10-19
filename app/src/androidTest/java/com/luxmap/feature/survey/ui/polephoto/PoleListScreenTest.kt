@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
@@ -23,13 +22,13 @@ class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_progress_indicator() {
+    fun loading_state_shows_the_hero_header() {
         composeRule.setContent {
             LuxMapTheme {
-                PoleListScreen(state = PoleListUiState.Loading, onCapturePole = {}, onDone = {})
+                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Loading, onCapturePole = {}, onDone = {})
             }
         }
-        composeRule.onNodeWithTag("pole_list_loading").assertExists()
+        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertExists()
     }
 
     @Test
@@ -37,13 +36,14 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1", fixtureStatus = "dim"))),
                     onCapturePole = {},
                     onDone = {},
                 )
             }
         }
-        composeRule.onNodeWithText("Cột #1 — POLE-1").assertExists()
+        composeRule.onNodeWithText("POLE-1").assertExists()
         composeRule.onNodeWithText("Đèn mờ").assertExists()
     }
 
@@ -53,13 +53,14 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
                     onCapturePole = { capturedPoleId = it },
                     onDone = {},
                 )
             }
         }
-        composeRule.onNodeWithText("Cột #1 — POLE-1").performClick()
+        composeRule.onNodeWithText("POLE-1").performClick()
         assertEquals("POLE-1", capturedPoleId)
     }
 
@@ -68,6 +69,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
@@ -86,6 +88,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
@@ -105,6 +108,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.SYNCING)),
@@ -122,6 +126,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole()), isStale = true),
                     onCapturePole = {},
                     onDone = {},
@@ -138,6 +143,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole())),
                     onCapturePole = {},
                     onDone = { done = true },
@@ -151,7 +157,9 @@ class PoleListScreenTest {
     @Test
     fun empty_state_shows_the_no_poles_message() {
         composeRule.setContent {
-            LuxMapTheme { PoleListScreen(state = PoleListUiState.Empty, onCapturePole = {}, onDone = {}) }
+            LuxMapTheme {
+                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Empty, onCapturePole = {}, onDone = {})
+            }
         }
         composeRule.onNodeWithText("Tuyến này chưa có cột đèn nào").assertExists()
     }
@@ -162,6 +170,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Error("network down"),
                     onCapturePole = {},
                     onDone = {},
@@ -179,6 +188,7 @@ class PoleListScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
+                    workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole())),
                     aiResultState = PolePhotoResultUiState.Empty,
                     onCapturePole = {},
