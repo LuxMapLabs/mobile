@@ -69,6 +69,7 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TopBarHeight
+import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
@@ -217,14 +218,10 @@ private fun HomeContent(
             }
         }
         if (nextUp != null) {
-            val clusterLabel =
-                data.clusters
-                    .first { cluster -> cluster.items.any { it.workOrderId == nextUp.workOrderId } }
-                    .clusterLabel
             item {
                 NextUpCard(
                     item = nextUp,
-                    clusterLabel = clusterLabel,
+                    clusterLabel = data.clusterLabelFor(nextUp.workOrderId),
                     onClick = { onOpenWorkOrder(nextUp.workOrderId) },
                 )
             }
@@ -236,6 +233,7 @@ private fun HomeContent(
                     TaskKindSection(
                         kind = kind,
                         items = remaining,
+                        clusterLabelOf = data::clusterLabelFor,
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
                 }
@@ -243,6 +241,9 @@ private fun HomeContent(
         }
     }
 }
+
+private fun HomeData.clusterLabelFor(workOrderId: String): String =
+    clusters.first { cluster -> cluster.items.any { it.workOrderId == workOrderId } }.clusterLabel
 
 // Spec order is "overdue > urgent > due today > priority_score", but WorkOrderSummaryItem has
 // no severity/urgent field (only a raw priorityScore) - the urgent tier is dropped, not guessed.
@@ -448,10 +449,13 @@ private fun MetricCell(
     }
 }
 
+private val TaskKindAvatarSize = 32.dp
+
 @Composable
 private fun TaskKindSection(
     kind: WorkOrderTaskKind,
     items: List<WorkOrderSummaryItem>,
+    clusterLabelOf: (workOrderId: String) -> String,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
     Column {
@@ -462,39 +466,53 @@ private fun TaskKindSection(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Icon(
-                    imageVector = kind.icon(),
-                    contentDescription = null,
-                    tint = Navy700,
-                    modifier = Modifier.size(20.dp),
-                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(TaskKindAvatarSize)
+                            .background(Navy700, RoundedCornerShape(Radius.chip)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = kind.icon(),
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
                 Text(text = kind.label(), style = MaterialTheme.typography.titleMedium)
             }
-            Text(
-                text = "${items.size} việc",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            StatusBadge(text = "${items.size} việc", colors = WorkOrderStatus.ASSIGNED.badgeColors())
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items.forEach { item ->
-                TaskRow(item = item, onClick = { onOpenWorkOrder(item.workOrderId) })
+                TaskRow(
+                    item = item,
+                    clusterLabel = clusterLabelOf(item.workOrderId),
+                    onClick = { onOpenWorkOrder(item.workOrderId) },
+                )
             }
         }
     }
 }
 
-private val TaskRowAccentWidth = 4.dp
-private val TaskRowAccentHeight = 36.dp
-
 @Composable
 private fun TaskRow(
     item: WorkOrderSummaryItem,
+    clusterLabel: String,
     onClick: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(item.woStatus)
+    val due = dueDateLabel(item.dueDate)
+    // Same 3-tier due-date color convention as NextUpCard/WorkOrderDetailScreen.kt.
+    val dueColor =
+        when {
+            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isToday -> DueTodayColor
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
     Row(
         modifier =
             Modifier
@@ -502,21 +520,16 @@ private fun TaskRow(
                 .heightIn(min = Dimens.minTouchTarget)
                 .clickable(onClick = onClick)
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.sm),
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .width(TaskRowAccentWidth)
-                    .height(TaskRowAccentHeight)
-                    .background(status.badgeColors().text, RoundedCornerShape(Radius.badge)),
-        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(text = item.workOrderId, style = MaterialTheme.typography.titleMedium)
-            StatusBadge(text = status.label(), colors = status.badgeColors())
+            Text(text = "$clusterLabel · ${due.text}", style = LabelTextStyle, color = dueColor)
         }
+        StatusBadge(text = status.label(), colors = status.badgeColors())
         Icon(
             imageVector = Icons.Filled.ChevronRight,
             contentDescription = null,
