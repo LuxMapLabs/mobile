@@ -230,6 +230,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 val polePhotoWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 PoleListRoute(
+                    workOrderId = polePhotoWorkOrderId,
                     onCapturePole = { poleId ->
                         navController.navigate(Routes.PolePhotoCapture.createRoute(polePhotoWorkOrderId, poleId))
                     },
