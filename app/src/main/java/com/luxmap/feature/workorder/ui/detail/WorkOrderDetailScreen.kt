@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -218,8 +219,17 @@ private fun WorkOrderDetailContent(
     val canComplete = "complete" in detail.allowedActions
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         WorkOrderHeroSection(detail = detail, onBack = onBack)
+        // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top technique F02
+        // uses, so this sheet reads as floating over the navy hero instead of a hard seam.
         Column(
-            modifier = Modifier.padding(Spacing.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .offset(y = -Spacing.xl)
+                    .background(
+                        MaterialTheme.colorScheme.background,
+                        RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
+                    ).padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             WorkOrderHeaderSection(detail)
@@ -419,27 +429,47 @@ private fun HeroInfoCell(
 }
 
 // Manager note / review note only now - badges/title/due/schedule/lifecycle moved into
-// WorkOrderHeroSection above.
+// WorkOrderHeroSection above. Review note first, then the note card - same order the mockup
+// stacks them in, since a review request is the more urgent of the two.
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank()) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        if (!detail.note.isNullOrBlank()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Icon(
-                    imageVector = Icons.Filled.StickyNote2,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(text = detail.note, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
         if (!detail.reviewNote.isNullOrBlank()) {
-            Text(
-                text = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
+            InlineBanner(
+                message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
+                tone = InlineBannerTone.ERROR,
             )
+        }
+        if (!detail.note.isNullOrBlank()) {
+            ManagerNoteCard(note = detail.note)
+        }
+    }
+}
+
+@Composable
+private fun ManagerNoteCard(note: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.StickyNote2,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Ghi chú từ Manager",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = note, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
