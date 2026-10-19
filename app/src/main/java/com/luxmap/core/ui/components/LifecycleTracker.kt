@@ -21,26 +21,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Spacing
 
 enum class LifecycleStepState { DONE, CURRENT, FUTURE }
 
 data class LifecycleStep(val label: String, val state: LifecycleStepState)
 
+// onDarkHero switches every color to the white-on-navy variant the F09 redesign mockup uses
+// for this tracker's hero placement, instead of the theme-aware primary/outline pair - safe to
+// flip by default value since this component has no other caller today (only
+// WorkOrderDetailScreen.kt).
 @Composable
 fun LifecycleTracker(
     steps: List<LifecycleStep>,
     modifier: Modifier = Modifier,
+    onDarkHero: Boolean = false,
 ) {
     // Matches the lifecycle's own "navy blue" progress color from the design (its own fixed
     // brand color, not the generic near-black onSurface text color).
-    val doneColor = MaterialTheme.colorScheme.primary
-    val futureColor = MaterialTheme.colorScheme.outline
+    val doneColor = if (onDarkHero) Color.White else MaterialTheme.colorScheme.primary
+    val futureColor = if (onDarkHero) Color.White.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline
+    val dotSurface = if (onDarkHero) Navy700 else MaterialTheme.colorScheme.surface
+    val lineFutureColor = if (onDarkHero) Color.White.copy(alpha = 0.25f) else futureColor
+    val futureBorderColor = if (onDarkHero) Color.White.copy(alpha = 0.35f) else MaterialTheme.colorScheme.outline
     Column(modifier = modifier) {
         Row(
             modifier =
@@ -53,7 +63,8 @@ fun LifecycleTracker(
                         for (index in 0 until steps.lastIndex) {
                             val startX = cellWidth * (index + 0.5f)
                             val endX = cellWidth * (index + 1.5f)
-                            val color = if (steps[index].state == LifecycleStepState.DONE) doneColor else futureColor
+                            val color =
+                                if (steps[index].state == LifecycleStepState.DONE) doneColor else lineFutureColor
                             drawLine(
                                 color = color,
                                 start = Offset(startX, y),
@@ -65,7 +76,13 @@ fun LifecycleTracker(
         ) {
             steps.forEachIndexed { index, step ->
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    StepDot(index = index, state = step.state)
+                    StepDot(
+                        index = index,
+                        state = step.state,
+                        doneColor = doneColor,
+                        dotSurface = dotSurface,
+                        futureBorderColor = futureBorderColor,
+                    )
                 }
             }
         }
@@ -89,17 +106,20 @@ fun LifecycleTracker(
 private fun StepDot(
     index: Int,
     state: LifecycleStepState,
+    doneColor: Color,
+    dotSurface: Color,
+    futureBorderColor: Color,
 ) {
     when (state) {
         LifecycleStepState.DONE ->
             Box(
-                modifier = Modifier.size(24.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
+                modifier = Modifier.size(24.dp).clip(CircleShape).background(doneColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Filled.Check,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.surface,
+                    tint = dotSurface,
                     modifier = Modifier.size(14.dp).testTag("lifecycle_check_$index"),
                 )
             }
@@ -110,8 +130,8 @@ private fun StepDot(
                     Modifier
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                        .background(dotSurface)
+                        .border(2.dp, doneColor, CircleShape),
             )
 
         LifecycleStepState.FUTURE ->
@@ -120,8 +140,8 @@ private fun StepDot(
                     Modifier
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                        .background(dotSurface)
+                        .border(1.dp, futureBorderColor, CircleShape),
             )
     }
 }
