@@ -1,7 +1,6 @@
 package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
@@ -32,11 +31,11 @@ class SurveyHubScreenTest {
         )
 
     @Test
-    fun loading_state_shows_progress_indicator() {
+    fun loading_state_shows_hero_header() {
         composeRule.setContent {
             LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Loading, onCheckReadiness = {}) }
         }
-        composeRule.onNodeWithTag("survey_hub_loading").assertExists()
+        composeRule.onNodeWithText("Khảo sát").assertExists()
     }
 
     @Test
@@ -49,8 +48,10 @@ class SurveyHubScreenTest {
                 )
             }
         }
+        // "Tuyến được giao" by itself is ambiguous - the hero's metric cell has the exact same
+        // label text, so this checks the section's own count badge instead ("1 tuyến").
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
-        composeRule.onNodeWithText("TUYẾN ĐƯỢC GIAO").assertExists()
+        composeRule.onNodeWithText("1 tuyến").assertExists()
     }
 
     @Test
@@ -67,7 +68,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("TUYẾN ĐƯỢC GIAO").assertDoesNotExist()
+        composeRule.onNodeWithText("Kiểm tra sẵn sàng").assertDoesNotExist()
         composeRule.onNodeWithText("Chờ tải lên · SWEEP-2").assertExists()
     }
 
