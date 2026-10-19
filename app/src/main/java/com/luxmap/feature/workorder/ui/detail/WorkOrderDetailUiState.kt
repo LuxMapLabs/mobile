@@ -36,12 +36,6 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
     }
 }
 
-// An inspection order being completed moves its submit CTA out of the scrolling content into a
-// bottom-pinned bar (so the per-fault outcome progress stays visible next to the button) - repair
-// and survey orders keep their CTA inline, unaffected.
-fun WorkOrderDetailUiState.Success.showsInspectionBottomBar(): Boolean =
-    detail.taskKind == "inspection" && "complete" in detail.allowedActions
-
 fun WorkOrderDetailUiState.Success.syncStatus(): SyncStatus? =
     when (localCompletion?.submitStatus) {
         null -> null

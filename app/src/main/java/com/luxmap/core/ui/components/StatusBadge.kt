@@ -55,6 +55,7 @@ fun PriorityDot(
     text: String,
     dotColor: Color,
     modifier: Modifier = Modifier,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Row(
         modifier = modifier,
@@ -67,6 +68,6 @@ fun PriorityDot(
                     .background(color = dotColor, shape = CircleShape),
         )
         Spacer(Modifier.width(Spacing.xs))
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+        Text(text = text, style = MaterialTheme.typography.labelLarge, color = textColor)
     }
 }

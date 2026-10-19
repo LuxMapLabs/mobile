@@ -3,13 +3,15 @@ package com.luxmap.core.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.Success600
 
 private val TileSize = 88.dp
 
@@ -44,19 +47,29 @@ fun EvidencePicker(
     }
 }
 
+// Tapping this tile retakes the photo (replaces it) - there is no separate "remove" action in
+// the ViewModel, so the check badge is decorative only, matching the mockup's check_circle
+// overlay without inventing a delete-only interaction that nothing backs.
 @Composable
 private fun FilledTile(onClick: () -> Unit) {
-    Column(
+    Box(
         modifier =
             Modifier
                 .size(TileSize)
                 .clickable(onClick = onClick)
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.control)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(imageVector = Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text = "Đã chụp", style = LabelTextStyle)
+        Text(
+            text = "Đã chụp",
+            style = LabelTextStyle,
+            modifier = Modifier.align(Alignment.Center),
+        )
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = Success600,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(Spacing.xs).size(18.dp),
+        )
     }
 }
 
@@ -84,7 +97,7 @@ private fun AddTile(onClick: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.Add,
+            imageVector = Icons.Filled.AddAPhoto,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
