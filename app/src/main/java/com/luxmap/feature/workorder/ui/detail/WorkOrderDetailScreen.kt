@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,7 +50,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -61,9 +61,9 @@ import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
+import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
-import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
@@ -71,6 +71,7 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
+import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
@@ -361,7 +362,7 @@ private fun WorkOrderDetailContent(
 // Navy hero (BrandHeroGradient, same fixed-color pattern as F02) holding the back button,
 // badges, title/id, due/schedule panel, and lifecycle tracker - everything the F09 redesign
 // mockup groups into one dark block above the light content sheet. Manager note/review note
-// stay in WorkOrderHeaderSection below for now, unchanged in this step.
+// move to WorkOrderHeaderSection below instead, since the mockup puts those in the light area.
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
@@ -369,6 +370,10 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
+    // Highest severity among the work order's own faults - severity is set by the Manager
+    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
+    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
+    // order) means no rank to show, so the dot is simply left out.
     val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
     val due = dueDateLabel(detail.dueDate)
     // Same dark-theme AssetCondition text colors F02's SyncPill reuses for an on-navy accent -
@@ -565,6 +570,7 @@ private fun FaultListSection(
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 faults.forEach { fault ->
                     FaultRow(
+                        kind = kind,
                         fault = fault,
                         onNavigate = { onNavigateFault(fault.lat, fault.lng) },
                         showOutcomePicker = showOutcomePicker,
@@ -578,12 +584,14 @@ private fun FaultListSection(
 }
 
 private val FaultSectionAvatarSize = 32.dp
-private val NavigateDiamondSize = 32.dp
-private val NavigateDiamondRotation = 45f
-private val NavigateIconSize = 18.dp
+private val FaultNavigateButtonSize = 48.dp
 
+// Card border highlights navy once the FE has picked an outcome for this fault (inspection
+// only) - matches the mockup's per-fault "answered" signal, same idea as the kind/status
+// badges already in use elsewhere, not a new color.
 @Composable
 private fun FaultRow(
+    kind: WorkOrderTaskKind,
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
     showOutcomePicker: Boolean,
@@ -591,25 +599,25 @@ private fun FaultRow(
     onOutcomeSelected: (String) -> Unit,
 ) {
     val priority = severityFromWire(fault.severity)
+    val borderColor =
+        if (showOutcomePicker && selectedOutcome != null) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline
+        }
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                .border(1.dp, borderColor, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .width(6.dp)
-                        .height(36.dp)
-                        .background(priority.color(), RoundedCornerShape(Radius.badge)),
-            )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text(text = fault.faultId, style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -617,32 +625,20 @@ private fun FaultRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (fault.inspectionOutcome != null) {
-                    Text(
-                        text = inspectionOutcomeLabel(fault.inspectionOutcome),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            if (fault.hasLocation()) {
-                IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(NavigateDiamondSize)
-                                .rotate(NavigateDiamondRotation)
-                                .border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.badge)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Navigation,
-                            contentDescription = "Điều hướng",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(NavigateIconSize).rotate(-NavigateDiamondRotation),
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    PriorityChip(priority = priority)
+                    // Only a repair order already carries a past outcome worth showing here -
+                    // an inspection order's outcome is what OutcomeSegment below is collecting.
+                    if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
+                        StatusBadge(
+                            text = inspectionOutcomeLabel(fault.inspectionOutcome),
+                            colors = WorkOrderStatus.VERIFIED.badgeColors(),
                         )
                     }
                 }
+            }
+            if (fault.hasLocation()) {
+                NavigateButton(onClick = onNavigate)
             } else {
                 Text(
                     text = "Chưa có toạ độ",
@@ -652,8 +648,44 @@ private fun FaultRow(
             }
         }
         if (showOutcomePicker) {
-            OutcomeSegment(selected = selectedOutcome, onSelected = onOutcomeSelected)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(
+                    text = "Kết quả tại hiện trường",
+                    style = LabelTextStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutcomeSegment(selected = selectedOutcome, onSelected = onOutcomeSelected)
+            }
         }
+    }
+}
+
+@Composable
+private fun PriorityChip(priority: WorkOrderPriority) {
+    Row(
+        modifier =
+            Modifier
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.badge))
+                .padding(horizontal = Spacing.sm, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(modifier = Modifier.size(7.dp).background(priority.color(), CircleShape))
+        Text(text = priority.label(), style = BadgeTextStyle)
+    }
+}
+
+@Composable
+private fun NavigateButton(onClick: () -> Unit) {
+    val colors = WorkOrderStatus.ASSIGNED.badgeColors()
+    IconButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .size(FaultNavigateButtonSize)
+                .background(colors.background, RoundedCornerShape(Radius.control)),
+    ) {
+        Icon(imageVector = Icons.Filled.Navigation, contentDescription = "Điều hướng", tint = colors.text)
     }
 }
 
