@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,12 +10,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -29,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
+import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -42,63 +48,138 @@ import java.io.File
 import kotlin.math.roundToInt
 
 private val PhotoPreviewHeight = 180.dp
-
 private val StatePlaceholderHeight = 160.dp
+private val SkeletonBlockHeight = 60.dp
+private val HeaderBadgeSize = 44.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PolePhotoResultBottomSheet(
+    poleId: String,
+    position: Int,
     state: PolePhotoResultUiState,
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
+    onRetake: () -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
-            Text(text = "Kết quả AI", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(Spacing.md))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
 
-            when (state) {
-                is PolePhotoResultUiState.Loading ->
-                    Box(
-                        modifier =
-                            Modifier.fillMaxWidth().height(StatePlaceholderHeight).testTag("pole_photo_result_loading"),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+                when (state) {
+                    is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
-                is PolePhotoResultUiState.Success -> PolePhotoResultContent(state)
+                    is PolePhotoResultUiState.Success -> PolePhotoResultContent(state)
 
-                // heightIn (not a fixed height) - MessageState's action button (Error) makes this
-                // content taller than the Loading spinner needs, and a fixed height here clipped
-                // the button outside the touchable area.
-                is PolePhotoResultUiState.Empty ->
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                        MessageState(
-                            icon = Icons.Filled.SmartToy,
-                            iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                            title = "AI chưa phân loại được ảnh này",
-                            subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                            action = {},
-                        )
-                    }
+                    // heightIn (not a fixed height) - MessageState's action button (Error) makes this
+                    // content taller than the skeleton needs, and a fixed height here clipped
+                    // the button outside the touchable area.
+                    is PolePhotoResultUiState.Empty ->
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                            MessageState(
+                                icon = Icons.Filled.SmartToy,
+                                iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
+                                title = "AI chưa phân loại được ảnh này",
+                                subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                                action = {},
+                            )
+                        }
 
-                is PolePhotoResultUiState.Error ->
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                        MessageState(
-                            icon = Icons.Filled.CloudOff,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
-                            title = "Không tải được kết quả AI",
-                            subtitle = state.message,
-                            action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
-                        )
-                    }
+                    is PolePhotoResultUiState.Error ->
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                            MessageState(
+                                icon = Icons.Filled.CloudOff,
+                                iconColors = SyncStatus.FAILED.badgeColors(),
+                                title = "Không tải được kết quả AI",
+                                subtitle = state.message,
+                                action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                            )
+                        }
+                }
+
+                Spacer(Modifier.height(Spacing.lg))
             }
-
-            Spacer(Modifier.height(Spacing.lg))
         }
+    }
+}
+
+// Shown for every state (loading/success/empty/error), not only Success - the pole being
+// reviewed and the ability to close the sheet don't depend on whether its AI result loaded.
+@Composable
+private fun PolePhotoResultHeader(
+    poleId: String,
+    position: Int,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(HeaderBadgeSize)
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.control)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "#$position",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = poleId, style = MaterialTheme.typography.titleMedium)
+        }
+        IconButton(onClick = onDismiss) {
+            Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng")
+        }
+    }
+}
+
+// Mirrors the Success content's layout (photo + 2 info blocks + a decision-size block) so the
+// sheet doesn't visibly reflow once the real result swaps in.
+@Composable
+private fun PolePhotoResultSkeleton() {
+    Column(
+        modifier = Modifier.fillMaxWidth().testTag("pole_photo_result_loading"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(PhotoPreviewHeight)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(SkeletonBlockHeight)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(SkeletonBlockHeight)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+            )
+        }
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(Dimens.minTouchTarget + Spacing.md)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+        )
     }
 }
 
