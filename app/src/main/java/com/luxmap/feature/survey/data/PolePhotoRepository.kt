@@ -28,4 +28,16 @@ interface PolePhotoRepository {
     // Room-only read, no network - lets the caller show an already-fetched AI result
     // immediately (offline-first) before/instead of waiting on fetchResult.
     suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity?
+
+    // Field Engineer corrects/confirms the AI's cvState before a Manager decides.
+    // finalCvState must be "on" or "off". Server requires reviewNote whenever
+    // finalCvState != cvState (including when cvState is null/inconclusive) - a 400
+    // HttpException surfaces that, same as 409 POLE_PHOTO_ALREADY_DECIDED once a Manager
+    // has already decided. See docs/contract-drift.md "PATCH .../review".
+    suspend fun reviewPhoto(
+        workOrderId: String,
+        serverPhotoId: String,
+        finalCvState: String,
+        reviewNote: String?,
+    ): Result<LocalPolePhotoEntity>
 }

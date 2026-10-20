@@ -6,6 +6,7 @@ import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
+import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -162,12 +163,109 @@ class RealPolePhotoRepositoryTest {
                     confidence = 0.92,
                     modelVersion = "cv-v1",
                     analyzedAt = Instant.parse("2026-10-16T10:00:10Z"),
+                    finalCvState = null,
+                    reviewNote = null,
+                    reviewedBy = null,
+                    reviewedAt = null,
                     decision = null,
                     decisionNote = null,
                     decidedBy = null,
                     decidedAt = null,
                 )
             }
+        }
+
+    @Test
+    fun `reviewPhoto sends final_cv_state and review_note then writes the response onto the local row`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            val syncQueueManager = mockk<SyncQueueManager>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            val reviewed =
+                polePhotoItemDto().copy(
+                    finalCvState = "off",
+                    reviewNote = "Thấy đèn tắt khi kiểm tra lại",
+                    reviewedBy = "U-2",
+                    reviewedAt = "2026-10-20T08:00:00Z",
+                )
+            coEvery {
+                api.reviewPolePhoto(
+                    "WO-1",
+                    "PPH-000001",
+                    PolePhotoReviewRequestDto(
+                        finalCvState = "off",
+                        reviewNote = "Thấy đèn tắt khi kiểm tra lại",
+                    ),
+                )
+            } returns reviewed
+            coEvery { dao.byServerPhotoId("PPH-000001") } returns localPhoto(serverPhotoId = "PPH-000001")
+            coEvery { dao.byId("PHOTO-1") } returns
+                localPhoto(serverPhotoId = "PPH-000001").copy(
+                    finalCvState = "off",
+                    reviewNote = "Thấy đèn tắt khi kiểm tra lại",
+                )
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
+
+            val result =
+                repository.reviewPhoto(
+                    workOrderId = "WO-1",
+                    serverPhotoId = "PPH-000001",
+                    finalCvState = "off",
+                    reviewNote = "Thấy đèn tắt khi kiểm tra lại",
+                )
+
+            assertTrue(result.isSuccess)
+            assertEquals("off", result.getOrNull()?.finalCvState)
+            coVerify {
+                dao.updateAiResult(
+                    photoId = "PHOTO-1",
+                    aiStatus = "available",
+                    cvState = "on",
+                    confidence = 0.92,
+                    modelVersion = "cv-v1",
+                    analyzedAt = Instant.parse("2026-10-16T10:00:10Z"),
+                    finalCvState = "off",
+                    reviewNote = "Thấy đèn tắt khi kiểm tra lại",
+                    reviewedBy = "U-2",
+                    reviewedAt = Instant.parse("2026-10-20T08:00:00Z"),
+                    decision = null,
+                    decisionNote = null,
+                    decidedBy = null,
+                    decidedAt = null,
+                )
+            }
+        }
+
+    @Test
+    fun `reviewPhoto fails when no local row matches that serverPhotoId`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            val syncQueueManager = mockk<SyncQueueManager>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            coEvery { api.reviewPolePhoto(any(), any(), any()) } returns polePhotoItemDto().copy(finalCvState = "off")
+            coEvery { dao.byServerPhotoId("PPH-000001") } returns null
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
+
+            val result = repository.reviewPhoto("WO-1", "PPH-000001", "off", "note")
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun `reviewPhoto fails when the backend rejects the request`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            val syncQueueManager = mockk<SyncQueueManager>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            coEvery { api.reviewPolePhoto(any(), any(), any()) } throws IllegalStateException("review_note required")
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
+
+            val result = repository.reviewPhoto("WO-1", "PPH-000001", "off", null)
+
+            assertTrue(result.isFailure)
         }
 
     @Test

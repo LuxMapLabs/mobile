@@ -3,6 +3,7 @@ package com.luxmap.core.network
 import com.luxmap.core.network.dto.PagedResultDto
 import com.luxmap.feature.survey.data.dto.PoleListItemDto
 import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
+import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
 import com.luxmap.feature.survey.data.dto.PolePhotoUploadResponseDto
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.EvidenceItemDto
@@ -13,6 +14,7 @@ import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
@@ -79,5 +81,14 @@ interface WorkOrdersApi {
     suspend fun polePhotoDetail(
         @Path("id") id: String,
         @Path("photo_id") photoId: String,
+    ): PolePhotoItemDto
+
+    // Field Engineer corrects/confirms cvState before a Manager decides - added 2026-10-20
+    // (ticket PHOTO-REVIEW). See docs/contract-drift.md "PATCH .../review".
+    @PATCH("api/v1/work-orders/{id}/pole-photos/{photo_id}/review")
+    suspend fun reviewPolePhoto(
+        @Path("id") id: String,
+        @Path("photo_id") photoId: String,
+        @Body body: PolePhotoReviewRequestDto,
     ): PolePhotoItemDto
 }
