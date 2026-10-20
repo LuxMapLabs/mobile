@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
@@ -87,7 +89,16 @@ fun PolePhotoResultBottomSheet(
         Column(modifier = Modifier.fillMaxWidth()) {
             PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
 
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+            // The photo now shows at its real 3:4 aspect ratio (tall), so the card grid + decision
+            // card + retake button below it can push past the sheet's visible height on smaller
+            // screens - without this the retake button becomes unreachable instead of just scrolled to.
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            ) {
                 when (state) {
                     is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
