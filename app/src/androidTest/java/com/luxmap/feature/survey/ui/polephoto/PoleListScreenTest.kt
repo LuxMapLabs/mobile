@@ -79,7 +79,7 @@ class PoleListScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đã đồng bộ").assertExists()
+        composeRule.onNodeWithText("Đã tải lên").assertExists()
     }
 
     @Test

@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -346,9 +347,28 @@ private fun PoleRow(
     ) {
         PoleNumberAvatar(position = pole.position, isNext = isNext, hasSync = pole.syncStatus != null)
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = pole.poleId, style = MaterialTheme.typography.titleMedium)
-            StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
+            Text(
+                text = pole.poleId,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // Condition + sync badges share one row here instead of the sync badge sitting in
+            // the row's trailing slot - with the AI-result icon button also in that slot, 2
+            // variable-width badges plus a button no longer fit on screen width without wrapping.
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
+                if (pole.syncStatus != null) {
+                    StatusBadge(
+                        text = polePhotoSyncLabel(pole.syncStatus),
+                        colors = pole.syncStatus.badgeColors(),
+                        icon = pole.syncStatus.icon(),
+                    )
+                }
+            }
         }
+        // Trailing slot now holds exactly one action affordance - the AI-result icon when
+        // available, otherwise the not-yet-captured camera icon - not a status badge too.
         if (hasAi) {
             IconButton(onClick = onViewAiResult) {
                 Icon(
@@ -357,14 +377,7 @@ private fun PoleRow(
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
-        }
-        if (pole.syncStatus != null) {
-            StatusBadge(
-                text = pole.syncStatus.label(),
-                colors = pole.syncStatus.badgeColors(),
-                icon = pole.syncStatus.icon(),
-            )
-        } else {
+        } else if (pole.syncStatus == null) {
             Box(
                 modifier =
                     Modifier
@@ -381,6 +394,12 @@ private fun PoleRow(
         }
     }
 }
+
+// "Đã tải lên" reads more naturally than the shared SyncStatus.DONE wording ("Đã đồng bộ") for a
+// single uploaded pole photo - a local override for this row only, not a change to the shared
+// sync badge table in core/theme/Color.kt (that wording still fits other screens using it).
+private fun polePhotoSyncLabel(status: SyncStatus): String =
+    if (status == SyncStatus.DONE) "Đã tải lên" else status.label()
 
 // isNext (navy, matches SurveyHubScreen's own fixed-navy accent) takes priority over hasSync
 // (a neutral "already handled" chip reusing WorkOrderStatus.ASSIGNED's pair) over the plain
