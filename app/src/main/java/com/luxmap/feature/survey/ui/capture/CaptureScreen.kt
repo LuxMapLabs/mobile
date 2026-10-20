@@ -333,10 +333,9 @@ internal fun CaptureBottomPanelContent(
     Column(
         modifier =
             modifier
-                .background(
-                    MaterialTheme.colorScheme.background,
-                    RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-                ).padding(Spacing.lg),
+                .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                .background(MaterialTheme.colorScheme.background)
+                .padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         when (state) {
