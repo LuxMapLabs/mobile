@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -33,7 +34,7 @@ class PolePhotoResultBottomSheetTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_progress_indicator() {
+    fun loading_state_shows_the_skeleton() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
@@ -46,6 +47,60 @@ class PolePhotoResultBottomSheetTest {
             }
         }
         composeRule.onNodeWithTag("pole_photo_result_loading").assertExists()
+    }
+
+    @Test
+    fun header_shows_the_pole_id_and_the_position_badge_in_every_state() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = PolePhotoResultUiState.Loading,
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("P-0103").assertExists()
+        composeRule.onNodeWithText("#3").assertExists()
+    }
+
+    @Test
+    fun closing_the_header_button_invokes_onDismiss() {
+        var dismissed = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = PolePhotoResultUiState.Empty,
+                    onDismiss = { dismissed = true },
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Đóng").performClick()
+        assertEquals(true, dismissed)
+    }
+
+    @Test
+    fun success_state_tapping_chup_lai_invokes_onRetake() {
+        var retaken = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(),
+                    onDismiss = {},
+                    onRetry = {},
+                    onRetake = { retaken = true },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chụp lại cột này").performClick()
+        assertEquals(true, retaken)
     }
 
     @Test
