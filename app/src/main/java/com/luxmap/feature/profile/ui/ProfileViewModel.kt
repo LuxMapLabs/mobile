@@ -12,9 +12,12 @@ import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
+import com.luxmap.feature.profile.data.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -25,6 +28,7 @@ class ProfileViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        private val profileRepository: ProfileRepository,
         syncQueueManager: SyncQueueManager,
         connectivityObserver: ConnectivityObserver,
         bleClient: LuxSensorBleClient,
@@ -35,6 +39,23 @@ class ProfileViewModel
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
                 null,
             )
+
+        private val _profileState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
+        val profileState: StateFlow<ProfileUiState> = _profileState.asStateFlow()
+
+        init {
+            loadProfile()
+        }
+
+        private fun loadProfile() {
+            viewModelScope.launch {
+                _profileState.value =
+                    profileRepository.fetchCurrentUser().fold(
+                        onSuccess = { ProfileUiState.Success(it) },
+                        onFailure = { ProfileUiState.Error(it.message ?: "Không tải được thông tin cá nhân") },
+                    )
+            }
+        }
 
         val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
         val appVersion: String = BuildConfig.VERSION_NAME
