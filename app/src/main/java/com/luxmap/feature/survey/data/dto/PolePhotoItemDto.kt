@@ -22,6 +22,13 @@ data class PolePhotoItemDto(
     @SerialName("model_version") val modelVersion: String? = null,
     @SerialName("artifact_version") val artifactVersion: String? = null,
     @SerialName("analyzed_at") val analyzedAt: String? = null,
+    // Added 2026-10-20 (ticket PHOTO-REVIEW) - the Field Engineer's correction/agreement on
+    // cvState before a Manager decides. Null until reviewed, never defaults to cvState -
+    // see docs/contract-drift.md "PATCH .../review".
+    @SerialName("final_cv_state") val finalCvState: String? = null,
+    @SerialName("review_note") val reviewNote: String? = null,
+    @SerialName("reviewed_by") val reviewedBy: String? = null,
+    @SerialName("reviewed_at") val reviewedAt: String? = null,
     val decision: String? = null,
     @SerialName("decided_by") val decidedBy: String? = null,
     @SerialName("decided_at") val decidedAt: String? = null,
@@ -30,4 +37,12 @@ data class PolePhotoItemDto(
     @SerialName("status_reason") val statusReason: String? = null,
     @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
     @SerialName("original_url") val originalUrl: String? = null,
+)
+
+// PATCH .../pole-photos/{photo_id}/review body - see docs/contract-drift.md "PATCH .../review".
+// finalCvState must be exactly "on" or "off" (never "inconclusive", never null).
+@Serializable
+data class PolePhotoReviewRequestDto(
+    @SerialName("final_cv_state") val finalCvState: String,
+    @SerialName("review_note") val reviewNote: String? = null,
 )

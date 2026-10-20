@@ -25,6 +25,12 @@ data class LocalPolePhotoEntity(
     val confidence: Double? = null,
     val modelVersion: String? = null,
     val analyzedAt: Instant? = null,
+    // Field Engineer's correction/agreement on cvState, added 2026-10-20 (ticket PHOTO-REVIEW).
+    // Null until reviewed - never defaults to cvState. See contract-drift.md "PATCH .../review".
+    val finalCvState: String? = null,
+    val reviewNote: String? = null,
+    val reviewedBy: String? = null,
+    val reviewedAt: Instant? = null,
     val decision: String? = null,
     val decisionNote: String? = null,
     val decidedBy: String? = null,

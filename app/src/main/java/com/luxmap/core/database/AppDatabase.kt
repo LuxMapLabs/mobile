@@ -36,7 +36,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
         LocalPoleListItemEntity::class,
         LocalAssignedSurveyRouteEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
