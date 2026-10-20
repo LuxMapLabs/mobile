@@ -80,20 +80,34 @@ fun PoleListRoute(
     // Remembered so the bottom sheet's "Thử lại" button can re-fetch the same photo on error -
     // the sheet itself only knows the current PolePhotoResultUiState, not which photo it's for.
     var lastViewedServerPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Remembered the same way, for the sheet's header (pole number + id) and "Chụp lại" button -
+    // PolePhotoResultUiState stays free of pole identity on purpose (it only describes the AI
+    // result itself), so the Route looks the pole up from the already-loaded list instead.
+    var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
     PoleListScreen(
         workOrderId = workOrderId,
         state = uiState,
         aiResultState = aiResultState,
+        aiResultPoleId = lastViewedPoleId.orEmpty(),
+        aiResultPosition = lastViewedPosition ?: 0,
         onCapturePole = onCapturePole,
         onDone = onDone,
         onRetry = viewModel::onRetry,
         onViewAiResult = { serverPhotoId ->
+            val pole = (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
             lastViewedServerPhotoId = serverPhotoId
+            lastViewedPoleId = pole?.poleId
+            lastViewedPosition = pole?.position
             viewModel.onViewAiResult(serverPhotoId)
         },
         onDismissAiResult = viewModel::onDismissAiResult,
         onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
+        onRetake = {
+            viewModel.onDismissAiResult()
+            lastViewedPoleId?.let(onCapturePole)
+        },
     )
 }
 
@@ -105,9 +119,12 @@ fun PoleListScreen(
     onDone: () -> Unit,
     onRetry: () -> Unit = {},
     aiResultState: PolePhotoResultUiState? = null,
+    aiResultPoleId: String = "",
+    aiResultPosition: Int = 0,
     onViewAiResult: (serverPhotoId: String) -> Unit = {},
     onDismissAiResult: () -> Unit = {},
     onRetryAiResult: () -> Unit = {},
+    onRetake: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PoleListHeader(workOrderId = workOrderId, onBack = onDone)
@@ -193,9 +210,12 @@ fun PoleListScreen(
 
     if (aiResultState != null) {
         PolePhotoResultBottomSheet(
+            poleId = aiResultPoleId,
+            position = aiResultPosition,
             state = aiResultState,
             onDismiss = onDismissAiResult,
             onRetry = onRetryAiResult,
+            onRetake = onRetake,
         )
     }
 }

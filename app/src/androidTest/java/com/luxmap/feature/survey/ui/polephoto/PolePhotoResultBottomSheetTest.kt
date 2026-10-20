@@ -36,7 +36,13 @@ class PolePhotoResultBottomSheetTest {
     fun loading_state_shows_the_progress_indicator() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(state = PolePhotoResultUiState.Loading, onDismiss = {}, onRetry = {})
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = PolePhotoResultUiState.Loading,
+                    onDismiss = {},
+                    onRetry = {},
+                )
             }
         }
         composeRule.onNodeWithTag("pole_photo_result_loading").assertExists()
@@ -47,6 +53,8 @@ class PolePhotoResultBottomSheetTest {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
                     state = successState(cvState = "on", confidence = 0.92),
                     onDismiss = {},
                     onRetry = {},
@@ -61,7 +69,13 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_shows_no_decision_yet_when_decision_is_null() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(state = successState(decision = null), onDismiss = {}, onRetry = {})
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(decision = null),
+                    onDismiss = {},
+                    onRetry = {},
+                )
             }
         }
         composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertExists()
@@ -72,6 +86,8 @@ class PolePhotoResultBottomSheetTest {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
                     state = successState(decision = "confirm", decisionNote = "Đã kiểm tra thực tế"),
                     onDismiss = {},
                     onRetry = {},
@@ -86,7 +102,13 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_shows_the_stale_banner_only_when_isStale_is_true() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(state = successState(isStale = true), onDismiss = {}, onRetry = {})
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(isStale = true),
+                    onDismiss = {},
+                    onRetry = {},
+                )
             }
         }
         composeRule.onNodeWithText("Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất").assertExists()
@@ -96,7 +118,13 @@ class PolePhotoResultBottomSheetTest {
     fun empty_state_shows_the_ai_unavailable_message() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(state = PolePhotoResultUiState.Empty, onDismiss = {}, onRetry = {})
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = PolePhotoResultUiState.Empty,
+                    onDismiss = {},
+                    onRetry = {},
+                )
             }
         }
         composeRule.onNodeWithText("AI chưa phân loại được ảnh này").assertExists()
@@ -108,6 +136,8 @@ class PolePhotoResultBottomSheetTest {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
                     state = PolePhotoResultUiState.Error("network down"),
                     onDismiss = {},
                     onRetry = { retried = true },
