@@ -2,10 +2,12 @@ package com.luxmap.feature.profile.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -16,16 +18,28 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.BluetoothSearching
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,12 +55,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
@@ -54,12 +71,22 @@ import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.Success600
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.profile.data.CurrentUserProfile
 import java.time.Instant
+
+// Exact hex from the F15 redesign doc ("ĐỀ XUẤT THEO HƯỚNG 2a") - no existing shared token matches
+// this amber, same reasoning as the per-screen bespoke colors in PolePhotoResultBottomSheet.
+private val AttentionColor = Color(0xFFB45309)
+private val PendingCaptionColor = Color(0xFF92400E)
+
+// Icon-chip size + the row's own Spacing.md gap, so the stat grid below a row lines up under its
+// text instead of its icon.
+private val SyncDetailIndent = 48.dp
 
 @Composable
 fun ProfileRoute(
@@ -91,9 +118,9 @@ fun ProfileRoute(
     )
 }
 
-// F15 Cá nhân - "Đề xuất theo hướng 2a": hero carries identity (name/username/role). Content
-// below is still the plain settings-row layout for now - restyled into the "Sẵn sàng làm việc"
-// card group in the next commit.
+// F15 Cá nhân - "Đề xuất theo hướng 2a": hero carries identity (name/username/role), the sheet
+// below groups network/sync/lux sensor under one "Sẵn sàng làm việc" block, and device/version
+// move to a plain footer line - replacing the old flat settings-list layout.
 @Composable
 fun ProfileScreen(
     username: String,
@@ -275,94 +302,257 @@ private fun ProfileContent(
     onLogoutClick: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
-        SettingsGroup(title = "TÀI KHOẢN") {
-            SettingsRow(label = "Email", value = profile.email)
-            SettingsRow(label = "Địa bàn phụ trách", value = profile.communeIds.joinToString(", "))
-        }
-
-        SettingsGroup(title = "SẴN SÀNG LÀM VIỆC") {
-            SettingsRow(label = "Kết nối mạng", value = if (isOnline) "Trực tuyến" else "Ngoại tuyến")
-            SyncQueueRow(pendingSyncCount = pendingSyncCount, errorSyncCount = errorSyncCount)
-            SettingsRow(label = "Lần đồng bộ cuối", value = DateFormatUtils.formatInstant(lastSyncedAt))
-            SettingsRow(label = "Cảm biến lux (Bluetooth)", value = bleConnectionLabel(bleConnectionState))
-        }
-
+        AccountSection(profile)
+        ReadinessSection(
+            bleConnectionState = bleConnectionState,
+            pendingSyncCount = pendingSyncCount,
+            errorSyncCount = errorSyncCount,
+            lastSyncedAt = lastSyncedAt,
+            isOnline = isOnline,
+        )
         LogoutSection(isLoggingOut = isLoggingOut, pendingSyncCount = pendingSyncCount, onClick = onLogoutClick)
-
-        SettingsGroup(title = "THIẾT BỊ") {
-            SettingsRow(label = "Thiết bị", value = deviceModel)
-            SettingsRow(label = "Phiên bản", value = appVersion)
-        }
+        FooterInfo(deviceModel = deviceModel, appVersion = appVersion)
     }
 }
 
 @Composable
-private fun SettingsGroup(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
+private fun AccountSection(profile: CurrentUserProfile) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(text = title, style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun SettingsRow(
-    label: String,
-    value: String,
-) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun SyncQueueRow(
-    pendingSyncCount: Int,
-    errorSyncCount: Int,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = "Hàng đợi đồng bộ", style = MaterialTheme.typography.bodyMedium)
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "$pendingSyncCount mục",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (errorSyncCount > 0) {
-                StatusBadge(text = "$errorSyncCount lỗi", colors = SyncStatus.FAILED.badgeColors())
+        Text(text = "TÀI KHOẢN", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.fillMaxWidth().cardOutline()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Email,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column {
+                    Text(
+                        text = "Email",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(text = profile.email, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Place,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Text(
+                        text = "Địa bàn phụ trách · ${profile.communeIds.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    CommuneChips(communeIds = profile.communeIds)
+                }
             }
         }
     }
 }
 
-private fun bleConnectionLabel(state: BleConnectionState): String =
-    when (state) {
-        BleConnectionState.Connected -> "Đã kết nối"
-        BleConnectionState.Connecting -> "Đang kết nối"
-        BleConnectionState.Disconnected -> "Chưa kết nối"
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CommuneChips(communeIds: List<String>) {
+    val colors = SyncStatus.QUEUED_ONLINE.badgeColors()
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        communeIds.forEach { communeId ->
+            Box(
+                modifier =
+                    Modifier
+                        .background(colors.background, RoundedCornerShape(Radius.badge))
+                        .padding(horizontal = Spacing.sm, vertical = 4.dp),
+            ) {
+                Text(text = communeId, style = MaterialTheme.typography.labelLarge, color = colors.text)
+            }
+        }
     }
+}
+
+@Composable
+private fun ReadinessSection(
+    bleConnectionState: BleConnectionState,
+    pendingSyncCount: Int,
+    errorSyncCount: Int,
+    lastSyncedAt: Instant?,
+    isOnline: Boolean,
+) {
+    val issues =
+        (if (!isOnline) 1 else 0) +
+            (if (errorSyncCount > 0) 1 else 0) +
+            (if (bleConnectionState != BleConnectionState.Connected) 1 else 0)
+
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "SẴN SÀNG LÀM VIỆC",
+                style = OverlineTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val readyColor = if (issues == 0) Success600 else AttentionColor
+            val readyLabel = if (issues == 0) "Sẵn sàng" else "$issues mục cần kiểm tra"
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(modifier = Modifier.size(8.dp).background(readyColor, CircleShape))
+                Text(text = readyLabel, style = MaterialTheme.typography.labelMedium, color = readyColor)
+            }
+        }
+        Column(modifier = Modifier.fillMaxWidth().cardOutline()) {
+            NetworkRow(isOnline = isOnline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            SyncRow(pendingSyncCount = pendingSyncCount, errorSyncCount = errorSyncCount, lastSyncedAt = lastSyncedAt)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            BleRow(state = bleConnectionState)
+        }
+    }
+}
+
+@Composable
+private fun NetworkRow(isOnline: Boolean) {
+    val colors = if (isOnline) SyncStatus.DONE.badgeColors() else SyncStatus.QUEUED_OFFLINE.badgeColors()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        IconChip(icon = if (isOnline) Icons.Filled.Wifi else Icons.Filled.WifiOff, colors = colors)
+        Text(text = "Kết nối mạng", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        StatusBadge(text = if (isOnline) "Trực tuyến" else "Ngoại tuyến", colors = colors)
+    }
+}
+
+@Composable
+private fun SyncRow(
+    pendingSyncCount: Int,
+    errorSyncCount: Int,
+    lastSyncedAt: Instant?,
+) {
+    val colors =
+        when {
+            errorSyncCount > 0 -> SyncStatus.FAILED.badgeColors()
+            pendingSyncCount > 0 -> SyncStatus.QUEUED_ONLINE.badgeColors()
+            else -> SyncStatus.DONE.badgeColors()
+        }
+    val icon =
+        when {
+            errorSyncCount > 0 -> Icons.Filled.ErrorOutline
+            pendingSyncCount > 0 -> Icons.Filled.Sync
+            else -> Icons.Filled.CloudDone
+        }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            IconChip(icon = icon, colors = colors)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Đồng bộ dữ liệu", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Lần cuối: ${DateFormatUtils.formatInstant(lastSyncedAt)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = SyncDetailIndent),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            StatCell(label = "Chờ đồng bộ", value = pendingSyncCount, isError = false, modifier = Modifier.weight(1f))
+            StatCell(
+                label = "Đồng bộ lỗi",
+                value = errorSyncCount,
+                isError = errorSyncCount > 0,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BleRow(state: BleConnectionState) {
+    val (icon, colors, label) =
+        when (state) {
+            BleConnectionState.Connected ->
+                Triple(
+                    Icons.Filled.BluetoothConnected,
+                    SyncStatus.DONE.badgeColors(),
+                    "Đã kết nối",
+                )
+            BleConnectionState.Connecting ->
+                Triple(Icons.Filled.BluetoothSearching, SyncStatus.QUEUED_ONLINE.badgeColors(), "Đang kết nối")
+            BleConnectionState.Disconnected ->
+                Triple(Icons.Filled.BluetoothDisabled, SyncStatus.QUEUED_OFFLINE.badgeColors(), "Chưa kết nối")
+        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        IconChip(icon = icon, colors = colors)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = "Cảm biến lux", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Bluetooth · cần cho khảo sát video",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        StatusBadge(text = label, colors = colors)
+    }
+}
+
+@Composable
+private fun IconChip(
+    icon: ImageVector,
+    colors: BadgeColors,
+) {
+    Box(
+        modifier = Modifier.size(36.dp).background(colors.background, RoundedCornerShape(Radius.control)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = colors.text, modifier = Modifier.size(20.dp))
+    }
+}
+
+@Composable
+private fun StatCell(
+    label: String,
+    value: Int,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val colors =
+        if (isError) {
+            SyncStatus.FAILED.badgeColors()
+        } else {
+            BadgeColors(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    Column(modifier = modifier.background(colors.background, RoundedCornerShape(Radius.control)).padding(Spacing.sm)) {
+        Text(
+            text = value.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = if (isError) colors.text else MaterialTheme.colorScheme.onSurface,
+        )
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = colors.text)
+    }
+}
 
 @Composable
 private fun LogoutSection(
@@ -383,6 +573,8 @@ private fun LogoutSection(
             if (isLoggingOut) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
+                Icon(imageVector = Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(Spacing.sm))
                 Text("Đăng xuất")
             }
         }
@@ -390,11 +582,33 @@ private fun LogoutSection(
             Text(
                 text = "Còn $pendingSyncCount mục chưa đồng bộ trên thiết bị này",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = PendingCaptionColor,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
 }
+
+@Composable
+private fun FooterInfo(
+    deviceModel: String,
+    appVersion: String,
+) {
+    Text(
+        text = "$deviceModel · Phiên bản $appVersion",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun Modifier.cardOutline(): Modifier =
+    this
+        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
 
 // "NB" from "Nguyễn Văn Bình" - first letter of the first word + first letter of the last word.
 // Falls back to the single token's own first letter (e.g. a bare username while loading/erroring).
