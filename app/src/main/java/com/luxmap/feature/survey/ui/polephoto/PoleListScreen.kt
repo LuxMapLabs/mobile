@@ -45,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -130,17 +131,18 @@ fun PoleListScreen(
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PoleListHeader(workOrderId = workOrderId, onBack = onDone)
         // Overlaps the hero's bottom edge, same pattern as SurveyHubScreen's own sheet - reads as
-        // a sheet floating over the navy hero instead of a hard seam between the two.
+        // a sheet floating over the navy hero instead of a hard seam between the two. The clip
+        // (not just background) matters once the list scrolls - background alone paints the
+        // rounded shape but never cuts the LazyColumn's own square corners, so a scrolled row's
+        // edge shows past the rounding at the top instead of following it.
         Box(
             modifier =
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .offset(y = -Spacing.xl)
-                    .background(
-                        MaterialTheme.colorScheme.background,
-                        RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-                    ),
+                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                    .background(MaterialTheme.colorScheme.background),
         ) {
             Box(Modifier.fillMaxSize()) {
                 when (state) {
