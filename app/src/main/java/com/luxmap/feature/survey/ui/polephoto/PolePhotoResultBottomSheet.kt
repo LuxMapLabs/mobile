@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -62,7 +63,9 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
-private val PhotoPreviewHeight = 180.dp
+// Matches the captured-photo aspect ratio used right after taking the shot
+// (PolePhotoCaptureScreen) - a fixed height here would crop a portrait photo down to a sliver.
+private const val PHOTO_ASPECT_RATIO = 3f / 4f
 private val StatePlaceholderHeight = 160.dp
 private val SkeletonBlockHeight = 60.dp
 private val HeaderBadgeSize = 44.dp
@@ -170,7 +173,7 @@ private fun PolePhotoResultSkeleton() {
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(PhotoPreviewHeight)
+                    .aspectRatio(PHOTO_ASPECT_RATIO)
                     .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -235,7 +238,7 @@ private fun PolePhotoResultContent(
 
 @Composable
 private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
-    Box(modifier = Modifier.fillMaxWidth().height(PhotoPreviewHeight)) {
+    Box(modifier = Modifier.fillMaxWidth().aspectRatio(PHOTO_ASPECT_RATIO)) {
         AsyncImage(
             model = File(state.filePath),
             contentDescription = "Ảnh cột đèn đã chụp",
