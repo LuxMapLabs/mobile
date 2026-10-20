@@ -110,6 +110,9 @@ fun PoleListRoute(
             viewModel.onDismissAiResult()
             lastViewedPoleId?.let(onCapturePole)
         },
+        onSubmitReview = { finalCvState, reviewNote ->
+            lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
+        },
     )
 }
 
@@ -127,6 +130,7 @@ fun PoleListScreen(
     onDismissAiResult: () -> Unit = {},
     onRetryAiResult: () -> Unit = {},
     onRetake: () -> Unit = {},
+    onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
 ) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PoleListHeader(workOrderId = workOrderId, onBack = onDone)
@@ -219,6 +223,7 @@ fun PoleListScreen(
             onDismiss = onDismissAiResult,
             onRetry = onRetryAiResult,
             onRetake = onRetake,
+            onSubmitReview = onSubmitReview,
         )
     }
 }

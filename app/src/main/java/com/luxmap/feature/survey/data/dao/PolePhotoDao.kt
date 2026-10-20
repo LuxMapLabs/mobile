@@ -28,6 +28,8 @@ interface PolePhotoDao {
         serverPhotoId: String,
     )
 
+    // Writes the full server PolePhotoItem snapshot into Room. Used both after fetching the AI
+    // result (GET) and after a review (PATCH .../review) - both return the same full item shape.
     @Query(
         """
         UPDATE local_pole_photo SET
@@ -36,6 +38,10 @@ interface PolePhotoDao {
             confidence = :confidence,
             modelVersion = :modelVersion,
             analyzedAt = :analyzedAt,
+            finalCvState = :finalCvState,
+            reviewNote = :reviewNote,
+            reviewedBy = :reviewedBy,
+            reviewedAt = :reviewedAt,
             decision = :decision,
             decisionNote = :decisionNote,
             decidedBy = :decidedBy,
@@ -50,6 +56,10 @@ interface PolePhotoDao {
         confidence: Double?,
         modelVersion: String?,
         analyzedAt: Instant?,
+        finalCvState: String?,
+        reviewNote: String?,
+        reviewedBy: String?,
+        reviewedAt: Instant?,
         decision: String?,
         decisionNote: String?,
         decidedBy: String?,

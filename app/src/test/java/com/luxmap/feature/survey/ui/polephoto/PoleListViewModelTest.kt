@@ -9,6 +9,7 @@ import com.luxmap.feature.survey.data.PoleListResult
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -18,15 +19,30 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 import java.time.Instant
 
 private const val WORK_ORDER_ID = "WO-1"
 
 private fun savedStateHandle() = SavedStateHandle(mapOf(PoleListViewModel.WORK_ORDER_ID_ARG to WORK_ORDER_ID))
+
+private fun httpException(
+    code: Int,
+    errorCode: String? = null,
+) = HttpException(
+    Response.error<Any>(
+        code,
+        (if (errorCode == null) "" else """{"error":{"code":"$errorCode","message":"x"}}""")
+            .toResponseBody("application/json".toMediaType()),
+    ),
+)
 
 private fun photo(
     poleId: String,
@@ -218,6 +234,95 @@ class PoleListViewModelTest {
                 val stale = awaitItem() as PolePhotoResultUiState.Success
                 assertEquals("off", stale.cvState)
                 assertEquals(true, stale.isStale)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult maps ai_status unavailable to Success with a null cvState, not Empty`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "unavailable", cvState = null))
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                assertEquals(PolePhotoResultUiState.Loading, awaitItem())
+                // The Field Engineer must still be able to review a photo even when the AI model
+                // failed outright (business rule D-2) - this must not be the Empty dead end.
+                val result = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals(null, result.cvState)
+            }
+        }
+
+    @Test
+    fun `onSubmitReview sends final_cv_state and review_note then replaces the state with the server response`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on"))
+            coEvery { polePhotoRepository.reviewPhoto(WORK_ORDER_ID, "SERVER-PH-1", "off", "Thấy đèn tắt") } returns
+                Result.success(
+                    photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on")
+                        .copy(finalCvState = "off", reviewNote = "Thấy đèn tắt", reviewedBy = "U-2"),
+                )
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                assertEquals(PolePhotoResultUiState.Loading, awaitItem())
+                awaitItem() // the fetched result, not under test here
+
+                vm.onSubmitReview("SERVER-PH-1", "off", "Thấy đèn tắt")
+                val submitting = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals(true, submitting.isSubmittingReview)
+                val reviewed = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("off", reviewed.finalCvState)
+                assertEquals("Thấy đèn tắt", reviewed.reviewNote)
+                assertEquals(false, reviewed.isSubmittingReview)
+            }
+            coVerify { polePhotoRepository.reviewPhoto(WORK_ORDER_ID, "SERVER-PH-1", "off", "Thấy đèn tắt") }
+        }
+
+    @Test
+    fun `onSubmitReview shows a Vietnamese message when the photo is already decided`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", cvState = "on"))
+            coEvery { polePhotoRepository.reviewPhoto(WORK_ORDER_ID, "SERVER-PH-1", "off", null) } returns
+                Result.failure(httpException(409, "POLE_PHOTO_ALREADY_DECIDED"))
+            val vm = PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository)
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                assertEquals(PolePhotoResultUiState.Loading, awaitItem())
+                awaitItem()
+
+                vm.onSubmitReview("SERVER-PH-1", "off", null)
+                val submitting = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals(true, submitting.isSubmittingReview)
+                val failed = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals(false, failed.isSubmittingReview)
+                assertEquals(
+                    "Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa",
+                    failed.reviewError,
+                )
             }
         }
 }

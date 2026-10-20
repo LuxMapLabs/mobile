@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.ui.polephoto
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.network.errorCodeOrNull
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -65,28 +67,65 @@ class PoleListViewModel
         }
 
         // null means no usable cached AI result yet (aiStatus itself is null - never fetched).
+        // Both "available" and "unavailable" map to Success now - even when the AI model failed
+        // entirely (cvState null), the Field Engineer must still be able to review it (business
+        // rule D-2, ticket PHOTO-REVIEW) - there is no longer a separate "AI failed" dead end.
         private fun LocalPolePhotoEntity.toResultUiState(isStale: Boolean): PolePhotoResultUiState? =
-            when (aiStatus) {
-                null -> null
-                "available" ->
-                    PolePhotoResultUiState.Success(
-                        filePath = filePath,
-                        cvState = cvState ?: "inconclusive",
-                        confidence = confidence,
-                        modelVersion = modelVersion,
-                        analyzedAt = analyzedAt,
-                        decision = decision,
-                        decisionNote = decisionNote,
-                        decidedBy = decidedBy,
-                        decidedAt = decidedAt,
-                        isStale = isStale,
-                    )
-                else -> PolePhotoResultUiState.Empty
+            if (aiStatus == null) {
+                null
+            } else {
+                PolePhotoResultUiState.Success(
+                    filePath = filePath,
+                    cvState = cvState,
+                    confidence = confidence,
+                    modelVersion = modelVersion,
+                    analyzedAt = analyzedAt,
+                    finalCvState = finalCvState,
+                    reviewNote = reviewNote,
+                    reviewedBy = reviewedBy,
+                    reviewedAt = reviewedAt,
+                    decision = decision,
+                    decisionNote = decisionNote,
+                    decidedBy = decidedBy,
+                    decidedAt = decidedAt,
+                    isStale = isStale,
+                )
             }
 
         fun onDismissAiResult() {
             _aiResultState.value = null
         }
+
+        // Field Engineer corrects/confirms cvState before a Manager decides (ticket PHOTO-REVIEW,
+        // 2026-10-20). Direct call like fetchResult/start - not queued through sync_queue, since
+        // it is a foreground state-correction action, not a file upload needing offline resilience.
+        fun onSubmitReview(
+            serverPhotoId: String,
+            finalCvState: String,
+            reviewNote: String?,
+        ) {
+            val current = _aiResultState.value as? PolePhotoResultUiState.Success ?: return
+            _aiResultState.value = current.copy(isSubmittingReview = true, reviewError = null)
+            viewModelScope.launch {
+                polePhotoRepository.reviewPhoto(workOrderId, serverPhotoId, finalCvState, reviewNote).fold(
+                    onSuccess = { photo ->
+                        _aiResultState.value = photo.toResultUiState(isStale = false) ?: PolePhotoResultUiState.Empty
+                    },
+                    onFailure = { e ->
+                        val latest = _aiResultState.value as? PolePhotoResultUiState.Success ?: current
+                        _aiResultState.value =
+                            latest.copy(isSubmittingReview = false, reviewError = reviewErrorMessage(e))
+                    },
+                )
+            }
+        }
+
+        private fun reviewErrorMessage(e: Throwable): String =
+            when ((e as? HttpException)?.errorCodeOrNull()) {
+                "POLE_PHOTO_ALREADY_DECIDED" -> "Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa"
+                "WORK_ORDER_NOT_IN_PROGRESS" -> "Phiếu công việc không còn ở trạng thái đang xử lý"
+                else -> e.message ?: "Không gửi được, thử lại"
+            }
 
         private fun load() {
             viewModelScope.launch {

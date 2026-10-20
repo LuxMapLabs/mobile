@@ -53,6 +53,10 @@ class FakePolePhotoRepository
                     confidence = 0.92,
                     modelVersion = "fake-model-v0",
                     analyzedAt = Instant.now(),
+                    finalCvState = null,
+                    reviewNote = null,
+                    reviewedBy = null,
+                    reviewedAt = null,
                     decision = null,
                     decisionNote = null,
                     decidedBy = null,
@@ -62,4 +66,31 @@ class FakePolePhotoRepository
             }
 
         override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? = dao.byId(serverPhotoId)
+
+        override suspend fun reviewPhoto(
+            workOrderId: String,
+            serverPhotoId: String,
+            finalCvState: String,
+            reviewNote: String?,
+        ): Result<LocalPolePhotoEntity> =
+            runCatching {
+                val existing = dao.byId(serverPhotoId) ?: error("Local pole photo row missing for review")
+                dao.updateAiResult(
+                    photoId = serverPhotoId,
+                    aiStatus = existing.aiStatus ?: "available",
+                    cvState = existing.cvState,
+                    confidence = existing.confidence,
+                    modelVersion = existing.modelVersion,
+                    analyzedAt = existing.analyzedAt,
+                    finalCvState = finalCvState,
+                    reviewNote = reviewNote,
+                    reviewedBy = "fake-user",
+                    reviewedAt = Instant.now(),
+                    decision = existing.decision,
+                    decisionNote = existing.decisionNote,
+                    decidedBy = existing.decidedBy,
+                    decidedAt = existing.decidedAt,
+                )
+                dao.byId(serverPhotoId) ?: error("Local pole photo row missing after review update")
+            }
     }

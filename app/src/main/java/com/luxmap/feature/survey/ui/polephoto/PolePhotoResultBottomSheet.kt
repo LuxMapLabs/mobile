@@ -3,16 +3,20 @@ package com.luxmap.feature.survey.ui.polephoto
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,9 +40,14 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +91,7 @@ fun PolePhotoResultBottomSheet(
     onDismiss: () -> Unit,
     onRetry: () -> Unit,
     onRetake: () -> Unit = {},
+    onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
 ) {
     val sheetState = rememberModalBottomSheetState()
 
@@ -89,24 +99,30 @@ fun PolePhotoResultBottomSheet(
         Column(modifier = Modifier.fillMaxWidth()) {
             PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
 
-            // The photo now shows at its real 3:4 aspect ratio (tall), so the card grid + decision
-            // card + retake button below it can push past the sheet's visible height on smaller
-            // screens - without this the retake button becomes unreachable instead of just scrolled to.
+            // The photo now shows at its real 3:4 aspect ratio (tall), plus ReviewCard added more
+            // content below it, so this can now reach the bottom of the screen on real devices -
+            // navigationBarsPadding keeps the last button (retake/submit) clear of the system
+            // nav bar area instead of its tap target sitting flush against it.
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                        .navigationBarsPadding(),
             ) {
                 when (state) {
                     is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
-                    is PolePhotoResultUiState.Success -> PolePhotoResultContent(state, onRetake)
+                    is PolePhotoResultUiState.Success ->
+                        PolePhotoResultContent(poleId, state, onRetake, onSubmitReview)
 
                     // heightIn (not a fixed height) - MessageState's action button (Error) makes this
                     // content taller than the skeleton needs, and a fixed height here clipped
                     // the button outside the touchable area.
+                    // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
+                    // A real "AI model failed" result (ai_status = "unavailable") now renders as
+                    // Success with cvState = null instead, so review stays possible.
                     is PolePhotoResultUiState.Empty ->
                         Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
                             MessageState(
@@ -215,8 +231,10 @@ private fun PolePhotoResultSkeleton() {
 
 @Composable
 private fun PolePhotoResultContent(
+    poleId: String,
     state: PolePhotoResultUiState.Success,
     onRetake: () -> Unit,
+    onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         PolePhotoPreview(state)
@@ -235,15 +253,145 @@ private fun PolePhotoResultContent(
             }
         }
 
-        Text(
-            text = "Phân tích lúc ${DateFormatUtils.formatInstant(state.analyzedAt)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (state.analyzedAt != null) {
+            Text(
+                text = "Phân tích lúc ${DateFormatUtils.formatInstant(state.analyzedAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Locked once a Manager has already decided (POLE_PHOTO_ALREADY_DECIDED) - review no
+        // longer applies, the decision card below already shows the published outcome.
+        if (state.decision == null) {
+            ReviewCard(poleId = poleId, state = state, onSubmit = onSubmitReview)
+        }
 
         PolePhotoDecisionCard(state)
 
         RetakeButton(onClick = onRetake, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+// Lets the Field Engineer correct/confirm the AI's cvState before a Manager decides (ticket
+// PHOTO-REVIEW, 2026-10-20). Keyed on poleId so switching to a different pole's sheet resets the
+// draft instead of carrying over a stale selection from the previous photo.
+@Composable
+private fun ReviewCard(
+    poleId: String,
+    state: PolePhotoResultUiState.Success,
+    onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
+) {
+    var selected by
+        rememberSaveable(poleId) {
+            mutableStateOf(state.finalCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
+        }
+    var note by rememberSaveable(poleId) { mutableStateOf(state.reviewNote.orEmpty()) }
+    // Required whenever the chosen label differs from the AI's own cvState, including when
+    // cvState is "inconclusive" or null (server rule, see docs/contract-drift.md "PATCH
+    // .../review" - review_note is mandatory even when AI never reached on/off or failed
+    // outright, not only when it disagrees).
+    val noteRequired = selected != null && selected != state.cvState
+    val canSubmit = selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank())
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Text(
+            text = "KỸ SƯ XÁC NHẬN NHÃN",
+            style = OverlineTextStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
+
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it },
+            label = { Text(if (noteRequired) "Ghi chú (bắt buộc - khác AI)" else "Ghi chú (không bắt buộc)") },
+            isError = noteRequired && note.isBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (noteRequired && note.isBlank()) {
+            Text(
+                text = "Cần ghi chú vì khác với nhận định của AI",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (state.reviewedBy != null) {
+            Text(
+                text = "Đã review lúc ${DateFormatUtils.formatInstant(state.reviewedAt)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (state.reviewError != null) {
+            Text(
+                text = state.reviewError,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        PrimaryButton(
+            text = if (state.isSubmittingReview) "Đang gửi..." else "Gửi xác nhận",
+            onClick = { selected?.let { onSubmit(it, note.trim().ifBlank { null }) } },
+            enabled = canSubmit,
+            isLoading = state.isSubmittingReview,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+// 2 equal chips in a gray tray, same visual pattern as OutcomeSegment (F09/F10) - a separate
+// component rather than generalizing that one, since its 3 options/colors are specific to
+// fault_outcomes and not meant to be reused as a generic 2-choice control.
+@Composable
+private fun ReviewChoiceSegment(
+    selected: String?,
+    onSelected: (String) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
+            val isSelected = selected == value
+            val colors = cvStateBadgeColors(value)
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(
+                            if (isSelected) colors.background else Color.Transparent,
+                            RoundedCornerShape(Radius.chip),
+                        )
+                        .clickable(onClick = { onSelected(value) })
+                        .testTag("review_choice_$value")
+                        .padding(vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -274,7 +422,7 @@ private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
 
 @Composable
 private fun AiVerdictCard(
-    cvState: String,
+    cvState: String?,
     modifier: Modifier = Modifier,
 ) {
     val colors = cvStateBadgeColors(cvState)
@@ -290,7 +438,14 @@ private fun AiVerdictCard(
                 tint = colors.text,
                 modifier = Modifier.size(18.dp),
             )
-            Text(text = cvStateLabel(cvState), style = MaterialTheme.typography.titleMedium, color = colors.text)
+            Text(
+                text = cvStateLabel(cvState),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.text,
+                // Distinguishes this from ReviewChoiceSegment's chips, which can show the same
+                // "Đèn sáng"/"Đèn tắt" text at the same time once ReviewCard is visible.
+                modifier = Modifier.testTag("ai_verdict_label"),
+            )
         }
     }
 }
@@ -406,14 +561,16 @@ private fun RetakeButton(
     }
 }
 
-private fun cvStateLabel(cvState: String): String =
+private fun cvStateLabel(cvState: String?): String =
     when (cvState) {
         "on" -> "Đèn sáng"
         "off" -> "Đèn tắt"
+        "inconclusive" -> "AI không chắc"
+        null -> "AI không xử lý được"
         else -> "Không rõ"
     }
 
-private fun cvStateBadgeColors(cvState: String): BadgeColors =
+private fun cvStateBadgeColors(cvState: String?): BadgeColors =
     when (cvState) {
         "on" -> SyncStatus.DONE.badgeColors()
         "off" -> SyncStatus.FAILED.badgeColors()

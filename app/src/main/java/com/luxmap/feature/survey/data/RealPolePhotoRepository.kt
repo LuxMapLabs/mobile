@@ -4,6 +4,8 @@ import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
+import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
+import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import com.luxmap.feature.survey.data.sync.PolePhotoSyncPayload
 import kotlinx.coroutines.flow.Flow
@@ -70,23 +72,56 @@ class RealPolePhotoRepository
                 val localPhotoId =
                     dao.byServerPhotoId(serverPhotoId)?.photoId
                         ?: error("Local pole photo row missing for server photo $serverPhotoId")
-                dao.updateAiResult(
-                    photoId = localPhotoId,
-                    aiStatus = item.aiStatus,
-                    cvState = item.cvState,
-                    confidence = item.confidence,
-                    modelVersion = item.modelVersion,
-                    analyzedAt = item.analyzedAt?.let(Instant::parse),
-                    decision = item.decision,
-                    decisionNote = item.decisionNote,
-                    decidedBy = item.decidedBy,
-                    decidedAt = item.decidedAt?.let(Instant::parse),
-                )
+                persist(localPhotoId, item)
                 dao.byId(localPhotoId) ?: error("Local pole photo row missing after AI result update")
             }
 
         override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? =
             dao.byServerPhotoId(serverPhotoId)
+
+        override suspend fun reviewPhoto(
+            workOrderId: String,
+            serverPhotoId: String,
+            finalCvState: String,
+            reviewNote: String?,
+        ): Result<LocalPolePhotoEntity> =
+            runCatching {
+                val item =
+                    api.reviewPolePhoto(
+                        workOrderId,
+                        serverPhotoId,
+                        PolePhotoReviewRequestDto(finalCvState = finalCvState, reviewNote = reviewNote),
+                    )
+                val localPhotoId =
+                    dao.byServerPhotoId(serverPhotoId)?.photoId
+                        ?: error("Local pole photo row missing for server photo $serverPhotoId")
+                persist(localPhotoId, item)
+                dao.byId(localPhotoId) ?: error("Local pole photo row missing after review update")
+            }
+
+        // Writes a server PolePhotoItemDto (from either the GET detail or PATCH review response -
+        // both return the same full item shape) into Room.
+        private suspend fun persist(
+            localPhotoId: String,
+            item: PolePhotoItemDto,
+        ) {
+            dao.updateAiResult(
+                photoId = localPhotoId,
+                aiStatus = item.aiStatus,
+                cvState = item.cvState,
+                confidence = item.confidence,
+                modelVersion = item.modelVersion,
+                analyzedAt = item.analyzedAt?.let(Instant::parse),
+                finalCvState = item.finalCvState,
+                reviewNote = item.reviewNote,
+                reviewedBy = item.reviewedBy,
+                reviewedAt = item.reviewedAt?.let(Instant::parse),
+                decision = item.decision,
+                decisionNote = item.decisionNote,
+                decidedBy = item.decidedBy,
+                decidedAt = item.decidedAt?.let(Instant::parse),
+            )
+        }
 
         private companion object {
             val json = Json { ignoreUnknownKeys = true }

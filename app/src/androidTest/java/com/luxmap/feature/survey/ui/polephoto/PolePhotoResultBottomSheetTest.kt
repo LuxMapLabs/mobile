@@ -1,10 +1,14 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.luxmap.core.theme.LuxMapTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -12,7 +16,7 @@ import org.junit.Test
 import java.time.Instant
 
 private fun successState(
-    cvState: String = "on",
+    cvState: String? = "on",
     confidence: Double? = 0.92,
     decision: String? = null,
     decisionNote: String? = null,
@@ -99,7 +103,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chụp lại cột này").performClick()
+        composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
         assertEquals(true, retaken)
     }
 
@@ -116,7 +120,8 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đèn sáng").assertExists()
+        // Tagged, not plain text - ReviewCard's own "Đèn sáng" chip renders at the same time.
+        composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Đèn sáng")
         composeRule.onNodeWithText("Độ tin cậy 92%").assertExists()
     }
 
@@ -202,5 +207,101 @@ class PolePhotoResultBottomSheetTest {
         composeRule.onNodeWithText("network down").assertExists()
         composeRule.onNodeWithText("Thử lại").performClick()
         assertEquals(true, retried)
+    }
+
+    @Test
+    fun review_card_is_hidden_once_a_manager_decision_already_exists() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(decision = "confirm"),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("KỸ SƯ XÁC NHẬN NHÃN").assertDoesNotExist()
+    }
+
+    @Test
+    fun review_card_shows_even_when_the_ai_model_failed_outright() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = null, confidence = null),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("AI không xử lý được").assertExists()
+        composeRule.onNodeWithText("KỸ SƯ XÁC NHẬN NHÃN").assertExists()
+    }
+
+    @Test
+    fun review_card_does_not_require_a_note_when_agreeing_with_the_ai_label() {
+        var submitted: Pair<String, String?>? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onDismiss = {},
+                    onRetry = {},
+                    onSubmitReview = { finalCvState, reviewNote -> submitted = finalCvState to reviewNote },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("review_choice_on").performClick()
+        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
+        assertEquals("on" to null, submitted)
+    }
+
+    @Test
+    fun review_card_blocks_submit_until_a_note_is_given_for_a_label_different_from_ai() {
+        var submitted = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onDismiss = {},
+                    onRetry = {},
+                    onSubmitReview = { _, _ -> submitted = true },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("review_choice_off").performClick()
+        composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
+        composeRule.onNodeWithText("Gửi xác nhận").assertIsNotEnabled()
+
+        composeRule.onNodeWithText("Ghi chú (bắt buộc - khác AI)").performTextInput("Thấy đèn tắt khi kiểm tra")
+        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
+        assertEquals(true, submitted)
+    }
+
+    @Test
+    fun review_card_shows_a_message_when_the_submission_fails() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state =
+                        successState(cvState = "on").copy(
+                            reviewError = "Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa",
+                        ),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa").assertExists()
     }
 }
