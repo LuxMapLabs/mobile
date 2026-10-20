@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -156,16 +157,17 @@ fun HomeScreen(
             // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top the mockup
             // uses, so the rounded top corners read as a sheet floating over the navy hero
             // instead of a hard seam. Needs its own opaque background (not just Scaffold's) so
-            // the overlap actually occludes the hero gradient underneath it.
+            // the overlap actually occludes the hero gradient underneath it. The clip (not just
+            // background) matters once the list scrolls - background alone paints the rounded
+            // shape but never cuts the LazyColumn's own square corners, so a scrolled row's edge
+            // shows past the rounding at the top instead of following it.
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .offset(y = -Spacing.xl)
-                        .background(
-                            MaterialTheme.colorScheme.background,
-                            RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-                        ),
+                        .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                        .background(MaterialTheme.colorScheme.background),
             ) {
                 when (uiState) {
                     is HomeUiState.Loading -> LoadingSkeletonState()
