@@ -1,21 +1,31 @@
 package com.luxmap.feature.profile.ui
 
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.feature.profile.data.CurrentUserProfile
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
+private val SAMPLE_PROFILE =
+    CurrentUserProfile(
+        fullName = "Nguyễn Văn Bình",
+        email = "binh.nv@luxmap.vn",
+        role = "field_engineer",
+        communeIds = listOf("COM-001", "COM-002"),
+    )
+
 class ProfileScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     private fun setContent(
+        profileState: ProfileUiState = ProfileUiState.Success(SAMPLE_PROFILE),
         isOnline: Boolean = true,
         pendingSyncCount: Int = 0,
         errorSyncCount: Int = 0,
@@ -27,6 +37,7 @@ class ProfileScreenTest {
             LuxMapTheme {
                 ProfileScreen(
                     username = "fe_thinh",
+                    profileState = profileState,
                     isLoggingOut = false,
                     deviceModel = "Pixel 7a",
                     appVersion = "1.0.0",
@@ -42,10 +53,25 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun shows_the_username_and_device_model() {
+    fun loading_state_shows_the_progress_indicator() {
+        setContent(profileState = ProfileUiState.Loading)
+        composeRule.onNodeWithTag("profile_loading").assertExists()
+    }
+
+    @Test
+    fun success_state_shows_the_full_name_username_and_email() {
         setContent()
-        composeRule.onNodeWithText("fe_thinh").assertExists()
-        composeRule.onNodeWithText("Pixel 7a").assertExists()
+        composeRule.onNodeWithText("Nguyễn Văn Bình").assertExists()
+        composeRule.onNodeWithText("@fe_thinh").assertExists()
+        composeRule.onNodeWithText("binh.nv@luxmap.vn").assertExists()
+    }
+
+    @Test
+    fun success_state_shows_the_assigned_communes_and_device_footer() {
+        setContent()
+        composeRule.onNodeWithText("COM-001, COM-002", substring = true).assertExists()
+        composeRule.onNodeWithText("Pixel 7a", substring = true).assertExists()
+        composeRule.onNodeWithText("1.0.0", substring = true).assertExists()
     }
 
     @Test
@@ -69,15 +95,13 @@ class ProfileScreenTest {
     @Test
     fun shows_offline_when_not_online() {
         setContent(isOnline = false)
-        composeRule.onNodeWithText("Offline").assertExists()
+        composeRule.onNodeWithText("Ngoại tuyến").assertExists()
     }
 
     @Test
-    fun the_notification_and_offline_map_rows_say_not_supported_in_this_version() {
-        setContent()
-        composeRule.onNodeWithText("Thông báo").assertExists()
-        composeRule.onNodeWithText("Bản đồ ngoại tuyến").assertExists()
-        composeRule.onAllNodesWithText("Chưa hỗ trợ trong phiên bản này", substring = true).assertCountEquals(2)
+    fun error_state_shows_the_message() {
+        setContent(profileState = ProfileUiState.Error("network down"))
+        composeRule.onNodeWithText("network down").assertExists()
     }
 
     @Test
