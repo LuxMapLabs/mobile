@@ -50,6 +50,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -305,10 +306,9 @@ private fun WorkOrderDetailContent(
                 Modifier
                     .fillMaxWidth()
                     .offset(y = -Spacing.xl)
-                    .background(
-                        MaterialTheme.colorScheme.background,
-                        RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet),
-                    ).padding(Spacing.lg),
+                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             WorkOrderHeaderSection(detail)
