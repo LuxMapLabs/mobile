@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -90,6 +91,10 @@ private fun OutcomeChip(
                     shape = RoundedCornerShape(Radius.chip),
                     clip = false,
                 )
+                // Without this, the clickable ripple below draws as a plain rectangle past the
+                // rounded background on tap - this clips both the fill and the ripple to the
+                // chip's real rounded shape.
+                .clip(RoundedCornerShape(Radius.chip))
                 .background(if (selected) Color.White else Color.Transparent, RoundedCornerShape(Radius.chip))
                 .clickable(onClick = onClick)
                 .padding(horizontal = Spacing.xs),

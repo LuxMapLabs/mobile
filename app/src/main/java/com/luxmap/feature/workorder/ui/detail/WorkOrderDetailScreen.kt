@@ -1,5 +1,6 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,11 +23,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Event
@@ -33,14 +39,17 @@ import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -48,16 +57,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
@@ -98,6 +115,7 @@ import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
+import java.io.File
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -238,6 +256,18 @@ private fun workOrderCtaState(
                 icon = Icons.Filled.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
+            )
+        // A completion was already saved locally (tapping the button writes it immediately,
+        // offline-first) - lock the CTA right away instead of leaving it looking tappable until
+        // the screen is reopened and detail.allowedActions is refetched from the server. Without
+        // this, a field engineer who taps again (since nothing visibly changed) just gets a 409
+        // from the server, which is confusing and looks like the button does nothing.
+        "complete" in detail.allowedActions && state.localCompletion != null ->
+            WorkOrderCtaState(
+                text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
+                icon = Icons.Filled.HourglassTop,
+                enabled = false,
+                onClick = {},
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.REPAIR ->
             WorkOrderCtaState(
@@ -413,6 +443,7 @@ private fun WorkOrderHeroSection(
                     text = "Ưu tiên ${overallPriority.label()}",
                     dotColor = overallPriority.color(),
                     textColor = Color.White,
+                    borderColor = Color.White.copy(alpha = 0.3f),
                 )
             }
         }
@@ -706,6 +737,12 @@ private fun RepairCompletionSection(
         } else {
             WorkOrderStatus.ASSIGNED.badgeColors()
         }
+    val focusManager = LocalFocusManager.current
+    // Tapping the filled tile used to call onRetakeEvidence directly, silently discarding the
+    // photo and reopening the camera - now it only opens a preview, which has its own explicit
+    // retake action.
+    var showEvidencePreview by remember { mutableStateOf(false) }
+
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         CompletionSectionHeader(
             icon = Icons.Filled.FactCheck,
@@ -724,12 +761,16 @@ private fun RepairCompletionSection(
         ) {
             EvidencePicker(
                 hasPhoto = hasPhoto,
-                onTileClick = if (hasPhoto) onRetakeEvidence else onCaptureEvidence,
+                filePath = state.localEvidence?.filePath,
+                onTileClick = if (hasPhoto) ({ showEvidencePreview = true }) else onCaptureEvidence,
             )
             OutlinedTextField(
                 value = state.reportNote,
                 onValueChange = onReportNoteChanged,
                 label = { Text("Kết quả sửa chữa") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
@@ -741,9 +782,70 @@ private fun RepairCompletionSection(
                 value = state.materialsUsed,
                 onValueChange = onMaterialsUsedChanged,
                 label = { Text("Vật tư đã dùng (không bắt buộc)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
             )
             RequirementList(items = requirements)
+        }
+    }
+
+    val evidenceFilePath = state.localEvidence?.filePath
+    if (showEvidencePreview && evidenceFilePath != null) {
+        EvidencePreviewDialog(
+            filePath = evidenceFilePath,
+            onDismiss = { showEvidencePreview = false },
+            onRetake = {
+                showEvidencePreview = false
+                onRetakeEvidence()
+            },
+        )
+    }
+}
+
+// Full-size look at the captured "after" photo, opened by tapping EvidencePicker's filled tile -
+// retake is now an explicit choice here instead of the tile's only possible action.
+@Composable
+private fun EvidencePreviewDialog(
+    filePath: String,
+    onDismiss: () -> Unit,
+    onRetake: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black, RoundedCornerShape(Radius.card))
+                    .padding(Spacing.md),
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
+                }
+            }
+            AsyncImage(
+                model = File(filePath),
+                contentDescription = "Ảnh sau sửa chữa",
+                contentScale = ContentScale.Fit,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(3f / 4f)
+                        .clip(RoundedCornerShape(Radius.card)),
+            )
+            Spacer(Modifier.height(Spacing.md))
+            OutlinedButton(
+                onClick = onRetake,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+            ) {
+                Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(Spacing.sm))
+                Text("Chụp lại")
+            }
         }
     }
 }
@@ -788,12 +890,16 @@ private fun InspectionCompletionSection(
     state: WorkOrderDetailUiState.Success,
     onReportNoteChanged: (String) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         CompletionSectionHeader(icon = Icons.Filled.EditNote, title = "Ghi chú kiểm tra")
         OutlinedTextField(
             value = state.reportNote,
             onValueChange = onReportNoteChanged,
             label = { Text("Ghi chú kiểm tra") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             modifier = Modifier.fillMaxWidth(),
         )
     }

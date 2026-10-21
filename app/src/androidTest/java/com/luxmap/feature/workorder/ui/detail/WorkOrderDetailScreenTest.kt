@@ -1,6 +1,7 @@
 package com.luxmap.feature.workorder.ui.detail
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -10,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -158,8 +160,25 @@ class WorkOrderDetailScreenTest {
     fun a_repair_with_complete_allowed_shows_the_add_tile_and_the_unmet_requirement() {
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithContentDescription("Chụp ảnh sau").assertExists()
+        composeRule.onNodeWithContentDescription("Chụp ảnh").assertExists()
         composeRule.onNodeWithText("Có ảnh sau sửa chữa").assertExists()
+    }
+
+    @Test
+    fun a_repair_already_submitted_locally_shows_a_locked_submitted_cta_instead_of_the_submit_button() {
+        val detail = repairDetail(allowedActions = listOf("complete"))
+        val completion =
+            LocalWorkOrderCompletionEntity(
+                workOrderId = detail.workOrderId,
+                reportNote = "Đã thay bóng đèn mới",
+                materialsUsed = null,
+                faultOutcomesJson = null,
+                clientOpId = "CLIENT-OP-1",
+                submitStatus = "pending",
+            )
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, localCompletion = completion))
+        composeRule.onNodeWithText("Hoàn thành lệnh").assertDoesNotExist()
+        composeRule.onNodeWithText("Đã nộp — Chờ đồng bộ").assertExists().assertIsNotEnabled()
     }
 
     @Test

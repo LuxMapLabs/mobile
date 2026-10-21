@@ -38,5 +38,4 @@ object Radius {
 val ScreenMargin = 20.dp
 val PrimaryButtonHeight = 56.dp
 val RecordButtonSize = 84.dp
-val TopBarHeight = 64.dp
 val NavBarHeight = 76.dp

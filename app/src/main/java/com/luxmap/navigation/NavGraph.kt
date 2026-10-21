@@ -148,8 +148,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
         // un-animated "if" here made the bell/bottom bar flash in while the old screen was still
         // fading out underneath it.
         topBar = {
+            // Hidden on Map specifically (per product decision) - the bottom nav bar's own
+            // visibility is untouched, only the bell bar is skipped for this one tab.
             AnimatedVisibility(
-                visible = showBottomBar,
+                visible = showBottomBar && currentRoute != Routes.Map.route,
                 enter = fadeIn(animationSpec = tween(FADE_IN_MS)),
                 exit = fadeOut(animationSpec = tween(FADE_OUT_MS)),
             ) {
