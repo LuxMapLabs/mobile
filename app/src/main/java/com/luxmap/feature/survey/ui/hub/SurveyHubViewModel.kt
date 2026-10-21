@@ -53,6 +53,13 @@ class SurveyHubViewModel
             load()
         }
 
+        // Unlike onRetry, works from any state - called when the screen's own back stack entry
+        // resumes (e.g. returning from the pole-photo list after "Hoan tat"), so a status change
+        // made there (in_progress -> done) shows up without the user tapping anything.
+        fun refresh() {
+            load()
+        }
+
         // No reachable "Bat dau" for a survey work order otherwise: Home deliberately hides
         // survey orders (see HomeScreen.kt), and "Kiem tra san sang" below only checks local
         // device readiness for the video flow - it never calls this API. Reuses the same

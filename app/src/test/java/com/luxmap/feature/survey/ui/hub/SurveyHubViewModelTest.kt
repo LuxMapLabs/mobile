@@ -165,6 +165,30 @@ class SurveyHubViewModelTest {
         }
 
     @Test
+    fun `refresh re-loads from Success, unlike onRetry which only works from Error`() =
+        runTest {
+            val startedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success (assigned)
+                viewModel.refresh()
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(startedRoute), success.assignedRoutes)
+            }
+        }
+
+    @Test
     fun `onStartRoute calls the API then reloads to pick up the new status`() =
         runTest {
             val startedRoute = route.copy(woStatus = "in_progress")
