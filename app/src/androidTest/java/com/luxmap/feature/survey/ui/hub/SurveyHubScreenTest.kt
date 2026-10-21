@@ -1,5 +1,7 @@
 package com.luxmap.feature.survey.ui.hub
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,6 +54,34 @@ class SurveyHubScreenTest {
         // label text, so this checks the section's own count badge instead ("1 tuyến").
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
         composeRule.onNodeWithText("1 tuyến").assertExists()
+    }
+
+    @Test
+    fun an_assigned_route_disables_capture_pole_photos_and_shows_the_start_first_hint() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsNotEnabled()
+        composeRule.onNodeWithText("bắt đầu tuyến trước khi chụp ảnh cột đèn", substring = true).assertExists()
+    }
+
+    @Test
+    fun an_in_progress_route_enables_capture_pole_photos_and_hides_the_hint() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route().copy(woStatus = "in_progress"))),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsEnabled()
+        composeRule.onNodeWithText("bắt đầu tuyến trước khi chụp ảnh cột đèn", substring = true).assertDoesNotExist()
     }
 
     @Test

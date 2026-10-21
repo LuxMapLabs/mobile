@@ -582,8 +582,14 @@ private fun AssignedRouteCard(
         ) {
             Text(text = "Kiểm tra sẵn sàng")
         }
+        // Uploading a pole photo needs the work order to be in_progress server-side
+        // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could capture
+        // a photo for a route that was never started, only to see a confusing "Xung dot" sync
+        // badge later with no clue why.
+        val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
         OutlinedButton(
             onClick = onCapturePolePhotos,
+            enabled = canCapturePolePhotos,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
             shape = RoundedCornerShape(Radius.control),
             // Not Navy700 - that's a fixed dark color, unreadable against the card's dark-mode
@@ -592,6 +598,13 @@ private fun AssignedRouteCard(
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         ) {
             Text(text = "Chụp ảnh cột đèn")
+        }
+        if (!canCapturePolePhotos) {
+            Text(
+                text = "Bấm \"Kiểm tra sẵn sàng\" và bắt đầu tuyến trước khi chụp ảnh cột đèn",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
