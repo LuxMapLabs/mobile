@@ -95,7 +95,10 @@ fun PoleListRoute(
         aiResultPoleId = lastViewedPoleId.orEmpty(),
         aiResultPosition = lastViewedPosition ?: 0,
         onCapturePole = onCapturePole,
-        onDone = onDone,
+        onDone = {
+            viewModel.onComplete()
+            onDone()
+        },
         onRetry = viewModel::onRetry,
         onViewAiResult = { serverPhotoId ->
             val pole = (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
