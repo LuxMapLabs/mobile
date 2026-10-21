@@ -43,18 +43,24 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
@@ -108,6 +114,25 @@ fun HomeRoute(
     val scope = rememberCoroutineScope()
     val showNotImplemented: () -> Unit = {
         scope.launch { snackbarHostState.showSnackbar("Chức năng đang được hoàn thiện") }
+    }
+
+    // Home's own ViewModel survives navigating into another screen (work order detail, survey...)
+    // and back - its data would otherwise go stale after an action there changes a work order's
+    // status (e.g. the engineer submits, or a manager verifies/returns it from the web). Refetch
+    // every time this screen's back stack entry becomes the visible one again, not just on first
+    // load - but skip the very first ON_RESUME, since init{} already covers that one and retrying
+    // too would just flash the loading state right after it.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isFirstResume by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    if (isFirstResume) isFirstResume = false else viewModel.retry()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     HomeScreen(
         uiState = uiState,
