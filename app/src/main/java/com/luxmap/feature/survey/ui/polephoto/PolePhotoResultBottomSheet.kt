@@ -314,7 +314,7 @@ private fun ReviewCard(
         OutlinedTextField(
             value = note,
             onValueChange = { note = it },
-            label = { Text(if (noteRequired) "Ghi chú (bắt buộc - khác AI)" else "Ghi chú (không bắt buộc)") },
+            label = { Text("Ghi chú") },
             isError = noteRequired && note.isBlank(),
             modifier = Modifier.fillMaxWidth(),
         )

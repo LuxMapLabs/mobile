@@ -281,7 +281,7 @@ class PolePhotoResultBottomSheetTest {
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
         composeRule.onNodeWithText("Gửi xác nhận").assertIsNotEnabled()
 
-        composeRule.onNodeWithText("Ghi chú (bắt buộc - khác AI)").performTextInput("Thấy đèn tắt khi kiểm tra")
+        composeRule.onNodeWithText("Ghi chú").performTextInput("Thấy đèn tắt khi kiểm tra")
         composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
         assertEquals(true, submitted)
     }
