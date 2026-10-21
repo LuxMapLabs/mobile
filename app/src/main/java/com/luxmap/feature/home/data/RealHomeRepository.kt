@@ -22,7 +22,10 @@ class RealHomeRepository
         override fun observeHomeData(): Flow<HomeData> =
             flow {
                 val userId = userApi.me().userId
-                val items = workOrdersApi.list(assignedTo = userId).items
+                // "Việc hôm nay" only means open work - without this filter the server returns
+                // every work order ever assigned to this user, including done/verified/cancelled
+                // ones from the past, which then show up mixed into today's task list.
+                val items = workOrdersApi.list(assignedTo = userId, woStatus = ACTIVE_STATUSES).items
                 emit(items.toHomeData())
             }
 
@@ -63,6 +66,7 @@ class RealHomeRepository
             )
 
         private companion object {
+            const val ACTIVE_STATUSES = "assigned,in_progress"
             val TERMINAL_STATUSES = setOf("done", "verified", "cancelled")
         }
     }
