@@ -257,12 +257,17 @@ private fun workOrderCtaState(
                 enabled = !state.isStarting,
                 onClick = onStart,
             )
-        // A completion was already saved locally (tapping the button writes it immediately,
+        // A completion was just saved locally (tapping the button writes it immediately,
         // offline-first) - lock the CTA right away instead of leaving it looking tappable until
         // the screen is reopened and detail.allowedActions is refetched from the server. Without
         // this, a field engineer who taps again (since nothing visibly changed) just gets a 409
         // from the server, which is confusing and looks like the button does nothing.
-        "complete" in detail.allowedActions && state.localCompletion != null ->
+        //
+        // Only "pending" locks it - a manager can return a completed order for rework, which
+        // puts "complete" back in allowedActions while the OLD completion row is still sitting
+        // in Room as "synced". Checking localCompletion != null here would lock the CTA forever
+        // after a return, since nothing ever deletes that stale row.
+        "complete" in detail.allowedActions && state.localCompletion?.submitStatus == "pending" ->
             WorkOrderCtaState(
                 text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
                 icon = Icons.Filled.HourglassTop,
