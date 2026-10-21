@@ -64,4 +64,6 @@ class FakeSurveyRepository
             sessionDao.deleteSessionAndSegments(sessionId)
             return session.surveySweepId
         }
+
+        override suspend fun startRoute(workOrderId: String): Result<Unit> = Result.success(Unit)
     }
