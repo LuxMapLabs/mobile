@@ -1,6 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,15 +51,22 @@ fun StatusBadge(
     }
 }
 
+// Bordered pill, same padding/shape as StatusBadge - previously bare dot+text with no box, which
+// looked uneven sitting next to StatusBadge's filled pills in the same row (e.g. the work order
+// hero's "Kiểm tra"/"Hoàn tất" badges next to "Ưu tiên Bình thường").
 @Composable
 fun PriorityDot(
     text: String,
     dotColor: Color,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
+    borderColor: Color = MaterialTheme.colorScheme.outline,
 ) {
     Row(
-        modifier = modifier,
+        modifier =
+            modifier
+                .border(1.dp, borderColor, RoundedCornerShape(Radius.badge))
+                .padding(horizontal = Spacing.sm, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -68,6 +76,6 @@ fun PriorityDot(
                     .background(color = dotColor, shape = CircleShape),
         )
         Spacer(Modifier.width(Spacing.xs))
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = textColor)
+        Text(text = text, style = BadgeTextStyle, color = textColor, maxLines = 1)
     }
 }

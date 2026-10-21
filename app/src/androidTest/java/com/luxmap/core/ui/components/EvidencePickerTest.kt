@@ -16,19 +16,25 @@ class EvidencePickerTest {
     fun when_there_is_no_photo_shows_the_add_tile_and_invokes_onTileClick() {
         var tapped = false
         composeRule.setContent {
-            LuxMapTheme { EvidencePicker(hasPhoto = false, onTileClick = { tapped = true }) }
+            LuxMapTheme { EvidencePicker(hasPhoto = false, filePath = null, onTileClick = { tapped = true }) }
         }
-        composeRule.onNodeWithContentDescription("Chụp ảnh sau").performClick()
+        composeRule.onNodeWithContentDescription("Chụp ảnh").performClick()
         assertTrue(tapped)
     }
 
     @Test
-    fun when_there_is_a_photo_shows_the_filled_tile_and_invokes_onTileClick_to_retake() {
+    fun when_there_is_a_photo_shows_the_filled_tile_and_invokes_onTileClick_to_preview() {
         var tapped = false
         composeRule.setContent {
-            LuxMapTheme { EvidencePicker(hasPhoto = true, onTileClick = { tapped = true }) }
+            LuxMapTheme {
+                EvidencePicker(
+                    hasPhoto = true,
+                    filePath = "/data/evidence.jpg",
+                    onTileClick = { tapped = true },
+                )
+            }
         }
-        composeRule.onNodeWithText("Đã chụp").performClick()
+        composeRule.onNodeWithText("Chụp ảnh").performClick()
         assertTrue(tapped)
     }
 }
