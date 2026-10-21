@@ -32,6 +32,10 @@ sealed interface SurveyHubUiState {
         val pendingAiConfirmation: List<LocalPendingAiConfirmation> = emptyList(),
         // True when assignedRoutes came from the local cache after a failed fetch.
         val isStale: Boolean = false,
+        // The route currently calling POST /work-orders/{id}/start - disables its "Bat dau
+        // tuyen" button while in flight, null the rest of the time.
+        val startingWorkOrderId: String? = null,
+        val startError: String? = null,
     ) : SurveyHubUiState
 
     data object Empty : SurveyHubUiState

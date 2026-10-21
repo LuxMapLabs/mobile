@@ -1,5 +1,7 @@
 package com.luxmap.feature.survey.ui.hub
 
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -52,6 +54,67 @@ class SurveyHubScreenTest {
         // label text, so this checks the section's own count badge instead ("1 tuyến").
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
         composeRule.onNodeWithText("1 tuyến").assertExists()
+    }
+
+    @Test
+    fun an_assigned_route_shows_bat_dau_tuyen_and_disables_capture_pole_photos() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu tuyến").assertIsEnabled()
+        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsNotEnabled()
+    }
+
+    @Test
+    fun tapping_bat_dau_tuyen_invokes_onStartRoute_with_the_work_order_id() {
+        var started: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    onCheckReadiness = {},
+                    onStartRoute = { started = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu tuyến").performClick()
+        assertEquals("WO-1", started)
+    }
+
+    @Test
+    fun an_in_progress_route_hides_bat_dau_tuyen_and_enables_capture_pole_photos() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route().copy(woStatus = "in_progress"))),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu tuyến").assertDoesNotExist()
+        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsEnabled()
+    }
+
+    @Test
+    fun a_start_error_shows_an_inline_banner() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route()),
+                            startError = "Không bắt đầu được tuyến này",
+                        ),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Không bắt đầu được tuyến này").assertExists()
     }
 
     @Test

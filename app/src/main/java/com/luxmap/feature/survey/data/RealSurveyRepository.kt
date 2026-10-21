@@ -93,4 +93,7 @@ class RealSurveyRepository
             sessionDao.deleteSessionAndSegments(sessionId)
             return session.surveySweepId
         }
+
+        override suspend fun startRoute(workOrderId: String): Result<Unit> =
+            runCatching { workOrdersApi.start(workOrderId) }.map {}
     }

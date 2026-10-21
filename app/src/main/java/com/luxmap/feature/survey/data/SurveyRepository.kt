@@ -42,4 +42,9 @@ interface SurveyRepository {
     // Deletes the session's local video/log files and its Room rows, returning the
     // surveySweepId so the caller can start a fresh recording for the same route.
     suspend fun discardSession(sessionId: String): String
+
+    // Same generic POST /work-orders/{id}/start WorkOrderDetailScreen (F09) already uses - the
+    // Hub needs its own way to call it, since Home deliberately hides survey work orders (see
+    // HomeScreen.kt), so F09 is not reachable for them except through a notification tap.
+    suspend fun startRoute(workOrderId: String): Result<Unit>
 }
