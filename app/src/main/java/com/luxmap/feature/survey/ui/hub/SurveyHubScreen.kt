@@ -103,6 +103,7 @@ fun SurveyHubRoute(
                 onCapturePolePhotos = onCapturePolePhotos,
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
+                onStartRoute = viewModel::onStartRoute,
                 onReviewAiConfirmation = onReviewAiConfirmation,
             )
         }
@@ -116,6 +117,7 @@ fun SurveyHubScreen(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
+    onStartRoute: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
 ) {
@@ -143,6 +145,7 @@ fun SurveyHubScreen(
                         state = state,
                         onCheckReadiness = onCheckReadiness,
                         onCapturePolePhotos = onCapturePolePhotos,
+                        onStartRoute = onStartRoute,
                         onReviewAiConfirmation = onReviewAiConfirmation,
                         onResurvey = onResurvey,
                     )
@@ -343,6 +346,7 @@ private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
+    onStartRoute: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
 ) {
@@ -362,6 +366,9 @@ private fun SurveyHubContent(
                     tone = InlineBannerTone.OFFLINE,
                 )
             }
+        }
+        if (state.startError != null) {
+            item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
         if (hasAttentionCards) {
             item {
@@ -384,8 +391,10 @@ private fun SurveyHubContent(
             items(state.assignedRoutes) { route ->
                 AssignedRouteCard(
                     route,
+                    isStarting = state.startingWorkOrderId == route.workOrderId,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
+                    onStartRoute = { onStartRoute(route.workOrderId) },
                 )
             }
         }
@@ -520,8 +529,10 @@ private fun scheduledDateText(scheduledDate: String?): String =
 @Composable
 private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
+    isStarting: Boolean,
     onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
+    onStartRoute: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
     val dateColor =
@@ -574,6 +585,22 @@ private fun AssignedRouteCard(
                 modifier = Modifier.weight(1f),
             )
         }
+        // A freshly-created work order (e.g. from the web) starts "assigned" - neither the video
+        // flow nor pole-photo uploads work yet (server rejects both with 409
+        // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
+        // only reachable place to call the start API for one - "Kiem tra san sang" below does
+        // NOT call it, it only checks local device readiness for the video flow.
+        if (status == WorkOrderStatus.ASSIGNED) {
+            Button(
+                onClick = onStartRoute,
+                enabled = !isStarting,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+            ) {
+                Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+            }
+        }
         Button(
             onClick = onCheckReadiness,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
@@ -582,8 +609,14 @@ private fun AssignedRouteCard(
         ) {
             Text(text = "Kiểm tra sẵn sàng")
         }
+        // Uploading a pole photo needs the work order to be in_progress server-side
+        // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could capture
+        // a photo for a route that was never started, only to see a confusing "Xung dot" sync
+        // badge later with no clue why.
+        val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
         OutlinedButton(
             onClick = onCapturePolePhotos,
+            enabled = canCapturePolePhotos,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
             shape = RoundedCornerShape(Radius.control),
             // Not Navy700 - that's a fixed dark color, unreadable against the card's dark-mode
@@ -592,6 +625,13 @@ private fun AssignedRouteCard(
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         ) {
             Text(text = "Chụp ảnh cột đèn")
+        }
+        if (!canCapturePolePhotos) {
+            Text(
+                text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
