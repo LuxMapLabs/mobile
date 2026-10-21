@@ -182,6 +182,26 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun a_repair_returned_for_rework_shows_the_submit_button_instead_of_the_locked_cta() {
+        // A manager returning the order puts "complete" back in allowedActions while the OLD
+        // completion row is still "synced" in Room - the CTA must unlock, not stay stuck on
+        // "Da nop" forever.
+        val detail = repairDetail(allowedActions = listOf("complete")).copy(reviewNote = "Chụp lại ảnh rõ hơn")
+        val completion =
+            LocalWorkOrderCompletionEntity(
+                workOrderId = detail.workOrderId,
+                reportNote = "Đã thay bóng đèn mới",
+                materialsUsed = null,
+                faultOutcomesJson = null,
+                clientOpId = "CLIENT-OP-1",
+                submitStatus = "synced",
+            )
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, localCompletion = completion))
+        composeRule.onNodeWithText("Đã nộp", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Hoàn thành lệnh").assertExists()
+    }
+
+    @Test
     fun an_inspection_shows_an_outcome_segment_per_fault_and_the_progress_hint() {
         val faults = listOf(fault("FAULT-1", "POLE-0047"), fault("FAULT-2", "POLE-0048"))
         val state =
