@@ -39,9 +39,6 @@ private data class OutcomeOption(
     val condition: AssetCondition,
 )
 
-// (wire value, label, icon, which AssetCondition pair supplies the selected tile color) - reuses
-// the existing light-theme OUT/NORMAL/DIM colors instead of inventing a new trio, since this
-// tray always sits on the light content sheet, never on a dark hero.
 private val OUTCOME_OPTIONS =
     listOf(
         OutcomeOption("fault_present", "Có sự cố", Icons.Filled.Error, AssetCondition.OUT),
@@ -49,8 +46,6 @@ private val OUTCOME_OPTIONS =
         OutcomeOption("inconclusive", "Chưa xác định", Icons.Filled.Help, AssetCondition.DIM),
     )
 
-// 3 vertical icon+label tiles in a row, matching the F09 v2 mockup - replaces the earlier
-// horizontal dot+label pill tray, same idea (pick one of 3 outcomes, color-coded once chosen).
 @Composable
 fun OutcomeSegment(
     selected: String?,

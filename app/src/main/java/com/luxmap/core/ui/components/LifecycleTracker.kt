@@ -25,10 +25,6 @@ enum class LifecycleStepState { DONE, CURRENT, FUTURE }
 
 data class LifecycleStep(val label: String, val state: LifecycleStepState)
 
-// Thin segmented bar + one "Bước X/5 · <label>" line, matching the F09 v2 mockup's compact
-// "Quy trình" row - replaces the earlier step-dots-with-labels-and-connecting-lines look, which
-// needed the hero's full width. This component has only one caller (WorkOrderDetailScreen.kt),
-// now inside a small summary card instead of the dark hero, so the smaller footprint matters.
 @Composable
 fun LifecycleTracker(
     steps: List<LifecycleStep>,

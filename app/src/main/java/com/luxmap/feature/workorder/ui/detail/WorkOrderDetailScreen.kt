@@ -205,17 +205,12 @@ fun WorkOrderDetailScreen(
                 val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
                 if (cta != null) {
                     Column {
-                        // WO-CANCEL-REQUEST - only while still "assigned" (Rules.cs), same gate
-                        // the server itself enforces, not re-derived from woStatus client-side.
                         if ("request_cancellation" in uiState.detail.allowedActions) {
                             CancelRequestButton(onClick = { showCancelSheet = true })
                         }
                         BottomActionBar(
                             ctaText = cta.text,
                             ctaIcon = cta.icon,
-                            // A submit action always confirms first (the mockup's own "Nộp báo
-                            // cáo?" sheet) - "start" and the disabled lock/wait states have no
-                            // reason to.
                             onCtaClick = {
                                 if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
                             },
@@ -290,9 +285,6 @@ fun WorkOrderDetailScreen(
         )
     }
 
-    // Closes the sheet and shows the success message once the server actually confirms the
-    // request (cancellationRequestStatus flips to "pending") - a real network call, unlike the
-    // submit sheet above, so it can't just close itself optimistically on tap.
     LaunchedEffect(uiState) {
         val success = uiState as? WorkOrderDetailUiState.Success
         if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
@@ -320,8 +312,6 @@ private data class WorkOrderCtaState(
     val hintColor: Color? = null,
     val progressText: String? = null,
     val progressSegments: List<Boolean>? = null,
-    // true only for the 2 "complete" branches below - "start" and the locked/waiting states
-    // have nothing to confirm, they either do nothing or aren't tappable at all.
     val requiresConfirmation: Boolean = false,
 )
 
@@ -454,9 +444,6 @@ private fun submitSummaryRows(
         )
     }
 
-// "Nộp báo cáo?" confirmation sheet, matching the mockup - shown before onSubmit actually runs,
-// with a quick summary so the engineer can catch a mistake before it locks (the order becomes
-// read-only for them once submitted, until the Manager reviews it).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SubmitConfirmationSheet(
@@ -564,10 +551,6 @@ private fun SubmitConfirmationSheet(
     }
 }
 
-// Red-bordered secondary action above the main CTA, matching the mockup's "Yêu cầu hủy" button -
-// only ever shown alongside "Bắt đầu" (both require wo_status == assigned, per Rules.cs), so it
-// sits on its own instead of inside BottomActionBar (that component is shared by 2 other screens
-// with no concept of a second button).
 @Composable
 private fun CancelRequestButton(onClick: () -> Unit) {
     OutlinedButton(
@@ -593,9 +576,6 @@ private val CANCEL_REASON_OPTIONS =
         "Lý do khác",
     )
 
-// Reason is free text server-side (1-500 chars, required) - these 4 options are canned starting
-// points matching the mockup, combined with the optional note into one string before sending,
-// since the real request body only has a single "reason" field.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CancelRequestSheet(
@@ -671,8 +651,6 @@ private fun CancelReasonRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    // Reuses AssetCondition.OUT's red pair instead of M3's uncustomized errorContainer role
-    // (that one still carries the default M3 palette here, not this app's red - see CLAUDE.md).
     val outColors = AssetCondition.OUT.badgeColors(isDark = false)
     Row(
         modifier =
@@ -815,20 +793,12 @@ private fun WorkOrderHeroSection(
     }
 }
 
-// Due/schedule/priority + the case lifecycle progress, gathered into one light-surface card
-// right below the hero - matches the F09 v2 mockup, which moves these off the dark hero (where
-// HeroInfoCell + LifecycleTracker(onDarkHero=true) used to render them) onto the content sheet.
 @Composable
 private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    // Highest severity among the work order's own faults - severity is set by the Manager
-    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
-    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
-    // order) means no rank to show, so the cell is simply left out.
     val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
     val due = dueDateLabel(detail.dueDate)
-    // Same 3-tier due-date color convention F02's NextUpCard/TaskRow use on a light surface.
     val dueColor =
         when {
             due.isOverdue -> MaterialTheme.colorScheme.error
@@ -914,9 +884,6 @@ private fun SummaryPriorityCell(
     }
 }
 
-// Manager note / review note / cancellation-request status - badges/title/due/schedule/
-// lifecycle moved into WorkOrderHeroSection above. Order: review note (most urgent, needs a
-// response), then cancellation status, then the plain note card.
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val hasCancellationBanner = detail.cancellationRequestStatus != "none"
@@ -928,9 +895,6 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
                 tone = InlineBannerTone.ERROR,
             )
         }
-        // WO-CANCEL-REQUEST - "pending" means waiting on the Manager, "rejected" shows their
-        // reason (request_cancellation reappears in allowedActions once rejected, so the FE
-        // can read why and try again with a different reason if they still want to).
         when (detail.cancellationRequestStatus) {
             "pending" ->
                 InlineBanner(
@@ -1038,9 +1002,6 @@ private val FaultSectionAvatarSize = 32.dp
 private val FaultTypeIconSize = 44.dp
 private val FaultNavigateButtonSize = 48.dp
 
-// Icon + color per fault_type wire value, same AssetCondition pairs the rest of the app already
-// uses for severity colors (OUT = red, DIM = amber, UNKNOWN = neutral gray) instead of inventing
-// a new palette - this card always sits on the light content sheet, never a dark hero.
 private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
     when (faultType) {
         "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors(isDark = false)
@@ -1106,8 +1067,6 @@ private fun FaultRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // Only a repair order already carries a past outcome worth showing here - an
-                // inspection order's outcome is what OutcomeSegment below is collecting.
                 if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
                     StatusBadge(
                         text = inspectionOutcomeLabel(fault.inspectionOutcome),
@@ -1138,8 +1097,6 @@ private fun FaultRow(
     }
 }
 
-// Inline dot + text, no border/box - matches the mockup's small priority indicator that sits
-// right next to the fault type headline, instead of the earlier separate bordered chip.
 @Composable
 private fun PriorityDotLabel(priority: WorkOrderPriority) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

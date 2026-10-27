@@ -38,9 +38,7 @@ import com.luxmap.core.theme.Spacing
 // the surrounding list's own horizontal padding instead of adding a second one on top of it.
 // progressText is a separate, neutral-colored line (e.g. "3/5 đã có kết quả") for a screen that
 // wants to show ongoing progress, not a blocking reason - unlike hint, it is never styled as an
-// error. progressSegments/hintColor/showHintIcon are additive, defaulted off - only the F09
-// inspection CTA (WorkOrderDetailScreen.kt) passes them today; SurveyPlanScreen/AiConfirmation
-// keep their current look unchanged.
+// error. ctaIcon is optional (defaults to null, no icon) so existing callers are unaffected.
 @Composable
 fun BottomActionBar(
     ctaText: String,

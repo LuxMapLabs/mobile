@@ -48,7 +48,6 @@ interface WorkOrdersApi {
         @Body body: CompleteWorkOrderRequestDto,
     ): WorkOrderDetailDto
 
-    // WO-CANCEL-REQUEST (SELF-SIGNED) - FieldEngineer only, work order must still be "assigned".
     @POST("api/v1/work-orders/{id}/request-cancellation")
     suspend fun requestCancellation(
         @Path("id") id: String,
