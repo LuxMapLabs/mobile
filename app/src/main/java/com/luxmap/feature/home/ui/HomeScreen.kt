@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -225,6 +226,7 @@ private fun HomeContent(
     lastSyncedAt: Instant?,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
+    var selectedTab by remember { mutableStateOf(TaskFilterTab.ALL) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
@@ -256,9 +258,19 @@ private fun HomeContent(
                 )
             }
         }
-        data.groupedByTaskKind().forEach { (kind, items) ->
+        item {
+            TaskFilterTabs(
+                selected = selectedTab,
+                counts = data.taskFilterTabCounts(),
+                onSelect = { selectedTab = it },
+            )
+        }
+        val groupsForTab = data.groupedByTaskKind().filter { (kind, _) -> selectedTab.matches(kind) }
+        var shownAnyGroup = false
+        groupsForTab.forEach { (kind, items) ->
             val remaining = items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
             if (remaining.isNotEmpty()) {
+                shownAnyGroup = true
                 item {
                     TaskKindSection(
                         kind = kind,
@@ -267,6 +279,83 @@ private fun HomeContent(
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
                 }
+            }
+        }
+        // Mockup's "noFiltered" state - the selected tab has no matching work orders, distinct
+        // from the screen's own 4-state Empty (that one means no data at all, not a filter miss).
+        if (!shownAnyGroup) {
+            item {
+                Text(
+                    text = "Không có lệnh nào trong mục này.",
+                    style = LabelTextStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xl),
+                )
+            }
+        }
+    }
+}
+
+private enum class TaskFilterTab(val label: String) {
+    ALL("Tất cả"),
+    REPAIR("Sửa chữa"),
+    INSPECTION("Kiểm tra"),
+}
+
+private fun TaskFilterTab.matches(kind: WorkOrderTaskKind): Boolean =
+    when (this) {
+        TaskFilterTab.ALL -> true
+        TaskFilterTab.REPAIR -> kind == WorkOrderTaskKind.REPAIR
+        TaskFilterTab.INSPECTION -> kind == WorkOrderTaskKind.INSPECTION
+    }
+
+private fun HomeData.taskFilterTabCounts(): Map<TaskFilterTab, Int> {
+    val all = clusters.flatMap { it.items }
+
+    fun countOf(kind: WorkOrderTaskKind) = all.count { workOrderTaskKindFromWire(it.taskKind) == kind }
+    val repairCount = countOf(WorkOrderTaskKind.REPAIR)
+    val inspectionCount = countOf(WorkOrderTaskKind.INSPECTION)
+    return mapOf(
+        TaskFilterTab.ALL to repairCount + inspectionCount,
+        TaskFilterTab.REPAIR to repairCount,
+        TaskFilterTab.INSPECTION to inspectionCount,
+    )
+}
+
+@Composable
+private fun TaskFilterTabs(
+    selected: TaskFilterTab,
+    counts: Map<TaskFilterTab, Int>,
+    onSelect: (TaskFilterTab) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
+                .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TaskFilterTab.entries.forEach { tab ->
+            val isSelected = tab == selected
+            val contentColor =
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
+                        .clickable { onSelect(tab) }
+                        .padding(vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = tab.label, style = BodyStrongTextStyle, color = contentColor)
+                Spacer(Modifier.width(Spacing.xs))
+                Text(text = "${counts[tab] ?: 0}", style = LabelTextStyle, color = contentColor)
             }
         }
     }
