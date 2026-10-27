@@ -800,12 +800,24 @@ private fun NextUpCardSkeleton() {
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SkeletonBar(width = 84.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-            SkeletonBar(width = 64.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SkeletonBar(widthFraction = 0.6f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+                SkeletonBar(widthFraction = 0.4f, height = 20.dp, color = MaterialTheme.colorScheme.outline)
+            }
         }
-        SkeletonBar(widthFraction = 0.6f, height = 24.dp, color = MaterialTheme.colorScheme.outline)
-        SkeletonBar(widthFraction = 0.85f, height = 14.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        SkeletonBar(
+            widthFraction = 1f,
+            height = 44.dp,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(Radius.chip),
+        )
         SkeletonBar(
             widthFraction = 1f,
             height = Dimens.minTouchTarget,
@@ -817,17 +829,26 @@ private fun NextUpCardSkeleton() {
 
 @Composable
 private fun TaskRowSkeleton() {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        SkeletonBar(widthFraction = 0.4f, height = 16.dp, color = MaterialTheme.colorScheme.outline)
-        SkeletonBar(widthFraction = 0.7f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SkeletonBar(widthFraction = 0.45f, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+            SkeletonBar(widthFraction = 0.7f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        }
     }
 }
 
