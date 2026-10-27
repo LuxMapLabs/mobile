@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +31,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Lock
@@ -41,7 +38,6 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
 import androidx.compose.material3.ButtonDefaults
@@ -70,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -77,7 +74,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
-import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
@@ -101,13 +97,13 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.OutcomeSegment
-import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
@@ -346,6 +342,7 @@ private fun WorkOrderDetailContent(
                     .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
+            WorkOrderSummaryCard(detail)
             WorkOrderHeaderSection(detail)
             state.syncStatus()?.let { status ->
                 StatusBadge(text = status.label(), colors = status.badgeColors())
@@ -405,22 +402,6 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    // Highest severity among the work order's own faults - severity is set by the Manager
-    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
-    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
-    // order) means no rank to show, so the dot is simply left out.
-    val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
-    val due = dueDateLabel(detail.dueDate)
-    // Same dark-theme AssetCondition text colors F02's SyncPill reuses for an on-navy accent -
-    // not inventing a new pair for "due today"/"overdue" here either.
-    val dueColor =
-        when {
-            due.isOverdue -> AssetCondition.OUT.badgeColors(isDark = true).text
-            due.isToday -> AssetCondition.DIM.badgeColors(isDark = true).text
-            else -> Color.White
-        }
-    val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
-    val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     Column(
         modifier =
             Modifier
@@ -443,75 +424,110 @@ private fun WorkOrderHeroSection(
         ) {
             StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
             StatusBadge(text = status.label(), colors = status.badgeColors())
-            if (overallPriority != null) {
-                PriorityDot(
-                    text = "Ưu tiên ${overallPriority.label()}",
-                    dotColor = overallPriority.color(),
-                    textColor = Color.White,
-                    borderColor = Color.White.copy(alpha = 0.3f),
-                )
-            }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
             Text(text = detail.workOrderId, style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
         }
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(Radius.card)),
-        ) {
-            HeroInfoCell(
-                icon = Icons.Filled.Event,
+    }
+}
+
+// Due/schedule/priority + the case lifecycle progress, gathered into one light-surface card
+// right below the hero - matches the F09 v2 mockup, which moves these off the dark hero (where
+// HeroInfoCell + LifecycleTracker(onDarkHero=true) used to render them) onto the content sheet.
+@Composable
+private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
+    val status = workOrderStatusFromWire(detail.woStatus)
+    val kind = workOrderTaskKindFromWire(detail.taskKind)
+    // Highest severity among the work order's own faults - severity is set by the Manager
+    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
+    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
+    // order) means no rank to show, so the cell is simply left out.
+    val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
+    val due = dueDateLabel(detail.dueDate)
+    // Same 3-tier due-date color convention F02's NextUpCard/TaskRow use on a light surface.
+    val dueColor =
+        when {
+            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isToday -> DueTodayColor
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+    val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
+    val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SummaryMetricCell(
                 label = "Hạn xử lý",
                 value = due.text,
                 valueColor = dueColor,
                 modifier = Modifier.weight(1f),
             )
-            Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.12f)))
-            HeroInfoCell(
-                icon = Icons.Filled.Schedule,
+            SummaryMetricCell(
                 label = scheduleLabel,
                 value = scheduleValue,
-                valueColor = Color.White,
+                valueColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
+            if (overallPriority != null) {
+                SummaryPriorityCell(priority = overallPriority, modifier = Modifier.weight(1f))
+            }
         }
         if (status != WorkOrderStatus.CANCELLED) {
-            LifecycleTracker(
-                steps = workOrderLifecycleSteps(status, kind),
-                onDarkHero = true,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-            )
+            LifecycleTracker(steps = workOrderLifecycleSteps(status, kind))
         }
     }
 }
 
 @Composable
-private fun HeroInfoCell(
-    icon: ImageVector,
+private fun SummaryMetricCell(
     label: String,
     value: String,
     valueColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(Spacing.sm),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                .padding(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(15.dp),
-            )
-            Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
+        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = value,
+            style = BodyStrongTextStyle,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun SummaryPriorityCell(
+    priority: WorkOrderPriority,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                .padding(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(text = "Ưu tiên", style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Box(modifier = Modifier.size(8.dp).background(priority.color(), CircleShape))
+            Text(text = priority.label(), style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
         }
-        Text(text = value, style = BodyStrongTextStyle, color = valueColor)
     }
 }
 
