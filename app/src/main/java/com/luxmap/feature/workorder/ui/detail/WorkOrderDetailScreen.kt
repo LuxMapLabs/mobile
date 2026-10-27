@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -104,6 +105,7 @@ import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Radius
+import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
@@ -160,6 +162,7 @@ fun WorkOrderDetailRoute(
         onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
+        onRequestCancellation = viewModel::requestCancellation,
         onCaptureEvidence = onCaptureEvidence,
         onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
         modifier = modifier,
@@ -176,11 +179,13 @@ fun WorkOrderDetailScreen(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    onRequestCancellation: (reason: String) -> Unit = {},
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
+    var showCancelSheet by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -199,19 +204,29 @@ fun WorkOrderDetailScreen(
             if (uiState is WorkOrderDetailUiState.Success) {
                 val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
                 if (cta != null) {
-                    BottomActionBar(
-                        ctaText = cta.text,
-                        ctaIcon = cta.icon,
-                        // A submit action always confirms first (the mockup's own "Nộp báo cáo?"
-                        // sheet) - "start" and the disabled lock/wait states have no reason to.
-                        onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() },
-                        ctaEnabled = cta.enabled,
-                        hint = cta.hint,
-                        hintColor = cta.hintColor,
-                        showHintIcon = cta.hint != null,
-                        progressText = cta.progressText,
-                        progressSegments = cta.progressSegments,
-                    )
+                    Column {
+                        // WO-CANCEL-REQUEST - only while still "assigned" (Rules.cs), same gate
+                        // the server itself enforces, not re-derived from woStatus client-side.
+                        if ("request_cancellation" in uiState.detail.allowedActions) {
+                            CancelRequestButton(onClick = { showCancelSheet = true })
+                        }
+                        BottomActionBar(
+                            ctaText = cta.text,
+                            ctaIcon = cta.icon,
+                            // A submit action always confirms first (the mockup's own "Nộp báo
+                            // cáo?" sheet) - "start" and the disabled lock/wait states have no
+                            // reason to.
+                            onCtaClick = {
+                                if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
+                            },
+                            ctaEnabled = cta.enabled,
+                            hint = cta.hint,
+                            hintColor = cta.hintColor,
+                            showHintIcon = cta.hint != null,
+                            progressText = cta.progressText,
+                            progressSegments = cta.progressSegments,
+                        )
+                    }
                 }
             }
         },
@@ -264,6 +279,28 @@ fun WorkOrderDetailScreen(
                 }
             },
         )
+    }
+
+    if (showCancelSheet && uiState is WorkOrderDetailUiState.Success) {
+        CancelRequestSheet(
+            isSubmitting = uiState.isRequestingCancellation,
+            errorMessage = uiState.cancellationError,
+            onDismiss = { showCancelSheet = false },
+            onSend = onRequestCancellation,
+        )
+    }
+
+    // Closes the sheet and shows the success message once the server actually confirms the
+    // request (cancellationRequestStatus flips to "pending") - a real network call, unlike the
+    // submit sheet above, so it can't just close itself optimistically on tap.
+    LaunchedEffect(uiState) {
+        val success = uiState as? WorkOrderDetailUiState.Success
+        if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
+            showCancelSheet = false
+            scope.launch {
+                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt")
+            }
+        }
     }
 }
 
@@ -527,6 +564,139 @@ private fun SubmitConfirmationSheet(
     }
 }
 
+// Red-bordered secondary action above the main CTA, matching the mockup's "Yêu cầu hủy" button -
+// only ever shown alongside "Bắt đầu" (both require wo_status == assigned, per Rules.cs), so it
+// sits on its own instead of inside BottomActionBar (that component is shared by 2 other screens
+// with no concept of a second button).
+@Composable
+private fun CancelRequestButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ScreenMargin)
+                .padding(top = Spacing.sm)
+                .heightIn(min = Dimens.minTouchTarget),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) {
+        Text("Yêu cầu hủy")
+    }
+}
+
+private val CANCEL_REASON_OPTIONS =
+    listOf(
+        "Thời tiết không cho phép",
+        "Không tiếp cận được hiện trường",
+        "Trùng với lệnh khác",
+        "Lý do khác",
+    )
+
+// Reason is free text server-side (1-500 chars, required) - these 4 options are canned starting
+// points matching the mockup, combined with the optional note into one string before sending,
+// since the real request body only has a single "reason" field.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CancelRequestSheet(
+    isSubmitting: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSend: (reason: String) -> Unit,
+) {
+    var selectedReason by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(text = "Yêu cầu hủy lệnh", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = "Lý do", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                CANCEL_REASON_OPTIONS.forEach { reason ->
+                    CancelReasonRow(
+                        label = reason,
+                        selected = selectedReason == reason,
+                        onClick = { selectedReason = reason },
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Ghi chú thêm (không bắt buộc)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("Quay lại")
+                }
+                Button(
+                    onClick = {
+                        val reason = selectedReason ?: return@Button
+                        onSend(if (note.isBlank()) reason else "$reason - ${note.trim()}")
+                    },
+                    enabled = selectedReason != null && !isSubmitting,
+                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text(if (isSubmitting) "Đang gửi..." else "Gửi yêu cầu")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CancelReasonRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    // Reuses AssetCondition.OUT's red pair instead of M3's uncustomized errorContainer role
+    // (that one still carries the default M3 palette here, not this app's red - see CLAUDE.md).
+    val outColors = AssetCondition.OUT.badgeColors(isDark = false)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Dimens.minTouchTarget)
+                .clip(RoundedCornerShape(Radius.chip))
+                .background(
+                    if (selected) outColors.background else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(Radius.chip),
+                )
+                .border(if (selected) 2.dp else 0.dp, outColors.text, RoundedCornerShape(Radius.chip))
+                .selectable(selected = selected, onClick = onClick)
+                .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = BodyStrongTextStyle,
+            color = if (selected) outColors.text else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
@@ -744,18 +914,34 @@ private fun SummaryPriorityCell(
     }
 }
 
-// Manager note / review note only now - badges/title/due/schedule/lifecycle moved into
-// WorkOrderHeroSection above. Review note first, then the note card - same order the mockup
-// stacks them in, since a review request is the more urgent of the two.
+// Manager note / review note / cancellation-request status - badges/title/due/schedule/
+// lifecycle moved into WorkOrderHeroSection above. Order: review note (most urgent, needs a
+// response), then cancellation status, then the plain note card.
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
-    if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank()) return
+    val hasCancellationBanner = detail.cancellationRequestStatus != "none"
+    if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank() && !hasCancellationBanner) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (!detail.reviewNote.isNullOrBlank()) {
             InlineBanner(
                 message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
                 tone = InlineBannerTone.ERROR,
             )
+        }
+        // WO-CANCEL-REQUEST - "pending" means waiting on the Manager, "rejected" shows their
+        // reason (request_cancellation reappears in allowedActions once rejected, so the FE
+        // can read why and try again with a different reason if they still want to).
+        when (detail.cancellationRequestStatus) {
+            "pending" ->
+                InlineBanner(
+                    message = "Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt",
+                    tone = InlineBannerTone.OFFLINE,
+                )
+            "rejected" ->
+                InlineBanner(
+                    message = "Yêu cầu hủy bị từ chối: ${detail.cancellationRejectNote}",
+                    tone = InlineBannerTone.ERROR,
+                )
         }
         if (!detail.note.isNullOrBlank()) {
             ManagerNoteCard(note = detail.note)
