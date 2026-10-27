@@ -36,17 +36,23 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BrandHeroGradient
@@ -85,6 +91,24 @@ fun SurveyHubRoute(
     viewModel: SurveyHubViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // The Hub's own ViewModel survives navigating into another screen (pole-photo list,
+    // F03 readiness check) and back - its data would otherwise go stale after an action there
+    // changes a route's status (e.g. "Bat dau tuyen", or "Hoan tat" completing a survey).
+    // Refetch on every ON_RESUME after the first one, same pattern as HomeScreen.kt.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isFirstResume by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    if (isFirstResume) isFirstResume = false else viewModel.refresh()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
     // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
     // instead of blending into an all-dark one.
@@ -103,6 +127,7 @@ fun SurveyHubRoute(
                 onCapturePolePhotos = onCapturePolePhotos,
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
+                onStartRoute = viewModel::onStartRoute,
                 onReviewAiConfirmation = onReviewAiConfirmation,
             )
         }
@@ -116,6 +141,7 @@ fun SurveyHubScreen(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
+    onStartRoute: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
 ) {
@@ -143,6 +169,7 @@ fun SurveyHubScreen(
                         state = state,
                         onCheckReadiness = onCheckReadiness,
                         onCapturePolePhotos = onCapturePolePhotos,
+                        onStartRoute = onStartRoute,
                         onReviewAiConfirmation = onReviewAiConfirmation,
                         onResurvey = onResurvey,
                     )
@@ -343,6 +370,7 @@ private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
+    onStartRoute: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
 ) {
@@ -362,6 +390,9 @@ private fun SurveyHubContent(
                     tone = InlineBannerTone.OFFLINE,
                 )
             }
+        }
+        if (state.startError != null) {
+            item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
         if (hasAttentionCards) {
             item {
@@ -384,8 +415,10 @@ private fun SurveyHubContent(
             items(state.assignedRoutes) { route ->
                 AssignedRouteCard(
                     route,
+                    isStarting = state.startingWorkOrderId == route.workOrderId,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
+                    onStartRoute = { onStartRoute(route.workOrderId) },
                 )
             }
         }
@@ -520,8 +553,10 @@ private fun scheduledDateText(scheduledDate: String?): String =
 @Composable
 private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
+    isStarting: Boolean,
     onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
+    onStartRoute: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
     val dateColor =
@@ -574,6 +609,22 @@ private fun AssignedRouteCard(
                 modifier = Modifier.weight(1f),
             )
         }
+        // A freshly-created work order (e.g. from the web) starts "assigned" - neither the video
+        // flow nor pole-photo uploads work yet (server rejects both with 409
+        // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
+        // only reachable place to call the start API for one - "Kiem tra san sang" below does
+        // NOT call it, it only checks local device readiness for the video flow.
+        if (status == WorkOrderStatus.ASSIGNED) {
+            Button(
+                onClick = onStartRoute,
+                enabled = !isStarting,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+            ) {
+                Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+            }
+        }
         Button(
             onClick = onCheckReadiness,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
@@ -582,8 +633,14 @@ private fun AssignedRouteCard(
         ) {
             Text(text = "Kiểm tra sẵn sàng")
         }
+        // Uploading a pole photo needs the work order to be in_progress server-side
+        // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could capture
+        // a photo for a route that was never started, only to see a confusing "Xung dot" sync
+        // badge later with no clue why.
+        val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
         OutlinedButton(
             onClick = onCapturePolePhotos,
+            enabled = canCapturePolePhotos,
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
             shape = RoundedCornerShape(Radius.control),
             // Not Navy700 - that's a fixed dark color, unreadable against the card's dark-mode
@@ -592,6 +649,13 @@ private fun AssignedRouteCard(
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         ) {
             Text(text = "Chụp ảnh cột đèn")
+        }
+        if (!canCapturePolePhotos) {
+            Text(
+                text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -8,6 +8,7 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,7 @@ class PoleListViewModel
         savedStateHandle: SavedStateHandle,
         private val poleListRepository: PoleListRepository,
         private val polePhotoRepository: PolePhotoRepository,
+        private val completionRepository: WorkOrderCompletionRepository,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val _uiState = MutableStateFlow<PoleListUiState>(PoleListUiState.Loading)
@@ -94,6 +96,26 @@ class PoleListViewModel
 
         fun onDismissAiResult() {
             _aiResultState.value = null
+        }
+
+        // "Hoan tat" used to just navigate back (PoleListRoute's onDone), leaving the work order
+        // stuck "in_progress" forever - there was no other call site for POST
+        // /work-orders/{id}/complete for a survey work order (WorkOrderDetailScreen draws
+        // nothing for task_kind=survey). Only completes when at least one photo was captured -
+        // tapping this on an empty list just navigates back, nothing to report yet.
+        fun onComplete() {
+            val state = _uiState.value as? PoleListUiState.Success ?: return
+            val captured = state.poles.count { it.syncStatus != null }
+            if (captured == 0) return
+            viewModelScope.launch {
+                completionRepository.submitCompletion(
+                    workOrderId = workOrderId,
+                    taskKind = "survey",
+                    reportNote = "Đã khảo sát $captured/${state.poles.size} cột đèn bằng ảnh chụp.",
+                    materialsUsed = null,
+                    faultOutcomes = null,
+                )
+            }
         }
 
         // Field Engineer corrects/confirms cvState before a Manager decides (ticket PHOTO-REVIEW,

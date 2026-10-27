@@ -7,6 +7,7 @@ import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -160,6 +161,80 @@ class SurveyHubViewModelTest {
                 assertEquals(SurveyHubUiState.Loading, awaitItem())
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(listOf(route), success.assignedRoutes)
+            }
+        }
+
+    @Test
+    fun `refresh re-loads from Success, unlike onRetry which only works from Error`() =
+        runTest {
+            val startedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success (assigned)
+                viewModel.refresh()
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(startedRoute), success.assignedRoutes)
+            }
+        }
+
+    @Test
+    fun `onStartRoute calls the API then reloads to pick up the new status`() =
+        runTest {
+            val startedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success (assigned)
+                viewModel.onStartRoute("WO-1")
+                val starting = awaitItem() as SurveyHubUiState.Success
+                assertEquals("WO-1", starting.startingWorkOrderId)
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(startedRoute), success.assignedRoutes)
+                assertEquals(null, success.startingWorkOrderId)
+            }
+        }
+
+    @Test
+    fun `a failed onStartRoute clears startingWorkOrderId and sets startError`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(AssignedRoutesResult(listOf(route), false))
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success
+                viewModel.onStartRoute("WO-1")
+                awaitItem() // Success (starting)
+                val failed = awaitItem() as SurveyHubUiState.Success
+                assertEquals(null, failed.startingWorkOrderId)
+                assertEquals("conflict", failed.startError)
             }
         }
 }
