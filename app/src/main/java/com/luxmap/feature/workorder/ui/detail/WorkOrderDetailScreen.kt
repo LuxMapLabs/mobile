@@ -33,13 +33,18 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -74,6 +79,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
+import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
@@ -636,7 +642,21 @@ private fun FaultListSection(
 }
 
 private val FaultSectionAvatarSize = 32.dp
+private val FaultTypeIconSize = 44.dp
 private val FaultNavigateButtonSize = 48.dp
+
+// Icon + color per fault_type wire value, same AssetCondition pairs the rest of the app already
+// uses for severity colors (OUT = red, DIM = amber, UNKNOWN = neutral gray) instead of inventing
+// a new palette - this card always sits on the light content sheet, never a dark hero.
+private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
+    when (faultType) {
+        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors(isDark = false)
+        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors(isDark = false)
+        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors(isDark = false)
+        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors(isDark = false)
+        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+    }
 
 // Card border highlights navy once the FE has picked an outcome for this fault (inspection
 // only) - matches the mockup's per-fault "answered" signal, same idea as the kind/status
@@ -651,6 +671,7 @@ private fun FaultRow(
     onOutcomeSelected: (String) -> Unit,
 ) {
     val priority = severityFromWire(fault.severity)
+    val (typeIcon, typeColors) = faultTypeVisual(fault.faultType)
     val borderColor =
         if (showOutcomePicker && selectedOutcome != null) {
             MaterialTheme.colorScheme.primary
@@ -670,23 +691,35 @@ private fun FaultRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(FaultTypeIconSize)
+                        .background(typeColors.background, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = typeIcon, contentDescription = null, tint = typeColors.text)
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(text = fault.faultId, style = MaterialTheme.typography.titleMedium)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.titleMedium)
+                    PriorityDotLabel(priority = priority)
+                }
                 Text(
-                    text = listOfNotNull(fault.poleId, faultTypeLabel(fault.faultType)).joinToString(" · "),
+                    text = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    PriorityChip(priority = priority)
-                    // Only a repair order already carries a past outcome worth showing here -
-                    // an inspection order's outcome is what OutcomeSegment below is collecting.
-                    if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
-                        StatusBadge(
-                            text = inspectionOutcomeLabel(fault.inspectionOutcome),
-                            colors = WorkOrderStatus.VERIFIED.badgeColors(),
-                        )
-                    }
+                // Only a repair order already carries a past outcome worth showing here - an
+                // inspection order's outcome is what OutcomeSegment below is collecting.
+                if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
+                    StatusBadge(
+                        text = inspectionOutcomeLabel(fault.inspectionOutcome),
+                        colors = WorkOrderStatus.VERIFIED.badgeColors(),
+                    )
                 }
             }
             if (fault.hasLocation()) {
@@ -712,18 +745,13 @@ private fun FaultRow(
     }
 }
 
+// Inline dot + text, no border/box - matches the mockup's small priority indicator that sits
+// right next to the fault type headline, instead of the earlier separate bordered chip.
 @Composable
-private fun PriorityChip(priority: WorkOrderPriority) {
-    Row(
-        modifier =
-            Modifier
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.badge))
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+private fun PriorityDotLabel(priority: WorkOrderPriority) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(modifier = Modifier.size(7.dp).background(priority.color(), CircleShape))
-        Text(text = priority.label(), style = BadgeTextStyle)
+        Text(text = priority.label(), style = BadgeTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
