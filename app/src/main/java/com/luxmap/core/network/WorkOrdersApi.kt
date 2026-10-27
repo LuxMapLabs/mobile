@@ -7,6 +7,7 @@ import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
 import com.luxmap.feature.survey.data.dto.PolePhotoUploadResponseDto
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.EvidenceItemDto
+import com.luxmap.feature.workorder.data.dto.RequestCancellationRequestDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
 import okhttp3.MultipartBody
@@ -45,6 +46,13 @@ interface WorkOrdersApi {
     suspend fun complete(
         @Path("id") id: String,
         @Body body: CompleteWorkOrderRequestDto,
+    ): WorkOrderDetailDto
+
+    // WO-CANCEL-REQUEST (SELF-SIGNED) - FieldEngineer only, work order must still be "assigned".
+    @POST("api/v1/work-orders/{id}/request-cancellation")
+    suspend fun requestCancellation(
+        @Path("id") id: String,
+        @Body body: RequestCancellationRequestDto,
     ): WorkOrderDetailDto
 
     @GET("api/v1/work-orders/{id}/poles")

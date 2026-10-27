@@ -16,6 +16,13 @@ data class WorkOrderDetailDto(
     @SerialName("report_note") val reportNote: String? = null,
     @SerialName("materials_used") val materialsUsed: String? = null,
     @SerialName("allowed_actions") val allowedActions: List<String> = emptyList(),
+    // WO-CANCEL-REQUEST (SELF-SIGNED), confirmed 2026-10-26 against luxmap_backend's
+    // api-contract-v1.1.md - all 5 fields, cancellationRequestStatus defaults to "none".
+    @SerialName("cancellation_request_status") val cancellationRequestStatus: String = "none",
+    @SerialName("cancellation_request_note") val cancellationRequestNote: String? = null,
+    @SerialName("cancellation_requested_at") val cancellationRequestedAt: String? = null,
+    @SerialName("cancellation_reject_note") val cancellationRejectNote: String? = null,
+    @SerialName("cancellation_rejected_at") val cancellationRejectedAt: String? = null,
     val faults: List<WorkOrderFaultDetailDto> = emptyList(),
 )
 

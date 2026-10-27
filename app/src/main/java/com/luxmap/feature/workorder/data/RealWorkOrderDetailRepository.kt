@@ -1,6 +1,7 @@
 package com.luxmap.feature.workorder.data
 
 import com.luxmap.core.network.WorkOrdersApi
+import com.luxmap.feature.workorder.data.dto.RequestCancellationRequestDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
@@ -24,4 +25,13 @@ class RealWorkOrderDetailRepository
 
         override suspend fun start(workOrderId: String): Result<WorkOrderDetail> =
             runCatching { workOrdersApi.start(workOrderId).toWorkOrderDetail() }
+
+        override suspend fun requestCancellation(
+            workOrderId: String,
+            reason: String,
+        ): Result<WorkOrderDetail> =
+            runCatching {
+                val body = RequestCancellationRequestDto(reason)
+                workOrdersApi.requestCancellation(workOrderId, body).toWorkOrderDetail()
+            }
     }
