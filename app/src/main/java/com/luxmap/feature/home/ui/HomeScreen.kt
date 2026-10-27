@@ -265,15 +265,15 @@ private fun HomeContent(
                 onSelect = { selectedTab = it },
             )
         }
-        val groupsForTab = data.groupedByTaskKind().filter { (kind, _) -> selectedTab.matches(kind) }
+        val groupsForTab = data.groupedByDeadline(selectedTab)
         var shownAnyGroup = false
-        groupsForTab.forEach { (kind, items) ->
+        groupsForTab.forEach { (bucket, items) ->
             val remaining = items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
             if (remaining.isNotEmpty()) {
                 shownAnyGroup = true
                 item {
-                    TaskKindSection(
-                        kind = kind,
+                    DeadlineGroupSection(
+                        bucket = bucket,
                         items = remaining,
                         clusterLabelOf = data::clusterLabelFor,
                         onOpenWorkOrder = onOpenWorkOrder,
@@ -385,11 +385,42 @@ private fun HomeData.nextUp(): WorkOrderSummaryItem? {
 // states) that this plain task row can't offer, so showing them here too would just duplicate it.
 private val TASK_KIND_SECTION_ORDER = listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
 
-private fun HomeData.groupedByTaskKind(): List<Pair<WorkOrderTaskKind, List<WorkOrderSummaryItem>>> {
-    val all = clusters.flatMap { it.items }
-    return TASK_KIND_SECTION_ORDER.mapNotNull { kind ->
-        val items = all.filter { workOrderTaskKindFromWire(it.taskKind) == kind }
-        if (items.isEmpty()) null else kind to items
+private enum class DeadlineBucket(val label: String) {
+    TODAY("HẠN HÔM NAY"),
+    DOING("ĐANG THỰC HIỆN"),
+    LATER("SẮP TỚI"),
+}
+
+@Composable
+private fun DeadlineBucket.dotColor(): Color =
+    when (this) {
+        DeadlineBucket.TODAY -> DueTodayColor
+        DeadlineBucket.DOING -> Green400
+        DeadlineBucket.LATER -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+// Overdue items fall into TODAY too (not a separate bucket) - they already stand out via the
+// error banner at the top of the list and via each row's own red due-date text, so this bucket
+// just means "needs attention today or sooner", matching the mockup's one label for both cases.
+private fun WorkOrderSummaryItem.deadlineBucket(): DeadlineBucket {
+    val due = dueDateLabel(dueDate)
+    return when {
+        due.isOverdue || due.isToday -> DeadlineBucket.TODAY
+        woStatus == "in_progress" -> DeadlineBucket.DOING
+        else -> DeadlineBucket.LATER
+    }
+}
+
+private val DEADLINE_BUCKET_ORDER = listOf(DeadlineBucket.TODAY, DeadlineBucket.DOING, DeadlineBucket.LATER)
+
+private fun HomeData.groupedByDeadline(tab: TaskFilterTab): List<Pair<DeadlineBucket, List<WorkOrderSummaryItem>>> {
+    val all =
+        clusters.flatMap { it.items }
+            .filter { TASK_KIND_SECTION_ORDER.contains(workOrderTaskKindFromWire(it.taskKind)) }
+            .filter { tab.matches(workOrderTaskKindFromWire(it.taskKind)) }
+    return DEADLINE_BUCKET_ORDER.mapNotNull { bucket ->
+        val items = all.filter { it.deadlineBucket() == bucket }
+        if (items.isEmpty()) null else bucket to items
     }
 }
 
@@ -637,42 +668,27 @@ private fun MetricLegendCell(
     }
 }
 
-private val TaskKindAvatarSize = 32.dp
-
 @Composable
-private fun TaskKindSection(
-    kind: WorkOrderTaskKind,
+private fun DeadlineGroupSection(
+    bucket: DeadlineBucket,
     items: List<WorkOrderSummaryItem>,
     clusterLabelOf: (workOrderId: String) -> String,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(TaskKindAvatarSize)
-                            .background(Navy700, RoundedCornerShape(Radius.chip)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = kind.icon(),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(text = kind.label(), style = MaterialTheme.typography.titleMedium)
-            }
-            StatusBadge(text = "${items.size} việc", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+            Box(modifier = Modifier.size(8.dp).background(bucket.dotColor(), CircleShape))
+            Text(
+                text = bucket.label,
+                style = OverlineTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(text = "${items.size}", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.outline)
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items.forEach { item ->
@@ -692,8 +708,10 @@ private fun TaskRow(
     clusterLabel: String,
     onClick: () -> Unit,
 ) {
+    val kind = workOrderTaskKindFromWire(item.taskKind)
     val status = workOrderStatusFromWire(item.woStatus)
     val due = dueDateLabel(item.dueDate)
+    val kindColors = kind.badgeColors()
     // Same 3-tier due-date color convention as NextUpCard/WorkOrderDetailScreen.kt.
     val dueColor =
         when {
@@ -713,11 +731,43 @@ private fun TaskRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = item.workOrderId, style = MaterialTheme.typography.titleMedium)
-            Text(text = "$clusterLabel · ${due.text}", style = LabelTextStyle, color = dueColor)
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(kindColors.background, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = kind.icon(),
+                contentDescription = null,
+                tint = kindColors.text,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        StatusBadge(text = status.label(), colors = status.badgeColors())
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(text = item.workOrderId, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                StatusBadge(text = status.label(), colors = status.badgeColors())
+            }
+            Text(
+                text = "${kind.label()} · $clusterLabel",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.EventAvailable,
+                    contentDescription = null,
+                    tint = dueColor,
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(text = due.text, style = LabelTextStyle, color = dueColor)
+            }
+        }
         Icon(
             imageVector = Icons.Filled.ChevronRight,
             contentDescription = null,
