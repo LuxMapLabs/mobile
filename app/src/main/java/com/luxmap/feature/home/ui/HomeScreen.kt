@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -31,8 +32,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -63,6 +64,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
@@ -310,17 +313,9 @@ private fun NextUpCard(
     clusterLabel: String,
     onClick: () -> Unit,
 ) {
-    val status = workOrderStatusFromWire(item.woStatus)
     val kind = workOrderTaskKindFromWire(item.taskKind)
     val due = dueDateLabel(item.dueDate)
-    // Same 3-tier convention WorkOrderDetailScreen.kt already uses for due-date color, reused
-    // here instead of inventing a separate rule for this card.
-    val dueColor =
-        when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        }
+    val kindColors = kind.badgeColors()
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(text = "TIẾP THEO", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(
@@ -328,58 +323,101 @@ private fun NextUpCard(
                 Modifier
                     .fillMaxWidth()
                     .shadow(elevation = NextUpCardElevation, shape = RoundedCornerShape(Radius.block), clip = false)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                    .clip(RoundedCornerShape(Radius.block))
+                    .background(MaterialTheme.colorScheme.surface),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
-                StatusBadge(text = status.label(), colors = status.badgeColors())
+            // Only shown when the item is actually overdue - the mockup only demonstrates this
+            // one variant, so due-today/upcoming next-up items keep the plain card with no banner.
+            if (due.isOverdue) {
+                OverdueBanner(text = due.text)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(text = item.workOrderId, style = HeadlineTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Column(
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(52.dp)
+                                .background(kindColors.background, RoundedCornerShape(Radius.card)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = kind.icon(),
+                            contentDescription = null,
+                            tint = kindColors.text,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "VIỆC TIẾP THEO · ${kind.label().uppercase(Locale.forLanguageTag("vi"))}",
+                            style = OverlineTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = item.workOrderId,
+                            style = HeadlineTextStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(text = "Địa bàn", style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = clusterLabel, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+                ) {
+                    Text(text = "Bắt đầu xử lý")
+                    Spacer(Modifier.width(Spacing.sm))
                     Icon(
-                        imageVector = Icons.Filled.Place,
+                        imageVector = Icons.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Địa bàn $clusterLabel",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    Icon(imageVector = Icons.Filled.EventAvailable, contentDescription = null, tint = dueColor)
-                    Text(text = due.text, style = MaterialTheme.typography.bodyMedium, color = dueColor)
-                }
-            }
-            Button(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-            ) {
-                Text(text = "Mở lệnh")
-                Spacer(Modifier.width(Spacing.sm))
-                Icon(
-                    imageVector = Icons.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
             }
         }
+    }
+}
+
+// Reuses AssetCondition.OUT's red badge colors instead of the mockup's own ad-hoc hex values -
+// same red family already used for "overdue"/"out" elsewhere (InlineBannerTone.ERROR).
+@Composable
+private fun OverdueBanner(text: String) {
+    val colors = AssetCondition.OUT.badgeColors(isSystemInDarkTheme())
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(colors.background)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = colors.text,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(text = text, style = OverlineTextStyle, color = colors.text, modifier = Modifier.weight(1f))
+        Text(text = "ƯU TIÊN", style = OverlineTextStyle, color = colors.text)
     }
 }
 
