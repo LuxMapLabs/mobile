@@ -4,11 +4,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,14 +25,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -56,12 +57,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
@@ -221,6 +226,7 @@ private fun HomeContent(
     lastSyncedAt: Instant?,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
+    var selectedTab by remember { mutableStateOf(TaskFilterTab.ALL) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(Spacing.lg),
@@ -252,17 +258,104 @@ private fun HomeContent(
                 )
             }
         }
-        data.groupedByTaskKind().forEach { (kind, items) ->
+        item {
+            TaskFilterTabs(
+                selected = selectedTab,
+                counts = data.taskFilterTabCounts(),
+                onSelect = { selectedTab = it },
+            )
+        }
+        val groupsForTab = data.groupedByDeadline(selectedTab)
+        var shownAnyGroup = false
+        groupsForTab.forEach { (bucket, items) ->
             val remaining = items.filterNot { nextUp != null && it.workOrderId == nextUp.workOrderId }
             if (remaining.isNotEmpty()) {
+                shownAnyGroup = true
                 item {
-                    TaskKindSection(
-                        kind = kind,
+                    DeadlineGroupSection(
+                        bucket = bucket,
                         items = remaining,
                         clusterLabelOf = data::clusterLabelFor,
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
                 }
+            }
+        }
+        // Mockup's "noFiltered" state - the selected tab has no matching work orders, distinct
+        // from the screen's own 4-state Empty (that one means no data at all, not a filter miss).
+        if (!shownAnyGroup) {
+            item {
+                Text(
+                    text = "Không có lệnh nào trong mục này.",
+                    style = LabelTextStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xl),
+                )
+            }
+        }
+    }
+}
+
+private enum class TaskFilterTab(val label: String) {
+    ALL("Tất cả"),
+    REPAIR("Sửa chữa"),
+    INSPECTION("Kiểm tra"),
+}
+
+private fun TaskFilterTab.matches(kind: WorkOrderTaskKind): Boolean =
+    when (this) {
+        TaskFilterTab.ALL -> true
+        TaskFilterTab.REPAIR -> kind == WorkOrderTaskKind.REPAIR
+        TaskFilterTab.INSPECTION -> kind == WorkOrderTaskKind.INSPECTION
+    }
+
+private fun HomeData.taskFilterTabCounts(): Map<TaskFilterTab, Int> {
+    val all = clusters.flatMap { it.items }
+
+    fun countOf(kind: WorkOrderTaskKind) = all.count { workOrderTaskKindFromWire(it.taskKind) == kind }
+    val repairCount = countOf(WorkOrderTaskKind.REPAIR)
+    val inspectionCount = countOf(WorkOrderTaskKind.INSPECTION)
+    return mapOf(
+        TaskFilterTab.ALL to repairCount + inspectionCount,
+        TaskFilterTab.REPAIR to repairCount,
+        TaskFilterTab.INSPECTION to inspectionCount,
+    )
+}
+
+@Composable
+private fun TaskFilterTabs(
+    selected: TaskFilterTab,
+    counts: Map<TaskFilterTab, Int>,
+    onSelect: (TaskFilterTab) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
+                .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TaskFilterTab.entries.forEach { tab ->
+            val isSelected = tab == selected
+            val contentColor =
+                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 40.dp)
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
+                        .clickable { onSelect(tab) }
+                        .padding(vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = tab.label, style = BodyStrongTextStyle, color = contentColor)
+                Spacer(Modifier.width(Spacing.xs))
+                Text(text = "${counts[tab] ?: 0}", style = LabelTextStyle, color = contentColor)
             }
         }
     }
@@ -292,11 +385,42 @@ private fun HomeData.nextUp(): WorkOrderSummaryItem? {
 // states) that this plain task row can't offer, so showing them here too would just duplicate it.
 private val TASK_KIND_SECTION_ORDER = listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
 
-private fun HomeData.groupedByTaskKind(): List<Pair<WorkOrderTaskKind, List<WorkOrderSummaryItem>>> {
-    val all = clusters.flatMap { it.items }
-    return TASK_KIND_SECTION_ORDER.mapNotNull { kind ->
-        val items = all.filter { workOrderTaskKindFromWire(it.taskKind) == kind }
-        if (items.isEmpty()) null else kind to items
+private enum class DeadlineBucket(val label: String) {
+    TODAY("HẠN HÔM NAY"),
+    DOING("ĐANG THỰC HIỆN"),
+    LATER("SẮP TỚI"),
+}
+
+@Composable
+private fun DeadlineBucket.dotColor(): Color =
+    when (this) {
+        DeadlineBucket.TODAY -> DueTodayColor
+        DeadlineBucket.DOING -> Green400
+        DeadlineBucket.LATER -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+// Overdue items fall into TODAY too (not a separate bucket) - they already stand out via the
+// error banner at the top of the list and via each row's own red due-date text, so this bucket
+// just means "needs attention today or sooner", matching the mockup's one label for both cases.
+private fun WorkOrderSummaryItem.deadlineBucket(): DeadlineBucket {
+    val due = dueDateLabel(dueDate)
+    return when {
+        due.isOverdue || due.isToday -> DeadlineBucket.TODAY
+        woStatus == "in_progress" -> DeadlineBucket.DOING
+        else -> DeadlineBucket.LATER
+    }
+}
+
+private val DEADLINE_BUCKET_ORDER = listOf(DeadlineBucket.TODAY, DeadlineBucket.DOING, DeadlineBucket.LATER)
+
+private fun HomeData.groupedByDeadline(tab: TaskFilterTab): List<Pair<DeadlineBucket, List<WorkOrderSummaryItem>>> {
+    val all =
+        clusters.flatMap { it.items }
+            .filter { TASK_KIND_SECTION_ORDER.contains(workOrderTaskKindFromWire(it.taskKind)) }
+            .filter { tab.matches(workOrderTaskKindFromWire(it.taskKind)) }
+    return DEADLINE_BUCKET_ORDER.mapNotNull { bucket ->
+        val items = all.filter { it.deadlineBucket() == bucket }
+        if (items.isEmpty()) null else bucket to items
     }
 }
 
@@ -309,17 +433,9 @@ private fun NextUpCard(
     clusterLabel: String,
     onClick: () -> Unit,
 ) {
-    val status = workOrderStatusFromWire(item.woStatus)
     val kind = workOrderTaskKindFromWire(item.taskKind)
     val due = dueDateLabel(item.dueDate)
-    // Same 3-tier convention WorkOrderDetailScreen.kt already uses for due-date color, reused
-    // here instead of inventing a separate rule for this card.
-    val dueColor =
-        when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        }
+    val kindColors = kind.badgeColors()
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(text = "TIẾP THEO", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Column(
@@ -327,58 +443,101 @@ private fun NextUpCard(
                 Modifier
                     .fillMaxWidth()
                     .shadow(elevation = NextUpCardElevation, shape = RoundedCornerShape(Radius.block), clip = false)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                    .clip(RoundedCornerShape(Radius.block))
+                    .background(MaterialTheme.colorScheme.surface),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
-                StatusBadge(text = status.label(), colors = status.badgeColors())
+            // Only shown when the item is actually overdue - the mockup only demonstrates this
+            // one variant, so due-today/upcoming next-up items keep the plain card with no banner.
+            if (due.isOverdue) {
+                OverdueBanner(text = due.text)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(text = item.workOrderId, style = HeadlineTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Column(
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
                 ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(52.dp)
+                                .background(kindColors.background, RoundedCornerShape(Radius.card)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = kind.icon(),
+                            contentDescription = null,
+                            tint = kindColors.text,
+                            modifier = Modifier.size(26.dp),
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "VIỆC TIẾP THEO · ${kind.label().uppercase(Locale.forLanguageTag("vi"))}",
+                            style = OverlineTextStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = item.workOrderId,
+                            style = HeadlineTextStyle,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(text = "Địa bàn", style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = clusterLabel, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+                ) {
+                    Text(text = "Bắt đầu xử lý")
+                    Spacer(Modifier.width(Spacing.sm))
                     Icon(
-                        imageVector = Icons.Filled.Place,
+                        imageVector = Icons.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "Địa bàn $clusterLabel",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    Icon(imageVector = Icons.Filled.EventAvailable, contentDescription = null, tint = dueColor)
-                    Text(text = due.text, style = MaterialTheme.typography.bodyMedium, color = dueColor)
-                }
-            }
-            Button(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-            ) {
-                Text(text = "Mở lệnh")
-                Spacer(Modifier.width(Spacing.sm))
-                Icon(
-                    imageVector = Icons.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
             }
         }
+    }
+}
+
+// Reuses AssetCondition.OUT's red badge colors instead of the mockup's own ad-hoc hex values -
+// same red family already used for "overdue"/"out" elsewhere (InlineBannerTone.ERROR).
+@Composable
+private fun OverdueBanner(text: String) {
+    val colors = AssetCondition.OUT.badgeColors(isSystemInDarkTheme())
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(colors.background)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = colors.text,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(text = text, style = OverlineTextStyle, color = colors.text, modifier = Modifier.weight(1f))
+        Text(text = "ƯU TIÊN", style = OverlineTextStyle, color = colors.text)
     }
 }
 
@@ -421,95 +580,115 @@ private fun HomeHeader(
         Spacer(Modifier.height(Spacing.md))
         SyncPill(status = syncStatus, lastSyncedAt = lastSyncedAt, onClick = onRefresh, onDarkHero = true)
         Spacer(Modifier.height(Spacing.lg))
-        MetricRow(metrics = metrics)
+        MetricProgressBar(metrics = metrics)
+        Spacer(Modifier.height(Spacing.sm))
+        MetricLegendRow(metrics = metrics)
     }
 }
 
-// 1 combined translucent block with 3 columns divided by hairlines, instead of 3 separate
-// cards - matches the F02 redesign mockup. No per-column tinted background for overdue
-// anymore (the mockup only differs by text color, not container color).
+// Segmented bar replaces the old 3-box MetricRow, matching the F02 v2 mockup. Same 3 raw
+// counts as before - overdueCount is not a mutually exclusive 4th bucket on the backend (it's
+// "overdue among assigned/in_progress"), so this just reshapes the same numbers, not a new stat.
 @Composable
-private fun MetricRow(metrics: HomeMetrics?) {
-    val dividerColor = Color.White.copy(alpha = 0.12f)
+private fun MetricProgressBar(metrics: HomeMetrics?) {
+    val placeholderColor = Color.White.copy(alpha = 0.16f)
+    val segments =
+        listOfNotNull(
+            metrics?.overdueCount?.takeIf { it > 0 }?.let { it to ErrorDark },
+            metrics?.inProgressCount?.takeIf { it > 0 }?.let { it to Green400 },
+            metrics?.assignedCount?.takeIf { it > 0 }?.let { it to Color.White.copy(alpha = 0.35f) },
+        )
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
-                .border(1.dp, dividerColor, RoundedCornerShape(Radius.card)),
+        modifier = Modifier.fillMaxWidth().height(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        val cells =
-            listOf(
-                Triple("Được giao", metrics?.assignedCount, Color.White),
-                Triple("Đang xử lý", metrics?.inProgressCount, Green400),
-                Triple("Quá hạn", metrics?.overdueCount, ErrorDark),
+        if (segments.isEmpty()) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(placeholderColor, RoundedCornerShape(4.dp)),
             )
-        cells.forEachIndexed { index, (label, value, valueColor) ->
-            if (index > 0) {
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(dividerColor))
+        } else {
+            segments.forEach { (count, color) ->
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(count.toFloat())
+                            .fillMaxHeight()
+                            .background(color, RoundedCornerShape(4.dp)),
+                )
             }
-            MetricCell(label = label, value = value, valueColor = valueColor, modifier = Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun MetricCell(
+private fun MetricLegendRow(metrics: HomeMetrics?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        val cells =
+            listOf(
+                Triple("Quá hạn", metrics?.overdueCount, ErrorDark),
+                Triple("Đang làm", metrics?.inProgressCount, Green400),
+                Triple("Chưa bắt đầu", metrics?.assignedCount, Color.White.copy(alpha = 0.5f)),
+            )
+        cells.forEach { (label, value, dotColor) ->
+            MetricLegendCell(label = label, value = value, dotColor = dotColor, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MetricLegendCell(
     label: String,
     value: Int?,
-    valueColor: Color,
+    dotColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(vertical = Spacing.md, horizontal = Spacing.md),
+        modifier =
+            modifier
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.chip))
+                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            text = value?.toString() ?: "—",
-            style = MetricTextStyle,
-            color = if (value != null) valueColor else Color.White.copy(alpha = 0.5f),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(modifier = Modifier.size(8.dp).background(dotColor, CircleShape))
+            Text(
+                text = value?.toString() ?: "—",
+                style = MetricTextStyle.copy(fontSize = 20.sp, lineHeight = 24.sp),
+                color = Color.White,
+            )
+        }
         Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.75f))
     }
 }
 
-private val TaskKindAvatarSize = 32.dp
-
 @Composable
-private fun TaskKindSection(
-    kind: WorkOrderTaskKind,
+private fun DeadlineGroupSection(
+    bucket: DeadlineBucket,
     items: List<WorkOrderSummaryItem>,
     clusterLabelOf: (workOrderId: String) -> String,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(TaskKindAvatarSize)
-                            .background(Navy700, RoundedCornerShape(Radius.chip)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = kind.icon(),
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                Text(text = kind.label(), style = MaterialTheme.typography.titleMedium)
-            }
-            StatusBadge(text = "${items.size} việc", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+            Box(modifier = Modifier.size(8.dp).background(bucket.dotColor(), CircleShape))
+            Text(
+                text = bucket.label,
+                style = OverlineTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(text = "${items.size}", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.outline)
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             items.forEach { item ->
@@ -529,8 +708,10 @@ private fun TaskRow(
     clusterLabel: String,
     onClick: () -> Unit,
 ) {
+    val kind = workOrderTaskKindFromWire(item.taskKind)
     val status = workOrderStatusFromWire(item.woStatus)
     val due = dueDateLabel(item.dueDate)
+    val kindColors = kind.badgeColors()
     // Same 3-tier due-date color convention as NextUpCard/WorkOrderDetailScreen.kt.
     val dueColor =
         when {
@@ -550,11 +731,43 @@ private fun TaskRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = item.workOrderId, style = MaterialTheme.typography.titleMedium)
-            Text(text = "$clusterLabel · ${due.text}", style = LabelTextStyle, color = dueColor)
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(kindColors.background, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = kind.icon(),
+                contentDescription = null,
+                tint = kindColors.text,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        StatusBadge(text = status.label(), colors = status.badgeColors())
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                Text(text = item.workOrderId, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                StatusBadge(text = status.label(), colors = status.badgeColors())
+            }
+            Text(
+                text = "${kind.label()} · $clusterLabel",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(
+                    imageVector = Icons.Filled.EventAvailable,
+                    contentDescription = null,
+                    tint = dueColor,
+                    modifier = Modifier.size(15.dp),
+                )
+                Text(text = due.text, style = LabelTextStyle, color = dueColor)
+            }
+        }
         Icon(
             imageVector = Icons.Filled.ChevronRight,
             contentDescription = null,
@@ -587,12 +800,24 @@ private fun NextUpCardSkeleton() {
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            SkeletonBar(width = 84.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-            SkeletonBar(width = 64.dp, height = 22.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SkeletonBar(widthFraction = 0.6f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+                SkeletonBar(widthFraction = 0.4f, height = 20.dp, color = MaterialTheme.colorScheme.outline)
+            }
         }
-        SkeletonBar(widthFraction = 0.6f, height = 24.dp, color = MaterialTheme.colorScheme.outline)
-        SkeletonBar(widthFraction = 0.85f, height = 14.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        SkeletonBar(
+            widthFraction = 1f,
+            height = 44.dp,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(Radius.chip),
+        )
         SkeletonBar(
             widthFraction = 1f,
             height = Dimens.minTouchTarget,
@@ -604,17 +829,26 @@ private fun NextUpCardSkeleton() {
 
 @Composable
 private fun TaskRowSkeleton() {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        SkeletonBar(widthFraction = 0.4f, height = 16.dp, color = MaterialTheme.colorScheme.outline)
-        SkeletonBar(widthFraction = 0.7f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        Box(
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SkeletonBar(widthFraction = 0.45f, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+            SkeletonBar(widthFraction = 0.7f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
+        }
     }
 }
 
