@@ -84,6 +84,7 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
+import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
@@ -183,7 +184,10 @@ fun WorkOrderDetailScreen(
                         onCtaClick = cta.onClick,
                         ctaEnabled = cta.enabled,
                         hint = cta.hint,
+                        hintColor = cta.hintColor,
+                        showHintIcon = cta.hint != null,
                         progressText = cta.progressText,
+                        progressSegments = cta.progressSegments,
                     )
                 }
             }
@@ -237,7 +241,9 @@ private data class WorkOrderCtaState(
     val enabled: Boolean,
     val onClick: () -> Unit,
     val hint: String? = null,
+    val hintColor: Color? = null,
     val progressText: String? = null,
+    val progressSegments: List<Boolean>? = null,
 )
 
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
@@ -283,15 +289,20 @@ private fun workOrderCtaState(
                 enabled = canSubmitNow,
                 onClick = onSubmit,
                 hint = missingRequirementsHint(repairRequirements(state)),
+                hintColor = DueTodayColor,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
             val recordedCount = detail.faults.count { state.faultOutcomes.containsKey(it.faultId) }
+            val missingCount = detail.faults.size - recordedCount
             WorkOrderCtaState(
                 text = "Nộp báo cáo kiểm tra",
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
+                hint = if (missingCount > 0) "Còn $missingCount sự cố chưa có kết quả" else null,
+                hintColor = DueTodayColor,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
+                progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
             )
         }
         workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
@@ -301,6 +312,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+                hintColor = Gray500,
             )
         else -> null
     }
