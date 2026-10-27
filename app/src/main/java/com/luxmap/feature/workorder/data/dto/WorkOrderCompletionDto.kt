@@ -17,6 +17,11 @@ data class FaultOutcomeRequestDto(
 )
 
 @Serializable
+data class RequestCancellationRequestDto(
+    val reason: String,
+)
+
+@Serializable
 data class EvidenceItemDto(
     @SerialName("evidence_id") val evidenceId: String,
     val kind: String,

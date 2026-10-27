@@ -7,20 +7,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -30,35 +30,51 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +86,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -82,10 +99,13 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.BrandHeroGradient
+import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Radius
+import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
@@ -101,13 +121,13 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.OutcomeSegment
-import com.luxmap.core.ui.components.PriorityDot
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
@@ -115,6 +135,7 @@ import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
+import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
@@ -141,6 +162,7 @@ fun WorkOrderDetailRoute(
         onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
+        onRequestCancellation = viewModel::requestCancellation,
         onCaptureEvidence = onCaptureEvidence,
         onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
         modifier = modifier,
@@ -157,10 +179,16 @@ fun WorkOrderDetailScreen(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    onRequestCancellation: (reason: String) -> Unit = {},
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
+    var showCancelSheet by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
         modifier = modifier,
         // Success renders its own navy hero with an embedded back button (see
@@ -171,18 +199,29 @@ fun WorkOrderDetailScreen(
                 AppTopBar(title = "Chi tiết lệnh", onBack = onBack)
             }
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (uiState is WorkOrderDetailUiState.Success) {
                 val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
                 if (cta != null) {
-                    BottomActionBar(
-                        ctaText = cta.text,
-                        ctaIcon = cta.icon,
-                        onCtaClick = cta.onClick,
-                        ctaEnabled = cta.enabled,
-                        hint = cta.hint,
-                        progressText = cta.progressText,
-                    )
+                    Column {
+                        if ("request_cancellation" in uiState.detail.allowedActions) {
+                            CancelRequestButton(onClick = { showCancelSheet = true })
+                        }
+                        BottomActionBar(
+                            ctaText = cta.text,
+                            ctaIcon = cta.icon,
+                            onCtaClick = {
+                                if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
+                            },
+                            ctaEnabled = cta.enabled,
+                            hint = cta.hint,
+                            hintColor = cta.hintColor,
+                            showHintIcon = cta.hint != null,
+                            progressText = cta.progressText,
+                            progressSegments = cta.progressSegments,
+                        )
+                    }
                 }
             }
         },
@@ -220,6 +259,41 @@ fun WorkOrderDetailScreen(
             }
         }
     }
+
+    if (showSubmitConfirm && uiState is WorkOrderDetailUiState.Success) {
+        SubmitConfirmationSheet(
+            state = uiState,
+            onDismiss = { showSubmitConfirm = false },
+            onConfirm = {
+                showSubmitConfirm = false
+                onSubmit()
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        "Nộp báo cáo thành công · Chờ Kỹ sư bảo trì duyệt",
+                    )
+                }
+            },
+        )
+    }
+
+    if (showCancelSheet && uiState is WorkOrderDetailUiState.Success) {
+        CancelRequestSheet(
+            isSubmitting = uiState.isRequestingCancellation,
+            errorMessage = uiState.cancellationError,
+            onDismiss = { showCancelSheet = false },
+            onSend = onRequestCancellation,
+        )
+    }
+
+    LaunchedEffect(uiState) {
+        val success = uiState as? WorkOrderDetailUiState.Success
+        if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
+            showCancelSheet = false
+            scope.launch {
+                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt")
+            }
+        }
+    }
 }
 
 private fun workOrderDetailTopBarTitle(taskKindWire: String): String =
@@ -235,7 +309,10 @@ private data class WorkOrderCtaState(
     val enabled: Boolean,
     val onClick: () -> Unit,
     val hint: String? = null,
+    val hintColor: Color? = null,
     val progressText: String? = null,
+    val progressSegments: List<Boolean>? = null,
+    val requiresConfirmation: Boolean = false,
 )
 
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
@@ -281,15 +358,22 @@ private fun workOrderCtaState(
                 enabled = canSubmitNow,
                 onClick = onSubmit,
                 hint = missingRequirementsHint(repairRequirements(state)),
+                hintColor = DueTodayColor,
+                requiresConfirmation = true,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
             val recordedCount = detail.faults.count { state.faultOutcomes.containsKey(it.faultId) }
+            val missingCount = detail.faults.size - recordedCount
             WorkOrderCtaState(
                 text = "Nộp báo cáo kiểm tra",
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
+                hint = if (missingCount > 0) "Còn $missingCount sự cố chưa có kết quả" else null,
+                hintColor = DueTodayColor,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
+                progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
+                requiresConfirmation = true,
             )
         }
         workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
@@ -299,6 +383,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+                hintColor = Gray500,
             )
         else -> null
     }
@@ -316,6 +401,278 @@ private fun missingRequirementsHint(requirements: List<Requirement>): String? {
     val missing = requirements.filterNot { it.met }
     if (missing.isEmpty()) return null
     return "Cần " + missing.joinToString(" và ") { it.label.lowercase() }
+}
+
+private data class SubmitSummaryRow(val icon: ImageVector, val iconColor: Color, val label: String, val value: String)
+
+private fun submitSummaryRows(
+    kind: WorkOrderTaskKind,
+    state: WorkOrderDetailUiState.Success,
+): List<SubmitSummaryRow> =
+    if (kind == WorkOrderTaskKind.INSPECTION) {
+        val outcomes = state.faultOutcomes.values
+        listOf(
+            SubmitSummaryRow(
+                Icons.Filled.Error,
+                AssetCondition.OUT.badgeColors(isDark = false).text,
+                "Có sự cố",
+                outcomes.count { it == "fault_present" }.toString(),
+            ),
+            SubmitSummaryRow(
+                Icons.Filled.CheckCircle,
+                AssetCondition.NORMAL.badgeColors(isDark = false).text,
+                "Không có sự cố",
+                outcomes.count { it == "fault_absent" }.toString(),
+            ),
+            SubmitSummaryRow(
+                Icons.Filled.Help,
+                AssetCondition.DIM.badgeColors(isDark = false).text,
+                "Chưa xác định",
+                outcomes.count { it == "inconclusive" }.toString(),
+            ),
+        )
+    } else {
+        listOf(
+            SubmitSummaryRow(Icons.Filled.ReportProblem, Gray500, "Sự cố đã sửa", state.detail.faults.size.toString()),
+            SubmitSummaryRow(
+                Icons.Filled.PhotoCamera,
+                Navy700,
+                "Ảnh nghiệm thu",
+                if (state.localEvidence != null) "1 ảnh" else "0 ảnh",
+            ),
+            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
+        )
+    }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SubmitConfirmationSheet(
+    state: WorkOrderDetailUiState.Success,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val detail = state.detail
+    val kind = workOrderTaskKindFromWire(detail.taskKind)
+    val rows = submitSummaryRows(kind, state)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(52.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Send,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(text = "Nộp báo cáo?", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        text = detail.workOrderId,
+                        style = LabelTextStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
+                        .padding(horizontal = Spacing.md),
+            ) {
+                rows.forEachIndexed { index, row ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        Icon(
+                            imageVector = row.icon,
+                            contentDescription = null,
+                            tint = row.iconColor,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            text = row.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = row.value,
+                            style = BodyStrongTextStyle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            Text(
+                text =
+                    "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
+                        "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("Kiểm tra lại")
+                }
+                Button(
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+                ) {
+                    Text("Nộp báo cáo")
+                    Spacer(Modifier.width(Spacing.sm))
+                    Icon(imageVector = Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CancelRequestButton(onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = ScreenMargin)
+                .padding(top = Spacing.sm)
+                .heightIn(min = Dimens.minTouchTarget),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) {
+        Text("Yêu cầu hủy")
+    }
+}
+
+private val CANCEL_REASON_OPTIONS =
+    listOf(
+        "Thời tiết không cho phép",
+        "Không tiếp cận được hiện trường",
+        "Trùng với lệnh khác",
+        "Lý do khác",
+    )
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CancelRequestSheet(
+    isSubmitting: Boolean,
+    errorMessage: String?,
+    onDismiss: () -> Unit,
+    onSend: (reason: String) -> Unit,
+) {
+    var selectedReason by remember { mutableStateOf<String?>(null) }
+    var note by remember { mutableStateOf("") }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Text(text = "Yêu cầu hủy lệnh", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = "Lý do", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                CANCEL_REASON_OPTIONS.forEach { reason ->
+                    CancelReasonRow(
+                        label = reason,
+                        selected = selectedReason == reason,
+                        onClick = { selectedReason = reason },
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = note,
+                onValueChange = { note = it },
+                label = { Text("Ghi chú thêm (không bắt buộc)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("Quay lại")
+                }
+                Button(
+                    onClick = {
+                        val reason = selectedReason ?: return@Button
+                        onSend(if (note.isBlank()) reason else "$reason - ${note.trim()}")
+                    },
+                    enabled = selectedReason != null && !isSubmitting,
+                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = Color.White,
+                        ),
+                ) {
+                    Text(if (isSubmitting) "Đang gửi..." else "Gửi yêu cầu")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CancelReasonRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val outColors = AssetCondition.OUT.badgeColors(isDark = false)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Dimens.minTouchTarget)
+                .clip(RoundedCornerShape(Radius.chip))
+                .background(
+                    if (selected) outColors.background else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(Radius.chip),
+                )
+                .border(if (selected) 2.dp else 0.dp, outColors.text, RoundedCornerShape(Radius.chip))
+                .selectable(selected = selected, onClick = onClick)
+                .padding(horizontal = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = BodyStrongTextStyle,
+            color = if (selected) outColors.text else MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 @Composable
@@ -346,6 +703,7 @@ private fun WorkOrderDetailContent(
                     .padding(Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
+            WorkOrderSummaryCard(detail)
             WorkOrderHeaderSection(detail)
             state.syncStatus()?.let { status ->
                 StatusBadge(text = status.label(), colors = status.badgeColors())
@@ -405,22 +763,6 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    // Highest severity among the work order's own faults - severity is set by the Manager
-    // (reliable), unlike priority_score which CV-16 was never wired up to compute (confirmed
-    // against luxmap_backend's contract-drift.md). No fault (repair with none, or a survey
-    // order) means no rank to show, so the dot is simply left out.
-    val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
-    val due = dueDateLabel(detail.dueDate)
-    // Same dark-theme AssetCondition text colors F02's SyncPill reuses for an on-navy accent -
-    // not inventing a new pair for "due today"/"overdue" here either.
-    val dueColor =
-        when {
-            due.isOverdue -> AssetCondition.OUT.badgeColors(isDark = true).text
-            due.isToday -> AssetCondition.DIM.badgeColors(isDark = true).text
-            else -> Color.White
-        }
-    val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
-    val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     Column(
         modifier =
             Modifier
@@ -443,90 +785,127 @@ private fun WorkOrderHeroSection(
         ) {
             StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
             StatusBadge(text = status.label(), colors = status.badgeColors())
-            if (overallPriority != null) {
-                PriorityDot(
-                    text = "Ưu tiên ${overallPriority.label()}",
-                    dotColor = overallPriority.color(),
-                    textColor = Color.White,
-                    borderColor = Color.White.copy(alpha = 0.3f),
-                )
-            }
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
             Text(text = detail.workOrderId, style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
         }
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(IntrinsicSize.Min)
-                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(Radius.card)),
-        ) {
-            HeroInfoCell(
-                icon = Icons.Filled.Event,
+    }
+}
+
+@Composable
+private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
+    val status = workOrderStatusFromWire(detail.woStatus)
+    val kind = workOrderTaskKindFromWire(detail.taskKind)
+    val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
+    val due = dueDateLabel(detail.dueDate)
+    val dueColor =
+        when {
+            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isToday -> DueTodayColor
+            else -> MaterialTheme.colorScheme.onSurface
+        }
+    val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
+    val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SummaryMetricCell(
                 label = "Hạn xử lý",
                 value = due.text,
                 valueColor = dueColor,
                 modifier = Modifier.weight(1f),
             )
-            Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = 0.12f)))
-            HeroInfoCell(
-                icon = Icons.Filled.Schedule,
+            SummaryMetricCell(
                 label = scheduleLabel,
                 value = scheduleValue,
-                valueColor = Color.White,
+                valueColor = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
+            if (overallPriority != null) {
+                SummaryPriorityCell(priority = overallPriority, modifier = Modifier.weight(1f))
+            }
         }
         if (status != WorkOrderStatus.CANCELLED) {
-            LifecycleTracker(
-                steps = workOrderLifecycleSteps(status, kind),
-                onDarkHero = true,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs),
-            )
+            LifecycleTracker(steps = workOrderLifecycleSteps(status, kind))
         }
     }
 }
 
 @Composable
-private fun HeroInfoCell(
-    icon: ImageVector,
+private fun SummaryMetricCell(
     label: String,
     value: String,
     valueColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(Spacing.sm),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                .padding(Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.7f),
-                modifier = Modifier.size(15.dp),
-            )
-            Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
-        }
-        Text(text = value, style = BodyStrongTextStyle, color = valueColor)
+        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = value,
+            style = BodyStrongTextStyle,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
-// Manager note / review note only now - badges/title/due/schedule/lifecycle moved into
-// WorkOrderHeroSection above. Review note first, then the note card - same order the mockup
-// stacks them in, since a review request is the more urgent of the two.
+@Composable
+private fun SummaryPriorityCell(
+    priority: WorkOrderPriority,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
+                .padding(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(text = "Ưu tiên", style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Box(modifier = Modifier.size(8.dp).background(priority.color(), CircleShape))
+            Text(text = priority.label(), style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
-    if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank()) return
+    val hasCancellationBanner = detail.cancellationRequestStatus != "none"
+    if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank() && !hasCancellationBanner) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (!detail.reviewNote.isNullOrBlank()) {
             InlineBanner(
                 message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
                 tone = InlineBannerTone.ERROR,
             )
+        }
+        when (detail.cancellationRequestStatus) {
+            "pending" ->
+                InlineBanner(
+                    message = "Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt",
+                    tone = InlineBannerTone.OFFLINE,
+                )
+            "rejected" ->
+                InlineBanner(
+                    message = "Yêu cầu hủy bị từ chối: ${detail.cancellationRejectNote}",
+                    tone = InlineBannerTone.ERROR,
+                )
         }
         if (!detail.note.isNullOrBlank()) {
             ManagerNoteCard(note = detail.note)
@@ -620,7 +999,18 @@ private fun FaultListSection(
 }
 
 private val FaultSectionAvatarSize = 32.dp
+private val FaultTypeIconSize = 44.dp
 private val FaultNavigateButtonSize = 48.dp
+
+private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
+    when (faultType) {
+        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors(isDark = false)
+        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors(isDark = false)
+        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors(isDark = false)
+        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors(isDark = false)
+        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+    }
 
 // Card border highlights navy once the FE has picked an outcome for this fault (inspection
 // only) - matches the mockup's per-fault "answered" signal, same idea as the kind/status
@@ -635,6 +1025,7 @@ private fun FaultRow(
     onOutcomeSelected: (String) -> Unit,
 ) {
     val priority = severityFromWire(fault.severity)
+    val (typeIcon, typeColors) = faultTypeVisual(fault.faultType)
     val borderColor =
         if (showOutcomePicker && selectedOutcome != null) {
             MaterialTheme.colorScheme.primary
@@ -654,23 +1045,33 @@ private fun FaultRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(FaultTypeIconSize)
+                        .background(typeColors.background, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = typeIcon, contentDescription = null, tint = typeColors.text)
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(text = fault.faultId, style = MaterialTheme.typography.titleMedium)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.titleMedium)
+                    PriorityDotLabel(priority = priority)
+                }
                 Text(
-                    text = listOfNotNull(fault.poleId, faultTypeLabel(fault.faultType)).joinToString(" · "),
+                    text = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    PriorityChip(priority = priority)
-                    // Only a repair order already carries a past outcome worth showing here -
-                    // an inspection order's outcome is what OutcomeSegment below is collecting.
-                    if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
-                        StatusBadge(
-                            text = inspectionOutcomeLabel(fault.inspectionOutcome),
-                            colors = WorkOrderStatus.VERIFIED.badgeColors(),
-                        )
-                    }
+                if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
+                    StatusBadge(
+                        text = inspectionOutcomeLabel(fault.inspectionOutcome),
+                        colors = WorkOrderStatus.VERIFIED.badgeColors(),
+                    )
                 }
             }
             if (fault.hasLocation()) {
@@ -697,17 +1098,10 @@ private fun FaultRow(
 }
 
 @Composable
-private fun PriorityChip(priority: WorkOrderPriority) {
-    Row(
-        modifier =
-            Modifier
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.badge))
-                .padding(horizontal = Spacing.sm, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
+private fun PriorityDotLabel(priority: WorkOrderPriority) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(modifier = Modifier.size(7.dp).background(priority.color(), CircleShape))
-        Text(text = priority.label(), style = BadgeTextStyle)
+        Text(text = priority.label(), style = BadgeTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

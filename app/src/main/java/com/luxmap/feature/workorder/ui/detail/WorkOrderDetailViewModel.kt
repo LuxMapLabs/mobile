@@ -145,6 +145,32 @@ class WorkOrderDetailViewModel
             }
         }
 
+        fun requestCancellation(reason: String) {
+            val current = _uiState.value
+            if (current !is WorkOrderDetailUiState.Success || current.isRequestingCancellation) return
+            _uiState.value = current.copy(isRequestingCancellation = true, cancellationError = null)
+            viewModelScope.launch {
+                detailRepository.requestCancellation(workOrderId, reason).fold(
+                    onSuccess = { detail ->
+                        val after = _uiState.value
+                        if (after is WorkOrderDetailUiState.Success) {
+                            _uiState.value = after.copy(detail = detail, isRequestingCancellation = false)
+                        }
+                    },
+                    onFailure = { e ->
+                        val after = _uiState.value
+                        if (after is WorkOrderDetailUiState.Success) {
+                            _uiState.value =
+                                after.copy(
+                                    isRequestingCancellation = false,
+                                    cancellationError = cancellationErrorMessage(e),
+                                )
+                        }
+                    },
+                )
+            }
+        }
+
         fun retakeEvidence(onReady: () -> Unit) {
             viewModelScope.launch {
                 completionRepository.retakeEvidence(workOrderId)
@@ -161,6 +187,9 @@ class WorkOrderDetailViewModel
 
         private fun startErrorMessage(e: Throwable): String =
             if (e is IOException) "Mất kết nối. Vui lòng thử lại." else "Không bắt đầu được lệnh này"
+
+        private fun cancellationErrorMessage(e: Throwable): String =
+            if (e is IOException) "Mất kết nối. Vui lòng thử lại." else "Không gửi được yêu cầu hủy"
 
         private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 

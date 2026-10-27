@@ -15,6 +15,9 @@ data class WorkOrderDetail(
     val reportNote: String? = null,
     val materialsUsed: String? = null,
     val allowedActions: List<String>,
+    val cancellationRequestStatus: String = "none",
+    val cancellationRequestNote: String? = null,
+    val cancellationRejectNote: String? = null,
     val faults: List<WorkOrderFaultDetail>,
 )
 
@@ -44,6 +47,9 @@ fun WorkOrderDetailDto.toWorkOrderDetail(): WorkOrderDetail =
         reportNote = reportNote,
         materialsUsed = materialsUsed,
         allowedActions = allowedActions,
+        cancellationRequestStatus = cancellationRequestStatus,
+        cancellationRequestNote = cancellationRequestNote,
+        cancellationRejectNote = cancellationRejectNote,
         faults = faults.map { it.toWorkOrderFaultDetail() },
     )
 
