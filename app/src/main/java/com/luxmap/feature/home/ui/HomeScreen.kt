@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -421,55 +422,90 @@ private fun HomeHeader(
         Spacer(Modifier.height(Spacing.md))
         SyncPill(status = syncStatus, lastSyncedAt = lastSyncedAt, onClick = onRefresh, onDarkHero = true)
         Spacer(Modifier.height(Spacing.lg))
-        MetricRow(metrics = metrics)
+        MetricProgressBar(metrics = metrics)
+        Spacer(Modifier.height(Spacing.sm))
+        MetricLegendRow(metrics = metrics)
     }
 }
 
-// 1 combined translucent block with 3 columns divided by hairlines, instead of 3 separate
-// cards - matches the F02 redesign mockup. No per-column tinted background for overdue
-// anymore (the mockup only differs by text color, not container color).
+// Segmented bar replaces the old 3-box MetricRow, matching the F02 v2 mockup. Same 3 raw
+// counts as before - overdueCount is not a mutually exclusive 4th bucket on the backend (it's
+// "overdue among assigned/in_progress"), so this just reshapes the same numbers, not a new stat.
 @Composable
-private fun MetricRow(metrics: HomeMetrics?) {
-    val dividerColor = Color.White.copy(alpha = 0.12f)
+private fun MetricProgressBar(metrics: HomeMetrics?) {
+    val placeholderColor = Color.White.copy(alpha = 0.16f)
+    val segments =
+        listOfNotNull(
+            metrics?.overdueCount?.takeIf { it > 0 }?.let { it to ErrorDark },
+            metrics?.inProgressCount?.takeIf { it > 0 }?.let { it to Green400 },
+            metrics?.assignedCount?.takeIf { it > 0 }?.let { it to Color.White.copy(alpha = 0.35f) },
+        )
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
-                .border(1.dp, dividerColor, RoundedCornerShape(Radius.card)),
+        modifier = Modifier.fillMaxWidth().height(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        val cells =
-            listOf(
-                Triple("Được giao", metrics?.assignedCount, Color.White),
-                Triple("Đang xử lý", metrics?.inProgressCount, Green400),
-                Triple("Quá hạn", metrics?.overdueCount, ErrorDark),
+        if (segments.isEmpty()) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(placeholderColor, RoundedCornerShape(4.dp)),
             )
-        cells.forEachIndexed { index, (label, value, valueColor) ->
-            if (index > 0) {
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(dividerColor))
+        } else {
+            segments.forEach { (count, color) ->
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(count.toFloat())
+                            .fillMaxHeight()
+                            .background(color, RoundedCornerShape(4.dp)),
+                )
             }
-            MetricCell(label = label, value = value, valueColor = valueColor, modifier = Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun MetricCell(
+private fun MetricLegendRow(metrics: HomeMetrics?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        val cells =
+            listOf(
+                Triple("Quá hạn", metrics?.overdueCount, ErrorDark),
+                Triple("Đang làm", metrics?.inProgressCount, Green400),
+                Triple("Chưa bắt đầu", metrics?.assignedCount, Color.White.copy(alpha = 0.5f)),
+            )
+        cells.forEach { (label, value, dotColor) ->
+            MetricLegendCell(label = label, value = value, dotColor = dotColor, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun MetricLegendCell(
     label: String,
     value: Int?,
-    valueColor: Color,
+    dotColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(vertical = Spacing.md, horizontal = Spacing.md),
+        modifier =
+            modifier
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.chip))
+                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(
-            text = value?.toString() ?: "—",
-            style = MetricTextStyle,
-            color = if (value != null) valueColor else Color.White.copy(alpha = 0.5f),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(modifier = Modifier.size(8.dp).background(dotColor, CircleShape))
+            Text(
+                text = value?.toString() ?: "—",
+                style = MetricTextStyle.copy(fontSize = 20.sp, lineHeight = 24.sp),
+                color = Color.White,
+            )
+        }
         Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.75f))
     }
 }
