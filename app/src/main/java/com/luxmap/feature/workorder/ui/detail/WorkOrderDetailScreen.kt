@@ -296,13 +296,6 @@ fun WorkOrderDetailScreen(
     }
 }
 
-private fun workOrderDetailTopBarTitle(taskKindWire: String): String =
-    when (workOrderTaskKindFromWire(taskKindWire)) {
-        WorkOrderTaskKind.INSPECTION -> "Lệnh kiểm tra"
-        WorkOrderTaskKind.REPAIR -> "Lệnh sửa chữa"
-        WorkOrderTaskKind.SURVEY -> "Lệnh khảo sát"
-    }
-
 private data class WorkOrderCtaState(
     val text: String,
     val icon: ImageVector,
@@ -763,6 +756,7 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
+    val kindColors = kind.badgeColors()
     Column(
         modifier =
             Modifier
@@ -773,25 +767,45 @@ private fun WorkOrderHeroSection(
                 .padding(top = Spacing.xs, bottom = Spacing.xxxl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onBack) {
                 Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
             }
-            Text(text = workOrderDetailTopBarTitle(detail.taskKind), style = TitleTextStyle, color = Color.White)
+            Text(
+                text = detail.workOrderId,
+                style = LabelTextStyle,
+                color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            StatusBadge(text = kind.label(), colors = kind.badgeColors(), icon = kind.icon())
-            StatusBadge(text = status.label(), colors = status.badgeColors())
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
-            Text(text = detail.workOrderId, style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
+            Box(
+                modifier =
+                    Modifier
+                        .size(HeroKindIconSize)
+                        .background(kindColors.background, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = kind.icon(), contentDescription = null, tint = kindColors.text)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    StatusBadge(
+                        text = kind.label(),
+                        colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
+                    )
+                    StatusBadge(text = status.label(), colors = status.badgeColors())
+                }
+            }
         }
     }
 }
+
+private val HeroKindIconSize = 56.dp
 
 @Composable
 private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
