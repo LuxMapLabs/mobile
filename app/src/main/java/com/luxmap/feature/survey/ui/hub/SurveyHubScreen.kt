@@ -6,11 +6,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -58,10 +55,8 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
-import com.luxmap.core.theme.Green400
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
-import com.luxmap.core.theme.MetricTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
@@ -155,12 +150,12 @@ fun SurveyHubScreen(
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
 ) {
-    val metrics = hubMetricsOf(state)
+    val routeCount = assignedRouteCountOf(state)
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
     var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        SurveyHubHeader(metrics = metrics)
+        SurveyHubHeader(routeCount = routeCount)
         // Overlaps the hero's bottom edge by Spacing.xl, same as HomeScreen's HomeHeader overlap -
         // reads as a sheet floating over the navy hero instead of a hard seam between the two.
         // The clip (not just background) matters once the list scrolls - background alone paints
@@ -297,26 +292,21 @@ private fun SkeletonBar(
     Box(modifier = widthModifier.height(height).background(color, shape))
 }
 
-private data class HubMetrics(val routes: Int?, val attention: Int?, val uploading: Int?)
-
-// Loading/Error show "—" for all 3 cells (same convention as HomeScreen's metrics ?: null),
-// Empty is all-zero since every section is confirmed empty by then.
-private fun hubMetricsOf(state: SurveyHubUiState): HubMetrics =
+// Loading/Error show null (hero falls back to a neutral line), Empty is 0 since every section
+// is confirmed empty by then.
+private fun assignedRouteCountOf(state: SurveyHubUiState): Int? =
     when (state) {
-        is SurveyHubUiState.Success ->
-            HubMetrics(
-                routes = state.assignedRoutes.size,
-                attention = state.rejectedSweeps.size + state.pendingAiConfirmation.size,
-                uploading = state.uploadingSessions.size,
-            )
-        is SurveyHubUiState.Empty -> HubMetrics(routes = 0, attention = 0, uploading = 0)
-        is SurveyHubUiState.Loading, is SurveyHubUiState.Error -> HubMetrics(null, null, null)
+        is SurveyHubUiState.Success -> state.assignedRoutes.size
+        is SurveyHubUiState.Empty -> 0
+        is SurveyHubUiState.Loading, is SurveyHubUiState.Error -> null
     }
 
-// Fixed Navy-gradient hero regardless of Light/Dark theme, same BrandHeroGradient as F02's
-// HomeHeader - reads as a distinct brand surface rather than blending into colorScheme.background.
+// Matches the Khao Sat v4 mock's hero exactly (CLAUDE.md 2026-10-29) - no metric block, just the
+// date, title, and a plain "N tuyen duoc giao cho ban" line. The notification bell+badge seen in
+// the mock is not drawn here - the real app already renders one globally in NavGraph's Scaffold
+// across all 4 tabs, not per-screen.
 @Composable
-private fun SurveyHubHeader(metrics: HubMetrics) {
+private fun SurveyHubHeader(routeCount: Int?) {
     val today =
         remember {
             LocalDate.now().format(
@@ -332,70 +322,23 @@ private fun SurveyHubHeader(metrics: HubMetrics) {
                 .padding(horizontal = Spacing.lg)
                 // Same top offset as HomeHeader's own title, to line up with the shared bell bar.
                 .padding(top = Spacing.xs, bottom = Spacing.xxxl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        Text(
-            text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
-            style = LabelTextStyle,
-            color = Color.White.copy(alpha = 0.75f),
-        )
-        Text(text = "Khảo sát", style = DisplayTextStyle, color = Color.White)
-        Spacer(Modifier.height(Spacing.lg))
-        HubMetricRow(metrics = metrics)
-    }
-}
-
-// Same 1-block-3-column translucent row as HomeScreen's MetricRow, with Survey Hub's own 3
-// metrics (routes/attention/uploading) and colors matching the design mock.
-@Composable
-private fun HubMetricRow(metrics: HubMetrics) {
-    val dividerColor = Color.White.copy(alpha = 0.12f)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(Radius.card))
-                .border(1.dp, dividerColor, RoundedCornerShape(Radius.card)),
-    ) {
-        val cells =
-            listOf(
-                Triple("Tuyến được giao", metrics.routes, Color.White),
-                Triple("Cần xử lý", metrics.attention, SurveyAttentionAmber),
-                Triple("Chờ tải lên", metrics.uploading, Green400),
+        Column {
+            Text(
+                text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
+                style = LabelTextStyle,
+                color = Color.White.copy(alpha = 0.75f),
             )
-        cells.forEachIndexed { index, (label, value, valueColor) ->
-            if (index > 0) {
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(dividerColor))
-            }
-            HubMetricCell(label = label, value = value, valueColor = valueColor, modifier = Modifier.weight(1f))
+            Text(text = "Khảo sát", style = DisplayTextStyle, color = Color.White)
         }
-    }
-}
-
-@Composable
-private fun HubMetricCell(
-    label: String,
-    value: Int?,
-    valueColor: Color,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(vertical = Spacing.md, horizontal = Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
         Text(
-            text = value?.toString() ?: "—",
-            style = MetricTextStyle,
-            color = if (value != null) valueColor else Color.White.copy(alpha = 0.5f),
+            text = if (routeCount != null) "$routeCount tuyến được giao cho bạn" else "Đang tải tuyến…",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.8f),
         )
-        Text(text = label, style = LabelTextStyle, color = Color.White.copy(alpha = 0.75f))
     }
 }
-
-// Mock-specific amber (#F7C66D), not one of Color.kt's named tokens - it's the same value as
-// AssetCondition.DIM's dark badge text, but that pairing is about asset condition, not a general
-// "attention" accent, so it's kept as its own local constant instead of reusing that token name.
-private val SurveyAttentionAmber = Color(0xFFF7C66D)
 
 @Composable
 private fun SurveyHubContent(
