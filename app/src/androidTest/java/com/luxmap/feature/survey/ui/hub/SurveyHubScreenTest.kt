@@ -72,6 +72,28 @@ class SurveyHubScreenTest {
         composeRule.onNodeWithText("Tiếp tục").assertDoesNotExist()
     }
 
+    // Found on a real device 2026-10-29: a route's card looked completely unchanged after
+    // completing its survey at the pole list, since nothing locally tracked a pending completion
+    // for it.
+    @Test
+    fun a_locally_completed_route_shows_a_locked_row_and_hides_the_action_buttons() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route()),
+                            locallyCompletedWorkOrderIds = setOf("WO-1"),
+                        ),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertExists()
+        composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
+        composeRule.onNodeWithText("Quay video toàn tuyến").assertDoesNotExist()
+    }
+
     @Test
     fun tapping_bat_dau_on_the_merged_cta_starts_for_pole_capture() {
         var started: String? = null
