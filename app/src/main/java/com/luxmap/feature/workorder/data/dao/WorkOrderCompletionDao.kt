@@ -40,6 +40,12 @@ interface WorkOrderCompletionDao {
     @Query("SELECT * FROM local_work_order_completion WHERE workOrderId = :workOrderId LIMIT 1")
     fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?>
 
+    // Used by SurveyHubScreen (CLAUDE.md 2026-10-29) to show every route's own local completion
+    // state at once, instead of one Flow per route - a completion row existing at all (regardless
+    // of its own submitStatus) means "already submitted locally", sync happens in the background.
+    @Query("SELECT * FROM local_work_order_completion")
+    fun observeAllCompletions(): Flow<List<LocalWorkOrderCompletionEntity>>
+
     @Query("SELECT * FROM local_work_order_completion WHERE workOrderId = :workOrderId LIMIT 1")
     suspend fun completionByWorkOrderId(workOrderId: String): LocalWorkOrderCompletionEntity?
 

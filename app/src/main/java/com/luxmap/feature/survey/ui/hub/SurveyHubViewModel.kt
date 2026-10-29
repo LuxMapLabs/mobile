@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,6 +48,7 @@ class SurveyHubViewModel
     constructor(
         private val repository: SurveyRepository,
         private val connectivityObserver: ConnectivityObserver,
+        private val completionRepository: WorkOrderCompletionRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<SurveyHubUiState>(SurveyHubUiState.Loading)
         val uiState: StateFlow<SurveyHubUiState> = _uiState.asStateFlow()
@@ -152,7 +154,8 @@ class SurveyHubViewModel
                         repository.observeAssignedRoutes(),
                         repository.observeUploadingSessions(),
                         connectivityObserver.isOnline,
-                    ) { routesResult, queuedSessions, isOnline ->
+                        completionRepository.observeCompletedWorkOrderIds(),
+                    ) { routesResult, queuedSessions, isOnline, locallyCompletedWorkOrderIds ->
                         val uploading =
                             queuedSessions.map { session ->
                                 UploadingSurveySession(
@@ -176,6 +179,7 @@ class SurveyHubViewModel
                                 pendingAiConfirmation = pending,
                                 isStale = routesResult.isStale,
                                 cancelledWorkOrderIds = cancelledWorkOrderIds,
+                                locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
                             )
                         }
                     }.catch { e ->

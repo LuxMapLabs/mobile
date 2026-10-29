@@ -42,6 +42,11 @@ sealed interface SurveyHubUiState {
         val cancelledWorkOrderIds: Set<String> = emptySet(),
         val requestingCancellationFor: String? = null,
         val cancellationError: String? = null,
+        // Routes with a local_work_order_completion row (any submitStatus - sync happens in the
+        // background). Found missing on a real device, 2026-10-29: a route's card looked
+        // completely unchanged after completing its survey at the pole list, same local-state
+        // gap as WorkOrderDetailScreen's own localCompletion check for repair/inspection.
+        val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
     ) : SurveyHubUiState
 
     data object Empty : SurveyHubUiState

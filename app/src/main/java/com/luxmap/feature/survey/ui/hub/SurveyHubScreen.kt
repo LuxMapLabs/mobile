@@ -399,6 +399,7 @@ private fun SurveyHubContent(
                     route,
                     isStarting = state.startingWorkOrderId == route.workOrderId,
                     isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
+                    isLocallyCompleted = route.workOrderId in state.locallyCompletedWorkOrderIds,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
                     onStartForPoleCapture = {
@@ -544,6 +545,7 @@ private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     isStarting: Boolean,
     isCancelled: Boolean,
+    isLocallyCompleted: Boolean,
     onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
     onStartForPoleCapture: () -> Unit,
@@ -628,6 +630,29 @@ private fun AssignedRouteCard(
                     Text(
                         text = "Đã gửi yêu cầu hủy · chờ duyệt",
                         color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                    )
+                }
+            } else if (isLocallyCompleted) {
+                // Found on a real device 2026-10-29: this route's card looked completely
+                // unchanged after completing its survey at the pole list - wo_status itself only
+                // catches up once sync_queue actually uploads the completion, same local-state
+                // gap WorkOrderDetailScreen already guards against for repair/inspection
+                // ("localCompletion?.submitStatus == pending").
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Dimens.minTouchTarget)
+                            .background(
+                                WorkOrderStatus.ASSIGNED.badgeColors().background,
+                                RoundedCornerShape(Radius.control),
+                            ),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Đã nộp kết quả khảo sát · chờ đồng bộ",
+                        color = WorkOrderStatus.ASSIGNED.badgeColors().text,
                     )
                 }
             } else {
