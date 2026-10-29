@@ -52,6 +52,8 @@ fun workOrderLifecycleSteps(
 data class WorkOrderScheduleWindow(
     val canActOnSchedule: Boolean,
     val isOverdueToComplete: Boolean,
+    // Only set when canActOnSchedule is false, so the UI can show "opens on <date>".
+    val unlocksOn: LocalDate? = null,
 )
 
 fun workOrderScheduleWindow(
@@ -69,8 +71,10 @@ fun workOrderScheduleWindow(
     if (scheduled == null) {
         return WorkOrderScheduleWindow(canActOnSchedule = true, isOverdueToComplete = false)
     }
+    val unlocksOn = scheduled.minusDays(1)
     return WorkOrderScheduleWindow(
-        canActOnSchedule = !today.isBefore(scheduled.minusDays(1)),
+        canActOnSchedule = !today.isBefore(unlocksOn),
         isOverdueToComplete = today.isAfter(scheduled),
+        unlocksOn = unlocksOn,
     )
 }

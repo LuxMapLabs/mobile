@@ -69,6 +69,7 @@ class WorkOrderLifecycleTest {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-08"))
         assertFalse(window.canActOnSchedule)
         assertFalse(window.isOverdueToComplete)
+        assertEquals(LocalDate.parse("2026-11-09"), window.unlocksOn)
     }
 
     @Test
