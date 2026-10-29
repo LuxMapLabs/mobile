@@ -20,6 +20,11 @@ sealed interface PoleListUiState {
         val poles: List<PoleListRowState>,
         // True when showing the cached pole list because the live fetch just failed.
         val isStale: Boolean = false,
+        // True once a local_work_order_completion row exists for this work order (regardless of
+        // its own submitStatus - sync happens in the background). Locks "Hoan tat" and reporting
+        // new poles, same as the mock's state.done - found missing on a real device, 2026-10-29:
+        // tapping "Hoan tat" gave no feedback at all and the screen looked completely unchanged.
+        val isCompleted: Boolean = false,
     ) : PoleListUiState
 
     data object Empty : PoleListUiState

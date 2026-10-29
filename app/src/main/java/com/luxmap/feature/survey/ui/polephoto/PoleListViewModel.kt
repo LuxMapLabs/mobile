@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -46,6 +47,12 @@ class PoleListViewModel
         // but nothing visibly confirms it). This one-shot event lets the Route show a snackbar.
         private val _reviewSubmitted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
         val reviewSubmitted: SharedFlow<Unit> = _reviewSubmitted.asSharedFlow()
+
+        // "Hoan tat" used to navigate back immediately with zero feedback, and the Hub card
+        // looked completely unchanged on return - found on a real device, 2026-10-29. This
+        // one-shot event lets the Route show a toast right on this screen instead.
+        private val _surveyCompleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val surveyCompleted: SharedFlow<Unit> = _surveyCompleted.asSharedFlow()
 
         init {
             load()
@@ -107,13 +114,16 @@ class PoleListViewModel
             _aiResultState.value = null
         }
 
-        // "Hoan tat" used to just navigate back (PoleListRoute's onDone), leaving the work order
+        // Used to just navigate back right away (PoleListRoute's onDone), leaving the work order
         // stuck "in_progress" forever - there was no other call site for POST
         // /work-orders/{id}/complete for a survey work order (WorkOrderDetailScreen draws
         // nothing for task_kind=survey). Only completes when at least one photo was captured -
-        // tapping this on an empty list just navigates back, nothing to report yet.
+        // tapping this on an empty list does nothing (the confirm sheet never opens, see
+        // PoleListScreen). Guarded against double-submit by isCompleted, same guard the UI itself
+        // uses to lock the button - this function can still be called once more after a resume.
         fun onComplete() {
             val state = _uiState.value as? PoleListUiState.Success ?: return
+            if (state.isCompleted) return
             val captured = state.poles.count { it.syncStatus != null }
             if (captured == 0) return
             viewModelScope.launch {
@@ -124,6 +134,7 @@ class PoleListViewModel
                     materialsUsed = null,
                     faultOutcomes = null,
                 )
+                _surveyCompleted.tryEmit(Unit)
             }
         }
 
@@ -168,39 +179,44 @@ class PoleListViewModel
                             _uiState.value = PoleListUiState.Empty
                             return@launch
                         }
-                        polePhotoRepository
-                            .observePhotos(workOrderId)
-                            .flatMapLatest { photos ->
-                                val latestByPole = photos.groupBy { it.poleId }.mapValues { it.value.first() }
-                                polePhotoRepository
-                                    .observeUploadStatuses(latestByPole.values.map { it.photoId })
-                                    .map {
-                                            statuses ->
-                                        // Keyed by local photoId (sync_queue.client_op_id) to look up status, but
-                                        // the row only needs serverPhotoId - the local id is never shown in the UI.
-                                        latestByPole.mapValues { (_, photo) ->
-                                            photo.serverPhotoId to statuses[photo.photoId]
+                        val infoByPoleFlow =
+                            polePhotoRepository
+                                .observePhotos(workOrderId)
+                                .flatMapLatest { photos ->
+                                    val latestByPole = photos.groupBy { it.poleId }.mapValues { it.value.first() }
+                                    polePhotoRepository
+                                        .observeUploadStatuses(latestByPole.values.map { it.photoId })
+                                        .map {
+                                                statuses ->
+                                            // Keyed by local photoId (sync_queue.client_op_id) to look up status, but
+                                            // the row only needs serverPhotoId - the local id is never shown in the UI.
+                                            latestByPole.mapValues { (_, photo) ->
+                                                photo.serverPhotoId to statuses[photo.photoId]
+                                            }
                                         }
-                                    }
-                            }
+                                }
+                        combine(
+                            infoByPoleFlow,
+                            completionRepository.observeCompletion(workOrderId),
+                        ) { infoByPole, completion ->
+                            PoleListUiState.Success(
+                                poles =
+                                    poles.map { pole ->
+                                        val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
+                                        PoleListRowState(
+                                            poleId = pole.poleId,
+                                            position = pole.position,
+                                            fixtureStatus = pole.fixtureStatus,
+                                            serverPhotoId = serverPhotoId,
+                                            syncStatus = status?.let(::toSyncStatus),
+                                        )
+                                    },
+                                isStale = result.isStale,
+                                isCompleted = completion != null,
+                            )
+                        }
                             .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi") }
-                            .collect { infoByPole ->
-                                _uiState.value =
-                                    PoleListUiState.Success(
-                                        poles =
-                                            poles.map { pole ->
-                                                val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
-                                                PoleListRowState(
-                                                    poleId = pole.poleId,
-                                                    position = pole.position,
-                                                    fixtureStatus = pole.fixtureStatus,
-                                                    serverPhotoId = serverPhotoId,
-                                                    syncStatus = status?.let(::toSyncStatus),
-                                                )
-                                            },
-                                        isStale = result.isStale,
-                                    )
-                            }
+                            .collect { _uiState.value = it }
                     },
                     onFailure = { e ->
                         _uiState.value = PoleListUiState.Error(e.message ?: "Không tải được danh sách cột")

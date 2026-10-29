@@ -57,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -101,15 +103,20 @@ fun PoleListRoute(
     var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    // A successful review submit otherwise only changes a small "Da review luc ..." timestamp
-    // inside the sheet - easy to miss (found on a real device, 2026-10-29). TopSlideToast (not a
-    // Material Snackbar) matches the Khao Sat v4 mock's own toast, which slides down from above
-    // the content instead of appearing at the bottom where a bottom-sheet action is easy to miss.
+    // A successful review submit, or completing the survey, otherwise gives no visible feedback
+    // at all (found on a real device, 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material
+    // Snackbar) matches the Khao Sat v4 mock's own toast, which slides down from above the
+    // content instead of appearing at the bottom where a bottom-sheet action is easy to miss.
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.reviewSubmitted.collect {
             scope.launch { toastState.show("Đã gửi xác nhận") }
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.surveyCompleted.collect {
+            scope.launch { toastState.show("Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì") }
         }
     }
 
@@ -121,10 +128,11 @@ fun PoleListRoute(
             aiResultPoleId = lastViewedPoleId.orEmpty(),
             aiResultPosition = lastViewedPosition ?: 0,
             onCapturePole = onCapturePole,
-            onDone = {
-                viewModel.onComplete()
-                onDone()
-            },
+            // Pure navigation - this used to also silently call onComplete() (found on a real
+            // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
+            // mark the whole survey complete even if the user only meant to leave.
+            onBack = onDone,
+            onComplete = viewModel::onComplete,
             onRetry = viewModel::onRetry,
             onViewAiResult = { serverPhotoId ->
                 val pole =
@@ -160,7 +168,8 @@ fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
     onCapturePole: (poleId: String) -> Unit,
-    onDone: () -> Unit,
+    onBack: () -> Unit,
+    onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
     aiResultState: PolePhotoResultUiState? = null,
     aiResultPoleId: String = "",
@@ -176,9 +185,13 @@ fun PoleListScreen(
     // flow (PolePhotoCaptureScreen) only exists for photos - see CLAUDE.md/contract-drift.md:
     // POST .../pole-photos validates strictly for a JPEG file named "photo", so there is no
     // server-side way to send video for a pole yet.
+    // Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet - added 2026-10-29, this used
+    // to call onComplete() and navigate away in the same tap, no confirmation and no way to tell
+    // afterward that it worked (see CLAUDE.md).
+    var showCompleteConfirm by rememberSaveable { mutableStateOf(false) }
     var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        PoleListHeader(workOrderId = workOrderId, onBack = onDone)
+        PoleListHeader(workOrderId = workOrderId, onBack = onBack)
         // Overlaps the hero's bottom edge, same pattern as SurveyHubScreen's own sheet - reads as
         // a sheet floating over the navy hero instead of a hard seam between the two. The clip
         // (not just background) matters once the list scrolls - background alone paints the
@@ -226,7 +239,15 @@ fun PoleListScreen(
                                         PoleRow(
                                             pole = pole,
                                             isNext = index == nextIndex,
-                                            onClick = { reportMethodSheetPoleId = pole.poleId },
+                                            // Matches the mock's canReport: !state.done - no point
+                                            // reporting a new issue after the survey was already
+                                            // marked complete.
+                                            onClick =
+                                                if (state.isCompleted) {
+                                                    {}
+                                                } else {
+                                                    { reportMethodSheetPoleId = pole.poleId }
+                                                },
                                             onViewAiResult = { pole.serverPhotoId?.let(onViewAiResult) },
                                         )
                                     }
@@ -256,8 +277,28 @@ fun PoleListScreen(
             }
         }
         if (state is PoleListUiState.Success) {
-            PoleListBottomBar(left = state.poles.count { it.syncStatus == null }, onDone = onDone)
+            PoleListBottomBar(
+                left = state.poles.count { it.syncStatus == null },
+                isCompleted = state.isCompleted,
+                onTapComplete = { showCompleteConfirm = true },
+            )
         }
+    }
+
+    if (showCompleteConfirm && state is PoleListUiState.Success) {
+        // A captured pole IS a reported issue in this v1 flow (there is no separate "mark
+        // normal" action - matches the mock's own info line "chi bao cot co loi, con lai tinh
+        // la binh thuong" and PoleListBottomBar's own "left" count below).
+        val issueCount = state.poles.count { it.syncStatus != null }
+        CompleteSurveyConfirmSheet(
+            issueCount = issueCount,
+            normalCount = state.poles.size - issueCount,
+            onDismiss = { showCompleteConfirm = false },
+            onConfirm = {
+                showCompleteConfirm = false
+                onComplete()
+            },
+        )
     }
 
     if (aiResultState != null) {
@@ -419,7 +460,8 @@ private fun PoleListHeader(
 @Composable
 private fun PoleListBottomBar(
     left: Int,
-    onDone: () -> Unit,
+    isCompleted: Boolean,
+    onTapComplete: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -437,7 +479,8 @@ private fun PoleListBottomBar(
                 Text(text = "$left cột chưa chụp", style = MaterialTheme.typography.titleMedium)
             }
             OutlinedButton(
-                onClick = onDone,
+                onClick = onTapComplete,
+                enabled = !isCompleted,
                 modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
                 shape = RoundedCornerShape(Radius.control),
                 // colorScheme.primary, not a fixed Navy700 - this screen has no theme override
@@ -448,7 +491,64 @@ private fun PoleListBottomBar(
             ) {
                 Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(Spacing.sm))
-                Text(text = "Hoàn tất")
+                Text(text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất")
+            }
+        }
+    }
+}
+
+// Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompleteSurveyConfirmSheet(
+    issueCount: Int,
+    normalCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.control)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(text = "Hoàn tất khảo sát tuyến?", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "$issueCount cột báo lỗi, $normalCount cột còn lại được tính là bình thường.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("Kiểm tra lại")
+                }
+                PrimaryButton(
+                    text = "Hoàn tất",
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1.4f).testTag("confirm_survey_complete"),
+                )
             }
         }
     }
