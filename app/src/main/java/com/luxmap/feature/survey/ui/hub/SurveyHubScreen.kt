@@ -37,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,6 +72,7 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
+import com.luxmap.core.ui.components.CancelRequestSheet
 import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
@@ -129,6 +131,7 @@ fun SurveyHubRoute(
                 onRetry = viewModel::onRetry,
                 onStartRoute = viewModel::onStartRoute,
                 onReviewAiConfirmation = onReviewAiConfirmation,
+                onRequestCancellation = viewModel::onRequestCancellation,
             )
         }
     }
@@ -144,8 +147,12 @@ fun SurveyHubScreen(
     onStartRoute: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
+    onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
 ) {
     val metrics = hubMetricsOf(state)
+    // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
+    // as F09's own showCancelSheet, since it is pure navigation/presentation state.
+    var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         SurveyHubHeader(metrics = metrics)
         // Overlaps the hero's bottom edge by Spacing.xl, same as HomeScreen's HomeHeader overlap -
@@ -172,6 +179,7 @@ fun SurveyHubScreen(
                         onStartRoute = onStartRoute,
                         onReviewAiConfirmation = onReviewAiConfirmation,
                         onResurvey = onResurvey,
+                        onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                     )
 
                 is SurveyHubUiState.Empty ->
@@ -201,6 +209,24 @@ fun SurveyHubScreen(
                         }
                     }
             }
+        }
+    }
+
+    val sheetWorkOrderId = cancelSheetWorkOrderId
+    if (sheetWorkOrderId != null && state is SurveyHubUiState.Success) {
+        CancelRequestSheet(
+            isSubmitting = state.requestingCancellationFor == sheetWorkOrderId,
+            errorMessage = state.cancellationError,
+            onDismiss = { cancelSheetWorkOrderId = null },
+            onSend = { reason -> onRequestCancellation(sheetWorkOrderId, reason) },
+        )
+    }
+    // Auto-close once this route's request actually lands in cancelledWorkOrderIds - matches
+    // F09's own LaunchedEffect(uiState) pattern for cancellationRequestStatus == "pending".
+    LaunchedEffect(state) {
+        val success = state as? SurveyHubUiState.Success
+        if (sheetWorkOrderId != null && success?.cancelledWorkOrderIds?.contains(sheetWorkOrderId) == true) {
+            cancelSheetWorkOrderId = null
         }
     }
 }
@@ -373,6 +399,7 @@ private fun SurveyHubContent(
     onStartRoute: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
+    onOpenCancelSheet: (workOrderId: String) -> Unit,
 ) {
     val hasAttentionCards =
         state.rejectedSweeps.isNotEmpty() ||
@@ -416,9 +443,11 @@ private fun SurveyHubContent(
                 AssignedRouteCard(
                     route,
                     isStarting = state.startingWorkOrderId == route.workOrderId,
+                    isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
                     onStartRoute = { onStartRoute(route.workOrderId) },
+                    onRequestCancellation = { onOpenCancelSheet(route.workOrderId) },
                 )
             }
         }
@@ -554,11 +583,18 @@ private fun scheduledDateText(scheduledDate: String?): String =
 private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     isStarting: Boolean,
+    isCancelled: Boolean,
     onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
     onStartRoute: () -> Unit,
+    onRequestCancellation: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
+    // Same rule WorkOrderDetailScreen (F09) uses (CLAUDE.md WO-CANCEL-REQUEST): only while
+    // still assigned, not yet started. The list endpoint has no allowed_actions field to read
+    // this from (unlike WorkOrderDetail), so this applies the documented rule directly instead
+    // of guessing a different one.
+    val canRequestCancellation = status == WorkOrderStatus.ASSIGNED && !isCancelled
     val dateColor =
         if (scheduledDateIsToday(route.scheduledDate)) DueTodayColor else MaterialTheme.colorScheme.onSurface
     Column(
@@ -609,53 +645,86 @@ private fun AssignedRouteCard(
                 modifier = Modifier.weight(1f),
             )
         }
-        // A freshly-created work order (e.g. from the web) starts "assigned" - neither the video
-        // flow nor pole-photo uploads work yet (server rejects both with 409
-        // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
-        // only reachable place to call the start API for one - "Kiem tra san sang" below does
-        // NOT call it, it only checks local device readiness for the video flow.
-        if (status == WorkOrderStatus.ASSIGNED) {
+        // Mirrors F09's own rule (CLAUDE.md WO-CANCEL-REQUEST): once a cancellation request is
+        // sent, hide every action button - the manager still needs to decide, so starting or
+        // capturing anything for this route in the meantime would just be wasted work.
+        if (isCancelled) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Dimens.minTouchTarget)
+                        .background(
+                            AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
+                            RoundedCornerShape(Radius.control),
+                        ),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Đã gửi yêu cầu hủy · chờ duyệt",
+                    color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                )
+            }
+        } else {
+            if (canRequestCancellation) {
+                OutlinedButton(
+                    onClick = onRequestCancellation,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Text(text = "Yêu cầu hủy")
+                }
+            }
+            // A freshly-created work order (e.g. from the web) starts "assigned" - neither the
+            // video flow nor pole-photo uploads work yet (server rejects both with 409
+            // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
+            // only reachable place to call the start API for one - "Kiem tra san sang" below
+            // does NOT call it, it only checks local device readiness for the video flow.
+            if (status == WorkOrderStatus.ASSIGNED) {
+                Button(
+                    onClick = onStartRoute,
+                    enabled = !isStarting,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+                ) {
+                    Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+                }
+            }
             Button(
-                onClick = onStartRoute,
-                enabled = !isStarting,
+                onClick = onCheckReadiness,
                 modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
                 shape = RoundedCornerShape(Radius.control),
                 colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
             ) {
-                Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+                Text(text = "Kiểm tra sẵn sàng")
             }
-        }
-        Button(
-            onClick = onCheckReadiness,
-            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-            colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-        ) {
-            Text(text = "Kiểm tra sẵn sàng")
-        }
-        // Uploading a pole photo needs the work order to be in_progress server-side
-        // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could capture
-        // a photo for a route that was never started, only to see a confusing "Xung dot" sync
-        // badge later with no clue why.
-        val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
-        OutlinedButton(
-            onClick = onCapturePolePhotos,
-            enabled = canCapturePolePhotos,
-            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-            // Not Navy700 - that's a fixed dark color, unreadable against the card's dark-mode
-            // surface (near-black). onSurface flips Gray900/DarkText with the theme, same as
-            // every other text in this card, so it stays legible in both modes.
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-        ) {
-            Text(text = "Chụp ảnh cột đèn")
-        }
-        if (!canCapturePolePhotos) {
-            Text(
-                text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Uploading a pole photo needs the work order to be in_progress server-side
+            // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could
+            // capture a photo for a route that was never started, only to see a confusing
+            // "Xung dot" sync badge later with no clue why.
+            val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
+            OutlinedButton(
+                onClick = onCapturePolePhotos,
+                enabled = canCapturePolePhotos,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                // Not Navy700 - that's a fixed dark color, unreadable against the card's
+                // dark-mode surface (near-black). onSurface flips Gray900/DarkText with the
+                // theme, same as every other text in this card, so it stays legible in both
+                // modes.
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+            ) {
+                Text(text = "Chụp ảnh cột đèn")
+            }
+            if (!canCapturePolePhotos) {
+                Text(
+                    text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
+                    style = LabelTextStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
