@@ -7,11 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -308,7 +306,7 @@ private fun ReviewCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
+        ReviewChoiceSegment(selected = selected, aiCvState = state.cvState, onSelected = { selected = it })
 
         OutlinedTextField(
             value = note,
@@ -350,46 +348,88 @@ private fun ReviewCard(
     }
 }
 
-// 2 equal chips in a gray tray, same visual pattern as OutcomeSegment (F09/F10) - a separate
-// component rather than generalizing that one, since its 3 options/colors are specific to
-// fault_outcomes and not meant to be reused as a generic 2-choice control.
+// 2-card grid (Khao Sat v4 - Ket Qua AI mock's "Chon ket qua dung" panel, CLAUDE.md 2026-10-30) -
+// same visual language as the mock's option grid (icon tile + label + "AI" tag on the AI's own
+// pick), but trimmed to exactly the 2 values the real review endpoint accepts
+// (final_cv_state: on|off) instead of the mock's 7-option fault-type list.
 @Composable
 private fun ReviewChoiceSegment(
     selected: String?,
+    aiCvState: String?,
     onSelected: (String) -> Unit,
 ) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
+            ReviewChoiceCard(
+                value = value,
+                label = label,
+                isSelected = selected == value,
+                isAiPick = aiCvState == value,
+                onClick = { onSelected(value) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReviewChoiceCard(
+    value: String,
+    label: String,
+    isSelected: Boolean,
+    isAiPick: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = cvStateBadgeColors(value)
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
-                .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
-            val isSelected = selected == value
-            val colors = cvStateBadgeColors(value)
-            Row(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(
-                            if (isSelected) colors.background else Color.Transparent,
-                            RoundedCornerShape(Radius.chip),
-                        )
-                        .clickable(onClick = { onSelected(value) })
-                        .testTag("review_choice_$value")
-                        .padding(vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier
+                .heightIn(min = Dimens.minTouchTarget)
+                .background(
+                    if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(Radius.chip),
                 )
-            }
+                .border(
+                    if (isSelected) 2.dp else 0.dp,
+                    colors.text,
+                    RoundedCornerShape(Radius.chip),
+                )
+                .clickable(onClick = onClick)
+                .testTag("review_choice_$value")
+                .padding(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .background(
+                        if (isSelected) colors.text else colors.background,
+                        RoundedCornerShape(Dimens.radiusSmall),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lightbulb,
+                contentDescription = null,
+                tint = if (isSelected) Color.White else colors.text,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (isAiPick) {
+            Text(
+                text = "AI",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
