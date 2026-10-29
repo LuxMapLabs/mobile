@@ -7,8 +7,11 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.SurveyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -43,6 +46,13 @@ class SurveyHubViewModel
 
         private var loadJob: Job? = null
 
+        // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29): same pattern as F09's own
+        // startedSurveyWorkOrderId (WorkOrderDetailViewModel) - the Route collects this once to
+        // navigate into the pole list right after a successful start, instead of the button
+        // calling 2 callbacks itself.
+        private val _startedRouteForCapture = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val startedRouteForCapture: SharedFlow<String> = _startedRouteForCapture.asSharedFlow()
+
         // Not part of the combine() below on purpose - that flow rebuilds Success from scratch
         // on every emission (routes, uploads, connectivity), which would otherwise wipe this
         // session-only marker on an unrelated reload (see SurveyHubUiState's own note on why
@@ -76,7 +86,10 @@ class SurveyHubViewModel
             _uiState.value = current.copy(startingWorkOrderId = workOrderId, startError = null)
             viewModelScope.launch {
                 repository.startRoute(workOrderId).fold(
-                    onSuccess = { load() },
+                    onSuccess = {
+                        load()
+                        _startedRouteForCapture.tryEmit(workOrderId)
+                    },
                     onFailure = { e ->
                         val latest = _uiState.value as? SurveyHubUiState.Success ?: current
                         _uiState.value =

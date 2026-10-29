@@ -110,6 +110,13 @@ fun SurveyHubRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29) - after a successful start from the
+    // card's single button, follow through into the pole list, same pattern as F09's own
+    // startedSurveyWorkOrderId collection in WorkOrderDetailRoute.
+    LaunchedEffect(Unit) {
+        viewModel.startedRouteForCapture.collect { workOrderId -> onCapturePolePhotos(workOrderId) }
+    }
+
     // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
     // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
     // instead of blending into an all-dark one.
@@ -678,22 +685,6 @@ private fun AssignedRouteCard(
                         Text(text = "Yêu cầu hủy")
                     }
                 }
-                // A freshly-created work order (e.g. from the web) starts "assigned" - neither the
-                // video flow nor pole-photo uploads work yet (server rejects both with 409
-                // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
-                // only reachable place to call the start API for one - "Kiem tra san sang" below
-                // does NOT call it, it only checks local device readiness for the video flow.
-                if (status == WorkOrderStatus.ASSIGNED) {
-                    Button(
-                        onClick = onStartRoute,
-                        enabled = !isStarting,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                        shape = RoundedCornerShape(Radius.control),
-                        colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-                    ) {
-                        Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
-                    }
-                }
                 Button(
                     onClick = onCheckReadiness,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
@@ -702,29 +693,30 @@ private fun AssignedRouteCard(
                 ) {
                     Text(text = "Kiểm tra sẵn sàng")
                 }
-                // Uploading a pole photo needs the work order to be in_progress server-side
-                // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could
-                // capture a photo for a route that was never started, only to see a confusing
-                // "Xung dot" sync badge later with no clue why.
-                val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
-                OutlinedButton(
-                    onClick = onCapturePolePhotos,
-                    enabled = canCapturePolePhotos,
+                // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29): a freshly-created work
+                // order starts "assigned" - pole-photo uploads need in_progress server-side
+                // (409 WORK_ORDER_NOT_IN_PROGRESS otherwise). Home deliberately hides survey
+                // orders, so this is the only reachable place to call the start API for one -
+                // "Kiem tra san sang" above does NOT call it, it only checks local device
+                // readiness for the video flow. Tapping this while still "assigned" starts the
+                // route, then SurveyHubViewModel's startedRouteForCapture flow (observed by
+                // SurveyHubRoute) navigates to the pole list on success - the button itself only
+                // ever calls one of the two callbacks, never both.
+                val canAct = status == WorkOrderStatus.ASSIGNED || status == WorkOrderStatus.IN_PROGRESS
+                Button(
+                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartRoute else onCapturePolePhotos,
+                    enabled = canAct && !isStarting,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
                     shape = RoundedCornerShape(Radius.control),
-                    // Not Navy700 - that's a fixed dark color, unreadable against the card's
-                    // dark-mode surface (near-black). onSurface flips Gray900/DarkText with the
-                    // theme, same as every other text in this card, so it stays legible in both
-                    // modes.
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
                 ) {
-                    Text(text = "Chụp ảnh cột đèn")
-                }
-                if (!canCapturePolePhotos) {
                     Text(
-                        text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
-                        style = LabelTextStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text =
+                            when {
+                                isStarting -> "Đang bắt đầu…"
+                                status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
+                                else -> "Chụp ảnh cột đèn"
+                            },
                     )
                 }
             }

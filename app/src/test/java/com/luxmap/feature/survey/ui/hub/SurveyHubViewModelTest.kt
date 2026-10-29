@@ -217,6 +217,32 @@ class SurveyHubViewModelTest {
         }
 
     @Test
+    fun `a successful onStartRoute emits startedRouteForCapture`() =
+        runTest {
+            val startedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val viewModel = SurveyHubViewModel(repository, connectivity)
+            // Let init's load() reach Success first - otherwise onStartRoute's own
+            // "current !is Success" guard returns early and never calls the repository, same
+            // as why the uiState-based tests above drain Loading/Success via awaitItem() first.
+            dispatcher.scheduler.advanceUntilIdle()
+
+            viewModel.startedRouteForCapture.test {
+                viewModel.onStartRoute("WO-1")
+                assertEquals("WO-1", awaitItem())
+            }
+        }
+
+    @Test
     fun `a failed onStartRoute clears startingWorkOrderId and sets startError`() =
         runTest {
             val repository = mockk<SurveyRepository>()
