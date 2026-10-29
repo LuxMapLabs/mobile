@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -601,129 +600,133 @@ private fun AssignedRouteCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surface),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = route.workOrderId,
-                style = OverlineTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            StatusBadge(text = status.label(), colors = status.badgeColors())
-        }
-        Text(
-            text = route.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Row(
+        // Navy header block (route id + commune, status, title) - matches the mock's card
+        // header, which groups the "which route, what state" info on its own dark band instead
+        // of mixing it into the white body with the action buttons.
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusMedium))
-                    .padding(Spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    .background(Navy700)
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            RouteInfoCell(
-                icon = Icons.Filled.Place,
-                label = "Địa bàn",
-                value = route.communeId,
-                valueColor = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${route.workOrderId} · ${route.communeId}",
+                    style = OverlineTextStyle,
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+                StatusBadge(text = status.label(), colors = status.badgeColors())
+            }
+            Text(
+                text = route.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
             )
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
             RouteInfoCell(
                 icon = Icons.Filled.Event,
                 label = "Ngày dự kiến",
                 value = scheduledDateText(route.scheduledDate),
                 valueColor = dateColor,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        // Mirrors F09's own rule (CLAUDE.md WO-CANCEL-REQUEST): once a cancellation request is
-        // sent, hide every action button - the manager still needs to decide, so starting or
-        // capturing anything for this route in the meantime would just be wasted work.
-        if (isCancelled) {
-            Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = Dimens.minTouchTarget)
-                        .background(
-                            AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
-                            RoundedCornerShape(Radius.control),
-                        ),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Đã gửi yêu cầu hủy · chờ duyệt",
-                    color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
-                )
-            }
-        } else {
-            if (canRequestCancellation) {
-                OutlinedButton(
-                    onClick = onRequestCancellation,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusMedium))
+                        .padding(Spacing.md),
+            )
+            // Mirrors F09's own rule (CLAUDE.md WO-CANCEL-REQUEST): once a cancellation request is
+            // sent, hide every action button - the manager still needs to decide, so starting or
+            // capturing anything for this route in the meantime would just be wasted work.
+            if (isCancelled) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = Dimens.minTouchTarget)
+                            .background(
+                                AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
+                                RoundedCornerShape(Radius.control),
+                            ),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(text = "Yêu cầu hủy")
+                    Text(
+                        text = "Đã gửi yêu cầu hủy · chờ duyệt",
+                        color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                    )
                 }
-            }
-            // A freshly-created work order (e.g. from the web) starts "assigned" - neither the
-            // video flow nor pole-photo uploads work yet (server rejects both with 409
-            // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
-            // only reachable place to call the start API for one - "Kiem tra san sang" below
-            // does NOT call it, it only checks local device readiness for the video flow.
-            if (status == WorkOrderStatus.ASSIGNED) {
+            } else {
+                if (canRequestCancellation) {
+                    OutlinedButton(
+                        onClick = onRequestCancellation,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    ) {
+                        Text(text = "Yêu cầu hủy")
+                    }
+                }
+                // A freshly-created work order (e.g. from the web) starts "assigned" - neither the
+                // video flow nor pole-photo uploads work yet (server rejects both with 409
+                // WORK_ORDER_NOT_IN_PROGRESS). Home deliberately hides survey orders, so this is the
+                // only reachable place to call the start API for one - "Kiem tra san sang" below
+                // does NOT call it, it only checks local device readiness for the video flow.
+                if (status == WorkOrderStatus.ASSIGNED) {
+                    Button(
+                        onClick = onStartRoute,
+                        enabled = !isStarting,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                        shape = RoundedCornerShape(Radius.control),
+                        colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+                    ) {
+                        Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+                    }
+                }
                 Button(
-                    onClick = onStartRoute,
-                    enabled = !isStarting,
+                    onClick = onCheckReadiness,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
                     shape = RoundedCornerShape(Radius.control),
                     colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
                 ) {
-                    Text(text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu tuyến")
+                    Text(text = "Kiểm tra sẵn sàng")
                 }
-            }
-            Button(
-                onClick = onCheckReadiness,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-            ) {
-                Text(text = "Kiểm tra sẵn sàng")
-            }
-            // Uploading a pole photo needs the work order to be in_progress server-side
-            // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could
-            // capture a photo for a route that was never started, only to see a confusing
-            // "Xung dot" sync badge later with no clue why.
-            val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
-            OutlinedButton(
-                onClick = onCapturePolePhotos,
-                enabled = canCapturePolePhotos,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                // Not Navy700 - that's a fixed dark color, unreadable against the card's
-                // dark-mode surface (near-black). onSurface flips Gray900/DarkText with the
-                // theme, same as every other text in this card, so it stays legible in both
-                // modes.
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            ) {
-                Text(text = "Chụp ảnh cột đèn")
-            }
-            if (!canCapturePolePhotos) {
-                Text(
-                    text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
-                    style = LabelTextStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Uploading a pole photo needs the work order to be in_progress server-side
+                // (WORK_ORDER_NOT_IN_PROGRESS, 409) - without this gate, a field engineer could
+                // capture a photo for a route that was never started, only to see a confusing
+                // "Xung dot" sync badge later with no clue why.
+                val canCapturePolePhotos = status == WorkOrderStatus.IN_PROGRESS
+                OutlinedButton(
+                    onClick = onCapturePolePhotos,
+                    enabled = canCapturePolePhotos,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    shape = RoundedCornerShape(Radius.control),
+                    // Not Navy700 - that's a fixed dark color, unreadable against the card's
+                    // dark-mode surface (near-black). onSurface flips Gray900/DarkText with the
+                    // theme, same as every other text in this card, so it stays legible in both
+                    // modes.
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                ) {
+                    Text(text = "Chụp ảnh cột đèn")
+                }
+                if (!canCapturePolePhotos) {
+                    Text(
+                        text = "Bấm \"Bắt đầu tuyến\" trước khi chụp ảnh cột đèn",
+                        style = LabelTextStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
