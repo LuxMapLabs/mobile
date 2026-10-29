@@ -791,7 +791,7 @@ private fun WorkOrderHeroSection(
             }
             Text(
                 text = detail.workOrderId,
-                style = LabelTextStyle,
+                style = BodyStrongTextStyle,
                 color = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.align(Alignment.Center),
             )
