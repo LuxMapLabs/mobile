@@ -41,9 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -82,6 +79,8 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import com.luxmap.core.ui.components.TopSlideToast
+import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -103,19 +102,18 @@ fun PoleListRoute(
     var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // A successful review submit otherwise only changes a small "Da review luc ..." timestamp
-    // inside the sheet - easy to miss (found on a real device, 2026-10-29). Scaffold is only
-    // used for this snackbar overlay, not for layout - PoleListScreen already handles its own
-    // status/navigation bar insets, so the padding Scaffold hands to its content is ignored on
-    // purpose to avoid double-padding.
-    val snackbarHostState = remember { SnackbarHostState() }
+    // inside the sheet - easy to miss (found on a real device, 2026-10-29). TopSlideToast (not a
+    // Material Snackbar) matches the Khao Sat v4 mock's own toast, which slides down from above
+    // the content instead of appearing at the bottom where a bottom-sheet action is easy to miss.
+    val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.reviewSubmitted.collect {
-            scope.launch { snackbarHostState.showSnackbar("Đã gửi xác nhận") }
+            scope.launch { toastState.show("Đã gửi xác nhận") }
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) {
+    Box(Modifier.fillMaxSize()) {
         PoleListScreen(
             workOrderId = workOrderId,
             state = uiState,
@@ -145,6 +143,14 @@ fun PoleListRoute(
             onSubmitReview = { finalCvState, reviewNote ->
                 lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
             },
+        )
+        TopSlideToast(
+            state = toastState,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         )
     }
 }

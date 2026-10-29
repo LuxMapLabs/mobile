@@ -289,7 +289,15 @@ private fun ReviewCard(
     // .../review" - review_note is mandatory even when AI never reached on/off or failed
     // outright, not only when it disagrees).
     val noteRequired = selected != null && selected != state.cvState
-    val canSubmit = selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank())
+    // Disabled right after a successful submit (not just while in flight) - selected/note are
+    // local drafts that do not reset on their own, so without this the button stayed tappable
+    // forever with nothing new to send (found on a real device, 2026-10-29). A real edit (either
+    // field) re-enables it, matching the server's own support for re-reviewing before a Manager
+    // decision (contract-drift.md "PATCH .../review").
+    val normalizedNote = note.trim().ifBlank { null }
+    val hasChange = selected != state.finalCvState || normalizedNote != state.reviewNote
+    val canSubmit =
+        selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank()) && hasChange
 
     Column(
         modifier =
