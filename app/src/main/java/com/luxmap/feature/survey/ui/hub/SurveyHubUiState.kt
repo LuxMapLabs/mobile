@@ -36,6 +36,17 @@ sealed interface SurveyHubUiState {
         // tuyen" button while in flight, null the rest of the time.
         val startingWorkOrderId: String? = null,
         val startError: String? = null,
+        // Session-only, like F09's own cancellationRequestStatus - the list endpoint
+        // (WorkOrderItemDto) does not carry cancellation_request_status, so this is not
+        // restored after a process death or app restart. See CLAUDE.md gap note.
+        val cancelledWorkOrderIds: Set<String> = emptySet(),
+        val requestingCancellationFor: String? = null,
+        val cancellationError: String? = null,
+        // Routes with a local_work_order_completion row (any submitStatus - sync happens in the
+        // background). Found missing on a real device, 2026-10-29: a route's card looked
+        // completely unchanged after completing its survey at the pole list, same local-state
+        // gap as WorkOrderDetailScreen's own localCompletion check for repair/inspection.
+        val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
     ) : SurveyHubUiState
 
     data object Empty : SurveyHubUiState

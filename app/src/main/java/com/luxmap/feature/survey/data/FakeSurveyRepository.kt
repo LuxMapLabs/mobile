@@ -66,4 +66,9 @@ class FakeSurveyRepository
         }
 
         override suspend fun startRoute(workOrderId: String): Result<Unit> = Result.success(Unit)
+
+        override suspend fun requestCancellation(
+            workOrderId: String,
+            reason: String,
+        ): Result<Unit> = Result.success(Unit)
     }

@@ -15,12 +15,12 @@ import org.junit.Test
 class SurveyHubScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
-    private fun route() =
+    private fun route(woStatus: String = "assigned") =
         AssignedSurveyRoute(
             workOrderId = "WO-1",
             title = "Khảo sát đường A",
             communeId = "COM-001",
-            woStatus = "assigned",
+            woStatus = woStatus,
             dueDate = null,
             scheduledDate = "2026-10-02",
         )
@@ -50,14 +50,15 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        // "Tuyến được giao" by itself is ambiguous - the hero's metric cell has the exact same
-        // label text, so this checks the section's own count badge instead ("1 tuyến").
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
         composeRule.onNodeWithText("1 tuyến").assertExists()
     }
 
+    // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29) - "Bat dau tuyen" and the separately
+    // disabled "Chup anh cot den" no longer exist as 2 buttons, replaced by one "Bat dau" button
+    // that leads into the pole list after starting.
     @Test
-    fun an_assigned_route_shows_bat_dau_tuyen_and_disables_capture_pole_photos() {
+    fun an_assigned_route_shows_bat_dau_on_the_merged_cta_and_quay_video_toan_tuyen() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
@@ -66,38 +67,108 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Bắt đầu tuyến").assertIsEnabled()
-        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsNotEnabled()
+        composeRule.onNodeWithText("Bắt đầu").assertIsEnabled()
+        composeRule.onNodeWithText("Quay video toàn tuyến").assertIsEnabled()
+        composeRule.onNodeWithText("Tiếp tục").assertDoesNotExist()
+    }
+
+    // Found on a real device 2026-10-29: a route's card looked completely unchanged after
+    // completing its survey at the pole list, since nothing locally tracked a pending completion
+    // for it.
+    @Test
+    fun a_locally_completed_route_shows_a_locked_row_and_hides_the_action_buttons() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route()),
+                            locallyCompletedWorkOrderIds = setOf("WO-1"),
+                        ),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertExists()
+        composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
+        composeRule.onNodeWithText("Quay video toàn tuyến").assertDoesNotExist()
     }
 
     @Test
-    fun tapping_bat_dau_tuyen_invokes_onStartRoute_with_the_work_order_id() {
+    fun tapping_bat_dau_on_the_merged_cta_starts_for_pole_capture() {
         var started: String? = null
+        var destination: SurveyRouteStartDestination? = null
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
                     state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
                     onCheckReadiness = {},
-                    onStartRoute = { started = it },
+                    onStartRoute = { id, dest ->
+                        started = id
+                        destination = dest
+                    },
                 )
             }
         }
-        composeRule.onNodeWithText("Bắt đầu tuyến").performClick()
+        composeRule.onNodeWithText("Bắt đầu").performClick()
         assertEquals("WO-1", started)
+        assertEquals(SurveyRouteStartDestination.POLE_CAPTURE, destination)
     }
 
+    // Fixes a gap found 2026-10-29: this button used to skip straight to the readiness check
+    // without starting the route, risking a lost recording at upload time (POST /sweeps
+    // requires wo_status = in_progress server-side).
     @Test
-    fun an_in_progress_route_hides_bat_dau_tuyen_and_enables_capture_pole_photos() {
+    fun tapping_quay_video_toan_tuyen_starts_for_readiness_check() {
+        var started: String? = null
+        var destination: SurveyRouteStartDestination? = null
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
-                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route().copy(woStatus = "in_progress"))),
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    onCheckReadiness = {},
+                    onStartRoute = { id, dest ->
+                        started = id
+                        destination = dest
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Quay video toàn tuyến").performClick()
+        assertEquals("WO-1", started)
+        assertEquals(SurveyRouteStartDestination.READINESS_CHECK, destination)
+    }
+
+    @Test
+    fun an_in_progress_route_shows_tiep_tuc_and_it_calls_onCapturePolePhotos_directly() {
+        var captured: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route(woStatus = "in_progress"))),
+                    onCheckReadiness = {},
+                    onCapturePolePhotos = { captured = it },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
+        composeRule.onNodeWithText("Tiếp tục").assertIsEnabled().performClick()
+        assertEquals("WO-1", captured)
+    }
+
+    // Found 2026-10-29: a done/verified route used to keep showing "Chup anh cot den" on a
+    // disabled button, which looked like a stuck action rather than a finished route.
+    @Test
+    fun a_done_route_shows_da_hoan_tat_disabled_on_the_merged_cta() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route(woStatus = "done"))),
                     onCheckReadiness = {},
                 )
             }
         }
-        composeRule.onNodeWithText("Bắt đầu tuyến").assertDoesNotExist()
-        composeRule.onNodeWithText("Chụp ảnh cột đèn").assertIsEnabled()
+        composeRule.onNodeWithText("Đã hoàn tất").assertIsNotEnabled()
     }
 
     @Test
@@ -131,7 +202,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Kiểm tra sẵn sàng").assertDoesNotExist()
+        composeRule.onNodeWithText("Quay video toàn tuyến").assertDoesNotExist()
         composeRule.onNodeWithText("Chờ tải lên · SWEEP-2").assertExists()
     }
 
@@ -184,5 +255,43 @@ class SurveyHubScreenTest {
         }
         composeRule.onNodeWithText("Xem & xác nhận").performClick()
         assertEquals("SWEEP-2029", reviewed)
+    }
+
+    // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): button only shows while still
+    // assigned, opens the shared CancelRequestSheet, and calls onRequestCancellation on send.
+    @Test
+    fun an_assigned_route_shows_yeu_cau_huy_and_sending_it_calls_onRequestCancellation() {
+        var cancelledId: String? = null
+        var cancelledReason: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    onCheckReadiness = {},
+                    onRequestCancellation = { id, reason ->
+                        cancelledId = id
+                        cancelledReason = reason
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Yêu cầu hủy").performClick()
+        composeRule.onNodeWithText("Lý do khác").performClick()
+        composeRule.onNodeWithText("Gửi yêu cầu").performClick()
+        assertEquals("WO-1", cancelledId)
+        assertEquals("Lý do khác", cancelledReason)
+    }
+
+    @Test
+    fun an_in_progress_route_hides_yeu_cau_huy() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route(woStatus = "in_progress"))),
+                    onCheckReadiness = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Yêu cầu hủy").assertDoesNotExist()
     }
 }

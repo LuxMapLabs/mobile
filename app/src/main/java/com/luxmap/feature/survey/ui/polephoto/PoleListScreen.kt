@@ -29,24 +29,36 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,6 +81,9 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import com.luxmap.core.ui.components.TopSlideToast
+import com.luxmap.core.ui.components.TopToastState
+import kotlinx.coroutines.launch
 
 @Composable
 fun PoleListRoute(
@@ -88,35 +103,64 @@ fun PoleListRoute(
     var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    PoleListScreen(
-        workOrderId = workOrderId,
-        state = uiState,
-        aiResultState = aiResultState,
-        aiResultPoleId = lastViewedPoleId.orEmpty(),
-        aiResultPosition = lastViewedPosition ?: 0,
-        onCapturePole = onCapturePole,
-        onDone = {
-            viewModel.onComplete()
-            onDone()
-        },
-        onRetry = viewModel::onRetry,
-        onViewAiResult = { serverPhotoId ->
-            val pole = (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
-            lastViewedServerPhotoId = serverPhotoId
-            lastViewedPoleId = pole?.poleId
-            lastViewedPosition = pole?.position
-            viewModel.onViewAiResult(serverPhotoId)
-        },
-        onDismissAiResult = viewModel::onDismissAiResult,
-        onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
-        onRetake = {
-            viewModel.onDismissAiResult()
-            lastViewedPoleId?.let(onCapturePole)
-        },
-        onSubmitReview = { finalCvState, reviewNote ->
-            lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
-        },
-    )
+    // A successful review submit, or completing the survey, otherwise gives no visible feedback
+    // at all (found on a real device, 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material
+    // Snackbar) matches the Khao Sat v4 mock's own toast, which slides down from above the
+    // content instead of appearing at the bottom where a bottom-sheet action is easy to miss.
+    val toastState = remember { TopToastState() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        viewModel.reviewSubmitted.collect {
+            scope.launch { toastState.show("Đã gửi xác nhận") }
+        }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.surveyCompleted.collect {
+            scope.launch { toastState.show("Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì") }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        PoleListScreen(
+            workOrderId = workOrderId,
+            state = uiState,
+            aiResultState = aiResultState,
+            aiResultPoleId = lastViewedPoleId.orEmpty(),
+            aiResultPosition = lastViewedPosition ?: 0,
+            onCapturePole = onCapturePole,
+            // Pure navigation - this used to also silently call onComplete() (found on a real
+            // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
+            // mark the whole survey complete even if the user only meant to leave.
+            onBack = onDone,
+            onComplete = viewModel::onComplete,
+            onRetry = viewModel::onRetry,
+            onViewAiResult = { serverPhotoId ->
+                val pole =
+                    (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
+                lastViewedServerPhotoId = serverPhotoId
+                lastViewedPoleId = pole?.poleId
+                lastViewedPosition = pole?.position
+                viewModel.onViewAiResult(serverPhotoId)
+            },
+            onDismissAiResult = viewModel::onDismissAiResult,
+            onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
+            onRetake = {
+                viewModel.onDismissAiResult()
+                lastViewedPoleId?.let(onCapturePole)
+            },
+            onSubmitReview = { finalCvState, reviewNote ->
+                lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
+            },
+        )
+        TopSlideToast(
+            state = toastState,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        )
+    }
 }
 
 @Composable
@@ -124,7 +168,8 @@ fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
     onCapturePole: (poleId: String) -> Unit,
-    onDone: () -> Unit,
+    onBack: () -> Unit,
+    onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
     aiResultState: PolePhotoResultUiState? = null,
     aiResultPoleId: String = "",
@@ -135,8 +180,18 @@ fun PoleListScreen(
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
 ) {
+    // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
+    // the design mock's sheet trigger, but only offers the choice itself here. The real upload
+    // flow (PolePhotoCaptureScreen) only exists for photos - see CLAUDE.md/contract-drift.md:
+    // POST .../pole-photos validates strictly for a JPEG file named "photo", so there is no
+    // server-side way to send video for a pole yet.
+    // Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet - added 2026-10-29, this used
+    // to call onComplete() and navigate away in the same tap, no confirmation and no way to tell
+    // afterward that it worked (see CLAUDE.md).
+    var showCompleteConfirm by rememberSaveable { mutableStateOf(false) }
+    var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        PoleListHeader(workOrderId = workOrderId, onBack = onDone)
+        PoleListHeader(workOrderId = workOrderId, onBack = onBack)
         // Overlaps the hero's bottom edge, same pattern as SurveyHubScreen's own sheet - reads as
         // a sheet floating over the navy hero instead of a hard seam between the two. The clip
         // (not just background) matters once the list scrolls - background alone paints the
@@ -184,7 +239,15 @@ fun PoleListScreen(
                                         PoleRow(
                                             pole = pole,
                                             isNext = index == nextIndex,
-                                            onClick = { onCapturePole(pole.poleId) },
+                                            // Matches the mock's canReport: !state.done - no point
+                                            // reporting a new issue after the survey was already
+                                            // marked complete.
+                                            onClick =
+                                                if (state.isCompleted) {
+                                                    {}
+                                                } else {
+                                                    { reportMethodSheetPoleId = pole.poleId }
+                                                },
                                             onViewAiResult = { pole.serverPhotoId?.let(onViewAiResult) },
                                         )
                                     }
@@ -214,8 +277,28 @@ fun PoleListScreen(
             }
         }
         if (state is PoleListUiState.Success) {
-            PoleListBottomBar(left = state.poles.count { it.syncStatus == null }, onDone = onDone)
+            PoleListBottomBar(
+                left = state.poles.count { it.syncStatus == null },
+                isCompleted = state.isCompleted,
+                onTapComplete = { showCompleteConfirm = true },
+            )
         }
+    }
+
+    if (showCompleteConfirm && state is PoleListUiState.Success) {
+        // A captured pole IS a reported issue in this v1 flow (there is no separate "mark
+        // normal" action - matches the mock's own info line "chi bao cot co loi, con lai tinh
+        // la binh thuong" and PoleListBottomBar's own "left" count below).
+        val issueCount = state.poles.count { it.syncStatus != null }
+        CompleteSurveyConfirmSheet(
+            issueCount = issueCount,
+            normalCount = state.poles.size - issueCount,
+            onDismiss = { showCompleteConfirm = false },
+            onConfirm = {
+                showCompleteConfirm = false
+                onComplete()
+            },
+        )
     }
 
     if (aiResultState != null) {
@@ -228,6 +311,108 @@ fun PoleListScreen(
             onRetake = onRetake,
             onSubmitReview = onSubmitReview,
         )
+    }
+
+    val methodSheetPoleId = reportMethodSheetPoleId
+    if (methodSheetPoleId != null) {
+        ReportMethodSheet(
+            poleId = methodSheetPoleId,
+            onDismiss = { reportMethodSheetPoleId = null },
+            onChoosePhoto = {
+                reportMethodSheetPoleId = null
+                onCapturePole(methodSheetPoleId)
+            },
+        )
+    }
+}
+
+// Mock's "Bao loi cot" sheet, trimmed to just the method choice - the mock's multi-file picker
+// (up to 5 photos/videos staged before one combined submit) does not match how upload actually
+// works today, where POST .../pole-photos takes exactly 1 JPEG per call (see contract-drift.md).
+// "Quay video" stays visible per the mock's layout but disabled, since that endpoint rejects
+// anything that is not a JPEG named "photo" - there is no server-side way to send video for a
+// pole yet, so it must not look like it already works.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportMethodSheet(
+    poleId: String,
+    onDismiss: () -> Unit,
+    onChoosePhoto: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Báo lỗi cột",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = poleId, style = MaterialTheme.typography.titleLarge)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                ReportMethodOption(
+                    icon = Icons.Filled.PhotoCamera,
+                    label = "Chụp ảnh",
+                    enabled = true,
+                    onClick = onChoosePhoto,
+                    modifier = Modifier.weight(1f),
+                )
+                ReportMethodOption(
+                    icon = Icons.Filled.Videocam,
+                    label = "Quay video",
+                    enabled = false,
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                text = "Chưa hỗ trợ gửi video, dùng ảnh thay thế",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportMethodOption(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor =
+        if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier =
+            modifier
+                .heightIn(min = 72.dp)
+                .clickable(enabled = enabled, onClick = onClick)
+                .border(
+                    1.dp,
+                    if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(Radius.control),
+                )
+                .padding(Spacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = contentColor)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = label, color = contentColor, style = MaterialTheme.typography.bodyMedium)
+            if (!enabled) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
     }
 }
 
@@ -275,7 +460,8 @@ private fun PoleListHeader(
 @Composable
 private fun PoleListBottomBar(
     left: Int,
-    onDone: () -> Unit,
+    isCompleted: Boolean,
+    onTapComplete: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -293,7 +479,8 @@ private fun PoleListBottomBar(
                 Text(text = "$left cột chưa chụp", style = MaterialTheme.typography.titleMedium)
             }
             OutlinedButton(
-                onClick = onDone,
+                onClick = onTapComplete,
+                enabled = !isCompleted,
                 modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
                 shape = RoundedCornerShape(Radius.control),
                 // colorScheme.primary, not a fixed Navy700 - this screen has no theme override
@@ -304,7 +491,64 @@ private fun PoleListBottomBar(
             ) {
                 Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(Spacing.sm))
-                Text(text = "Hoàn tất")
+                Text(text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất")
+            }
+        }
+    }
+}
+
+// Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompleteSurveyConfirmSheet(
+    issueCount: Int,
+    normalCount: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.control)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(text = "Hoàn tất khảo sát tuyến?", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "$issueCount cột báo lỗi, $normalCount cột còn lại được tính là bình thường.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("Kiểm tra lại")
+                }
+                PrimaryButton(
+                    text = "Hoàn tất",
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1.4f).testTag("confirm_survey_complete"),
+                )
             }
         }
     }

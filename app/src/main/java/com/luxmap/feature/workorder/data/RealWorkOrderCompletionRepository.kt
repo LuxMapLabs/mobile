@@ -8,6 +8,7 @@ import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import com.luxmap.feature.workorder.data.sync.EvidenceSyncPayload
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -28,6 +29,9 @@ class RealWorkOrderCompletionRepository
 
         override fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?> =
             dao.observeCompletion(workOrderId)
+
+        override fun observeCompletedWorkOrderIds(): Flow<Set<String>> =
+            dao.observeAllCompletions().map { completions -> completions.map { it.workOrderId }.toSet() }
 
         override suspend fun captureAfterEvidence(
             workOrderId: String,

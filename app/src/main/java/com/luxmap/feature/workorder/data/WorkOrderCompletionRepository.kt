@@ -11,6 +11,8 @@ interface WorkOrderCompletionRepository {
 
     fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?>
 
+    fun observeCompletedWorkOrderIds(): Flow<Set<String>>
+
     suspend fun captureAfterEvidence(
         workOrderId: String,
         clientOpId: String,

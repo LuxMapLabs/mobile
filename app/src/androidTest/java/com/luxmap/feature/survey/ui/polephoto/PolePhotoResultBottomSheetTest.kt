@@ -122,7 +122,7 @@ class PolePhotoResultBottomSheetTest {
         }
         // Tagged, not plain text - ReviewCard's own "Đèn sáng" chip renders at the same time.
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Đèn sáng")
-        composeRule.onNodeWithText("Độ tin cậy 92%").assertExists()
+        composeRule.onNodeWithText("Tin cậy 92%").assertExists()
     }
 
     @Test
@@ -257,9 +257,30 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_on").performClick()
+        composeRule.onNodeWithTag("review_choice_on").performScrollTo().performClick()
         composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
         assertEquals("on" to null, submitted)
+    }
+
+    // Found on a real device 2026-10-29: the button stayed enabled forever after a successful
+    // submit, since selected/note are local drafts that never reset on their own - resubmitting
+    // the exact same values was both pointless (server treats it as a no-op) and looked like the
+    // first tap never registered.
+    @Test
+    fun review_card_disables_submit_right_after_a_successful_submit_with_no_further_edit() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on").copy(finalCvState = "on", reviewNote = null),
+                    onDismiss = {},
+                    onRetry = {},
+                    onSubmitReview = { _, _ -> },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().assertIsNotEnabled()
     }
 
     @Test
@@ -277,7 +298,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_off").performClick()
+        composeRule.onNodeWithTag("review_choice_off").performScrollTo().performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
         composeRule.onNodeWithText("Gửi xác nhận").assertIsNotEnabled()
 

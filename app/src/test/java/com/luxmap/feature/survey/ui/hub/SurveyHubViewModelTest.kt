@@ -7,6 +7,7 @@ import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -44,6 +45,7 @@ class SurveyHubViewModelTest {
         queuedSessions: List<QueuedUploadSession> = emptyList(),
         isOnline: Boolean = true,
         repositoryFlowThrows: Boolean = false,
+        locallyCompletedWorkOrderIds: Set<String> = emptySet(),
     ): SurveyHubViewModel {
         val repository = mockk<SurveyRepository>()
         every { repository.observeAssignedRoutes() } returns
@@ -55,7 +57,9 @@ class SurveyHubViewModelTest {
         every { repository.observeUploadingSessions() } returns flowOf(queuedSessions)
         val connectivity = mockk<ConnectivityObserver>()
         every { connectivity.isOnline } returns flowOf(isOnline)
-        return SurveyHubViewModel(repository, connectivity)
+        val completionRepository = mockk<WorkOrderCompletionRepository>()
+        every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
+        return SurveyHubViewModel(repository, connectivity, completionRepository)
     }
 
     @Before
@@ -84,6 +88,20 @@ class SurveyHubViewModelTest {
                 awaitItem()
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(listOf(route), success.assignedRoutes)
+            }
+        }
+
+    // Found on a real device 2026-10-29: a route's Hub card looked completely unchanged after
+    // completing its survey at the pole list, since nothing locally tracked a pending completion
+    // for it - same local-state gap WorkOrderDetailScreen already guards against for
+    // repair/inspection.
+    @Test
+    fun `emits Success with locallyCompletedWorkOrderIds from the completion repository`() =
+        runTest {
+            viewModel(routes = listOf(route), locallyCompletedWorkOrderIds = setOf("WO-1")).uiState.test {
+                awaitItem()
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(setOf("WO-1"), success.locallyCompletedWorkOrderIds)
             }
         }
 
@@ -152,7 +170,9 @@ class SurveyHubViewModelTest {
             every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SurveyHubViewModel(repository, connectivity)
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -177,7 +197,9 @@ class SurveyHubViewModelTest {
             every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SurveyHubViewModel(repository, connectivity)
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -202,17 +224,49 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SurveyHubViewModel(repository, connectivity)
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success (assigned)
-                viewModel.onStartRoute("WO-1")
+                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.POLE_CAPTURE)
                 val starting = awaitItem() as SurveyHubUiState.Success
                 assertEquals("WO-1", starting.startingWorkOrderId)
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(listOf(startedRoute), success.assignedRoutes)
                 assertEquals(null, success.startingWorkOrderId)
+            }
+        }
+
+    @Test
+    fun `a successful onStartRoute emits startedRoute with the given destination`() =
+        runTest {
+            val startedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
+                )
+            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
+            coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
+            val connectivity = mockk<ConnectivityObserver>()
+            every { connectivity.isOnline } returns flowOf(true)
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository)
+            // Let init's load() reach Success first - otherwise onStartRoute's own
+            // "current !is Success" guard returns early and never calls the repository, same
+            // as why the uiState-based tests above drain Loading/Success via awaitItem() first.
+            dispatcher.scheduler.advanceUntilIdle()
+
+            viewModel.startedRoute.test {
+                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.READINESS_CHECK)
+                val navigation = awaitItem()
+                assertEquals("WO-1", navigation.workOrderId)
+                assertEquals(SurveyRouteStartDestination.READINESS_CHECK, navigation.destination)
             }
         }
 
@@ -225,12 +279,14 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
             val connectivity = mockk<ConnectivityObserver>()
             every { connectivity.isOnline } returns flowOf(true)
-            val viewModel = SurveyHubViewModel(repository, connectivity)
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success
-                viewModel.onStartRoute("WO-1")
+                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.POLE_CAPTURE)
                 awaitItem() // Success (starting)
                 val failed = awaitItem() as SurveyHubUiState.Success
                 assertEquals(null, failed.startingWorkOrderId)

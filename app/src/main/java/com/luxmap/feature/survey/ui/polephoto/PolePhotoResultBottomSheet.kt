@@ -7,11 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
+import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
@@ -154,6 +153,9 @@ fun PolePhotoResultBottomSheet(
 
 // Shown for every state (loading/success/empty/error), not only Success - the pole being
 // reviewed and the ability to close the sheet don't depend on whether its AI result loaded.
+// Navy band (Khao Sat v4 - Ket Qua AI mock, CLAUDE.md 2026-10-30) matching the mock's hero -
+// stays a bottom sheet (not a full screen/route), so the X here still just dismisses it, same
+// as before the restyle.
 @Composable
 private fun PolePhotoResultHeader(
     poleId: String,
@@ -161,7 +163,11 @@ private fun PolePhotoResultHeader(
     onDismiss: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(BrandHeroGradient, RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -169,21 +175,17 @@ private fun PolePhotoResultHeader(
             modifier =
                 Modifier
                     .size(HeaderBadgeSize)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(Radius.control)),
+                    .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(Radius.control)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "#$position",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimary,
-            )
+            Text(text = "#$position", style = MaterialTheme.typography.labelLarge, color = Color.White)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(text = poleId, style = MaterialTheme.typography.titleMedium)
+            Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = Color.White.copy(alpha = 0.75f))
+            Text(text = poleId, style = MaterialTheme.typography.titleMedium, color = Color.White)
         }
         IconButton(onClick = onDismiss) {
-            Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng")
+            Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
         }
     }
 }
@@ -246,12 +248,7 @@ private fun PolePhotoResultContent(
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            AiVerdictCard(cvState = state.cvState, modifier = Modifier.weight(1f))
-            if (state.confidence != null) {
-                ConfidenceCard(confidence = state.confidence, modifier = Modifier.weight(1f))
-            }
-        }
+        AiResultCard(cvState = state.cvState, confidence = state.confidence)
 
         if (state.analyzedAt != null) {
             Text(
@@ -292,7 +289,15 @@ private fun ReviewCard(
     // .../review" - review_note is mandatory even when AI never reached on/off or failed
     // outright, not only when it disagrees).
     val noteRequired = selected != null && selected != state.cvState
-    val canSubmit = selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank())
+    // Disabled right after a successful submit (not just while in flight) - selected/note are
+    // local drafts that do not reset on their own, so without this the button stayed tappable
+    // forever with nothing new to send (found on a real device, 2026-10-29). A real edit (either
+    // field) re-enables it, matching the server's own support for re-reviewing before a Manager
+    // decision (contract-drift.md "PATCH .../review").
+    val normalizedNote = note.trim().ifBlank { null }
+    val hasChange = selected != state.finalCvState || normalizedNote != state.reviewNote
+    val canSubmit =
+        selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank()) && hasChange
 
     Column(
         modifier =
@@ -309,7 +314,7 @@ private fun ReviewCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
+        ReviewChoiceSegment(selected = selected, aiCvState = state.cvState, onSelected = { selected = it })
 
         OutlinedTextField(
             value = note,
@@ -351,46 +356,86 @@ private fun ReviewCard(
     }
 }
 
-// 2 equal chips in a gray tray, same visual pattern as OutcomeSegment (F09/F10) - a separate
-// component rather than generalizing that one, since its 3 options/colors are specific to
-// fault_outcomes and not meant to be reused as a generic 2-choice control.
+// 2-card grid (Khao Sat v4 - Ket Qua AI mock's "Chon ket qua dung" panel, CLAUDE.md 2026-10-30) -
+// same visual language as the mock's option grid (icon tile + label + "AI" tag on the AI's own
+// pick), but trimmed to exactly the 2 values the real review endpoint accepts
+// (final_cv_state: on|off) instead of the mock's 7-option fault-type list.
 @Composable
 private fun ReviewChoiceSegment(
     selected: String?,
+    aiCvState: String?,
     onSelected: (String) -> Unit,
 ) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
+            ReviewChoiceCard(
+                value = value,
+                label = label,
+                isSelected = selected == value,
+                isAiPick = aiCvState == value,
+                onClick = { onSelected(value) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReviewChoiceCard(
+    value: String,
+    label: String,
+    isSelected: Boolean,
+    isAiPick: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = cvStateBadgeColors(value)
+    val shape = RoundedCornerShape(Radius.chip)
     Row(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
-                .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier
+                .heightIn(min = Dimens.minTouchTarget)
+                // clip must come before clickable, otherwise the tap ripple draws as a full
+                // rectangle instead of following this card's rounded corners (found on a real
+                // device, 2026-10-29).
+                .clip(shape)
+                .background(if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant, shape)
+                .border(if (isSelected) 2.dp else 0.dp, colors.text, shape)
+                .clickable(onClick = onClick)
+                .testTag("review_choice_$value")
+                .padding(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
-            val isSelected = selected == value
-            val colors = cvStateBadgeColors(value)
-            Row(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(
-                            if (isSelected) colors.background else Color.Transparent,
-                            RoundedCornerShape(Radius.chip),
-                        )
-                        .clickable(onClick = { onSelected(value) })
-                        .testTag("review_choice_$value")
-                        .padding(vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .background(
+                        if (isSelected) colors.text else colors.background,
+                        RoundedCornerShape(Dimens.radiusSmall),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Lightbulb,
+                contentDescription = null,
+                tint = if (isSelected) Color.White else colors.text,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (isAiPick) {
+            Text(
+                text = "AI",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -420,58 +465,57 @@ private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
     }
 }
 
+// Single card (Khao Sat v4 - Ket Qua AI mock, CLAUDE.md 2026-10-30) replacing the previous
+// side-by-side AiVerdictCard + ConfidenceCard - the mock groups the AI's label and its
+// confidence bar into one block instead of 2 separate cards.
 @Composable
-private fun AiVerdictCard(
+private fun AiResultCard(
     cvState: String?,
-    modifier: Modifier = Modifier,
+    confidence: Double?,
 ) {
     val colors = cvStateBadgeColors(cvState)
     Column(
-        modifier = modifier.background(colors.background, RoundedCornerShape(Radius.card)).padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Text(text = "AI NHẬN ĐỊNH", style = OverlineTextStyle, color = colors.text)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Icon(
-                imageVector = Icons.Filled.Lightbulb,
-                contentDescription = null,
-                tint = colors.text,
-                modifier = Modifier.size(18.dp),
-            )
+        Text(text = "AI NHẬN ĐỊNH", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Box(
+                modifier = Modifier.size(44.dp).background(colors.background, RoundedCornerShape(Radius.control)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
+            }
             Text(
                 text = cvStateLabel(cvState),
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.text,
                 // Distinguishes this from ReviewChoiceSegment's chips, which can show the same
                 // "Đèn sáng"/"Đèn tắt" text at the same time once ReviewCard is visible.
                 modifier = Modifier.testTag("ai_verdict_label"),
             )
         }
-    }
-}
-
-@Composable
-private fun ConfidenceCard(
-    confidence: Double,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Text(text = "ĐỘ TIN CẬY", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(text = "Độ tin cậy ${(confidence * 100).roundToInt()}%", style = MaterialTheme.typography.titleMedium)
-            LinearProgressIndicator(
-                progress = { confidence.toFloat() },
-                modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-            )
+        if (confidence != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                LinearProgressIndicator(
+                    progress = { confidence.toFloat() },
+                    modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+                Text(
+                    text = "Tin cậy ${(confidence * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
 }
