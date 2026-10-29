@@ -122,7 +122,7 @@ class PolePhotoResultBottomSheetTest {
         }
         // Tagged, not plain text - ReviewCard's own "Đèn sáng" chip renders at the same time.
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Đèn sáng")
-        composeRule.onNodeWithText("Độ tin cậy 92%").assertExists()
+        composeRule.onNodeWithText("Tin cậy 92%").assertExists()
     }
 
     @Test
@@ -257,7 +257,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_on").performClick()
+        composeRule.onNodeWithTag("review_choice_on").performScrollTo().performClick()
         composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
         assertEquals("on" to null, submitted)
     }
@@ -277,7 +277,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_off").performClick()
+        composeRule.onNodeWithTag("review_choice_off").performScrollTo().performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
         composeRule.onNodeWithText("Gửi xác nhận").assertIsNotEnabled()
 
