@@ -41,12 +41,18 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,6 +82,7 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import kotlinx.coroutines.launch
 
 @Composable
 fun PoleListRoute(
@@ -95,35 +102,51 @@ fun PoleListRoute(
     var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    PoleListScreen(
-        workOrderId = workOrderId,
-        state = uiState,
-        aiResultState = aiResultState,
-        aiResultPoleId = lastViewedPoleId.orEmpty(),
-        aiResultPosition = lastViewedPosition ?: 0,
-        onCapturePole = onCapturePole,
-        onDone = {
-            viewModel.onComplete()
-            onDone()
-        },
-        onRetry = viewModel::onRetry,
-        onViewAiResult = { serverPhotoId ->
-            val pole = (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
-            lastViewedServerPhotoId = serverPhotoId
-            lastViewedPoleId = pole?.poleId
-            lastViewedPosition = pole?.position
-            viewModel.onViewAiResult(serverPhotoId)
-        },
-        onDismissAiResult = viewModel::onDismissAiResult,
-        onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
-        onRetake = {
-            viewModel.onDismissAiResult()
-            lastViewedPoleId?.let(onCapturePole)
-        },
-        onSubmitReview = { finalCvState, reviewNote ->
-            lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
-        },
-    )
+    // A successful review submit otherwise only changes a small "Da review luc ..." timestamp
+    // inside the sheet - easy to miss (found on a real device, 2026-10-29). Scaffold is only
+    // used for this snackbar overlay, not for layout - PoleListScreen already handles its own
+    // status/navigation bar insets, so the padding Scaffold hands to its content is ignored on
+    // purpose to avoid double-padding.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        viewModel.reviewSubmitted.collect {
+            scope.launch { snackbarHostState.showSnackbar("Đã gửi xác nhận") }
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) {
+        PoleListScreen(
+            workOrderId = workOrderId,
+            state = uiState,
+            aiResultState = aiResultState,
+            aiResultPoleId = lastViewedPoleId.orEmpty(),
+            aiResultPosition = lastViewedPosition ?: 0,
+            onCapturePole = onCapturePole,
+            onDone = {
+                viewModel.onComplete()
+                onDone()
+            },
+            onRetry = viewModel::onRetry,
+            onViewAiResult = { serverPhotoId ->
+                val pole =
+                    (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
+                lastViewedServerPhotoId = serverPhotoId
+                lastViewedPoleId = pole?.poleId
+                lastViewedPosition = pole?.position
+                viewModel.onViewAiResult(serverPhotoId)
+            },
+            onDismissAiResult = viewModel::onDismissAiResult,
+            onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
+            onRetake = {
+                viewModel.onDismissAiResult()
+                lastViewedPoleId?.let(onCapturePole)
+            },
+            onSubmitReview = { finalCvState, reviewNote ->
+                lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
+            },
+        )
+    }
 }
 
 @Composable

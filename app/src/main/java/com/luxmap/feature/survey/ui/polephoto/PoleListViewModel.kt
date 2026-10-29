@@ -11,8 +11,11 @@ import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flatMapLatest
@@ -37,6 +40,12 @@ class PoleListViewModel
 
         private val _aiResultState = MutableStateFlow<PolePhotoResultUiState?>(null)
         val aiResultState: StateFlow<PolePhotoResultUiState?> = _aiResultState.asStateFlow()
+
+        // A successful PATCH .../review only changes a small "Da review luc ..." timestamp in
+        // the sheet, easy to miss - checked on a real device 2026-10-29 (the request returns 200
+        // but nothing visibly confirms it). This one-shot event lets the Route show a snackbar.
+        private val _reviewSubmitted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        val reviewSubmitted: SharedFlow<Unit> = _reviewSubmitted.asSharedFlow()
 
         init {
             load()
@@ -132,6 +141,7 @@ class PoleListViewModel
                 polePhotoRepository.reviewPhoto(workOrderId, serverPhotoId, finalCvState, reviewNote).fold(
                     onSuccess = { photo ->
                         _aiResultState.value = photo.toResultUiState(isStale = false) ?: PolePhotoResultUiState.Empty
+                        _reviewSubmitted.tryEmit(Unit)
                     },
                     onFailure = { e ->
                         val latest = _aiResultState.value as? PolePhotoResultUiState.Success ?: current

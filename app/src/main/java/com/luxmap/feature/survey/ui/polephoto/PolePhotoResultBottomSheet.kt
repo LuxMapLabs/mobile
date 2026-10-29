@@ -382,19 +382,17 @@ private fun ReviewChoiceCard(
     modifier: Modifier = Modifier,
 ) {
     val colors = cvStateBadgeColors(value)
+    val shape = RoundedCornerShape(Radius.chip)
     Row(
         modifier =
             modifier
                 .heightIn(min = Dimens.minTouchTarget)
-                .background(
-                    if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(Radius.chip),
-                )
-                .border(
-                    if (isSelected) 2.dp else 0.dp,
-                    colors.text,
-                    RoundedCornerShape(Radius.chip),
-                )
+                // clip must come before clickable, otherwise the tap ripple draws as a full
+                // rectangle instead of following this card's rounded corners (found on a real
+                // device, 2026-10-29).
+                .clip(shape)
+                .background(if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant, shape)
+                .border(if (isSelected) 2.dp else 0.dp, colors.text, shape)
                 .clickable(onClick = onClick)
                 .testTag("review_choice_$value")
                 .padding(Spacing.sm),
