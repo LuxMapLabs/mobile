@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -121,6 +120,8 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.CancelRequestButton
+import com.luxmap.core.ui.components.CancelRequestSheet
 import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
@@ -211,7 +212,10 @@ fun WorkOrderDetailScreen(
                         val showCancelRequest =
                             "request_cancellation" in uiState.detail.allowedActions && scheduleWindow.canActOnSchedule
                         if (showCancelRequest) {
-                            CancelRequestButton(onClick = { showCancelSheet = true })
+                            CancelRequestButton(
+                                onClick = { showCancelSheet = true },
+                                modifier = Modifier.padding(horizontal = ScreenMargin).padding(top = Spacing.sm),
+                            )
                         }
                         BottomActionBar(
                             ctaText = cta.text,
@@ -559,130 +563,6 @@ private fun SubmitConfirmationSheet(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CancelRequestButton(onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = ScreenMargin)
-                .padding(top = Spacing.sm)
-                .heightIn(min = Dimens.minTouchTarget),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-    ) {
-        Text("Yêu cầu hủy")
-    }
-}
-
-private val CANCEL_REASON_OPTIONS =
-    listOf(
-        "Thời tiết không cho phép",
-        "Không tiếp cận được hiện trường",
-        "Trùng với lệnh khác",
-        "Lý do khác",
-    )
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CancelRequestSheet(
-    isSubmitting: Boolean,
-    errorMessage: String?,
-    onDismiss: () -> Unit,
-    onSend: (reason: String) -> Unit,
-) {
-    var selectedReason by remember { mutableStateOf<String?>(null) }
-    var note by remember { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            Text(text = "Yêu cầu hủy lệnh", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            Text(text = "Lý do", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                CANCEL_REASON_OPTIONS.forEach { reason ->
-                    CancelReasonRow(
-                        label = reason,
-                        selected = selectedReason == reason,
-                        onClick = { selectedReason = reason },
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("Ghi chú thêm (không bắt buộc)") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (errorMessage != null) {
-                Text(
-                    text = errorMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text("Quay lại")
-                }
-                Button(
-                    onClick = {
-                        val reason = selectedReason ?: return@Button
-                        onSend(if (note.isBlank()) reason else "$reason - ${note.trim()}")
-                    },
-                    enabled = selectedReason != null && !isSubmitting,
-                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = Color.White,
-                        ),
-                ) {
-                    Text(if (isSubmitting) "Đang gửi..." else "Gửi yêu cầu")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CancelReasonRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val outColors = AssetCondition.OUT.badgeColors(isDark = false)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Dimens.minTouchTarget)
-                .clip(RoundedCornerShape(Radius.chip))
-                .background(
-                    if (selected) outColors.background else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(Radius.chip),
-                )
-                .border(if (selected) 2.dp else 0.dp, outColors.text, RoundedCornerShape(Radius.chip))
-                .selectable(selected = selected, onClick = onClick)
-                .padding(horizontal = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = BodyStrongTextStyle,
-            color = if (selected) outColors.text else MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 
