@@ -48,7 +48,24 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun success_state_tapping_a_pole_row_calls_onCapturePole_with_its_id() {
+    fun success_state_tapping_a_pole_row_opens_the_report_method_sheet() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
+                    onCapturePole = {},
+                    onDone = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("POLE-1").performClick()
+        composeRule.onNodeWithText("Chụp ảnh").assertExists()
+        composeRule.onNodeWithText("Quay video").assertExists()
+    }
+
+    @Test
+    fun report_method_sheet_choosing_chup_anh_calls_onCapturePole_with_its_id() {
         var capturedPoleId: String? = null
         composeRule.setContent {
             LuxMapTheme {
@@ -61,7 +78,27 @@ class PoleListScreenTest {
             }
         }
         composeRule.onNodeWithText("POLE-1").performClick()
+        composeRule.onNodeWithText("Chụp ảnh").performClick()
         assertEquals("POLE-1", capturedPoleId)
+    }
+
+    @Test
+    fun report_method_sheet_quay_video_is_disabled() {
+        var capturedPoleId: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
+                    onCapturePole = { capturedPoleId = it },
+                    onDone = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("POLE-1").performClick()
+        composeRule.onNodeWithText("Quay video").performClick()
+        composeRule.onNodeWithText("Chưa hỗ trợ gửi video, dùng ảnh thay thế").assertExists()
+        assertEquals(null, capturedPoleId)
     }
 
     @Test

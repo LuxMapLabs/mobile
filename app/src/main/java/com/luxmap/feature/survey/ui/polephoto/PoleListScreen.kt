@@ -29,14 +29,20 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -135,6 +142,12 @@ fun PoleListScreen(
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
 ) {
+    // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
+    // the design mock's sheet trigger, but only offers the choice itself here. The real upload
+    // flow (PolePhotoCaptureScreen) only exists for photos - see CLAUDE.md/contract-drift.md:
+    // POST .../pole-photos validates strictly for a JPEG file named "photo", so there is no
+    // server-side way to send video for a pole yet.
+    var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         PoleListHeader(workOrderId = workOrderId, onBack = onDone)
         // Overlaps the hero's bottom edge, same pattern as SurveyHubScreen's own sheet - reads as
@@ -184,7 +197,7 @@ fun PoleListScreen(
                                         PoleRow(
                                             pole = pole,
                                             isNext = index == nextIndex,
-                                            onClick = { onCapturePole(pole.poleId) },
+                                            onClick = { reportMethodSheetPoleId = pole.poleId },
                                             onViewAiResult = { pole.serverPhotoId?.let(onViewAiResult) },
                                         )
                                     }
@@ -228,6 +241,108 @@ fun PoleListScreen(
             onRetake = onRetake,
             onSubmitReview = onSubmitReview,
         )
+    }
+
+    val methodSheetPoleId = reportMethodSheetPoleId
+    if (methodSheetPoleId != null) {
+        ReportMethodSheet(
+            poleId = methodSheetPoleId,
+            onDismiss = { reportMethodSheetPoleId = null },
+            onChoosePhoto = {
+                reportMethodSheetPoleId = null
+                onCapturePole(methodSheetPoleId)
+            },
+        )
+    }
+}
+
+// Mock's "Bao loi cot" sheet, trimmed to just the method choice - the mock's multi-file picker
+// (up to 5 photos/videos staged before one combined submit) does not match how upload actually
+// works today, where POST .../pole-photos takes exactly 1 JPEG per call (see contract-drift.md).
+// "Quay video" stays visible per the mock's layout but disabled, since that endpoint rejects
+// anything that is not a JPEG named "photo" - there is no server-side way to send video for a
+// pole yet, so it must not look like it already works.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportMethodSheet(
+    poleId: String,
+    onDismiss: () -> Unit,
+    onChoosePhoto: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = "Báo lỗi cột",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(text = poleId, style = MaterialTheme.typography.titleLarge)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                ReportMethodOption(
+                    icon = Icons.Filled.PhotoCamera,
+                    label = "Chụp ảnh",
+                    enabled = true,
+                    onClick = onChoosePhoto,
+                    modifier = Modifier.weight(1f),
+                )
+                ReportMethodOption(
+                    icon = Icons.Filled.Videocam,
+                    label = "Quay video",
+                    enabled = false,
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                text = "Chưa hỗ trợ gửi video, dùng ảnh thay thế",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportMethodOption(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor =
+        if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Column(
+        modifier =
+            modifier
+                .heightIn(min = 72.dp)
+                .clickable(enabled = enabled, onClick = onClick)
+                .border(
+                    1.dp,
+                    if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.surfaceVariant,
+                    RoundedCornerShape(Radius.control),
+                )
+                .padding(Spacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = contentColor)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(text = label, color = contentColor, style = MaterialTheme.typography.bodyMedium)
+            if (!enabled) {
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
     }
 }
 
