@@ -919,16 +919,25 @@ private fun SummaryPriorityCell(
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val hasCancellationBanner = detail.cancellationRequestStatus != "none"
-    val isOverdueToComplete =
-        workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete &&
-            workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.IN_PROGRESS
+    val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
+    val status = workOrderStatusFromWire(detail.woStatus)
+    val isOverdueToStart = isPastSchedule && status == WorkOrderStatus.ASSIGNED
+    val isOverdueToComplete = isPastSchedule && status == WorkOrderStatus.IN_PROGRESS
     val hasAnyBanner =
         !detail.note.isNullOrBlank() ||
             !detail.reviewNote.isNullOrBlank() ||
             hasCancellationBanner ||
+            isOverdueToStart ||
             isOverdueToComplete
     if (!hasAnyBanner) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (isOverdueToStart) {
+            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
+            InlineBanner(
+                message = "Quá hạn bắt đầu (dự kiến $dueText) · vẫn bắt đầu được bình thường",
+                tone = InlineBannerTone.ERROR,
+            )
+        }
         if (isOverdueToComplete) {
             val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
             InlineBanner(
