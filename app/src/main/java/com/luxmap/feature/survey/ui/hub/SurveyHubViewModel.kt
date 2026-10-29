@@ -43,6 +43,12 @@ class SurveyHubViewModel
 
         private var loadJob: Job? = null
 
+        // Not part of the combine() below on purpose - that flow rebuilds Success from scratch
+        // on every emission (routes, uploads, connectivity), which would otherwise wipe this
+        // session-only marker on an unrelated reload (see SurveyHubUiState's own note on why
+        // this cannot come from the server for list items).
+        private var cancelledWorkOrderIds: Set<String> = emptySet()
+
         init {
             load()
         }
@@ -83,6 +89,36 @@ class SurveyHubViewModel
             }
         }
 
+        fun onRequestCancellation(
+            workOrderId: String,
+            reason: String,
+        ) {
+            val current = _uiState.value as? SurveyHubUiState.Success ?: return
+            if (current.requestingCancellationFor != null) return
+            _uiState.value = current.copy(requestingCancellationFor = workOrderId, cancellationError = null)
+            viewModelScope.launch {
+                repository.requestCancellation(workOrderId, reason).fold(
+                    onSuccess = {
+                        cancelledWorkOrderIds = cancelledWorkOrderIds + workOrderId
+                        val latest = _uiState.value as? SurveyHubUiState.Success ?: current
+                        _uiState.value =
+                            latest.copy(
+                                requestingCancellationFor = null,
+                                cancelledWorkOrderIds = cancelledWorkOrderIds,
+                            )
+                    },
+                    onFailure = { e ->
+                        val latest = _uiState.value as? SurveyHubUiState.Success ?: current
+                        _uiState.value =
+                            latest.copy(
+                                requestingCancellationFor = null,
+                                cancellationError = e.message ?: "Không gửi được yêu cầu hủy",
+                            )
+                    },
+                )
+            }
+        }
+
         private fun load() {
             loadJob?.cancel()
             loadJob =
@@ -114,6 +150,7 @@ class SurveyHubViewModel
                                 rejectedSweeps = rejected,
                                 pendingAiConfirmation = pending,
                                 isStale = routesResult.isStale,
+                                cancelledWorkOrderIds = cancelledWorkOrderIds,
                             )
                         }
                     }.catch { e ->
