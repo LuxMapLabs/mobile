@@ -105,11 +105,17 @@ fun SurveyHubRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29) - after a successful start from the
-    // card's single button, follow through into the pole list, same pattern as F09's own
-    // startedSurveyWorkOrderId collection in WorkOrderDetailRoute.
+    // After a successful start from either Hub button, follow through into the right screen -
+    // same pattern as F09's own startedSurveyWorkOrderId collection in WorkOrderDetailRoute. The
+    // 2 survey methods stay parallel (CLAUDE.md 2026-10-29), so this only picks a destination,
+    // it never starts one flow from the other.
     LaunchedEffect(Unit) {
-        viewModel.startedRouteForCapture.collect { workOrderId -> onCapturePolePhotos(workOrderId) }
+        viewModel.startedRoute.collect { navigation ->
+            when (navigation.destination) {
+                SurveyRouteStartDestination.POLE_CAPTURE -> onCapturePolePhotos(navigation.workOrderId)
+                SurveyRouteStartDestination.READINESS_CHECK -> onCheckReadiness(navigation.workOrderId)
+            }
+        }
     }
 
     // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
@@ -145,7 +151,7 @@ fun SurveyHubScreen(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
-    onStartRoute: (workOrderId: String) -> Unit = {},
+    onStartRoute: (workOrderId: String, destination: SurveyRouteStartDestination) -> Unit = { _, _ -> },
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
@@ -345,7 +351,7 @@ private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
-    onStartRoute: (workOrderId: String) -> Unit,
+    onStartRoute: (workOrderId: String, destination: SurveyRouteStartDestination) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
@@ -395,7 +401,12 @@ private fun SurveyHubContent(
                     isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
-                    onStartRoute = { onStartRoute(route.workOrderId) },
+                    onStartForPoleCapture = {
+                        onStartRoute(route.workOrderId, SurveyRouteStartDestination.POLE_CAPTURE)
+                    },
+                    onStartForReadinessCheck = {
+                        onStartRoute(route.workOrderId, SurveyRouteStartDestination.READINESS_CHECK)
+                    },
                     onRequestCancellation = { onOpenCancelSheet(route.workOrderId) },
                 )
             }
@@ -535,7 +546,8 @@ private fun AssignedRouteCard(
     isCancelled: Boolean,
     onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
-    onStartRoute: () -> Unit,
+    onStartForPoleCapture: () -> Unit,
+    onStartForReadinessCheck: () -> Unit,
     onRequestCancellation: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
@@ -628,26 +640,34 @@ private fun AssignedRouteCard(
                         Text(text = "Yêu cầu hủy")
                     }
                 }
+                // "Quay video toan tuyen" (CLAUDE.md 2026-10-29, renamed from "Kiem tra san
+                // sang" for clarity - that name described only the first screen it leads to).
+                // Runs in parallel with the pole-capture CTA below, never merged (CLAUDE.md
+                // "song song, khong gop"). Same as that CTA, tapping this while still "assigned"
+                // starts the route first (via SurveyHubViewModel.startedRoute), then continues
+                // into the readiness check - previously this button skipped straight to the
+                // checklist without starting the route, which could lose an entire recorded
+                // video at upload time (POST /sweeps requires wo_status = in_progress server-side).
                 Button(
-                    onClick = onCheckReadiness,
+                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForReadinessCheck else onCheckReadiness,
+                    enabled = !isStarting,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
                     shape = RoundedCornerShape(Radius.control),
                     colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
                 ) {
-                    Text(text = "Kiểm tra sẵn sàng")
+                    Text(text = if (isStarting) "Đang bắt đầu…" else "Quay video toàn tuyến")
                 }
                 // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29): a freshly-created work
                 // order starts "assigned" - pole-photo uploads need in_progress server-side
                 // (409 WORK_ORDER_NOT_IN_PROGRESS otherwise). Home deliberately hides survey
-                // orders, so this is the only reachable place to call the start API for one -
-                // "Kiem tra san sang" above does NOT call it, it only checks local device
-                // readiness for the video flow. Tapping this while still "assigned" starts the
-                // route, then SurveyHubViewModel's startedRouteForCapture flow (observed by
-                // SurveyHubRoute) navigates to the pole list on success - the button itself only
-                // ever calls one of the two callbacks, never both.
+                // orders, so this is the only reachable place to call the start API for one.
+                // Tapping this while still "assigned" starts the route, then
+                // SurveyHubViewModel's startedRoute flow (observed by SurveyHubRoute) navigates
+                // to the pole list on success - the button itself only ever calls one of the two
+                // callbacks, never both.
                 val canAct = status == WorkOrderStatus.ASSIGNED || status == WorkOrderStatus.IN_PROGRESS
                 Button(
-                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartRoute else onCapturePolePhotos,
+                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForPoleCapture else onCapturePolePhotos,
                     enabled = canAct && !isStarting,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
                     shape = RoundedCornerShape(Radius.control),
@@ -658,7 +678,8 @@ private fun AssignedRouteCard(
                             when {
                                 isStarting -> "Đang bắt đầu…"
                                 status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
-                                else -> "Chụp ảnh cột đèn"
+                                status == WorkOrderStatus.IN_PROGRESS -> "Tiếp tục"
+                                else -> "Đã hoàn tất"
                             },
                     )
                 }
