@@ -47,4 +47,12 @@ interface SurveyRepository {
     // Hub needs its own way to call it, since Home deliberately hides survey work orders (see
     // HomeScreen.kt), so F09 is not reachable for them except through a notification tap.
     suspend fun startRoute(workOrderId: String): Result<Unit>
+
+    // Same generic POST /work-orders/{id}/request-cancellation WorkOrderDetailScreen (F09)
+    // already uses (CLAUDE.md WO-CANCEL-REQUEST) - the rule is wo_status == assigned regardless
+    // of task_kind, so this works the same way for a survey route.
+    suspend fun requestCancellation(
+        workOrderId: String,
+        reason: String,
+    ): Result<Unit>
 }

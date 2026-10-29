@@ -7,6 +7,7 @@ import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalAssignedSurveyRouteEntity
+import com.luxmap.feature.workorder.data.dto.RequestCancellationRequestDto
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -96,4 +97,12 @@ class RealSurveyRepository
 
         override suspend fun startRoute(workOrderId: String): Result<Unit> =
             runCatching { workOrdersApi.start(workOrderId) }.map {}
+
+        override suspend fun requestCancellation(
+            workOrderId: String,
+            reason: String,
+        ): Result<Unit> =
+            runCatching {
+                workOrdersApi.requestCancellation(workOrderId, RequestCancellationRequestDto(reason))
+            }.map {}
     }
