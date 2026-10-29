@@ -137,6 +137,7 @@ import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDate
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -204,8 +205,12 @@ fun WorkOrderDetailScreen(
             if (uiState is WorkOrderDetailUiState.Success) {
                 val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
                 if (cta != null) {
+                    val scheduleWindow =
+                        workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
                     Column {
-                        if ("request_cancellation" in uiState.detail.allowedActions) {
+                        val showCancelRequest =
+                            "request_cancellation" in uiState.detail.allowedActions && scheduleWindow.canActOnSchedule
+                        if (showCancelRequest) {
                             CancelRequestButton(onClick = { showCancelSheet = true })
                         }
                         BottomActionBar(
@@ -315,17 +320,30 @@ private fun workOrderCtaState(
     state: WorkOrderDetailUiState.Success,
     onStart: () -> Unit,
     onSubmit: () -> Unit,
+    today: LocalDate = LocalDate.now(),
 ): WorkOrderCtaState? {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val canSubmitNow = state.canSubmit() && !state.isSubmitting
+    val scheduleWindow = workOrderScheduleWindow(detail.scheduledDate, today)
     return when {
-        "start" in detail.allowedActions ->
+        "start" in detail.allowedActions && scheduleWindow.canActOnSchedule ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
                 icon = Icons.Filled.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
+            )
+        // scheduleWindow.unlocksOn is only null when there is no scheduled_date, and that case
+        // always has canActOnSchedule = true, so it never reaches this branch.
+        "start" in detail.allowedActions ->
+            WorkOrderCtaState(
+                text = "Bắt đầu",
+                icon = Icons.Filled.Lock,
+                enabled = false,
+                onClick = {},
+                hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
+                hintColor = Gray500,
             )
         // A completion was just saved locally (tapping the button writes it immediately,
         // offline-first) - lock the CTA right away instead of leaving it looking tappable until
@@ -773,7 +791,7 @@ private fun WorkOrderHeroSection(
             }
             Text(
                 text = detail.workOrderId,
-                style = LabelTextStyle,
+                style = BodyStrongTextStyle,
                 color = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.align(Alignment.Center),
             )
@@ -901,8 +919,23 @@ private fun SummaryPriorityCell(
 @Composable
 private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
     val hasCancellationBanner = detail.cancellationRequestStatus != "none"
-    if (detail.note.isNullOrBlank() && detail.reviewNote.isNullOrBlank() && !hasCancellationBanner) return
+    val isOverdueToComplete =
+        workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete &&
+            workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.IN_PROGRESS
+    val hasAnyBanner =
+        !detail.note.isNullOrBlank() ||
+            !detail.reviewNote.isNullOrBlank() ||
+            hasCancellationBanner ||
+            isOverdueToComplete
+    if (!hasAnyBanner) return
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (isOverdueToComplete) {
+            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
+            InlineBanner(
+                message = "Quá hạn hoàn thành (dự kiến $dueText) · vẫn nộp được bình thường",
+                tone = InlineBannerTone.ERROR,
+            )
+        }
         if (!detail.reviewNote.isNullOrBlank()) {
             InlineBanner(
                 message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",

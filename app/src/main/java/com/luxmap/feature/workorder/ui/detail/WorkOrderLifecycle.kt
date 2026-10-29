@@ -4,6 +4,8 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.ui.components.LifecycleStep
 import com.luxmap.core.ui.components.LifecycleStepState
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
 
 // Case-level journey (CLAUDE.md "Luồng Field Engineer đã chốt"), not this one WorkOrder's own
 // wo_status machine - matches the real screen (LuxMap App v3.dc.html, "task" screen): a lighting
@@ -41,4 +43,38 @@ fun workOrderLifecycleSteps(
             }
         LifecycleStep(label = label, state = state)
     }
+}
+
+// Mobile-only guard (CLAUDE.md, "Cua so hanh dong Bat dau/Yeu cau huy theo lich", added
+// 2026-10-29) - start/request_cancellation only unlock from 1 day before scheduled_date
+// onward, with no close point, and a work order is flagged overdue to complete once
+// scheduled_date has passed. This is on top of the server's allowed_actions, not instead of it.
+data class WorkOrderScheduleWindow(
+    val canActOnSchedule: Boolean,
+    val isOverdueToComplete: Boolean,
+    // Only set when canActOnSchedule is false, so the UI can show "opens on <date>".
+    val unlocksOn: LocalDate? = null,
+)
+
+fun workOrderScheduleWindow(
+    scheduledDate: String?,
+    today: LocalDate,
+): WorkOrderScheduleWindow {
+    val scheduled =
+        try {
+            scheduledDate?.let { LocalDate.parse(it) }
+        } catch (e: DateTimeParseException) {
+            null
+        }
+    // No scheduled_date (or an unparseable one) means this rule does not apply - fall back to
+    // the old behavior, fully driven by allowed_actions.
+    if (scheduled == null) {
+        return WorkOrderScheduleWindow(canActOnSchedule = true, isOverdueToComplete = false)
+    }
+    val unlocksOn = scheduled.minusDays(1)
+    return WorkOrderScheduleWindow(
+        canActOnSchedule = !today.isBefore(unlocksOn),
+        isOverdueToComplete = today.isAfter(scheduled),
+        unlocksOn = unlocksOn,
+    )
 }

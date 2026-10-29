@@ -4,8 +4,11 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.ui.components.LifecycleStepState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class WorkOrderLifecycleTest {
     @Test
@@ -59,5 +62,41 @@ class WorkOrderLifecycleTest {
         assertThrows(IllegalStateException::class.java) {
             workOrderLifecycleSteps(WorkOrderStatus.CANCELLED, WorkOrderTaskKind.INSPECTION)
         }
+    }
+
+    @Test
+    fun schedule_window_is_closed_more_than_a_day_before_scheduled_date() {
+        val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-08"))
+        assertFalse(window.canActOnSchedule)
+        assertFalse(window.isOverdueToComplete)
+        assertEquals(LocalDate.parse("2026-11-09"), window.unlocksOn)
+    }
+
+    @Test
+    fun schedule_window_opens_exactly_one_day_before_scheduled_date() {
+        val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-09"))
+        assertTrue(window.canActOnSchedule)
+        assertFalse(window.isOverdueToComplete)
+    }
+
+    @Test
+    fun schedule_window_stays_open_on_the_scheduled_date_itself() {
+        val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-10"))
+        assertTrue(window.canActOnSchedule)
+        assertFalse(window.isOverdueToComplete)
+    }
+
+    @Test
+    fun schedule_window_stays_open_but_flags_overdue_after_the_scheduled_date() {
+        val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-11"))
+        assertTrue(window.canActOnSchedule)
+        assertTrue(window.isOverdueToComplete)
+    }
+
+    @Test
+    fun schedule_window_does_not_apply_when_there_is_no_scheduled_date() {
+        val window = workOrderScheduleWindow(null, today = LocalDate.parse("2026-11-11"))
+        assertTrue(window.canActOnSchedule)
+        assertFalse(window.isOverdueToComplete)
     }
 }
