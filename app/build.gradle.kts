@@ -31,13 +31,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Default 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
-        // and 5141 is the http port luxmap_backend listens on (see launchSettings.json). To use
-        // another address (for example a real device on LAN), set API_BASE_URL in
-        // local.properties. The URL must end with "/".
-        val apiBaseUrl = localProperties.getProperty("API_BASE_URL", "http://10.0.2.2:5141/")
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
-
         // Empty when not set in local.properties — MapLibreConfig.kt falls back to the
         // OpenFreeMap style in that case, so a missing key never breaks the build.
         val mapTilerApiKey = localProperties.getProperty("MAPTILER_API_KEY", "")
@@ -51,6 +44,39 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+        }
+    }
+
+    flavorDimensions += "env"
+    productFlavors {
+        // Talks to a backend run on this machine. Different applicationId so this installs
+        // side by side with the server flavor instead of overwriting it.
+        create("local") {
+            dimension = "env"
+            applicationIdSuffix = ".local"
+            versionNameSuffix = "-local"
+
+            // 10.0.2.2 is the loopback address Android Emulator uses to reach the host machine,
+            // and 5141 is the http port luxmap_backend listens on (see launchSettings.json). A
+            // real device needs `adb reverse tcp:5141 tcp:5141` and localhost instead. Override
+            // with API_BASE_URL in local.properties when neither default fits (for example a
+            // real device on LAN without adb reverse). The URL must end with "/".
+            val apiBaseUrl = localProperties.getProperty("API_BASE_URL", "http://10.0.2.2:5141/")
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+
+            // Overrides the app_name string from res/values so the two flavors show different
+            // launcher labels — otherwise both install as identical-looking "LuxMap" icons.
+            resValue("string", "app_name", "LuxMap Local")
+        }
+
+        // Talks to the deployed backend — see docs/contract-drift.md DEP-1. No "/api/v1" suffix
+        // here: every endpoint path in the app already starts with "api/v1/...".
+        create("server") {
+            dimension = "env"
+            applicationIdSuffix = ".server"
+            versionNameSuffix = "-server"
+            buildConfigField("String", "API_BASE_URL", "\"https://luxmap.com.vn/\"")
+            resValue("string", "app_name", "LuxMap Server")
         }
     }
 
