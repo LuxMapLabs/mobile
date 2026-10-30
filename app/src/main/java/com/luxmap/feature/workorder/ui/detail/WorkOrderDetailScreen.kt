@@ -211,7 +211,8 @@ fun WorkOrderDetailScreen(
                         Column {
                             val showCancelRequest =
                                 "request_cancellation" in uiState.detail.allowedActions &&
-                                    scheduleWindow.canActOnSchedule
+                                    scheduleWindow.canActOnSchedule &&
+                                    uiState.localCompletion?.submitStatus != "pending"
                             if (showCancelRequest) {
                                 CancelRequestButton(
                                     onClick = { showCancelSheet = true },
