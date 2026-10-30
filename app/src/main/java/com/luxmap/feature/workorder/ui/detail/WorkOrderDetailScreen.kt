@@ -589,7 +589,7 @@ private fun WorkOrderDetailContent(
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val canComplete = "complete" in detail.allowedActions
+    val canComplete = "complete" in detail.allowedActions && state.localCompletion?.submitStatus != "pending"
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         WorkOrderHeroSection(detail = detail, onBack = onBack)
         // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top technique F02
@@ -706,7 +706,9 @@ private fun WorkOrderHeroSection(
                         text = kind.label(),
                         colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
                     )
-                    StatusBadge(text = status.label(), colors = status.badgeColors())
+                    if (status != WorkOrderStatus.ASSIGNED) {
+                        StatusBadge(text = status.label(), colors = status.badgeColors())
+                    }
                 }
             }
         }
