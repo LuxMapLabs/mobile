@@ -212,7 +212,7 @@ fun WorkOrderDetailScreen(
                             val showCancelRequest =
                                 "request_cancellation" in uiState.detail.allowedActions &&
                                     scheduleWindow.canActOnSchedule &&
-                                    (uiState.localCompletion == null || isReturnedForRework(uiState.detail))
+                                    (uiState.localCompletion == null || isReturnedForRework(uiState))
                             if (showCancelRequest) {
                                 CancelRequestButton(
                                     onClick = { showCancelSheet = true },
@@ -326,8 +326,10 @@ private data class WorkOrderCtaState(
     val requiresConfirmation: Boolean = false,
 )
 
-private fun isReturnedForRework(detail: WorkOrderDetail): Boolean =
-    workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.IN_PROGRESS && !detail.reviewNote.isNullOrBlank()
+private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean =
+    !state.justSubmitted &&
+        workOrderStatusFromWire(state.detail.woStatus) == WorkOrderStatus.IN_PROGRESS &&
+        !state.detail.reviewNote.isNullOrBlank()
 
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
 // redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
@@ -361,7 +363,7 @@ private fun workOrderCtaState(
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
                 hintColor = Gray500,
             )
-        "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(detail) ->
+        "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
             WorkOrderCtaState(
                 text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
                 icon = Icons.Filled.HourglassTop,
@@ -582,7 +584,7 @@ private fun WorkOrderDetailContent(
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val hasActiveLocalCompletion = state.localCompletion != null && !isReturnedForRework(detail)
+    val hasActiveLocalCompletion = state.localCompletion != null && !isReturnedForRework(state)
     val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
@@ -702,10 +704,7 @@ private fun WorkOrderHeroSection(
                         colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
                     )
                     if (showSubmittedBadge) {
-                        StatusBadge(
-                            text = "Đã nộp",
-                            colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
-                        )
+                        StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
                     } else if (status != WorkOrderStatus.ASSIGNED) {
                         StatusBadge(text = status.label(), colors = status.badgeColors())
                     }
@@ -1109,7 +1108,6 @@ private fun RepairCompletionSection(
                 value = state.reportNote,
                 onValueChange = onReportNoteChanged,
                 label = { Text("Kết quả sửa chữa") },
-                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -1123,7 +1121,6 @@ private fun RepairCompletionSection(
                 value = state.materialsUsed,
                 onValueChange = onMaterialsUsedChanged,
                 label = { Text("Vật tư đã dùng (không bắt buộc)") },
-                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -1238,7 +1235,6 @@ private fun InspectionCompletionSection(
             value = state.reportNote,
             onValueChange = onReportNoteChanged,
             label = { Text("Ghi chú kiểm tra") },
-            singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             modifier = Modifier.fillMaxWidth(),

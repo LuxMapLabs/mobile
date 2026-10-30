@@ -22,6 +22,7 @@ sealed interface WorkOrderDetailUiState {
         val submitError: String? = null,
         val isRequestingCancellation: Boolean = false,
         val cancellationError: String? = null,
+        val justSubmitted: Boolean = false,
     ) : WorkOrderDetailUiState
 
     data object Empty : WorkOrderDetailUiState
