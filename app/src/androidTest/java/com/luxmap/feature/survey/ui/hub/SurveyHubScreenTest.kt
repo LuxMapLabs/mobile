@@ -140,7 +140,7 @@ class SurveyHubScreenTest {
     }
 
     @Test
-    fun an_in_progress_route_shows_tiep_tuc_and_it_calls_onCapturePolePhotos_directly() {
+    fun an_in_progress_route_shows_the_pole_capture_label_and_it_calls_onCapturePolePhotos_directly() {
         var captured: String? = null
         composeRule.setContent {
             LuxMapTheme {
@@ -152,7 +152,8 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
-        composeRule.onNodeWithText("Tiếp tục").assertIsEnabled().performClick()
+        composeRule.onNodeWithText("Tiếp tục").assertDoesNotExist()
+        composeRule.onNodeWithText("Chụp ảnh/video từng cột").assertIsEnabled().performClick()
         assertEquals("WO-1", captured)
     }
 

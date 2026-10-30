@@ -745,7 +745,7 @@ private fun AssignedRouteCard(
                             when {
                                 isStarting -> "Đang bắt đầu…"
                                 status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
-                                status == WorkOrderStatus.IN_PROGRESS -> "Tiếp tục"
+                                status == WorkOrderStatus.IN_PROGRESS -> "Chụp ảnh/video từng cột"
                                 else -> "Đã hoàn tất"
                             },
                     )
