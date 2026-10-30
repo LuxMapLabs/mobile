@@ -388,11 +388,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onCaptureEvidence = {
                         navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
                     },
-                    onStartSurvey = { startedWorkOrderId ->
-                        // Through F03 first, not straight into capture - the readiness checklist
-                        // (exposure lock/GPS/storage/battery) is a hard gate CLAUDE.md requires
-                        // for every survey entry point, not just the Survey Hub one.
-                        navController.navigate(Routes.SurveyPlan.createRoute(startedWorkOrderId))
+                    onStartSurvey = {
+                        navController.navigate(Routes.Survey.route)
                     },
                 )
             }
