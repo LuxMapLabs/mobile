@@ -46,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -90,9 +91,19 @@ import java.time.format.DateTimeParseException
 fun NotificationListRoute(
     onBack: () -> Unit,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
+    onOpenSurveyHub: (workOrderId: String) -> Unit = {},
     viewModel: NotificationListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.navigate.collect { event ->
+            when (event) {
+                is NotificationNavigationEvent.OpenWorkOrderDetail -> onOpenWorkOrder(event.workOrderId)
+                is NotificationNavigationEvent.OpenSurveyHub -> onOpenSurveyHub(event.workOrderId)
+            }
+        }
+    }
 
     NotificationListScreen(
         state = uiState,
@@ -100,10 +111,7 @@ fun NotificationListRoute(
         onRetry = viewModel::onRetry,
         onMarkAllRead = viewModel::onMarkAllRead,
         onFilterSelected = viewModel::onFilterSelected,
-        onItemClick = { row ->
-            viewModel.onMarkRead(row.notificationId)
-            notificationNavigationTarget(row)?.let(onOpenWorkOrder)
-        },
+        onItemClick = viewModel::onItemClick,
     )
 }
 

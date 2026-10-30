@@ -178,7 +178,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         // Map is the root of the main area (Login is removed from the back stack
                         // after sign-in), so each tab keeps its own state when you come back.
                         if (item.route != currentRoute) {
-                            navController.navigate(item.route) {
+                            val target =
+                                if (item.route == Routes.Survey.route) Routes.Survey.createRoute() else item.route
+                            navController.navigate(target) {
                                 popUpTo(Routes.Map.route) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
@@ -216,8 +218,18 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     },
                 )
             }
-            composable(Routes.Survey.route) {
+            composable(
+                route = Routes.Survey.route,
+                arguments =
+                    listOf(
+                        navArgument("highlightWorkOrderId") {
+                            type = NavType.StringType
+                            nullable = true
+                        },
+                    ),
+            ) { backStackEntry ->
                 SurveyHubRoute(
+                    highlightWorkOrderId = backStackEntry.arguments?.getString("highlightWorkOrderId"),
                     onCheckReadiness = { surveySweepId ->
                         navController.navigate(Routes.SurveyPlan.createRoute(surveySweepId))
                     },
@@ -342,7 +354,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 SubmitScreen(
                     sessionId = sessionId,
                     onBackToSurveyHub = {
-                        navController.navigate(Routes.Survey.route) {
+                        navController.navigate(Routes.Survey.createRoute()) {
                             popUpTo(Routes.Survey.route) { inclusive = true }
                         }
                     },
@@ -370,6 +382,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
+                    onOpenSurveyHub = { workOrderId ->
+                        navController.navigate(Routes.Survey.createRoute(workOrderId))
+                    },
                 )
             }
             composable(
@@ -389,7 +404,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
                     },
                     onStartSurvey = {
-                        navController.navigate(Routes.Survey.route)
+                        navController.navigate(Routes.Survey.createRoute(workOrderId))
                     },
                 )
             }
