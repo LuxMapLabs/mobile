@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeRepository
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
@@ -19,6 +21,7 @@ class HomeViewModel
     @Inject
     constructor(
         private val repository: HomeRepository,
+        private val completionRepository: WorkOrderCompletionRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -38,16 +41,22 @@ class HomeViewModel
             _uiState.value = HomeUiState.Loading
             loadJob =
                 viewModelScope.launch {
-                    repository
-                        .observeHomeData()
+                    combine(
+                        repository.observeHomeData(),
+                        completionRepository.observeCompletedWorkOrderIds(),
+                    ) { data, locallyCompletedWorkOrderIds -> data to locallyCompletedWorkOrderIds }
                         .catch { e ->
                             _uiState.value = HomeUiState.Error(e.message ?: "Không tải được dữ liệu")
-                        }.collect { data ->
+                        }.collect { (data, locallyCompletedWorkOrderIds) ->
                             _uiState.value =
                                 if (data.isEmpty()) {
                                     HomeUiState.Empty
                                 } else {
-                                    HomeUiState.Success(data = data, lastSyncedAt = Instant.now())
+                                    HomeUiState.Success(
+                                        data = data,
+                                        lastSyncedAt = Instant.now(),
+                                        locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
+                                    )
                                 }
                         }
                 }

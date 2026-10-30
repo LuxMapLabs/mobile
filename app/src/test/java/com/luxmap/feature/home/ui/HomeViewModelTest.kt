@@ -5,6 +5,7 @@ import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.home.data.WorkOrderCluster
+import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,12 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+
+private fun fakeCompletionRepository(ids: Set<String> = emptySet()): WorkOrderCompletionRepository {
+    val repository = mockk<WorkOrderCompletionRepository>()
+    every { repository.observeCompletedWorkOrderIds() } returns flowOf(ids)
+    return repository
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -51,7 +58,7 @@ class HomeViewModelTest {
                         clusters = emptyList(),
                     ),
                 )
-            val viewModel = HomeViewModel(repository)
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -75,7 +82,7 @@ class HomeViewModelTest {
                 )
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(data)
-            val viewModel = HomeViewModel(repository)
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -85,11 +92,36 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun `carries locally completed work order ids into the success state`() =
+        runTest {
+            val data =
+                HomeData(
+                    metrics =
+                        HomeMetrics(
+                            assignedCount = 1,
+                            inProgressCount = 0,
+                            overdueCount = 0,
+                            plannedSweepCount = 0,
+                        ),
+                    clusters = listOf(WorkOrderCluster(clusterLabel = "Xã Đông Thịnh", items = emptyList())),
+                )
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returns flowOf(data)
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(setOf("WO-1")))
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                val success = awaitItem() as HomeUiState.Success
+                assertEquals(setOf("WO-1"), success.locallyCompletedWorkOrderIds)
+            }
+        }
+
+    @Test
     fun `emits Error when the repository flow fails`() =
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flow { throw IllegalStateException("network down") }
-            val viewModel = HomeViewModel(repository)
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -118,7 +150,7 @@ class HomeViewModelTest {
                     flow { throw IllegalStateException("network down") },
                     flowOf(data),
                 )
-            val viewModel = HomeViewModel(repository)
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())

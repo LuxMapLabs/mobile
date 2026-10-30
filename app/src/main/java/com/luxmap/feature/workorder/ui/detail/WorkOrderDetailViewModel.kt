@@ -5,17 +5,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
+import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.IOException
 import javax.inject.Inject
@@ -34,9 +36,8 @@ class WorkOrderDetailViewModel
         private val _uiState = MutableStateFlow<WorkOrderDetailUiState>(WorkOrderDetailUiState.Loading)
         val uiState: StateFlow<WorkOrderDetailUiState> = _uiState.asStateFlow()
 
-        // One-shot: a survey work order's "Bắt đầu" should navigate into F03 (readiness check,
-        // mandatory before capture per CLAUDE.md) exactly once per tap, not replay on every
-        // recomposition the way a StateFlow would.
+        private val detailState = MutableStateFlow<WorkOrderDetail?>(null)
+
         private val _startedSurveyWorkOrderId = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val startedSurveyWorkOrderId: SharedFlow<String> = _startedSurveyWorkOrderId.asSharedFlow()
 
@@ -46,30 +47,44 @@ class WorkOrderDetailViewModel
 
         private fun load() {
             viewModelScope.launch {
+                launch {
+                    val detail =
+                        try {
+                            detailRepository.observeWorkOrderDetail(workOrderId).first()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            _uiState.value = WorkOrderDetailUiState.Error(e.message ?: "Không tải được dữ liệu lệnh")
+                            return@launch
+                        }
+                    if (detail == null) {
+                        _uiState.value = WorkOrderDetailUiState.Empty
+                    } else {
+                        detailState.value = detail
+                    }
+                }
                 combine(
-                    detailRepository.observeWorkOrderDetail(workOrderId),
+                    detailState,
                     completionRepository.observeEvidence(workOrderId),
                     completionRepository.observeCompletion(workOrderId),
                     connectivityObserver.isOnline,
-                ) { detail, evidence, completion, isOnline -> Quad(detail, evidence, completion, isOnline) }
-                    .catch { e ->
-                        _uiState.value = WorkOrderDetailUiState.Error(e.message ?: "Không tải được dữ liệu lệnh")
-                    }.collect { (detail, evidence, completion, isOnline) ->
-                        _uiState.value =
-                            if (detail == null) {
-                                WorkOrderDetailUiState.Empty
-                            } else {
-                                val current = _uiState.value as? WorkOrderDetailUiState.Success
-                                WorkOrderDetailUiState.Success(
-                                    detail = detail,
+                ) { latestDetail, evidence, completion, isOnline -> Quad(latestDetail, evidence, completion, isOnline) }
+                    .collect { (latestDetail, evidence, completion, isOnline) ->
+                        if (latestDetail != null) {
+                            val current = _uiState.value as? WorkOrderDetailUiState.Success
+                            _uiState.value =
+                                current?.copy(
+                                    detail = latestDetail,
                                     localEvidence = evidence,
                                     localCompletion = completion,
                                     isOnline = isOnline,
-                                    reportNote = current?.reportNote ?: detail.reportNote.orEmpty(),
-                                    materialsUsed = current?.materialsUsed ?: detail.materialsUsed.orEmpty(),
-                                    faultOutcomes = current?.faultOutcomes ?: emptyMap(),
+                                ) ?: WorkOrderDetailUiState.Success(
+                                    detail = latestDetail,
+                                    localEvidence = evidence,
+                                    localCompletion = completion,
+                                    isOnline = isOnline,
                                 )
-                            }
+                        }
                     }
             }
         }
@@ -81,23 +96,14 @@ class WorkOrderDetailViewModel
             viewModelScope.launch {
                 detailRepository.start(workOrderId).fold(
                     onSuccess = { detail ->
-                        val afterStart = _uiState.value
-                        if (afterStart is WorkOrderDetailUiState.Success) {
-                            _uiState.value = afterStart.copy(detail = detail, isStarting = false, startError = null)
-                        }
+                        updateSuccess { it.copy(detail = detail, isStarting = false, startError = null) }
+                        detailState.value = detail
                         if (detail.taskKind == "survey") {
                             _startedSurveyWorkOrderId.tryEmit(workOrderId)
                         }
                     },
                     onFailure = { e ->
-                        val afterFailure = _uiState.value
-                        if (afterFailure is WorkOrderDetailUiState.Success) {
-                            _uiState.value =
-                                afterFailure.copy(
-                                    isStarting = false,
-                                    startError = startErrorMessage(e),
-                                )
-                        }
+                        updateSuccess { it.copy(isStarting = false, startError = startErrorMessage(e)) }
                     },
                 )
             }
@@ -152,19 +158,15 @@ class WorkOrderDetailViewModel
             viewModelScope.launch {
                 detailRepository.requestCancellation(workOrderId, reason).fold(
                     onSuccess = { detail ->
-                        val after = _uiState.value
-                        if (after is WorkOrderDetailUiState.Success) {
-                            _uiState.value = after.copy(detail = detail, isRequestingCancellation = false)
-                        }
+                        updateSuccess { it.copy(detail = detail, isRequestingCancellation = false) }
+                        detailState.value = detail
                     },
                     onFailure = { e ->
-                        val after = _uiState.value
-                        if (after is WorkOrderDetailUiState.Success) {
-                            _uiState.value =
-                                after.copy(
-                                    isRequestingCancellation = false,
-                                    cancellationError = cancellationErrorMessage(e),
-                                )
+                        updateSuccess {
+                            it.copy(
+                                isRequestingCancellation = false,
+                                cancellationError = cancellationErrorMessage(e),
+                            )
                         }
                     },
                 )

@@ -38,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +74,10 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import com.luxmap.core.ui.components.TopSlideToast
+import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -160,63 +164,75 @@ fun SurveyHubScreen(
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
     var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        SurveyHubHeader(routeCount = routeCount)
-        // Overlaps the hero's bottom edge by Spacing.xl, same as HomeScreen's HomeHeader overlap -
-        // reads as a sheet floating over the navy hero instead of a hard seam between the two.
-        // The clip (not just background) matters once the list scrolls - background alone paints
-        // the rounded shape but never cuts the LazyColumn's own square corners, so a scrolled
-        // row's edge shows past the rounding at the top instead of following it.
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .offset(y = -Spacing.xl)
-                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
-            when (state) {
-                is SurveyHubUiState.Loading -> HubLoadingSkeleton()
+    val toastState = remember { TopToastState() }
+    val scope = rememberCoroutineScope()
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            SurveyHubHeader(routeCount = routeCount)
+            // Overlaps the hero's bottom edge by Spacing.xl, same as HomeScreen's HomeHeader overlap -
+            // reads as a sheet floating over the navy hero instead of a hard seam between the two.
+            // The clip (not just background) matters once the list scrolls - background alone paints
+            // the rounded shape but never cuts the LazyColumn's own square corners, so a scrolled
+            // row's edge shows past the rounding at the top instead of following it.
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .offset(y = -Spacing.xl)
+                        .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                        .background(MaterialTheme.colorScheme.background),
+            ) {
+                when (state) {
+                    is SurveyHubUiState.Loading -> HubLoadingSkeleton()
 
-                is SurveyHubUiState.Success ->
-                    SurveyHubContent(
-                        state = state,
-                        onCheckReadiness = onCheckReadiness,
-                        onCapturePolePhotos = onCapturePolePhotos,
-                        onStartRoute = onStartRoute,
-                        onReviewAiConfirmation = onReviewAiConfirmation,
-                        onResurvey = onResurvey,
-                        onOpenCancelSheet = { cancelSheetWorkOrderId = it },
-                    )
+                    is SurveyHubUiState.Success ->
+                        SurveyHubContent(
+                            state = state,
+                            onCheckReadiness = onCheckReadiness,
+                            onCapturePolePhotos = onCapturePolePhotos,
+                            onStartRoute = onStartRoute,
+                            onReviewAiConfirmation = onReviewAiConfirmation,
+                            onResurvey = onResurvey,
+                            onOpenCancelSheet = { cancelSheetWorkOrderId = it },
+                        )
 
-                is SurveyHubUiState.Empty ->
-                    MessageState(
-                        icon = Icons.Filled.EventAvailable,
-                        iconColors = SyncStatus.DONE.badgeColors(),
-                        title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
-                        subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
-                        action = {},
-                    )
+                    is SurveyHubUiState.Empty ->
+                        MessageState(
+                            icon = Icons.Filled.EventAvailable,
+                            iconColors = SyncStatus.DONE.badgeColors(),
+                            title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
+                            subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
+                            action = {},
+                        )
 
-                is SurveyHubUiState.Error ->
-                    MessageState(
-                        icon = Icons.Filled.CloudOff,
-                        iconColors = SyncStatus.FAILED.badgeColors(),
-                        title = state.message,
-                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                    ) {
-                        OutlinedButton(
-                            onClick = onRetry,
-                            colors =
-                                ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.primary,
-                                ),
+                    is SurveyHubUiState.Error ->
+                        MessageState(
+                            icon = Icons.Filled.CloudOff,
+                            iconColors = SyncStatus.FAILED.badgeColors(),
+                            title = state.message,
+                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
                         ) {
-                            Text("Thử lại")
+                            OutlinedButton(
+                                onClick = onRetry,
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                            ) {
+                                Text("Thử lại")
+                            }
                         }
-                    }
+                }
             }
         }
+        TopSlideToast(
+            state = toastState,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        )
     }
 
     val sheetWorkOrderId = cancelSheetWorkOrderId
@@ -233,6 +249,7 @@ fun SurveyHubScreen(
     LaunchedEffect(state) {
         val success = state as? SurveyHubUiState.Success
         if (sheetWorkOrderId != null && success?.cancelledWorkOrderIds?.contains(sheetWorkOrderId) == true) {
+            scope.launch { toastState.show("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt") }
             cancelSheetWorkOrderId = null
         }
     }

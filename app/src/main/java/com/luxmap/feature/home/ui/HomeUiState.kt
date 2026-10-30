@@ -13,6 +13,7 @@ sealed interface HomeUiState {
         val data: HomeData,
         val isStale: Boolean = false,
         val lastSyncedAt: Instant? = null,
+        val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
     ) : HomeUiState
 
     data object Empty : HomeUiState

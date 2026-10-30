@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -62,8 +63,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -132,7 +131,8 @@ import com.luxmap.core.ui.components.OutcomeSegment
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.dueDateLabel
+import com.luxmap.core.ui.components.TopSlideToast
+import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
@@ -188,85 +188,96 @@ fun WorkOrderDetailScreen(
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        modifier = modifier,
-        // Success renders its own navy hero with an embedded back button (see
-        // WorkOrderHeroSection) instead of this plain top bar - the other 3 states have no
-        // detail to put in a hero, so they keep the plain bar with a generic title.
-        topBar = {
-            if (uiState !is WorkOrderDetailUiState.Success) {
-                AppTopBar(title = "Chi tiết lệnh", onBack = onBack)
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            if (uiState is WorkOrderDetailUiState.Success) {
-                val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
-                if (cta != null) {
-                    val scheduleWindow =
-                        workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
-                    Column {
-                        val showCancelRequest =
-                            "request_cancellation" in uiState.detail.allowedActions && scheduleWindow.canActOnSchedule
-                        if (showCancelRequest) {
-                            CancelRequestButton(
-                                onClick = { showCancelSheet = true },
-                                modifier = Modifier.padding(horizontal = ScreenMargin).padding(top = Spacing.sm),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = modifier,
+            // Success renders its own navy hero with an embedded back button (see
+            // WorkOrderHeroSection) instead of this plain top bar - the other 3 states have no
+            // detail to put in a hero, so they keep the plain bar with a generic title.
+            topBar = {
+                if (uiState !is WorkOrderDetailUiState.Success) {
+                    AppTopBar(title = "Chi tiết lệnh", onBack = onBack)
+                }
+            },
+            bottomBar = {
+                if (uiState is WorkOrderDetailUiState.Success) {
+                    val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
+                    if (cta != null) {
+                        val scheduleWindow =
+                            workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
+                        Column {
+                            val showCancelRequest =
+                                "request_cancellation" in uiState.detail.allowedActions &&
+                                    scheduleWindow.canActOnSchedule &&
+                                    uiState.localCompletion?.submitStatus != "pending"
+                            if (showCancelRequest) {
+                                CancelRequestButton(
+                                    onClick = { showCancelSheet = true },
+                                    modifier = Modifier.padding(horizontal = ScreenMargin).padding(top = Spacing.sm),
+                                )
+                            }
+                            BottomActionBar(
+                                ctaText = cta.text,
+                                ctaIcon = cta.icon,
+                                onCtaClick = {
+                                    if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
+                                },
+                                ctaEnabled = cta.enabled,
+                                hint = cta.hint,
+                                hintColor = cta.hintColor,
+                                showHintIcon = cta.hint != null,
+                                progressText = cta.progressText,
+                                progressSegments = cta.progressSegments,
                             )
                         }
-                        BottomActionBar(
-                            ctaText = cta.text,
-                            ctaIcon = cta.icon,
-                            onCtaClick = {
-                                if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
-                            },
-                            ctaEnabled = cta.enabled,
-                            hint = cta.hint,
-                            hintColor = cta.hintColor,
-                            showHintIcon = cta.hint != null,
-                            progressText = cta.progressText,
-                            progressSegments = cta.progressSegments,
-                        )
                     }
                 }
-            }
-        },
-    ) { contentPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            when (uiState) {
-                is WorkOrderDetailUiState.Loading -> LoadingState()
-                is WorkOrderDetailUiState.Success ->
-                    WorkOrderDetailContent(
-                        state = uiState,
-                        onBack = onBack,
-                        onNavigateFault = onNavigateFault,
-                        onReportNoteChanged = onReportNoteChanged,
-                        onMaterialsUsedChanged = onMaterialsUsedChanged,
-                        onFaultOutcomeSelected = onFaultOutcomeSelected,
-                        onCaptureEvidence = onCaptureEvidence,
-                        onRetakeEvidence = onRetakeEvidence,
-                    )
-                is WorkOrderDetailUiState.Empty ->
-                    MessageState(
-                        icon = Icons.Filled.Assignment,
-                        iconColors = SyncStatus.DONE.badgeColors(),
-                        title = "Không tìm thấy lệnh này",
-                        subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
-                        action = {},
-                    )
-                is WorkOrderDetailUiState.Error ->
-                    MessageState(
-                        icon = Icons.Filled.CloudOff,
-                        iconColors = SyncStatus.FAILED.badgeColors(),
-                        title = uiState.message,
-                        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                        action = {},
-                    )
+            },
+        ) { contentPadding ->
+            Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+                when (uiState) {
+                    is WorkOrderDetailUiState.Loading -> LoadingState()
+                    is WorkOrderDetailUiState.Success ->
+                        WorkOrderDetailContent(
+                            state = uiState,
+                            onBack = onBack,
+                            onNavigateFault = onNavigateFault,
+                            onReportNoteChanged = onReportNoteChanged,
+                            onMaterialsUsedChanged = onMaterialsUsedChanged,
+                            onFaultOutcomeSelected = onFaultOutcomeSelected,
+                            onCaptureEvidence = onCaptureEvidence,
+                            onRetakeEvidence = onRetakeEvidence,
+                        )
+                    is WorkOrderDetailUiState.Empty ->
+                        MessageState(
+                            icon = Icons.Filled.Assignment,
+                            iconColors = SyncStatus.DONE.badgeColors(),
+                            title = "Không tìm thấy lệnh này",
+                            subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
+                            action = {},
+                        )
+                    is WorkOrderDetailUiState.Error ->
+                        MessageState(
+                            icon = Icons.Filled.CloudOff,
+                            iconColors = SyncStatus.FAILED.badgeColors(),
+                            title = uiState.message,
+                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
+                            action = {},
+                        )
+                }
             }
         }
+        TopSlideToast(
+            state = toastState,
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        )
     }
 
     if (showSubmitConfirm && uiState is WorkOrderDetailUiState.Success) {
@@ -277,9 +288,7 @@ fun WorkOrderDetailScreen(
                 showSubmitConfirm = false
                 onSubmit()
                 scope.launch {
-                    snackbarHostState.showSnackbar(
-                        "Nộp báo cáo thành công · Chờ Kỹ sư bảo trì duyệt",
-                    )
+                    toastState.show("Nộp báo cáo thành công · Chờ Kỹ sư bảo trì duyệt")
                 }
             },
         )
@@ -299,7 +308,7 @@ fun WorkOrderDetailScreen(
         if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
             showCancelSheet = false
             scope.launch {
-                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt")
+                toastState.show("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt")
             }
         }
     }
@@ -546,10 +555,11 @@ private fun SubmitConfirmationSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    contentPadding = PaddingValues(horizontal = Spacing.sm),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Kiểm tra lại")
+                    Text("Kiểm tra lại", maxLines = 1)
                 }
                 Button(
                     onClick = onConfirm,
@@ -710,13 +720,6 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
-    val due = dueDateLabel(detail.dueDate)
-    val dueColor =
-        when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
-            else -> MaterialTheme.colorScheme.onSurface
-        }
     val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     Column(
@@ -729,12 +732,6 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SummaryMetricCell(
-                label = "Hạn xử lý",
-                value = due.text,
-                valueColor = dueColor,
-                modifier = Modifier.weight(1f),
-            )
             SummaryMetricCell(
                 label = scheduleLabel,
                 value = scheduleValue,
