@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
@@ -87,6 +88,7 @@ fun SurveyHubRoute(
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
+    highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
 ) {
@@ -138,6 +140,7 @@ fun SurveyHubRoute(
                 state = uiState,
                 onCheckReadiness = onCheckReadiness,
                 onCapturePolePhotos = onCapturePolePhotos,
+                highlightWorkOrderId = highlightWorkOrderId,
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
                 onStartRoute = viewModel::onStartRoute,
@@ -153,6 +156,7 @@ fun SurveyHubScreen(
     state: SurveyHubUiState,
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
+    highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onStartRoute: (workOrderId: String, destination: SurveyRouteStartDestination) -> Unit = { _, _ -> },
@@ -194,6 +198,7 @@ fun SurveyHubScreen(
                             onReviewAiConfirmation = onReviewAiConfirmation,
                             onResurvey = onResurvey,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
+                            highlightWorkOrderId = highlightWorkOrderId,
                         )
 
                     is SurveyHubUiState.Empty ->
@@ -372,12 +377,27 @@ private fun SurveyHubContent(
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
+    highlightWorkOrderId: String? = null,
 ) {
     val hasAttentionCards =
         state.rejectedSweeps.isNotEmpty() ||
             state.pendingAiConfirmation.isNotEmpty() ||
             state.uploadingSessions.isNotEmpty()
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.assignedRoutes, highlightWorkOrderId) {
+        val routeIndex = state.assignedRoutes.indexOfFirst { it.workOrderId == highlightWorkOrderId }
+        if (routeIndex == -1) return@LaunchedEffect
+        var index = 0
+        if (state.isStale) index++
+        if (state.startError != null) index++
+        if (hasAttentionCards) {
+            index += 1 + state.rejectedSweeps.size + state.pendingAiConfirmation.size + state.uploadingSessions.size
+        }
+        index++
+        listState.animateScrollToItem(index + routeIndex)
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -417,6 +437,7 @@ private fun SurveyHubContent(
                     isStarting = state.startingWorkOrderId == route.workOrderId,
                     isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
                     isLocallyCompleted = route.workOrderId in state.locallyCompletedWorkOrderIds,
+                    isHighlighted = route.workOrderId == highlightWorkOrderId,
                     onCheckReadiness = { onCheckReadiness(route.workOrderId) },
                     onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
                     onStartForPoleCapture = {
@@ -568,6 +589,7 @@ private fun AssignedRouteCard(
     onStartForPoleCapture: () -> Unit,
     onStartForReadinessCheck: () -> Unit,
     onRequestCancellation: () -> Unit,
+    isHighlighted: Boolean = false,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
     // Same rule WorkOrderDetailScreen (F09) uses (CLAUDE.md WO-CANCEL-REQUEST): only while
@@ -582,7 +604,10 @@ private fun AssignedRouteCard(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surface),
+                .background(MaterialTheme.colorScheme.surface)
+                .let {
+                    if (isHighlighted) it.border(2.dp, Navy700, RoundedCornerShape(Radius.card)) else it
+                },
     ) {
         // Navy header block (route id + commune, status, title) - matches the mock's card
         // header, which groups the "which route, what state" info on its own dark band instead
@@ -720,7 +745,7 @@ private fun AssignedRouteCard(
                             when {
                                 isStarting -> "Đang bắt đầu…"
                                 status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
-                                status == WorkOrderStatus.IN_PROGRESS -> "Tiếp tục"
+                                status == WorkOrderStatus.IN_PROGRESS -> "Chụp ảnh/video từng cột"
                                 else -> "Đã hoàn tất"
                             },
                     )
