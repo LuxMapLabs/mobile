@@ -539,10 +539,11 @@ private fun CompleteSurveyConfirmSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    contentPadding = PaddingValues(horizontal = Spacing.sm),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Kiểm tra lại")
+                    Text("Kiểm tra lại", maxLines = 1)
                 }
                 PrimaryButton(
                     text = "Hoàn tất",

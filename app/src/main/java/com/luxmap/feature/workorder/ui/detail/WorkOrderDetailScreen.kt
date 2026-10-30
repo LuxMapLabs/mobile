@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -132,7 +133,6 @@ import com.luxmap.core.ui.components.OutcomeSegment
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.RequirementList
 import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
@@ -546,10 +546,11 @@ private fun SubmitConfirmationSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+                    contentPadding = PaddingValues(horizontal = Spacing.sm),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
-                    Text("Kiểm tra lại")
+                    Text("Kiểm tra lại", maxLines = 1)
                 }
                 Button(
                     onClick = onConfirm,
@@ -710,13 +711,6 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val overallPriority = detail.faults.maxOfOrNull { severityFromWire(it.severity) }
-    val due = dueDateLabel(detail.dueDate)
-    val dueColor =
-        when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
-            else -> MaterialTheme.colorScheme.onSurface
-        }
     val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     Column(
@@ -729,12 +723,6 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SummaryMetricCell(
-                label = "Hạn xử lý",
-                value = due.text,
-                valueColor = dueColor,
-                modifier = Modifier.weight(1f),
-            )
             SummaryMetricCell(
                 label = scheduleLabel,
                 value = scheduleValue,

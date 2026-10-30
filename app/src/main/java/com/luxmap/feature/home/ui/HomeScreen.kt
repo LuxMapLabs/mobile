@@ -751,7 +751,11 @@ private fun TaskRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(text = item.workOrderId, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-                StatusBadge(text = status.label(), colors = status.badgeColors())
+                // "Assigned" is the default state every task starts in here, so the badge is
+                // only useful once the engineer is actually working on it.
+                if (status != WorkOrderStatus.ASSIGNED) {
+                    StatusBadge(text = status.label(), colors = status.badgeColors())
+                }
             }
             Text(
                 text = "${kind.label()} · $clusterLabel",
