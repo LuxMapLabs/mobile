@@ -212,7 +212,7 @@ fun WorkOrderDetailScreen(
                             val showCancelRequest =
                                 "request_cancellation" in uiState.detail.allowedActions &&
                                     scheduleWindow.canActOnSchedule &&
-                                    uiState.localCompletion?.submitStatus != "pending"
+                                    (uiState.localCompletion == null || isReturnedForRework(uiState))
                             if (showCancelRequest) {
                                 CancelRequestButton(
                                     onClick = { showCancelSheet = true },
@@ -326,6 +326,11 @@ private data class WorkOrderCtaState(
     val requiresConfirmation: Boolean = false,
 )
 
+private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean =
+    !state.justSubmitted &&
+        workOrderStatusFromWire(state.detail.woStatus) == WorkOrderStatus.IN_PROGRESS &&
+        !state.detail.reviewNote.isNullOrBlank()
+
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
 // redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
 // the old layout's separate inline buttons for each case.
@@ -358,17 +363,7 @@ private fun workOrderCtaState(
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
                 hintColor = Gray500,
             )
-        // A completion was just saved locally (tapping the button writes it immediately,
-        // offline-first) - lock the CTA right away instead of leaving it looking tappable until
-        // the screen is reopened and detail.allowedActions is refetched from the server. Without
-        // this, a field engineer who taps again (since nothing visibly changed) just gets a 409
-        // from the server, which is confusing and looks like the button does nothing.
-        //
-        // Only "pending" locks it - a manager can return a completed order for rework, which
-        // puts "complete" back in allowedActions while the OLD completion row is still sitting
-        // in Room as "synced". Checking localCompletion != null here would lock the CTA forever
-        // after a return, since nothing ever deletes that stale row.
-        "complete" in detail.allowedActions && state.localCompletion?.submitStatus == "pending" ->
+        "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
             WorkOrderCtaState(
                 text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
                 icon = Icons.Filled.HourglassTop,
@@ -589,9 +584,10 @@ private fun WorkOrderDetailContent(
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val canComplete = "complete" in detail.allowedActions && state.localCompletion?.submitStatus != "pending"
+    val hasActiveLocalCompletion = state.localCompletion != null && !isReturnedForRework(state)
+    val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        WorkOrderHeroSection(detail = detail, onBack = onBack)
+        WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
         // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top technique F02
         // uses, so this sheet reads as floating over the navy hero instead of a hard seam.
         Column(
@@ -660,6 +656,7 @@ private fun WorkOrderDetailContent(
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
+    showSubmittedBadge: Boolean,
     onBack: () -> Unit,
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
@@ -706,7 +703,9 @@ private fun WorkOrderHeroSection(
                         text = kind.label(),
                         colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
                     )
-                    if (status != WorkOrderStatus.ASSIGNED) {
+                    if (showSubmittedBadge) {
+                        StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                    } else if (status != WorkOrderStatus.ASSIGNED) {
                         StatusBadge(text = status.label(), colors = status.badgeColors())
                     }
                 }
@@ -1109,7 +1108,8 @@ private fun RepairCompletionSection(
                 value = state.reportNote,
                 onValueChange = onReportNoteChanged,
                 label = { Text("Kết quả sửa chữa") },
-                singleLine = true,
+                minLines = 2,
+                maxLines = 5,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -1123,7 +1123,7 @@ private fun RepairCompletionSection(
                 value = state.materialsUsed,
                 onValueChange = onMaterialsUsedChanged,
                 label = { Text("Vật tư đã dùng (không bắt buộc)") },
-                singleLine = true,
+                maxLines = 4,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier.fillMaxWidth(),
@@ -1238,7 +1238,8 @@ private fun InspectionCompletionSection(
             value = state.reportNote,
             onValueChange = onReportNoteChanged,
             label = { Text("Ghi chú kiểm tra") },
-            singleLine = true,
+            minLines = 2,
+            maxLines = 5,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             modifier = Modifier.fillMaxWidth(),

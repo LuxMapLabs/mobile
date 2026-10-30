@@ -127,7 +127,7 @@ class WorkOrderDetailViewModel
         fun submit() {
             val current = _uiState.value
             if (current !is WorkOrderDetailUiState.Success || !current.canSubmit() || current.isSubmitting) return
-            _uiState.value = current.copy(isSubmitting = true, submitError = null)
+            _uiState.value = current.copy(isSubmitting = true, submitError = null, justSubmitted = true)
             viewModelScope.launch {
                 val faultOutcomes =
                     if (current.detail.taskKind == "inspection" && current.detail.faults.isNotEmpty()) {
