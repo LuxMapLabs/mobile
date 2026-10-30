@@ -825,10 +825,17 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
             )
         }
         if (!detail.reviewNote.isNullOrBlank()) {
-            InlineBanner(
-                message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
-                tone = InlineBannerTone.ERROR,
-            )
+            if (status == WorkOrderStatus.IN_PROGRESS) {
+                InlineBanner(
+                    message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
+                    tone = InlineBannerTone.ERROR,
+                )
+            } else {
+                InlineBanner(
+                    message = "Ghi chú của Manager: ${detail.reviewNote}",
+                    tone = InlineBannerTone.OFFLINE,
+                )
+            }
         }
         when (detail.cancellationRequestStatus) {
             "pending" ->
