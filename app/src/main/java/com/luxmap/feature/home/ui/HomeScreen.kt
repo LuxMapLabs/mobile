@@ -206,6 +206,7 @@ fun HomeScreen(
                             data = uiState.data,
                             isStale = uiState.isStale,
                             lastSyncedAt = uiState.lastSyncedAt,
+                            locallyCompletedWorkOrderIds = uiState.locallyCompletedWorkOrderIds,
                             onOpenWorkOrder = onOpenWorkOrder,
                         )
                     is HomeUiState.Empty -> EmptyState(onStartSurvey = onStartSurvey)
@@ -224,6 +225,7 @@ private fun HomeContent(
     data: HomeData,
     isStale: Boolean,
     lastSyncedAt: Instant?,
+    locallyCompletedWorkOrderIds: Set<String>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
     var selectedTab by remember { mutableStateOf(TaskFilterTab.ALL) }
@@ -276,6 +278,7 @@ private fun HomeContent(
                         bucket = bucket,
                         items = remaining,
                         clusterLabelOf = data::clusterLabelFor,
+                        locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
                 }
@@ -673,6 +676,7 @@ private fun DeadlineGroupSection(
     bucket: DeadlineBucket,
     items: List<WorkOrderSummaryItem>,
     clusterLabelOf: (workOrderId: String) -> String,
+    locallyCompletedWorkOrderIds: Set<String>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -695,6 +699,7 @@ private fun DeadlineGroupSection(
                 TaskRow(
                     item = item,
                     clusterLabel = clusterLabelOf(item.workOrderId),
+                    isLocallyCompleted = item.workOrderId in locallyCompletedWorkOrderIds,
                     onClick = { onOpenWorkOrder(item.workOrderId) },
                 )
             }
@@ -706,6 +711,7 @@ private fun DeadlineGroupSection(
 private fun TaskRow(
     item: WorkOrderSummaryItem,
     clusterLabel: String,
+    isLocallyCompleted: Boolean,
     onClick: () -> Unit,
 ) {
     val kind = workOrderTaskKindFromWire(item.taskKind)
@@ -751,9 +757,9 @@ private fun TaskRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(text = item.workOrderId, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-                // "Assigned" is the default state every task starts in here, so the badge is
-                // only useful once the engineer is actually working on it.
-                if (status != WorkOrderStatus.ASSIGNED) {
+                if (isLocallyCompleted) {
+                    StatusBadge(text = "Đã nộp · chờ đồng bộ", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+                } else if (status != WorkOrderStatus.ASSIGNED) {
                     StatusBadge(text = status.label(), colors = status.badgeColors())
                 }
             }
