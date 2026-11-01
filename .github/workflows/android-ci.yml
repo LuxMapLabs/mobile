@@ -32,3 +32,17 @@ jobs:
 
       - name: Run ktlint
         run: ./gradlew ktlintCheck
+
+      - name: Run unit tests
+        timeout-minutes: 15
+        run: ./gradlew testLocalDebugUnitTest --continue
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: |
+            app/build/reports/tests/testLocalDebugUnitTest/**
+            app/build/test-results/testLocalDebugUnitTest/*.xml
+          retention-days: 14
