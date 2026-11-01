@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.capture
 
 import android.view.Surface
+import androidx.lifecycle.viewModelScope
 import app.cash.turbine.test
 import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.ble.LuxDevice
@@ -24,6 +25,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -287,6 +289,7 @@ class CaptureViewModelTest {
                 assertEquals(false, recording.gpsSignalLost)
             }
             verify { controller.startSession(any(), "SWEEP-1", "WO-1", SENSOR_1.address, surface) }
+            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -386,23 +389,17 @@ class CaptureViewModelTest {
                     gpsSignalState = gpsSignalState,
                     recordingStartResult = recordingStartResult,
                 )
+            startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            viewModel.uiState.test {
-                awaitItem() // Scanning() field default
-                awaitItem() // Connecting
-                awaitItem() // Ready
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
-                awaitItem() // StartingRecording
-                viewModel.onPreviewSurfaceReady(mockk())
-                recordingStartResult.value = RecordingStartResult.Ready
-                val recording = awaitItem() as CaptureUiState.Recording
-                assertEquals(false, recording.gpsSignalLost)
+            val recording = viewModel.uiState.value as CaptureUiState.Recording
+            assertEquals(false, recording.gpsSignalLost)
 
-                gpsSignalState.value = GpsSignalState.Lost
+            gpsSignalState.value = GpsSignalState.Lost
+            dispatcher.scheduler.runCurrent()
 
-                val warned = awaitItem() as CaptureUiState.Recording
-                assertEquals(true, warned.gpsSignalLost)
-            }
+            val warned = viewModel.uiState.value as CaptureUiState.Recording
+            assertEquals(true, warned.gpsSignalLost)
+            viewModel.viewModelScope.cancel()
         }
 
     // Drives the ViewModel from Ready through StartingRecording into Recording, the same
@@ -446,6 +443,7 @@ class CaptureViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state is CaptureUiState.Recording)
             assertEquals(42.5f, (state as CaptureUiState.Recording).latestLuxValue)
+            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -473,6 +471,7 @@ class CaptureViewModelTest {
             assertEquals(7.5f, state.gpsAccuracyMeters)
             assertEquals(90f, state.headingDeg)
             assertEquals(123f, state.distanceMeters)
+            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -493,6 +492,7 @@ class CaptureViewModelTest {
 
             val state = viewModel.uiState.value as CaptureUiState.Recording
             assertEquals(3L, state.durationSeconds)
+            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -513,6 +513,7 @@ class CaptureViewModelTest {
 
             val state = viewModel.uiState.value as CaptureUiState.Recording
             assertEquals(2_000_000_000L, state.freeStorageBytes)
+            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -535,6 +536,7 @@ class CaptureViewModelTest {
                 dispatcher.scheduler.runCurrent()
                 assertEquals(Unit, awaitItem())
             }
+            viewModel.viewModelScope.cancel()
         }
 
     // Seeding gpsSignalState at Lost from the start (like the test above seeds Ok) would be wrong
@@ -574,5 +576,6 @@ class CaptureViewModelTest {
                 dispatcher.scheduler.runCurrent()
                 expectNoEvents()
             }
+            viewModel.viewModelScope.cancel()
         }
 }
