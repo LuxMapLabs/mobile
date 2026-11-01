@@ -103,6 +103,13 @@ android {
             excludes += "/META-INF/NOTICE.txt"
         }
     }
+
+    testOptions {
+        unitTests.all {
+            it.maxParallelForks = 1
+            it.maxHeapSize = "1536m"
+        }
+    }
 }
 
 dependencies {
