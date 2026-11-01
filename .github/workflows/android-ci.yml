@@ -46,3 +46,30 @@ jobs:
             app/build/reports/tests/testLocalDebugUnitTest/**
             app/build/test-results/testLocalDebugUnitTest/*.xml
           retention-days: 14
+
+  build-apk:
+    name: Build Debug APK
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build server-flavor debug APK
+        run: ./gradlew assembleServerDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: luxmap-server-debug-${{ github.sha }}
+          path: app/build/outputs/apk/server/debug/*.apk
+          retention-days: 14
