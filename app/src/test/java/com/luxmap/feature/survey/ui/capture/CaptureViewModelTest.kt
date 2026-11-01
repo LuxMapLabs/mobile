@@ -275,21 +275,24 @@ class CaptureViewModelTest {
                 )
             val surface = mockk<Surface>()
 
-            viewModel.uiState.test {
-                awaitItem() // Scanning() field default
-                awaitItem() // Connecting
-                assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
+            try {
+                viewModel.uiState.test {
+                    awaitItem() // Scanning() field default
+                    awaitItem() // Connecting
+                    assertEquals(CaptureUiState.Ready(gpsReadyToRecord = true, gpsAccuracyMeters = 5f), awaitItem())
 
-                viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
-                assertEquals(CaptureUiState.StartingRecording, awaitItem())
+                    viewModel.onStartRecording(surveySweepId = "SWEEP-1", workOrderId = "WO-1")
+                    assertEquals(CaptureUiState.StartingRecording, awaitItem())
 
-                viewModel.onPreviewSurfaceReady(surface)
-                recordingStartResult.value = RecordingStartResult.Ready
-                val recording = awaitItem() as CaptureUiState.Recording
-                assertEquals(false, recording.gpsSignalLost)
+                    viewModel.onPreviewSurfaceReady(surface)
+                    recordingStartResult.value = RecordingStartResult.Ready
+                    val recording = awaitItem() as CaptureUiState.Recording
+                    assertEquals(false, recording.gpsSignalLost)
+                }
+                verify { controller.startSession(any(), "SWEEP-1", "WO-1", SENSOR_1.address, surface) }
+            } finally {
+                viewModel.viewModelScope.cancel()
             }
-            verify { controller.startSession(any(), "SWEEP-1", "WO-1", SENSOR_1.address, surface) }
-            viewModel.viewModelScope.cancel()
         }
 
     @Test
@@ -391,15 +394,18 @@ class CaptureViewModelTest {
                 )
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            val recording = viewModel.uiState.value as CaptureUiState.Recording
-            assertEquals(false, recording.gpsSignalLost)
+            try {
+                val recording = viewModel.uiState.value as CaptureUiState.Recording
+                assertEquals(false, recording.gpsSignalLost)
 
-            gpsSignalState.value = GpsSignalState.Lost
-            dispatcher.scheduler.runCurrent()
+                gpsSignalState.value = GpsSignalState.Lost
+                dispatcher.scheduler.runCurrent()
 
-            val warned = viewModel.uiState.value as CaptureUiState.Recording
-            assertEquals(true, warned.gpsSignalLost)
-            viewModel.viewModelScope.cancel()
+                val warned = viewModel.uiState.value as CaptureUiState.Recording
+                assertEquals(true, warned.gpsSignalLost)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
         }
 
     // Drives the ViewModel from Ready through StartingRecording into Recording, the same
@@ -437,13 +443,16 @@ class CaptureViewModelTest {
             every { luxClient.samples } returns samples
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            samples.emit(LuxSample(sampleNo = 0, moduleEpoch = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
-            dispatcher.scheduler.runCurrent()
+            try {
+                samples.emit(LuxSample(sampleNo = 0, moduleEpoch = 0, moduleMs = 0, phoneElapsedNs = 0, lux = 42.5f))
+                dispatcher.scheduler.runCurrent()
 
-            val state = viewModel.uiState.value
-            assertTrue(state is CaptureUiState.Recording)
-            assertEquals(42.5f, (state as CaptureUiState.Recording).latestLuxValue)
-            viewModel.viewModelScope.cancel()
+                val state = viewModel.uiState.value
+                assertTrue(state is CaptureUiState.Recording)
+                assertEquals(42.5f, (state as CaptureUiState.Recording).latestLuxValue)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
         }
 
     @Test
@@ -463,15 +472,19 @@ class CaptureViewModelTest {
             every { controller.distanceMeters } returns distanceMeters
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            liveGpsPoint.value = TrackPoint(0L, 10.0, 106.0, accuracyM = 7.5f, gpsBearingDeg = 90f, speedMps = null)
-            distanceMeters.value = 123f
-            dispatcher.scheduler.runCurrent()
+            try {
+                liveGpsPoint.value =
+                    TrackPoint(0L, 10.0, 106.0, accuracyM = 7.5f, gpsBearingDeg = 90f, speedMps = null)
+                distanceMeters.value = 123f
+                dispatcher.scheduler.runCurrent()
 
-            val state = viewModel.uiState.value as CaptureUiState.Recording
-            assertEquals(7.5f, state.gpsAccuracyMeters)
-            assertEquals(90f, state.headingDeg)
-            assertEquals(123f, state.distanceMeters)
-            viewModel.viewModelScope.cancel()
+                val state = viewModel.uiState.value as CaptureUiState.Recording
+                assertEquals(7.5f, state.gpsAccuracyMeters)
+                assertEquals(90f, state.headingDeg)
+                assertEquals(123f, state.distanceMeters)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
         }
 
     @Test
@@ -487,12 +500,15 @@ class CaptureViewModelTest {
                 )
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            dispatcher.scheduler.advanceTimeBy(3_000)
-            dispatcher.scheduler.runCurrent()
+            try {
+                dispatcher.scheduler.advanceTimeBy(3_000)
+                dispatcher.scheduler.runCurrent()
 
-            val state = viewModel.uiState.value as CaptureUiState.Recording
-            assertEquals(3L, state.durationSeconds)
-            viewModel.viewModelScope.cancel()
+                val state = viewModel.uiState.value as CaptureUiState.Recording
+                assertEquals(3L, state.durationSeconds)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
         }
 
     @Test
@@ -511,9 +527,12 @@ class CaptureViewModelTest {
                 )
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            val state = viewModel.uiState.value as CaptureUiState.Recording
-            assertEquals(2_000_000_000L, state.freeStorageBytes)
-            viewModel.viewModelScope.cancel()
+            try {
+                val state = viewModel.uiState.value as CaptureUiState.Recording
+                assertEquals(2_000_000_000L, state.freeStorageBytes)
+            } finally {
+                viewModel.viewModelScope.cancel()
+            }
         }
 
     @Test
@@ -531,12 +550,15 @@ class CaptureViewModelTest {
             every { controller.gpsSignalState } returns gpsSignalState
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            viewModel.warningPulses.test {
-                gpsSignalState.value = GpsSignalState.Lost
-                dispatcher.scheduler.runCurrent()
-                assertEquals(Unit, awaitItem())
+            try {
+                viewModel.warningPulses.test {
+                    gpsSignalState.value = GpsSignalState.Lost
+                    dispatcher.scheduler.runCurrent()
+                    assertEquals(Unit, awaitItem())
+                }
+            } finally {
+                viewModel.viewModelScope.cancel()
             }
-            viewModel.viewModelScope.cancel()
         }
 
     // Seeding gpsSignalState at Lost from the start (like the test above seeds Ok) would be wrong
@@ -563,19 +585,22 @@ class CaptureViewModelTest {
             every { controller.gpsSignalState } returns gpsSignalState
             startRecordingAndReachRecordingState(viewModel, recordingStartResult)
 
-            viewModel.warningPulses.test {
-                gpsSignalState.value = GpsSignalState.Lost // real transition - exactly one pulse expected
-                dispatcher.scheduler.runCurrent()
-                awaitItem()
+            try {
+                viewModel.warningPulses.test {
+                    gpsSignalState.value = GpsSignalState.Lost // real transition - exactly one pulse expected
+                    dispatcher.scheduler.runCurrent()
+                    awaitItem()
 
-                // Same value written again - a StateFlow conflates equal values and never
-                // re-delivers them to collect, so this never even reaches the pulse guard in
-                // CaptureViewModel. Checking it anyway matches what a caller of warningPulses
-                // actually observes: no second pulse while the signal stays lost.
-                gpsSignalState.value = GpsSignalState.Lost
-                dispatcher.scheduler.runCurrent()
-                expectNoEvents()
+                    // Same value written again - a StateFlow conflates equal values and never
+                    // re-delivers them to collect, so this never even reaches the pulse guard in
+                    // CaptureViewModel. Checking it anyway matches what a caller of warningPulses
+                    // actually observes: no second pulse while the signal stays lost.
+                    gpsSignalState.value = GpsSignalState.Lost
+                    dispatcher.scheduler.runCurrent()
+                    expectNoEvents()
+                }
+            } finally {
+                viewModel.viewModelScope.cancel()
             }
-            viewModel.viewModelScope.cancel()
         }
 }

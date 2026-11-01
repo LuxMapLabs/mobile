@@ -73,3 +73,4 @@ jobs:
           name: luxmap-server-debug-${{ github.sha }}
           path: app/build/outputs/apk/server/debug/*.apk
           retention-days: 14
+          if-no-files-found: error
