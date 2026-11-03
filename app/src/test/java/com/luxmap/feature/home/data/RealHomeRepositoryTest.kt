@@ -30,8 +30,9 @@ class RealHomeRepositoryTest {
                 communeIds = listOf("COM-001"),
             )
         val workOrdersApi = mockk<WorkOrdersApi>()
-        coEvery { workOrdersApi.list(assignedTo = USER_ID, page = 1, pageSize = 200) } returns
-            PagedResultDto(page = 1, pageSize = 200, total = items.size, items = items)
+        coEvery {
+            workOrdersApi.list(assignedTo = USER_ID, woStatus = "assigned,in_progress", page = 1, pageSize = 200)
+        } returns PagedResultDto(page = 1, pageSize = 200, total = items.size, items = items)
         return RealHomeRepository(userApi, workOrdersApi)
     }
 
