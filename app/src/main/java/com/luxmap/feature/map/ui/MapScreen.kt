@@ -69,6 +69,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.luxmap.core.map.IOT_BADGE_ICON_ID
 import com.luxmap.core.map.MAP_STYLE_URL
+import com.luxmap.core.map.MARKER_BADGE_DIM_ICON_ID
+import com.luxmap.core.map.MARKER_BADGE_OUT_ICON_ID
+import com.luxmap.core.map.MARKER_BADGE_UNKNOWN_ICON_ID
 import com.luxmap.core.map.POI_BADGE_ICON_ID
 import com.luxmap.core.map.VECTOR_STYLE_URL
 import com.luxmap.core.map.markerColorArgb
@@ -116,6 +119,7 @@ private const val POLES_GLOW_CIRCLE_LAYER_ID = "poles-glow-circle-layer"
 // type name.
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
 private const val POLES_SELECTED_HALO_LAYER_ID = "poles-selected-halo-layer"
+private const val POLES_STATUS_BADGE_LAYER_ID = "poles-status-badge-layer"
 private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
 private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
@@ -125,9 +129,8 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 // halo layer's filter value when nothing is selected, so it matches zero features.
 private const val NO_SELECTION_SENTINEL = ""
 
-// Marker icons are 24dp source vectors (see ic_marker_*.xml), so size 1.0f renders at their full
-// 24dp and 1.3f at ~31dp for the selected pole — bumped up from the original 0.5f/0.75f, which
-// made the icon detail (checkmark/x shape) too small to read on a real device.
+// Marker icons are 28x35dp pin-shaped source vectors (see ic_marker_*.xml, Icon Cot Den Map
+// design), so size 1.0f renders at their full 28x35dp and 1.3f at ~36x45dp for the selected pole.
 private const val MARKER_ICON_SIZE = 1.0f
 private const val MARKER_ICON_SIZE_SELECTED = 1.3f
 private const val SELECTED_HALO_RADIUS = 20f
@@ -803,6 +806,7 @@ private fun setupMapLayers(
     style.addLayer(buildPoleSelectedHaloLayer())
     style.addLayer(buildPoleGlowCircleLayer())
     style.addLayer(buildPoleIconLayer())
+    style.addLayer(buildStatusBadgeLayer())
     style.addLayer(buildPoiBadgeLayer())
     style.addLayer(buildIotBadgeLayer())
 
@@ -904,6 +908,7 @@ private fun applyLayerVisibility(
     style.getLayer(POLES_SELECTED_HALO_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_GLOW_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
+    style.getLayer(POLES_STATUS_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_POI_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
     style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
@@ -951,22 +956,23 @@ private fun buildPoleIconLayer(): SymbolLayer =
                 ),
             ),
             PropertyFactory.iconSize(selectedIconSizeExpression(NO_SELECTION_SENTINEL)),
+            // Icon Cot Den Map design (2026-11-04): the pin's point (not its center) is now the
+            // actual geo-coordinate, since the icon switched from a centered dot to a teardrop pin.
+            PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
 
-// Ring drawn only around the currently selected pole (F12/FM-37: "marker được chọn lớn hơn và có
-// halo") — filtered to a single pole_id, re-applied whenever the selection changes (see
-// updateSelectedPoleStyle). Starts filtered to NO_SELECTION_SENTINEL so it draws nothing before
-// anything is selected.
+// Soft status-colored shadow at the selected pin's tip (Icon Cot Den Map design, 2026-11-04,
+// replaces the old white-fill/colored-stroke ring) — filtered to a single pole_id, re-applied
+// whenever the selection changes (see updateSelectedPoleStyle). Starts filtered to
+// NO_SELECTION_SENTINEL so it draws nothing before anything is selected.
 private fun buildPoleSelectedHaloLayer(): CircleLayer =
     CircleLayer(POLES_SELECTED_HALO_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.circleRadius(SELECTED_HALO_RADIUS),
-            PropertyFactory.circleColor("#FFFFFFFF"),
-            PropertyFactory.circleOpacity(0.25f),
-            PropertyFactory.circleStrokeWidth(2f),
-            PropertyFactory.circleStrokeColor(
+            PropertyFactory.circleOpacity(0.35f),
+            PropertyFactory.circleColor(
                 Expression.match(
                     Expression.get("fixture_status"),
                     Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
@@ -1000,19 +1006,48 @@ private fun updateSelectedPoleStyle(
     (style.getLayer(POLES_SELECTED_HALO_LAYER_ID) as? CircleLayer)?.setFilter(selectedPoleFilter(id))
 }
 
-// "Near sensitive area" badge (F12, near_sensitive_poi) — top-right corner of the dot. IoT
-// badge goes bottom-right so a pole that is both near a POI and has an IoT node doesn't overlap
-// badges. Badge icons are 24dp source vectors too, same as the marker, so 0.7f here against
+// Status badge (Icon Cot Den Map design, 2026-11-04) — dim/out/unknown only, normal has none
+// (see the match's default: "unknown" covers both the literal unknown status and any other
+// value, same fallback pattern as buildPoleGlowCircleLayer above). Sits at the pin's top-right
+// corner, offset computed from the pin's new bottom anchor up to the white circle's top-right
+// edge — approximate, tune after a real-device check.
+private fun buildStatusBadgeLayer(): SymbolLayer =
+    SymbolLayer(POLES_STATUS_BADGE_LAYER_ID, POLES_SOURCE_ID)
+        .withProperties(
+            PropertyFactory.iconImage(
+                Expression.match(
+                    Expression.get("fixture_status"),
+                    Expression.literal(MARKER_BADGE_UNKNOWN_ICON_ID),
+                    Expression.stop("dim", Expression.literal(MARKER_BADGE_DIM_ICON_ID)),
+                    Expression.stop("out", Expression.literal(MARKER_BADGE_OUT_ICON_ID)),
+                ),
+            ),
+            PropertyFactory.iconSize(0.7f),
+            PropertyFactory.iconOffset(arrayOf(10f, -26f)),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+        ).apply {
+            setFilter(
+                Expression.all(
+                    Expression.not(Expression.has("point_count")),
+                    Expression.neq(Expression.get("fixture_status"), Expression.literal("normal")),
+                ),
+            )
+            minZoom = BADGE_MIN_ZOOM
+        }
+
+// "Near sensitive area" badge (F12, near_sensitive_poi) — bottom-right corner of the pin's white
+// circle (moved from top-right in the old center-anchored dot design, since the new status badge
+// now takes that corner). IoT badge goes bottom-left so a pole with both badges doesn't overlap.
+// Badge icons are 24dp source vectors too, same as the marker, so 0.7f here against
 // MARKER_ICON_SIZE = 1.0f keeps the badge at ~70% of the marker's size — big enough to actually
-// read on a real device, still clearly smaller/secondary to the status icon. Offset scaled up to
-// match, so the bigger badge still sits tucked at the marker's corner instead of drifting toward
-// its center.
+// read on a real device, still clearly smaller/secondary to the status icon.
 private fun buildPoiBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(POI_BADGE_ICON_ID),
             PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(9f, -9f)),
+            PropertyFactory.iconOffset(arrayOf(10f, -12f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -1031,7 +1066,7 @@ private fun buildIotBadgeLayer(): SymbolLayer =
         .withProperties(
             PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
             PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(9f, 9f)),
+            PropertyFactory.iconOffset(arrayOf(-10f, -12f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -1066,13 +1101,16 @@ private fun buildClusterOptions(): GeoJsonOptions =
             ),
         )
 
+// Icon Cot Den Map design (2026-11-04): white fill + colored border by max severity (was a flat
+// colored fill before) — border width bumped to 3f so the severity color still reads clearly
+// against a white basemap or satellite imagery.
 private fun buildClusterCircleLayer(): CircleLayer =
     CircleLayer(CLUSTER_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.circleRadius(18f),
-            PropertyFactory.circleStrokeWidth(1.5f),
-            PropertyFactory.circleStrokeColor("#FFFFFF"),
-            PropertyFactory.circleColor(
+            PropertyFactory.circleColor("#FFFFFF"),
+            PropertyFactory.circleStrokeWidth(3f),
+            PropertyFactory.circleStrokeColor(
                 Expression.match(
                     Expression.toNumber(Expression.get(CLUSTER_MAX_SEVERITY_PROPERTY)),
                     Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
@@ -1083,12 +1121,13 @@ private fun buildClusterCircleLayer(): CircleLayer =
             ),
         ).apply { setFilter(Expression.has("point_count")) }
 
+// Count text switches from white to navy to stay readable on the now-white cluster fill.
 private fun buildClusterCountLayer(): SymbolLayer =
     SymbolLayer(CLUSTER_COUNT_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.textField(Expression.toString(Expression.get("point_count"))),
             PropertyFactory.textSize(12f),
-            PropertyFactory.textColor("#FFFFFF"),
+            PropertyFactory.textColor("#FF1F3864"),
             PropertyFactory.textIgnorePlacement(true),
             PropertyFactory.textAllowOverlap(true),
         ).apply { setFilter(Expression.has("point_count")) }
