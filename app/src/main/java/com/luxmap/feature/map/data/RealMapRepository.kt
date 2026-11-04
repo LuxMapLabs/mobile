@@ -6,6 +6,7 @@ import com.luxmap.core.network.errorMessageOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,17 +31,23 @@ class RealMapRepository
     ) : MapRepository {
         override fun observeGisMapDataset(): Flow<GisMapDataset> =
             flow {
-                val mapBounds = userApi.me().mapBounds ?: throw MapBoundsUnavailableException()
-                val bbox = mapBounds.bbox
-                val bboxParam = "${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}"
-
                 try {
+                    val mapBounds = userApi.me().mapBounds ?: throw MapBoundsUnavailableException()
+                    val bbox = mapBounds.bbox
+                    val bboxParam = "${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}"
+
                     val poles = mapApi.poles(bbox = bboxParam).features.map { it.toPoleMarker() }
                     val segments = mapApi.segments(bbox = bboxParam).features.map { it.toRoadSegmentLine() }
                     val center = mapBounds.center.lat to mapBounds.center.lng
                     emit(GisMapDataset(poles = poles, segments = segments, center = center))
+                } catch (e: MapBoundsUnavailableException) {
+                    throw e
                 } catch (e: HttpException) {
                     throw Exception(e.errorMessageOrNull() ?: "Không tải được dữ liệu bản đồ", e)
+                } catch (e: IOException) {
+                    throw Exception("Không có kết nối mạng. Vui lòng kiểm tra lại.", e)
+                } catch (e: Exception) {
+                    throw Exception("Không tải được dữ liệu bản đồ", e)
                 }
             }
     }

@@ -223,6 +223,10 @@ fun MapScreen(
     // True once the camera has been auto-moved to the real map_bounds.center — guards against
     // re-centering every time uiState re-emits (e.g. after a search/filter change).
     var hasCenteredOnRealData by rememberSaveable { mutableStateOf(false) }
+    // True only once the user has actually dragged/pinched the map — distinct from savedCamera,
+    // which also gets set by the idle event the very first programmatic camera placement below
+    // triggers, so savedCamera alone can't tell "the user moved it" from "we moved it".
+    var userMovedCamera by rememberSaveable { mutableStateOf(false) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
@@ -325,6 +329,11 @@ fun MapScreen(
                                     doubleArrayOf(target.latitude, target.longitude, position.zoom, position.bearing)
                             }
                         }
+                        map.addOnCameraMoveStartedListener { reason ->
+                            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                                userMovedCamera = true
+                            }
+                        }
                         val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                         map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
                             setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
@@ -423,7 +432,7 @@ fun MapScreen(
         // camera idle event) and only once, so this never fights a camera position the user chose.
         LaunchedEffect(maplibreMap, uiState) {
             val map = maplibreMap ?: return@LaunchedEffect
-            if (hasCenteredOnRealData || savedCamera != null) return@LaunchedEffect
+            if (hasCenteredOnRealData || userMovedCamera) return@LaunchedEffect
             val center = uiState.centerOrNull() ?: return@LaunchedEffect
             hasCenteredOnRealData = true
             map.cameraPosition =
@@ -680,7 +689,12 @@ fun MapScreen(
             when (uiState) {
                 is MapUiState.Loading -> LoadingOverlay()
                 is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
-                is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
+                is MapUiState.Error ->
+                    MessageOverlay(
+                        text = (uiState as MapUiState.Error).message,
+                        actionLabel = "Thử lại",
+                        onAction = viewModel::retry,
+                    )
                 is MapUiState.Success -> Unit
             }
 

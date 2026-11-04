@@ -132,4 +132,17 @@ class RealMapRepositoryTest {
                 )
             }
         }
+
+    @Test
+    fun `an offline IOException surfaces a friendly network message, not the raw exception text`() =
+        runTest {
+            val (repository, _, mapApi) = repository()
+            coEvery { mapApi.poles(bbox = "105.8,10.5,105.9,10.6") } throws
+                java.io.IOException("Unable to resolve host \"luxmap.com.vn\": No address associated with hostname")
+
+            repository.observeGisMapDataset().test {
+                val error = awaitError()
+                assertEquals("Không có kết nối mạng. Vui lòng kiểm tra lại.", error.message)
+            }
+        }
 }
