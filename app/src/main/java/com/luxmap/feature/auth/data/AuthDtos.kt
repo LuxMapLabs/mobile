@@ -44,6 +44,40 @@ data class CurrentUserResponseDto(
     @SerialName("full_name") val fullName: String,
     val role: String,
     @SerialName("commune_ids") val communeIds: List<String>,
+    val communes: List<CommuneSummaryDto> = emptyList(),
+    @SerialName("map_bounds") val mapBounds: MapBoundsDto? = null,
+)
+
+// COMMUNE-BBOX (luxmap_backend AuthContracts.cs) — a commune as the signed-in user sees it.
+// bbox/center are null until a System Admin sets a frame for that commune on Web GIS.
+@Serializable
+data class CommuneSummaryDto(
+    @SerialName("commune_id") val communeId: String,
+    val name: String,
+    val bbox: CommuneBboxDto? = null,
+    val center: MapCenterDto? = null,
+)
+
+// The union box over every commune the caller is assigned to, plus its centre point — the one
+// bbox GET /map/poles and GET /map/segments need (see RealMapRepository, FM-15).
+@Serializable
+data class MapBoundsDto(
+    val bbox: CommuneBboxDto,
+    val center: MapCenterDto,
+)
+
+@Serializable
+data class CommuneBboxDto(
+    @SerialName("min_lng") val minLng: Double,
+    @SerialName("min_lat") val minLat: Double,
+    @SerialName("max_lng") val maxLng: Double,
+    @SerialName("max_lat") val maxLat: Double,
+)
+
+@Serializable
+data class MapCenterDto(
+    val lat: Double,
+    val lng: Double,
 )
 
 // Shared error shape for the whole API — backend CLAUDE.md section 0:

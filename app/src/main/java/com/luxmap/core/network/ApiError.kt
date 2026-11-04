@@ -24,3 +24,9 @@ fun HttpException.errorCodeOrNull(): String? =
         val body = response()?.errorBody()?.string() ?: return null
         errorJson.decodeFromString<ApiErrorEnvelope>(body).error.code
     }.getOrNull()
+
+fun HttpException.errorMessageOrNull(): String? =
+    runCatching {
+        val body = response()?.errorBody()?.string() ?: return null
+        errorJson.decodeFromString<ApiErrorEnvelope>(body).error.message
+    }.getOrNull()

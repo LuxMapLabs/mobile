@@ -73,7 +73,12 @@ fun PoleQuickViewBottomSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 PoleStatCell(
                     label = "Nguồn điện",
-                    value = if (pole.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
+                    value =
+                        when (pole.powerSource) {
+                            "solar" -> "Năng lượng mặt trời"
+                            "grid" -> "Lưới điện"
+                            else -> "Chưa xác định"
+                        },
                     modifier = Modifier.weight(1f),
                 )
                 PoleStatCell(

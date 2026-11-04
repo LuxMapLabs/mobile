@@ -4,10 +4,10 @@ import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.auth.data.RealAuthRepository
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.home.data.RealHomeRepository
-import com.luxmap.feature.map.data.FakeMapRepository
 import com.luxmap.feature.map.data.FakePoleDetailRepository
 import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleDetailRepository
+import com.luxmap.feature.map.data.RealMapRepository
 import com.luxmap.feature.notification.data.NotificationRepository
 import com.luxmap.feature.notification.data.RealNotificationRepository
 import com.luxmap.feature.profile.data.ProfileRepository
@@ -38,7 +38,7 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
     @Binds
-    abstract fun bindMapRepository(impl: FakeMapRepository): MapRepository
+    abstract fun bindMapRepository(impl: RealMapRepository): MapRepository
 
     @Binds
     abstract fun bindPoleDetailRepository(impl: FakePoleDetailRepository): PoleDetailRepository

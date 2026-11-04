@@ -220,6 +220,13 @@ fun MapScreen(
     var isSatelliteBasemap by rememberSaveable { mutableStateOf(false) }
     // Last camera as [latitude, longitude, zoom, bearing]; null until the map has been moved once.
     var savedCamera by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
+    // True once the camera has been auto-moved to the real map_bounds.center — guards against
+    // re-centering every time uiState re-emits (e.g. after a search/filter change).
+    var hasCenteredOnRealData by rememberSaveable { mutableStateOf(false) }
+    // True only once the user has actually dragged/pinched the map — distinct from savedCamera,
+    // which also gets set by the idle event the very first programmatic camera placement below
+    // triggers, so savedCamera alone can't tell "the user moved it" from "we moved it".
+    var userMovedCamera by rememberSaveable { mutableStateOf(false) }
     var showLocationPermissionDenied by remember { mutableStateOf(false) }
     var showLocationPermissionSettingsHint by remember { mutableStateOf(false) }
     var showCoarseLocationNotice by remember { mutableStateOf(false) }
@@ -322,6 +329,11 @@ fun MapScreen(
                                     doubleArrayOf(target.latitude, target.longitude, position.zoom, position.bearing)
                             }
                         }
+                        map.addOnCameraMoveStartedListener { reason ->
+                            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                                userMovedCamera = true
+                            }
+                        }
                         val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
                         map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
                             setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
@@ -413,6 +425,21 @@ fun MapScreen(
             (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
             (style.getSource(ROAD_SEGMENTS_SOURCE_ID) as? GeoJsonSource)
                 ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
+        }
+
+        // Moves the camera to the real area the first time it's known (FM-15 "Hướng B") — only
+        // when the user has not already moved the map (savedCamera stays null until the first
+        // camera idle event) and only once, so this never fights a camera position the user chose.
+        LaunchedEffect(maplibreMap, uiState) {
+            val map = maplibreMap ?: return@LaunchedEffect
+            if (hasCenteredOnRealData || userMovedCamera) return@LaunchedEffect
+            val center = uiState.centerOrNull() ?: return@LaunchedEffect
+            hasCenteredOnRealData = true
+            map.cameraPosition =
+                CameraPosition.Builder()
+                    .target(LatLng(center.first, center.second))
+                    .zoom(MOCK_AREA_ZOOM)
+                    .build()
         }
 
         LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
@@ -662,7 +689,12 @@ fun MapScreen(
             when (uiState) {
                 is MapUiState.Loading -> LoadingOverlay()
                 is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
-                is MapUiState.Error -> MessageOverlay(text = (uiState as MapUiState.Error).message)
+                is MapUiState.Error ->
+                    MessageOverlay(
+                        text = (uiState as MapUiState.Error).message,
+                        actionLabel = "Thử lại",
+                        onAction = viewModel::retry,
+                    )
                 is MapUiState.Success -> Unit
             }
 
@@ -731,6 +763,8 @@ private fun MapUiState.roadSegmentsOrEmpty() = (this as? MapUiState.Success)?.fi
 private fun MapUiState.allPolesOrEmpty() = (this as? MapUiState.Success)?.dataset?.poles.orEmpty()
 
 private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
+
+private fun MapUiState.centerOrNull() = (this as? MapUiState.Success)?.dataset?.center
 
 private fun Set<AssetCondition>.toggled(condition: AssetCondition): Set<AssetCondition> =
     if (condition in this) this - condition else this + condition
