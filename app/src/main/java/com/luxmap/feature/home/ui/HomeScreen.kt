@@ -49,7 +49,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,23 +90,19 @@ import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.SyncPill
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 // Nav-graph entry point (F02/FM-16) — nối HomeViewModel, đưa HomeScreen thành stateless để dễ
-// lái bằng dữ liệu cố định. onOpenWorkOrder/onStartSurvey dẫn tới F09/F03, chưa có route thật
-// (feature/workorder, feature/survey chưa code) nên tạm báo qua snackbar, đúng cách PoleDetailRoute
-// đang làm với showNotImplemented — không thêm route giả vào NavGraph ở task này.
+// lái bằng dữ liệu cố định.
 @Composable
 fun HomeRoute(
     onOpenWorkOrder: (workOrderId: String) -> Unit,
@@ -116,10 +111,6 @@ fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val showNotImplemented: () -> Unit = {
-        scope.launch { snackbarHostState.showSnackbar("Chức năng đang được hoàn thiện") }
-    }
 
     // Home's own ViewModel survives navigating into another screen (work order detail, survey...)
     // and back - its data would otherwise go stale after an action there changes a work order's
@@ -142,7 +133,6 @@ fun HomeRoute(
     HomeScreen(
         uiState = uiState,
         onOpenWorkOrder = onOpenWorkOrder,
-        onStartSurvey = showNotImplemented,
         onRetry = viewModel::retry,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
@@ -157,7 +147,6 @@ fun HomeRoute(
 fun HomeScreen(
     uiState: HomeUiState,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
-    onStartSurvey: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
@@ -209,7 +198,7 @@ fun HomeScreen(
                             locallyCompletedWorkOrderIds = uiState.locallyCompletedWorkOrderIds,
                             onOpenWorkOrder = onOpenWorkOrder,
                         )
-                    is HomeUiState.Empty -> EmptyState(onStartSurvey = onStartSurvey)
+                    is HomeUiState.Empty -> EmptyState()
                     is HomeUiState.Error -> ErrorState(message = uiState.message, onRetry = onRetry)
                 }
             }
@@ -875,19 +864,14 @@ private fun SkeletonBar(
 }
 
 @Composable
-private fun BoxScope.EmptyState(onStartSurvey: () -> Unit) {
+private fun BoxScope.EmptyState() {
     MessageState(
         icon = Icons.Filled.EventAvailable,
         iconColors = SyncStatus.DONE.badgeColors(),
         title = "Không có việc nào cho hôm nay",
         subtitle = "Khi có lệnh sửa chữa mới được giao, danh sách sẽ hiển thị tại đây.",
-    ) {
-        PrimaryButton(
-            text = "Bắt đầu đợt khảo sát mới",
-            onClick = onStartSurvey,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+        action = {},
+    )
 }
 
 @Composable

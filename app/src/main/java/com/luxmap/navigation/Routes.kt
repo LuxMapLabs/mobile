@@ -93,30 +93,6 @@ sealed interface Routes {
         fun createRoute(workOrderId: String) = "work-order/$workOrderId/complete/evidence"
     }
 
-    data object ReportSubmit : Routes {
-        override val route = "report/submit"
-    }
-
-    data object ReportList : Routes {
-        override val route = "report/list"
-    }
-
-    data object ReportDetail : Routes {
-        override val route = "report/detail/{reportId}"
-    }
-
-    data object ReportFeedback : Routes {
-        override val route = "report/feedback/{reportId}"
-    }
-
-    data object Document : Routes {
-        override val route = "document"
-    }
-
-    data object Assistant : Routes {
-        override val route = "assistant"
-    }
-
     data object Notification : Routes {
         override val route = "notification"
     }
