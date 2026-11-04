@@ -20,12 +20,27 @@ const val MARKER_DIM_ICON_ID = "marker_icon_dim"
 const val MARKER_OUT_ICON_ID = "marker_icon_out"
 const val MARKER_UNKNOWN_ICON_ID = "marker_icon_unknown"
 
+// Status badge icons (Icon Cot Den Map design, 2026-11-04) — small navy glyph shown at the
+// pin's top-right corner for dim/out/unknown only, normal has no badge.
+const val MARKER_BADGE_DIM_ICON_ID = "marker_badge_icon_dim"
+const val MARKER_BADGE_OUT_ICON_ID = "marker_badge_icon_out"
+const val MARKER_BADGE_UNKNOWN_ICON_ID = "marker_badge_icon_unknown"
+
 fun AssetCondition.markerIconId(): String =
     when (this) {
         AssetCondition.NORMAL -> MARKER_NORMAL_ICON_ID
         AssetCondition.DIM -> MARKER_DIM_ICON_ID
         AssetCondition.OUT -> MARKER_OUT_ICON_ID
         AssetCondition.UNKNOWN -> MARKER_UNKNOWN_ICON_ID
+    }
+
+// Returns null for normal since it has no status badge.
+fun AssetCondition.markerBadgeIconId(): String? =
+    when (this) {
+        AssetCondition.NORMAL -> null
+        AssetCondition.DIM -> MARKER_BADGE_DIM_ICON_ID
+        AssetCondition.OUT -> MARKER_BADGE_OUT_ICON_ID
+        AssetCondition.UNKNOWN -> MARKER_BADGE_UNKNOWN_ICON_ID
     }
 
 // SymbolLayer icon-image needs a Bitmap already registered on the Style (style.addImage) — it
@@ -52,6 +67,15 @@ fun registerMarkerBadgeIcons(
     }
     if (style.getImage(MARKER_UNKNOWN_ICON_ID) == null) {
         style.addImage(MARKER_UNKNOWN_ICON_ID, context.drawableToBitmap(R.drawable.ic_marker_unknown))
+    }
+    if (style.getImage(MARKER_BADGE_DIM_ICON_ID) == null) {
+        style.addImage(MARKER_BADGE_DIM_ICON_ID, context.drawableToBitmap(R.drawable.ic_marker_badge_dim))
+    }
+    if (style.getImage(MARKER_BADGE_OUT_ICON_ID) == null) {
+        style.addImage(MARKER_BADGE_OUT_ICON_ID, context.drawableToBitmap(R.drawable.ic_marker_badge_out))
+    }
+    if (style.getImage(MARKER_BADGE_UNKNOWN_ICON_ID) == null) {
+        style.addImage(MARKER_BADGE_UNKNOWN_ICON_ID, context.drawableToBitmap(R.drawable.ic_marker_badge_unknown))
     }
 }
 

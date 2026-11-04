@@ -1,13 +1,27 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <!-- Marker shape for fixture_status=out (F12/FM-37, Design System 3.4: diamond+X). -->
+    android:width="28dp"
+    android:height="35dp"
+    android:viewportWidth="40"
+    android:viewportHeight="50">
+    <!-- Marker pin for fixture_status=out (Icon Cot Den Map design, 2026-11-04). Same shape as
+         ic_marker_normal, only the pin body color differs; badge glyph is a separate icon/layer
+         (ic_marker_badge_out), not baked into this pin. -->
     <path
         android:fillColor="#FFD64545"
-        android:pathData="M12,2 L22,12 L12,22 L2,12 Z" />
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M20 2C10.6 2 3 9.4 3 18.6 3 30.2 20 48 20 48S37 30.2 37 18.6C37 9.4 29.4 2 20 2z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M7.36,8.64 L8.64,7.36 L16.64,15.36 L15.36,16.64 Z M15.36,7.36 L16.64,8.64 L8.64,16.64 L7.36,15.36 Z" />
+        android:pathData="M8.5,18.5 a11.5,11.5 0 1,0 23,0 a11.5,11.5 0 1,0 -23,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FF1F3864"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M15.8,26.9 L21.2,26.9 M18.5,26.9 L18.5,15.65 A4.05,4.05 0 0 1 22.55,11.6 L23.9,11.6" />
+    <path
+        android:fillColor="#FF1F3864"
+        android:pathData="M22.64,10.7 L28.76,10.7 L27.23,13.76 L24.17,13.76 Z" />
 </vector>
