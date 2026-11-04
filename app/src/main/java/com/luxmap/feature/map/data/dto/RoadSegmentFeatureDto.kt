@@ -25,13 +25,17 @@ data class RoadSegmentGeometryDto(
     val coordinates: List<List<Double>>,
 )
 
+// Đúng tên field trong luxmap_backend MapProperties.cs (GET /api/v1/map/segments).
+// controller_node_ids replaces the old single controller_node_id (backend drift "BE-14 / IoT",
+// a documented breaking change — the old field was always null, nothing real depended on it).
+// length_m is a real double (declared length, not derived from geometry — can be fractional).
 @Serializable
 data class RoadSegmentPropertiesDto(
     @SerialName("segment_id") val segmentId: String,
     @SerialName("segment_name") val segmentName: String,
     @SerialName("road_class") val roadClass: String,
-    @SerialName("length_m") val lengthM: Int,
+    @SerialName("length_m") val lengthM: Double,
     @SerialName("pole_count") val poleCount: Int,
-    @SerialName("controller_node_id") val controllerNodeId: String,
+    @SerialName("controller_node_ids") val controllerNodeIds: List<String> = emptyList(),
     @SerialName("has_active_segment_fault") val hasActiveSegmentFault: Boolean,
 )

@@ -5,15 +5,15 @@ import com.luxmap.feature.map.data.dto.PoleFeatureDto
 
 // Domain model rút gọn từ PoleFeatureDto, chỉ giữ field UI cần cho FM-06 (marker + bottom
 // sheet xem nhanh) và FM-36 (segmentId, để biết cột này thuộc tuyến nào cho bottom sheet tóm
-// tắt tuyến). Dùng thẳng AssetCondition có sẵn từ FM-02 (core/theme/Color.kt) thay vì tự tạo
-// enum trạng thái mới — LuxMap chỉ có một bộ enum tình trạng tài sản dùng chung.
+// tắt tuyến). segmentId/powerSource are nullable — a pole can have no segment or no lamp
+// installed yet, matching the real backend (not every pole in a fake dataset has one).
 data class PoleMarker(
     val poleId: String,
-    val segmentId: String,
+    val segmentId: String?,
     val lat: Double,
     val lng: Double,
     val fixtureStatus: AssetCondition,
-    val powerSource: String,
+    val powerSource: String?,
     val hasIotNode: Boolean,
     val nearSensitivePoi: Boolean,
 )

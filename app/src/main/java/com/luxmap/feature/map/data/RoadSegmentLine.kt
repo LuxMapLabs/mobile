@@ -22,7 +22,7 @@ fun RoadSegmentFeatureDto.toRoadSegmentLine(): RoadSegmentLine =
         segmentId = properties.segmentId,
         name = properties.segmentName,
         hasActiveSegmentFault = properties.hasActiveSegmentFault,
-        lengthM = properties.lengthM,
+        lengthM = properties.lengthM.toInt(),
         poleCount = properties.poleCount,
         coordinates = geometry.coordinates.map { (lng, lat) -> lng to lat },
     )
