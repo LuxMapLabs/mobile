@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueDao
+import com.luxmap.feature.assetimport.data.dao.AssetImportDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
@@ -59,4 +60,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideSurveyRouteCacheDao(db: AppDatabase): SurveyRouteCacheDao = db.surveyRouteCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideAssetImportDao(db: AppDatabase): AssetImportDao = db.assetImportDao()
 }
