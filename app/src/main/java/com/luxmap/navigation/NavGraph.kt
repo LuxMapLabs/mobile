@@ -243,6 +243,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onCapturePolePhotos = { workOrderId ->
                         navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
                     },
+                    onOpenImportCapture = { tripId ->
+                        navController.navigate(Routes.AssetImportCapture.createRoute(tripId))
+                    },
                 )
             }
             composable(
