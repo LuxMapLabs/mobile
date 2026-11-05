@@ -45,6 +45,7 @@ class FakeAssetImportRepository
                     areaTitle = area.title,
                     startedAt = Instant.now(),
                     status = STATUS_IN_PROGRESS,
+                    submittedAt = null,
                 )
             dao.insertTrip(entity)
             return entity.toDomain()
@@ -85,7 +86,7 @@ class FakeAssetImportRepository
         }
 
         override suspend fun submitTrip(tripId: String) {
-            dao.updateTripStatus(tripId, STATUS_SUBMITTED)
+            dao.updateTripSubmitted(tripId, STATUS_SUBMITTED, Instant.now())
         }
     }
 
@@ -96,6 +97,7 @@ private fun LocalAssetImportTripEntity.toDomain() =
         areaTitle = areaTitle,
         startedAt = startedAt,
         status = if (status == STATUS_SUBMITTED) ImportTripStatus.SUBMITTED else ImportTripStatus.IN_PROGRESS,
+        submittedAt = submittedAt,
     )
 
 private fun LocalAssetImportPoleEntity.toDomain() =

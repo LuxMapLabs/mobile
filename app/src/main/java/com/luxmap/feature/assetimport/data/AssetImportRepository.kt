@@ -18,6 +18,7 @@ data class ImportTrip(
     val areaTitle: String,
     val startedAt: Instant,
     val status: ImportTripStatus,
+    val submittedAt: Instant?,
 )
 
 data class ImportPole(

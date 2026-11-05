@@ -11,4 +11,5 @@ data class LocalAssetImportTripEntity(
     val areaTitle: String,
     val startedAt: Instant,
     val status: String,
+    val submittedAt: Instant?,
 )

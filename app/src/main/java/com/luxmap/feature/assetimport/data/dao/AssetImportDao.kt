@@ -7,6 +7,7 @@ import androidx.room.Query
 import com.luxmap.feature.assetimport.data.entity.LocalAssetImportPoleEntity
 import com.luxmap.feature.assetimport.data.entity.LocalAssetImportTripEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 @Dao
 interface AssetImportDao {
@@ -19,10 +20,11 @@ interface AssetImportDao {
     @Query("SELECT * FROM local_asset_import_trip WHERE tripId = :tripId LIMIT 1")
     fun observeTrip(tripId: String): Flow<LocalAssetImportTripEntity?>
 
-    @Query("UPDATE local_asset_import_trip SET status = :status WHERE tripId = :tripId")
-    suspend fun updateTripStatus(
+    @Query("UPDATE local_asset_import_trip SET status = :status, submittedAt = :submittedAt WHERE tripId = :tripId")
+    suspend fun updateTripSubmitted(
         tripId: String,
         status: String,
+        submittedAt: Instant,
     )
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
