@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.hub
 
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.assetimport.data.AssignedImportArea
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 
 data class LocalRejectedSweep(
@@ -27,6 +28,7 @@ sealed interface SurveyHubUiState {
 
     data class Success(
         val assignedRoutes: List<AssignedSurveyRoute>,
+        val assignedImportAreas: List<AssignedImportArea> = emptyList(),
         val uploadingSessions: List<UploadingSurveySession> = emptyList(),
         val rejectedSweeps: List<LocalRejectedSweep> = emptyList(),
         val pendingAiConfirmation: List<LocalPendingAiConfirmation> = emptyList(),

@@ -77,6 +77,7 @@ import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
+import com.luxmap.feature.assetimport.data.AssignedImportArea
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -88,6 +89,7 @@ fun SurveyHubRoute(
     onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
+    onOpenImportCapture: (tripId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -123,6 +125,9 @@ fun SurveyHubRoute(
             }
         }
     }
+    LaunchedEffect(Unit) {
+        viewModel.startedImportTrip.collect { tripId -> onOpenImportCapture(tripId) }
+    }
 
     // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
     // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
@@ -146,6 +151,7 @@ fun SurveyHubRoute(
                 onStartRoute = viewModel::onStartRoute,
                 onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
+                onStartImportTrip = viewModel::onStartImportTrip,
             )
         }
     }
@@ -163,6 +169,7 @@ fun SurveyHubScreen(
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
+    onStartImportTrip: (areaCode: String) -> Unit = {},
 ) {
     val routeCount = assignedRouteCountOf(state)
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
@@ -199,6 +206,7 @@ fun SurveyHubScreen(
                             onResurvey = onResurvey,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
+                            onStartImportTrip = onStartImportTrip,
                         )
 
                     is SurveyHubUiState.Empty ->
@@ -378,6 +386,7 @@ private fun SurveyHubContent(
     onResurvey: (surveySweepId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
+    onStartImportTrip: (areaCode: String) -> Unit = {},
 ) {
     val hasAttentionCards =
         state.rejectedSweeps.isNotEmpty() ||
@@ -412,6 +421,9 @@ private fun SurveyHubContent(
         }
         if (state.startError != null) {
             item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
+        }
+        items(state.assignedImportAreas) { area ->
+            AssignedImportAreaCard(area, onStartTrip = { onStartImportTrip(area.areaCode) })
         }
         if (hasAttentionCards) {
             item {
@@ -448,6 +460,52 @@ private fun SurveyHubContent(
                     },
                     onRequestCancellation = { onOpenCancelSheet(route.workOrderId) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssignedImportAreaCard(
+    area: AssignedImportArea,
+    onStartTrip: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surface),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().background(Navy700).padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = area.communeLabel, style = OverlineTextStyle, color = Color.White.copy(alpha = 0.8f))
+                StatusBadge(text = "Đã giao", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+            }
+            Text(text = area.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                StatusBadge(text = "Chưa có bản đồ số", colors = SyncStatus.QUEUED_OFFLINE.badgeColors())
+                StatusBadge(text = "Hạn ${area.dueDateLabel}", colors = SyncStatus.QUEUED_ONLINE.badgeColors())
+            }
+            Button(
+                onClick = onStartTrip,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+            ) {
+                Text(text = "Bắt đầu chuyến")
             }
         }
     }

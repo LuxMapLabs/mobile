@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.assetimport.data.AssetImportRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,6 +50,7 @@ class SurveyHubViewModel
         private val repository: SurveyRepository,
         private val connectivityObserver: ConnectivityObserver,
         private val completionRepository: WorkOrderCompletionRepository,
+        private val assetImportRepository: AssetImportRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<SurveyHubUiState>(SurveyHubUiState.Loading)
         val uiState: StateFlow<SurveyHubUiState> = _uiState.asStateFlow()
@@ -62,6 +64,9 @@ class SurveyHubViewModel
         // somewhere different (CLAUDE.md 2026-10-29).
         private val _startedRoute = MutableSharedFlow<StartedRouteNavigation>(extraBufferCapacity = 1)
         val startedRoute: SharedFlow<StartedRouteNavigation> = _startedRoute.asSharedFlow()
+
+        private val _startedImportTrip = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val startedImportTrip: SharedFlow<String> = _startedImportTrip.asSharedFlow()
 
         // Not part of the combine() below on purpose - that flow rebuilds Success from scratch
         // on every emission (routes, uploads, connectivity), which would otherwise wipe this
@@ -146,6 +151,13 @@ class SurveyHubViewModel
             }
         }
 
+        fun onStartImportTrip(areaCode: String) {
+            viewModelScope.launch {
+                val trip = assetImportRepository.startOrResumeTrip(areaCode)
+                _startedImportTrip.tryEmit(trip.tripId)
+            }
+        }
+
         private fun load() {
             loadJob?.cancel()
             loadJob =
@@ -155,7 +167,8 @@ class SurveyHubViewModel
                         repository.observeUploadingSessions(),
                         connectivityObserver.isOnline,
                         completionRepository.observeCompletedWorkOrderIds(),
-                    ) { routesResult, queuedSessions, isOnline, locallyCompletedWorkOrderIds ->
+                        assetImportRepository.observeAssignedAreas(),
+                    ) { routesResult, queuedSessions, isOnline, locallyCompletedWorkOrderIds, importAreas ->
                         val uploading =
                             queuedSessions.map { session ->
                                 UploadingSurveySession(
@@ -168,12 +181,13 @@ class SurveyHubViewModel
                         val pending = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_PENDING_AI_CONFIRMATION else emptyList()
                         val hasNothing =
                             routesResult.routes.isEmpty() && uploading.isEmpty() &&
-                                rejected.isEmpty() && pending.isEmpty()
+                                rejected.isEmpty() && pending.isEmpty() && importAreas.isEmpty()
                         if (hasNothing) {
                             SurveyHubUiState.Empty
                         } else {
                             SurveyHubUiState.Success(
                                 assignedRoutes = routesResult.routes,
+                                assignedImportAreas = importAreas,
                                 uploadingSessions = uploading,
                                 rejectedSweeps = rejected,
                                 pendingAiConfirmation = pending,
