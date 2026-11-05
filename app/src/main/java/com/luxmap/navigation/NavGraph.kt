@@ -36,6 +36,10 @@ import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
 import com.luxmap.core.ui.components.NotificationBellBar
+import com.luxmap.feature.assetimport.ui.capture.CapturePointRoute
+import com.luxmap.feature.assetimport.ui.pending.PendingApprovalRoute
+import com.luxmap.feature.assetimport.ui.review.ReviewSubmitRoute
+import com.luxmap.feature.assetimport.ui.triplist.TripListRoute
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -264,6 +268,58 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 val capturePoleId = backStackEntry.arguments?.getString("poleId") ?: return@composable
                 PolePhotoCaptureRoute(poleId = capturePoleId, onDone = { navController.popBackStack() })
+            }
+            composable(
+                route = Routes.AssetImportCapture.route,
+                arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val tripId = backStackEntry.arguments?.getString("tripId") ?: return@composable
+                CapturePointRoute(
+                    tripId = tripId,
+                    onBack = { navController.popBackStack() },
+                    onOpenTripList = { navController.navigate(Routes.AssetImportTripList.createRoute(it)) },
+                )
+            }
+            composable(
+                route = Routes.AssetImportTripList.route,
+                arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val tripId = backStackEntry.arguments?.getString("tripId") ?: return@composable
+                TripListRoute(
+                    tripId = tripId,
+                    onBack = { navController.popBackStack() },
+                    onCaptureMore = { navController.navigate(Routes.AssetImportCapture.createRoute(it)) },
+                    onEndTrip = { navController.navigate(Routes.AssetImportReview.createRoute(it)) },
+                )
+            }
+            composable(
+                route = Routes.AssetImportReview.route,
+                arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val tripId = backStackEntry.arguments?.getString("tripId") ?: return@composable
+                ReviewSubmitRoute(
+                    tripId = tripId,
+                    onBack = { navController.popBackStack() },
+                    onSubmitted = {
+                        navController.navigate(Routes.AssetImportPending.createRoute(it)) {
+                            popUpTo(Routes.Survey.route)
+                        }
+                    },
+                )
+            }
+            composable(
+                route = Routes.AssetImportPending.route,
+                arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val tripId = backStackEntry.arguments?.getString("tripId") ?: return@composable
+                PendingApprovalRoute(
+                    tripId = tripId,
+                    onBackToSurveyHub = {
+                        navController.navigate(Routes.Survey.createRoute()) {
+                            popUpTo(Routes.Survey.route) { inclusive = true }
+                        }
+                    },
+                )
             }
             composable(
                 route = Routes.AiConfirmation.route,

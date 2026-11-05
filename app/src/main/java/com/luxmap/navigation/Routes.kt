@@ -71,6 +71,30 @@ sealed interface Routes {
         ) = "survey/pole-photos/$workOrderId/capture/$poleId"
     }
 
+    data object AssetImportCapture : Routes {
+        override val route = "asset-import/{tripId}/capture"
+
+        fun createRoute(tripId: String) = "asset-import/$tripId/capture"
+    }
+
+    data object AssetImportTripList : Routes {
+        override val route = "asset-import/{tripId}/list"
+
+        fun createRoute(tripId: String) = "asset-import/$tripId/list"
+    }
+
+    data object AssetImportReview : Routes {
+        override val route = "asset-import/{tripId}/review"
+
+        fun createRoute(tripId: String) = "asset-import/$tripId/review"
+    }
+
+    data object AssetImportPending : Routes {
+        override val route = "asset-import/{tripId}/pending"
+
+        fun createRoute(tripId: String) = "asset-import/$tripId/pending"
+    }
+
     data object Map : Routes {
         override val route = "map"
     }
