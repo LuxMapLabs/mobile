@@ -2,16 +2,19 @@ package com.luxmap.feature.home.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import javax.inject.Inject
@@ -22,9 +25,19 @@ class HomeViewModel
     constructor(
         private val repository: HomeRepository,
         private val completionRepository: WorkOrderCompletionRepository,
+        authRepository: AuthRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+        // Same source ProfileViewModel already reads for the greeting on F15 - no separate
+        // profile fetch just for a first-name greeting here.
+        val username: StateFlow<String?> =
+            authRepository.observeUsername().stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+                null,
+            )
 
         private var loadJob: Job? = null
 
@@ -60,6 +73,10 @@ class HomeViewModel
                                 }
                         }
                 }
+        }
+
+        private companion object {
+            const val STOP_TIMEOUT_MS = 5_000L
         }
     }
 
