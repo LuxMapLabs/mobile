@@ -51,7 +51,9 @@ fun OutcomeSegment(
     selected: String?,
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
+    val contentAlpha = if (enabled) 1f else 0.4f
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -63,8 +65,13 @@ fun OutcomeSegment(
                 label = option.label,
                 icon = option.icon,
                 selected = isSelected,
-                background = if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurfaceVariant,
+                enabled = enabled,
+                background =
+                    (if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant)
+                        .copy(alpha = contentAlpha),
+                contentColor =
+                    (if (isSelected) colors.text else MaterialTheme.colorScheme.onSurfaceVariant)
+                        .copy(alpha = contentAlpha),
                 onClick = { onSelected(option.value) },
                 modifier = Modifier.weight(1f),
             )
@@ -79,6 +86,7 @@ private fun OutcomeTile(
     label: String,
     icon: ImageVector,
     selected: Boolean,
+    enabled: Boolean,
     background: Color,
     contentColor: Color,
     onClick: () -> Unit,
@@ -91,7 +99,7 @@ private fun OutcomeTile(
                 .clip(RoundedCornerShape(Radius.chip))
                 .background(background, RoundedCornerShape(Radius.chip))
                 .border(if (selected) 2.dp else 0.dp, contentColor, RoundedCornerShape(Radius.chip))
-                .selectable(selected = selected, onClick = onClick)
+                .selectable(selected = selected, enabled = enabled, onClick = onClick)
                 .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),

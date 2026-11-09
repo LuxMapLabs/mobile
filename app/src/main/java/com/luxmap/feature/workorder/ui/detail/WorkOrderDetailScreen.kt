@@ -108,6 +108,7 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.BodyStrongTextStyle
+import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
@@ -418,8 +419,8 @@ private fun workOrderCtaState(
 ): WorkOrderCtaState? {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val canSubmitNow = state.canSubmit() && !state.isSubmitting
     val scheduleWindow = workOrderScheduleWindow(detail.scheduledDate, today)
+    val canSubmitNow = state.canSubmit() && !state.isSubmitting && !scheduleWindow.isOverdueToComplete
     return when {
         "start" in detail.allowedActions && scheduleWindow.canActOnSchedule ->
             WorkOrderCtaState(
@@ -428,8 +429,20 @@ private fun workOrderCtaState(
                 enabled = !state.isStarting,
                 onClick = onStart,
             )
-        // scheduleWindow.unlocksOn is only null when there is no scheduled_date, and that case
-        // always has canActOnSchedule = true, so it never reaches this branch.
+        // Two different reasons the window is closed - too early (unlocksOn still set) vs the
+        // work order went overdue without ever being started (unlocksOn cleared, see
+        // workOrderScheduleWindow). scheduleWindow.unlocksOn is only null when there is no
+        // scheduled_date (canActOnSchedule = true then, never reaching this branch) or when
+        // isOverdueToComplete is true, so the two conditions never both apply.
+        "start" in detail.allowedActions && scheduleWindow.isOverdueToComplete ->
+            WorkOrderCtaState(
+                text = "Bắt đầu",
+                icon = Icons.Filled.Lock,
+                enabled = false,
+                onClick = {},
+                hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
+                hintColor = Danger600,
+            )
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
@@ -452,8 +465,13 @@ private fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Check else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint = missingRequirementsHint(repairRequirements(state)),
-                hintColor = DueTodayColor,
+                hint =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                    } else {
+                        missingRequirementsHint(repairRequirements(state))
+                    },
+                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
                 requiresConfirmation = true,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
@@ -464,8 +482,13 @@ private fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint = if (missingCount > 0) "Còn $missingCount sự cố chưa có kết quả" else null,
-                hintColor = DueTodayColor,
+                hint =
+                    when {
+                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                        missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
+                        else -> null
+                    },
+                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
                 progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
                 requiresConfirmation = true,
@@ -663,6 +686,9 @@ private fun WorkOrderDetailContent(
     val status = workOrderStatusFromWire(detail.woStatus)
     val hasActiveLocalCompletion = state.localCompletion != null && !isReturnedForRework(state)
     val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
+    // "complete" in allowedActions implies wo_status = in_progress (WorkOrderRules on the
+    // backend), so this already means "started but overdue to submit", not "overdue to start".
+    val isFormLocked = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
         Column(
@@ -695,6 +721,7 @@ private fun WorkOrderDetailContent(
                         WorkOrderTaskKind.REPAIR ->
                             RepairCompletionSection(
                                 state = state,
+                                locked = isFormLocked,
                                 onReportNoteChanged = onReportNoteChanged,
                                 onMaterialsUsedChanged = onMaterialsUsedChanged,
                                 onCaptureEvidence = onCaptureEvidence,
@@ -703,6 +730,7 @@ private fun WorkOrderDetailContent(
                         WorkOrderTaskKind.INSPECTION ->
                             InspectionCompletionSection(
                                 state = state,
+                                locked = isFormLocked,
                                 onReportNoteChanged = onReportNoteChanged,
                                 onFaultOutcomeSelected = onFaultOutcomeSelected,
                             )
@@ -896,14 +924,15 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
         if (isOverdueToStart) {
             val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
             InlineBanner(
-                message = "Quá hạn bắt đầu (dự kiến $dueText) · vẫn bắt đầu được bình thường",
+                message =
+                    "Quá hạn bắt đầu (dự kiến $dueText) · Không thể bắt đầu, liên hệ Kỹ sư bảo trì để được giao lại",
                 tone = InlineBannerTone.ERROR,
             )
         }
         if (isOverdueToComplete) {
             val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
             InlineBanner(
-                message = "Quá hạn hoàn thành (dự kiến $dueText) · vẫn nộp được bình thường",
+                message = "Quá hạn nộp báo cáo (dự kiến $dueText) · Form đã khoá, liên hệ Kỹ sư bảo trì để xử lý",
                 tone = InlineBannerTone.ERROR,
             )
         }
@@ -1287,6 +1316,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
 @Composable
 private fun RepairCompletionSection(
     state: WorkOrderDetailUiState.Success,
+    locked: Boolean,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
     onCaptureEvidence: () -> Unit,
@@ -1343,7 +1373,13 @@ private fun RepairCompletionSection(
                 EvidencePicker(
                     hasPhoto = hasPhoto,
                     filePath = state.localEvidence?.filePath,
-                    onTileClick = if (hasPhoto) ({ showEvidencePreview = true }) else onCaptureEvidence,
+                    onTileClick =
+                        when {
+                            hasPhoto -> ({ showEvidencePreview = true })
+                            locked -> ({})
+                            else -> onCaptureEvidence
+                        },
+                    enabled = !locked || hasPhoto,
                 )
             }
             WorkflowStepRow(
@@ -1357,6 +1393,7 @@ private fun RepairCompletionSection(
                     value = state.reportNote,
                     onValueChange = onReportNoteChanged,
                     placeholder = { Text("VD: Thay bóng LED, kiểm tra lại dây nguồn") },
+                    enabled = !locked,
                     minLines = 2,
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -1375,6 +1412,7 @@ private fun RepairCompletionSection(
                     value = state.materialsUsed,
                     onValueChange = onMaterialsUsedChanged,
                     placeholder = { Text("VD: 1 bóng LED 100W") },
+                    enabled = !locked,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
@@ -1388,6 +1426,7 @@ private fun RepairCompletionSection(
     if (showEvidencePreview && evidenceFilePath != null) {
         EvidencePreviewDialog(
             filePath = evidenceFilePath,
+            showRetake = !locked,
             onDismiss = { showEvidencePreview = false },
             onRetake = {
                 showEvidencePreview = false
@@ -1398,10 +1437,12 @@ private fun RepairCompletionSection(
 }
 
 // Full-size look at the captured "after" photo, opened by tapping EvidencePicker's filled tile -
-// retake is now an explicit choice here instead of the tile's only possible action.
+// retake is now an explicit choice here instead of the tile's only possible action. Hidden once
+// the work order is overdue to complete, since retaking would re-open an otherwise-locked form.
 @Composable
 private fun EvidencePreviewDialog(
     filePath: String,
+    showRetake: Boolean,
     onDismiss: () -> Unit,
     onRetake: () -> Unit,
 ) {
@@ -1428,16 +1469,18 @@ private fun EvidencePreviewDialog(
                         .aspectRatio(3f / 4f)
                         .clip(RoundedCornerShape(Radius.card)),
             )
-            Spacer(Modifier.height(Spacing.md))
-            OutlinedButton(
-                onClick = onRetake,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-            ) {
-                Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(Spacing.sm))
-                Text("Chụp lại")
+            if (showRetake) {
+                Spacer(Modifier.height(Spacing.md))
+                OutlinedButton(
+                    onClick = onRetake,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
+                ) {
+                    Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text("Chụp lại")
+                }
             }
         }
     }
@@ -1481,6 +1524,7 @@ private fun CompletionSectionHeader(
 @Composable
 private fun InspectionCompletionSection(
     state: WorkOrderDetailUiState.Success,
+    locked: Boolean,
     onReportNoteChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
 ) {
@@ -1532,6 +1576,7 @@ private fun InspectionCompletionSection(
                             OutcomeSegment(
                                 selected = state.faultOutcomes[fault.faultId],
                                 onSelected = { outcome -> onFaultOutcomeSelected(fault.faultId, outcome) },
+                                enabled = !locked,
                             )
                         }
                     }
@@ -1549,6 +1594,7 @@ private fun InspectionCompletionSection(
                     value = state.reportNote,
                     onValueChange = onReportNoteChanged,
                     placeholder = { Text("VD: Cảm biến mất tín hiệu từ 08/10") },
+                    enabled = !locked,
                     minLines = 2,
                     maxLines = 5,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

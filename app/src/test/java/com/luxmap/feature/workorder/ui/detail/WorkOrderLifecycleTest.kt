@@ -87,10 +87,11 @@ class WorkOrderLifecycleTest {
     }
 
     @Test
-    fun schedule_window_stays_open_but_flags_overdue_after_the_scheduled_date() {
+    fun schedule_window_closes_again_and_flags_overdue_after_the_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-11"))
-        assertTrue(window.canActOnSchedule)
+        assertFalse(window.canActOnSchedule)
         assertTrue(window.isOverdueToComplete)
+        assertEquals(null, window.unlocksOn)
     }
 
     @Test
