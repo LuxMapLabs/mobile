@@ -46,12 +46,13 @@ fun EvidencePicker(
     filePath: String?,
     onTileClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (hasPhoto && filePath != null) {
-            FilledTile(filePath = filePath, onClick = onTileClick)
+            FilledTile(filePath = filePath, onClick = onTileClick, enabled = enabled)
         } else {
-            AddTile(onClick = onTileClick)
+            AddTile(onClick = onTileClick, enabled = enabled)
         }
     }
 }
@@ -64,12 +65,13 @@ fun EvidencePicker(
 private fun FilledTile(
     filePath: String,
     onClick: () -> Unit,
+    enabled: Boolean,
 ) {
     Box(
         modifier =
             Modifier
                 .size(TileSize)
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .clip(RoundedCornerShape(Radius.control)),
     ) {
         AsyncImage(
@@ -105,17 +107,21 @@ private fun FilledTile(
 }
 
 @Composable
-private fun AddTile(onClick: () -> Unit) {
+private fun AddTile(
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
     val outlineColor = MaterialTheme.colorScheme.outline
+    val contentAlpha = if (enabled) 1f else 0.4f
     Column(
         modifier =
             Modifier
                 .size(TileSize)
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .semantics { contentDescription = "Chụp ảnh" }
                 .drawBehind {
                     drawRoundRect(
-                        color = outlineColor,
+                        color = outlineColor.copy(alpha = contentAlpha),
                         cornerRadius = CornerRadius(Radius.control.toPx()),
                         style =
                             Stroke(
@@ -130,8 +136,12 @@ private fun AddTile(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Filled.AddAPhoto,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
         )
-        Text(text = "Chụp ảnh", style = LabelTextStyle)
+        Text(
+            text = "Chụp ảnh",
+            style = LabelTextStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
+        )
     }
 }
