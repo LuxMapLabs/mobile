@@ -243,9 +243,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenImportCapture = { tripId ->
                         navController.navigate(Routes.AssetImportCapture.createRoute(tripId))
                     },
-                    onOpenWorkOrderDetail = { workOrderId ->
-                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
-                    },
                 )
             }
             composable(

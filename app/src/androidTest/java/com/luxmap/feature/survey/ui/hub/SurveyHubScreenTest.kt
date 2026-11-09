@@ -3,7 +3,6 @@ package com.luxmap.feature.survey.ui.hub
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
@@ -213,11 +212,10 @@ class SurveyHubScreenTest {
         assertEquals("SWEEP-2029", reviewed)
     }
 
-    // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): "Yeu cau huy" now lives behind the
-    // card's overflow (3-dot) menu instead of its own standalone button (user decision, this
-    // session) - opens the shared CancelRequestSheet, and calls onRequestCancellation on send.
+    // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): button only shows while still
+    // assigned, opens the shared CancelRequestSheet, and calls onRequestCancellation on send.
     @Test
-    fun an_assigned_route_shows_yeu_cau_huy_lenh_in_its_overflow_menu_and_sending_it_calls_onRequestCancellation() {
+    fun an_assigned_route_shows_yeu_cau_huy_and_sending_it_calls_onRequestCancellation() {
         var cancelledId: String? = null
         var cancelledReason: String? = null
         composeRule.setContent {
@@ -231,8 +229,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Tuỳ chọn khác").performClick()
-        composeRule.onNodeWithText("Yêu cầu hủy lệnh").performClick()
+        composeRule.onNodeWithText("Yêu cầu hủy").performClick()
         composeRule.onNodeWithText("Lý do khác").performClick()
         composeRule.onNodeWithText("Gửi yêu cầu").performClick()
         assertEquals("WO-1", cancelledId)
@@ -240,7 +237,7 @@ class SurveyHubScreenTest {
     }
 
     @Test
-    fun an_in_progress_route_overflow_menu_hides_yeu_cau_huy_lenh() {
+    fun an_in_progress_route_hides_yeu_cau_huy() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
@@ -248,24 +245,6 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Tuỳ chọn khác").performClick()
-        composeRule.onNodeWithText("Xem chi tiết lệnh").assertExists()
-        composeRule.onNodeWithText("Yêu cầu hủy lệnh").assertDoesNotExist()
-    }
-
-    @Test
-    fun tapping_xem_chi_tiet_lenh_invokes_onOpenWorkOrderDetail() {
-        var openedId: String? = null
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyHubScreen(
-                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
-                    onOpenWorkOrderDetail = { openedId = it },
-                )
-            }
-        }
-        composeRule.onNodeWithContentDescription("Tuỳ chọn khác").performClick()
-        composeRule.onNodeWithText("Xem chi tiết lệnh").performClick()
-        assertEquals("WO-1", openedId)
+        composeRule.onNodeWithText("Yêu cầu hủy").assertDoesNotExist()
     }
 }

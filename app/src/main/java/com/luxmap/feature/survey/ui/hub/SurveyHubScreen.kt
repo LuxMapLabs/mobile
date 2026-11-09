@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,24 +22,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -98,7 +89,6 @@ fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
-    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -153,7 +143,6 @@ fun SurveyHubRoute(
                 onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
-                onOpenWorkOrderDetail = onOpenWorkOrderDetail,
             )
         }
     }
@@ -171,14 +160,10 @@ fun SurveyHubScreen(
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
-    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
     var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
-    // Which route's overflow (3-dot) sheet is open, if any - separate from the cancel sheet
-    // above since tapping "Yeu cau huy lenh" inside it closes this one and opens that one.
-    var menuSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     Box(modifier = Modifier.fillMaxSize()) {
@@ -195,7 +180,7 @@ fun SurveyHubScreen(
                             onStartRoute = onStartRoute,
                             onReviewAiConfirmation = onReviewAiConfirmation,
                             onResurvey = onResurvey,
-                            onOpenMenuSheet = { menuSheetWorkOrderId = it },
+                            onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
                         )
@@ -239,25 +224,6 @@ fun SurveyHubScreen(
         )
     }
 
-    val menuWorkOrderId = menuSheetWorkOrderId
-    if (menuWorkOrderId != null && state is SurveyHubUiState.Success) {
-        val route = state.assignedRoutes.firstOrNull { it.workOrderId == menuWorkOrderId }
-        if (route != null) {
-            RouteOverflowSheet(
-                route = route,
-                onDismiss = { menuSheetWorkOrderId = null },
-                onViewDetail = {
-                    menuSheetWorkOrderId = null
-                    onOpenWorkOrderDetail(menuWorkOrderId)
-                },
-                onRequestCancellation = {
-                    menuSheetWorkOrderId = null
-                    cancelSheetWorkOrderId = menuWorkOrderId
-                },
-            )
-        }
-    }
-
     val sheetWorkOrderId = cancelSheetWorkOrderId
     if (sheetWorkOrderId != null && state is SurveyHubUiState.Success) {
         CancelRequestSheet(
@@ -276,76 +242,6 @@ fun SurveyHubScreen(
             cancelSheetWorkOrderId = null
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RouteOverflowSheet(
-    route: AssignedSurveyRoute,
-    onDismiss: () -> Unit,
-    onViewDetail: () -> Unit,
-    onRequestCancellation: () -> Unit,
-) {
-    val canRequestCancellation = workOrderStatusFromWire(route.woStatus) == WorkOrderStatus.ASSIGNED
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
-            Text(
-                text = "${route.workOrderId} · Tuyến khảo sát",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = route.title,
-                style = BodyStrongTextStyle,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(bottom = Spacing.sm),
-            )
-            RouteOverflowSheetRow(
-                icon = Icons.Filled.Description,
-                label = "Xem chi tiết lệnh",
-                color = MaterialTheme.colorScheme.onSurface,
-                onClick = onViewDetail,
-            )
-            if (canRequestCancellation) {
-                RouteOverflowSheetRow(
-                    icon = Icons.Filled.Block,
-                    label = "Yêu cầu hủy lệnh",
-                    color = MaterialTheme.colorScheme.error,
-                    onClick = onRequestCancellation,
-                )
-            }
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm).heightIn(min = Dimens.minTouchTarget),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-            ) {
-                Text("Đóng")
-            }
-        }
-    }
-}
-
-@Composable
-private fun RouteOverflowSheetRow(
-    icon: ImageVector,
-    label: String,
-    color: Color,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = Dimens.minTouchTarget)
-                .clickable(onClick = onClick)
-                .padding(horizontal = Spacing.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = color)
-        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = color)
-    }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 }
 
 // Shaped like the real content below it (a thin section-label bar + 3 route-card-shaped rows)
@@ -444,7 +340,7 @@ private fun SurveyHubContent(
     onStartRoute: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
-    onOpenMenuSheet: (workOrderId: String) -> Unit,
+    onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
 ) {
@@ -524,7 +420,7 @@ private fun SurveyHubContent(
                         isHighlighted = route.workOrderId == highlightWorkOrderId,
                         onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
                         onStartForPoleCapture = { onStartRoute(route.workOrderId) },
-                        onOpenMenu = { onOpenMenuSheet(route.workOrderId) },
+                        onRequestCancellation = { onOpenCancelSheet(route.workOrderId) },
                     )
                 }
             }
@@ -714,10 +610,15 @@ private fun AssignedRouteCard(
     isLocallyCompleted: Boolean,
     onCapturePolePhotos: () -> Unit,
     onStartForPoleCapture: () -> Unit,
-    onOpenMenu: () -> Unit,
+    onRequestCancellation: () -> Unit,
     isHighlighted: Boolean = false,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
+    // Same rule WorkOrderDetailScreen (F09) uses (CLAUDE.md WO-CANCEL-REQUEST): only while
+    // still assigned, not yet started. The list endpoint has no allowed_actions field to read
+    // this from (unlike WorkOrderDetail), so this applies the documented rule directly instead
+    // of guessing a different one.
+    val canRequestCancellation = status == WorkOrderStatus.ASSIGNED && !isCancelled
     val dateColor =
         if (scheduledDateIsToday(route.scheduledDate)) DueTodayColor else MaterialTheme.colorScheme.onSurface
     val borderColor = if (isHighlighted) Navy700 else MaterialTheme.colorScheme.outline
@@ -810,43 +711,37 @@ private fun AssignedRouteCard(
                 )
             }
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                IconButton(
-                    onClick = onOpenMenu,
-                    modifier =
-                        Modifier
-                            .size(Dimens.minTouchTarget)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.control)),
+            if (canRequestCancellation) {
+                OutlinedButton(
+                    onClick = onRequestCancellation,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreHoriz,
-                        contentDescription = "Tuỳ chọn khác",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text(text = "Yêu cầu hủy")
                 }
-                // Only reachable way to call the start API for a survey work order - Home
-                // deliberately hides survey orders (see HomeScreen.kt). Tapping this while still
-                // "assigned" starts the route first (POST /sweeps needs wo_status = in_progress
-                // server-side), then SurveyHubViewModel's startedRoute flow navigates to the
-                // pole list on success.
-                val canAct = status == WorkOrderStatus.ASSIGNED || status == WorkOrderStatus.IN_PROGRESS
-                Button(
-                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForPoleCapture else onCapturePolePhotos,
-                    enabled = canAct && !isStarting,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-                ) {
-                    Text(
-                        text =
-                            when {
-                                isStarting -> "Đang bắt đầu…"
-                                status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
-                                status == WorkOrderStatus.IN_PROGRESS -> "Chụp ảnh/video từng cột"
-                                else -> "Đã hoàn tất"
-                            },
-                    )
-                }
+            }
+            // Only reachable way to call the start API for a survey work order - Home
+            // deliberately hides survey orders (see HomeScreen.kt). Tapping this while still
+            // "assigned" starts the route first (POST /sweeps needs wo_status = in_progress
+            // server-side), then SurveyHubViewModel's startedRoute flow navigates to the
+            // pole list on success.
+            val canAct = status == WorkOrderStatus.ASSIGNED || status == WorkOrderStatus.IN_PROGRESS
+            Button(
+                onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForPoleCapture else onCapturePolePhotos,
+                enabled = canAct && !isStarting,
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
+            ) {
+                Text(
+                    text =
+                        when {
+                            isStarting -> "Đang bắt đầu…"
+                            status == WorkOrderStatus.ASSIGNED -> "Bắt đầu"
+                            status == WorkOrderStatus.IN_PROGRESS -> "Chụp ảnh/video từng cột"
+                            else -> "Đã hoàn tất"
+                        },
+                )
             }
         }
     }
