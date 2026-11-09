@@ -659,6 +659,8 @@ private fun WorkOrderDetailContent(
 // badges, title/id, due/schedule panel, and lifecycle tracker - everything the F09 redesign
 // mockup groups into one dark block above the light content sheet. Manager note/review note
 // move to WorkOrderHeaderSection below instead, since the mockup puts those in the light area.
+private val HeroContentHeight = 190.dp
+
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
@@ -668,51 +670,51 @@ private fun WorkOrderHeroSection(
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val kindColors = kind.badgeColors()
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.xs, bottom = Spacing.xl),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onBack) {
-                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-            }
-            Text(
-                text = detail.workOrderId,
-                style = BodyStrongTextStyle,
-                color = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.align(Alignment.Center),
-            )
-        }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    Box(modifier = Modifier.fillMaxWidth().background(BrandHeroGradient).statusBarsPadding()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(HeroContentHeight)
+                    .padding(horizontal = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterVertically),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(HeroKindIconSize)
-                        .background(kindColors.background, RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = kind.icon(), contentDescription = null, tint = kindColors.text)
+            Box(modifier = Modifier.fillMaxWidth()) {
+                IconButton(onClick = onBack) {
+                    Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+                }
+                Text(
+                    text = detail.workOrderId,
+                    style = BodyStrongTextStyle,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.align(Alignment.Center),
+                )
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    StatusBadge(
-                        text = kind.label(),
-                        colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
-                    )
-                    if (showSubmittedBadge) {
-                        StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-                    } else if (status != WorkOrderStatus.ASSIGNED) {
-                        StatusBadge(text = status.label(), colors = status.badgeColors())
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(HeroKindIconSize)
+                            .background(kindColors.background, RoundedCornerShape(Radius.chip)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(imageVector = kind.icon(), contentDescription = null, tint = kindColors.text)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        StatusBadge(
+                            text = kind.label(),
+                            colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
+                        )
+                        if (showSubmittedBadge) {
+                            StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                        } else if (status != WorkOrderStatus.ASSIGNED) {
+                            StatusBadge(text = status.label(), colors = status.badgeColors())
+                        }
                     }
                 }
             }
