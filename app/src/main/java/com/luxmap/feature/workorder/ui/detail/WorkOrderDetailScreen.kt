@@ -89,11 +89,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -102,13 +106,13 @@ import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
+import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
-import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
@@ -720,8 +724,20 @@ private fun WorkOrderDetailContent(
     }
 }
 
-private val HeroBackButtonSize = 40.dp
-private val HeroMinHeight = 120.dp
+private val HeroBackButtonTouchSize = 48.dp
+private val HeroBackButtonChipSize = 40.dp
+private val HeroMinHeight = 136.dp
+private val HeroBackChipColor = Color(0xFF1E3D6B)
+private val HeroBackChipRing = Color(0xFF93B2E0)
+
+private val HeroMetadataTextStyle =
+    TextStyle(
+        fontFamily = BeVietnamPro,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.04.em,
+    )
 
 @Composable
 private fun WorkOrderHeroSection(
@@ -738,36 +754,43 @@ private fun WorkOrderHeroSection(
                 .background(Navy900)
                 .statusBarsPadding()
                 .heightIn(min = HeroMinHeight)
-                .padding(horizontal = Spacing.lg),
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         IconButton(
             onClick = onBack,
-            modifier =
-                Modifier
-                    .size(HeroBackButtonSize)
-                    .clip(RoundedCornerShape(Radius.control))
-                    .background(Color.White.copy(alpha = 0.12f)),
+            modifier = Modifier.size(HeroBackButtonTouchSize),
         ) {
-            Icon(
-                imageVector = Icons.Filled.ArrowBack,
-                contentDescription = "Quay lại",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp),
-            )
+            Box(
+                modifier =
+                    Modifier
+                        .size(HeroBackButtonChipSize)
+                        .clip(RoundedCornerShape(Radius.chip))
+                        .background(HeroBackChipColor)
+                        .border(1.dp, HeroBackChipRing.copy(alpha = 0.22f), RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowBack,
+                    contentDescription = "Quay lại",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
         Column(
-            modifier = Modifier.weight(1f).padding(start = Spacing.md),
+            modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
                     text = "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi")),
-                    style = OverlineTextStyle,
-                    color = Color.White.copy(alpha = 0.75f),
+                    style = HeroMetadataTextStyle,
+                    color = Color(0xFF9FB6D6),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -779,7 +802,7 @@ private fun WorkOrderHeroSection(
             }
             Text(
                 text = detail.title,
-                style = TitleTextStyle,
+                style = TitleTextStyle.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
