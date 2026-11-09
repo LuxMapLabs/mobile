@@ -22,7 +22,7 @@ class HomeScreenTest {
     fun loadingState_showsHeroHeader() {
         composeTestRule.setContent {
             LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Loading, onOpenWorkOrder = {}, onStartSurvey = {}, onRetry = {})
+                HomeScreen(uiState = HomeUiState.Loading, username = "kysu1", onOpenWorkOrder = {}, onRetry = {})
             }
         }
 
@@ -30,7 +30,7 @@ class HomeScreenTest {
     }
 
     @Test
-    fun successState_showsWorkOrdersGroupedByTaskKind() {
+    fun successState_showsRepairWorkOrdersInDefaultTab() {
         val data =
             HomeData(
                 metrics = HomeMetrics(assignedCount = 3, inProgressCount = 1, overdueCount = 0, plannedSweepCount = 2),
@@ -40,7 +40,6 @@ class HomeScreenTest {
                             clusterLabel = "COM-001",
                             items =
                                 listOf(
-                                    // Highest priority - becomes the "Tiếp theo" card, not a list row.
                                     WorkOrderSummaryItem(
                                         workOrderId = "WO-2031",
                                         woStatus = "assigned",
@@ -48,7 +47,6 @@ class HomeScreenTest {
                                         priorityScore = 90.0,
                                         taskKind = "repair",
                                     ),
-                                    // Stays in the list, under the "Sửa chữa" section.
                                     WorkOrderSummaryItem(
                                         workOrderId = "WO-2019",
                                         woStatus = "assigned",
@@ -65,23 +63,26 @@ class HomeScreenTest {
             LuxMapTheme {
                 HomeScreen(
                     uiState = HomeUiState.Success(data = data),
+                    username = "kysu1",
                     onOpenWorkOrder = {},
-                    onStartSurvey = {},
                     onRetry = {},
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("WO-2031").assertExists()
+        // The default tab is "Sửa chữa" (repair) - both items match it, so both rows render.
+        // workOrderId is not its own text node anymore, it's merged into "<kind label> · <id>"
+        // on one Text, hence substring = true instead of an exact match.
         composeTestRule.onNodeWithText("Sửa chữa").assertExists()
-        composeTestRule.onNodeWithText("WO-2019").assertExists()
+        composeTestRule.onNodeWithText("WO-2031", substring = true).assertExists()
+        composeTestRule.onNodeWithText("WO-2019", substring = true).assertExists()
     }
 
     @Test
     fun emptyState_showsEmptyMessage() {
         composeTestRule.setContent {
             LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Empty, onOpenWorkOrder = {}, onStartSurvey = {}, onRetry = {})
+                HomeScreen(uiState = HomeUiState.Empty, username = "kysu1", onOpenWorkOrder = {}, onRetry = {})
             }
         }
 
@@ -94,8 +95,8 @@ class HomeScreenTest {
             LuxMapTheme {
                 HomeScreen(
                     uiState = HomeUiState.Error(message = "Không tải được dữ liệu"),
+                    username = "kysu1",
                     onOpenWorkOrder = {},
-                    onStartSurvey = {},
                     onRetry = {},
                 )
             }
