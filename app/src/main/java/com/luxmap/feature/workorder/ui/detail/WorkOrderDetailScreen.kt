@@ -147,6 +147,7 @@ import com.luxmap.feature.workorder.data.hasLocation
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
+import java.util.Locale
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -719,6 +720,9 @@ private fun WorkOrderDetailContent(
     }
 }
 
+private val HeroBackButtonSize = 40.dp
+private val HeroMinHeight = 120.dp
+
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
@@ -733,28 +737,35 @@ private fun WorkOrderHeroSection(
                 .fillMaxWidth()
                 .background(Navy900)
                 .statusBarsPadding()
-                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+                .heightIn(min = HeroMinHeight)
+                .padding(horizontal = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
-            Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+        IconButton(
+            onClick = onBack,
+            modifier =
+                Modifier
+                    .size(HeroBackButtonSize)
+                    .clip(RoundedCornerShape(Radius.control))
+                    .background(Color.White.copy(alpha = 0.12f)),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Quay lại",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
         }
         Column(
-            modifier = Modifier.weight(1f).padding(horizontal = Spacing.xs),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier.weight(1f).padding(start = Spacing.md),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                Icon(
-                    imageVector = kind.icon(),
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.65f),
-                    modifier = Modifier.size(16.dp),
-                )
                 Text(
-                    text = "${kind.label()} · ${detail.workOrderId}",
+                    text = "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi")),
                     style = OverlineTextStyle,
                     color = Color.White.copy(alpha = 0.75f),
                     maxLines = 1,
@@ -770,7 +781,7 @@ private fun WorkOrderHeroSection(
                 text = detail.title,
                 style = TitleTextStyle,
                 color = Color.White,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
