@@ -594,13 +594,11 @@ private fun WorkOrderDetailContent(
     val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
-        // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top technique F02
-        // uses, so this sheet reads as floating over the navy hero instead of a hard seam.
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .offset(y = -Spacing.xl)
+                    .offset(y = -Spacing.lg)
                     .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
                     .background(MaterialTheme.colorScheme.background)
                     .padding(Spacing.lg),
@@ -677,7 +675,7 @@ private fun WorkOrderHeroSection(
                 .background(BrandHeroGradient)
                 .statusBarsPadding()
                 .padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
+                .padding(top = Spacing.xs, bottom = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
