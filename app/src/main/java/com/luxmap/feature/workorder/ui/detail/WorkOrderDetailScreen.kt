@@ -601,7 +601,7 @@ private fun WorkOrderDetailContent(
                     .offset(y = -Spacing.lg)
                     .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(Spacing.lg),
+                    .padding(start = Spacing.lg, top = Spacing.lg, end = Spacing.lg, bottom = Spacing.xxl),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             WorkOrderSummaryCard(detail)
@@ -659,7 +659,7 @@ private fun WorkOrderDetailContent(
 // badges, title/id, due/schedule panel, and lifecycle tracker - everything the F09 redesign
 // mockup groups into one dark block above the light content sheet. Manager note/review note
 // move to WorkOrderHeaderSection below instead, since the mockup puts those in the light area.
-private val HeroContentHeight = 190.dp
+private val HeroContentHeight = 200.dp
 
 @Composable
 private fun WorkOrderHeroSection(
@@ -676,8 +676,9 @@ private fun WorkOrderHeroSection(
                 Modifier
                     .fillMaxWidth()
                     .height(HeroContentHeight)
-                    .padding(horizontal = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterVertically),
+                    .padding(horizontal = Spacing.lg)
+                    .padding(top = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Box(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onBack) {
