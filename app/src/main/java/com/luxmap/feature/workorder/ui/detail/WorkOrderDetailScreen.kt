@@ -109,8 +109,8 @@ import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.OverlineTextStyle
+import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
-import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
@@ -353,7 +353,7 @@ private fun SideBySideBottomBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(top = Spacing.md, start = ScreenMargin, end = ScreenMargin, bottom = Spacing.lg),
+                    .padding(top = Spacing.md, start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (hint != null) {
@@ -376,14 +376,21 @@ private fun SideBySideBottomBar(
                     )
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                CancelRequestButton(onClick = onCancelClick, modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth().height(PrimaryButtonHeight),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                CancelRequestButton(
+                    onClick = onCancelClick,
+                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = Spacing.sm),
+                )
                 PrimaryButton(
                     text = primaryText,
                     onClick = onPrimaryClick,
                     enabled = primaryEnabled,
                     trailingIcon = primaryIcon,
-                    modifier = Modifier.weight(1.5f),
+                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
                 )
             }
         }
