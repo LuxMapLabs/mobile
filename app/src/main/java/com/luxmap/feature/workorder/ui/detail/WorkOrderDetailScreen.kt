@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -104,12 +103,12 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
-import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
+import com.luxmap.core.theme.Navy900
+import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
@@ -658,11 +657,9 @@ private fun WorkOrderDetailContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .offset(y = -Spacing.lg)
-                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(start = Spacing.lg, top = Spacing.lg, end = Spacing.lg, bottom = Spacing.xxl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    .padding(start = Spacing.md, top = Spacing.md, end = Spacing.md, bottom = Spacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             WorkOrderSummaryCard(detail)
             WorkOrderHeaderSection(detail)
@@ -715,12 +712,6 @@ private fun WorkOrderDetailContent(
     }
 }
 
-// Navy hero (BrandHeroGradient, same fixed-color pattern as F02) holding the back button,
-// badges, title/id, due/schedule panel, and lifecycle tracker - everything the F09 redesign
-// mockup groups into one dark block above the light content sheet. Manager note/review note
-// move to WorkOrderHeaderSection below instead, since the mockup puts those in the light area.
-private val HeroContentHeight = 200.dp
-
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
@@ -729,61 +720,55 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val kindColors = kind.badgeColors()
-    Box(modifier = Modifier.fillMaxWidth().background(BrandHeroGradient).statusBarsPadding()) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(Navy900)
+                .statusBarsPadding()
+                .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+        }
         Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(HeroContentHeight)
-                    .padding(horizontal = Spacing.lg)
-                    .padding(top = Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            modifier = Modifier.weight(1f).padding(horizontal = Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-                }
-                Text(
-                    text = detail.workOrderId,
-                    style = BodyStrongTextStyle,
-                    color = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(HeroKindIconSize)
-                            .background(kindColors.background, RoundedCornerShape(Radius.chip)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(imageVector = kind.icon(), contentDescription = null, tint = kindColors.text)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        StatusBadge(
-                            text = kind.label(),
-                            colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
-                        )
-                        if (showSubmittedBadge) {
-                            StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-                        } else if (status != WorkOrderStatus.ASSIGNED) {
-                            StatusBadge(text = status.label(), colors = status.badgeColors())
-                        }
-                    }
+                Icon(
+                    imageVector = kind.icon(),
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.65f),
+                    modifier = Modifier.size(16.dp),
+                )
+                Text(
+                    text = "${kind.label()} · ${detail.workOrderId}",
+                    style = OverlineTextStyle,
+                    color = Color.White.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showSubmittedBadge) {
+                    StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                } else if (status != WorkOrderStatus.ASSIGNED) {
+                    StatusBadge(text = status.label(), colors = status.badgeColors())
                 }
             }
+            Text(
+                text = detail.title,
+                style = TitleTextStyle,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
-
-private val HeroKindIconSize = 56.dp
 
 @Composable
 private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
