@@ -1,6 +1,7 @@
 package com.luxmap.feature.home.ui
 
 import app.cash.turbine.test
+import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.HomeRepository
@@ -24,6 +25,12 @@ import org.junit.Test
 private fun fakeCompletionRepository(ids: Set<String> = emptySet()): WorkOrderCompletionRepository {
     val repository = mockk<WorkOrderCompletionRepository>()
     every { repository.observeCompletedWorkOrderIds() } returns flowOf(ids)
+    return repository
+}
+
+private fun fakeAuthRepository(username: String? = "kysu1"): AuthRepository {
+    val repository = mockk<AuthRepository>()
+    every { repository.observeUsername() } returns flowOf(username)
     return repository
 }
 
@@ -58,7 +65,7 @@ class HomeViewModelTest {
                         clusters = emptyList(),
                     ),
                 )
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -82,7 +89,7 @@ class HomeViewModelTest {
                 )
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(data)
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -107,7 +114,7 @@ class HomeViewModelTest {
                 )
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(data)
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(setOf("WO-1")))
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(setOf("WO-1")), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -121,7 +128,7 @@ class HomeViewModelTest {
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flow { throw IllegalStateException("network down") }
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -150,7 +157,7 @@ class HomeViewModelTest {
                     flow { throw IllegalStateException("network down") },
                     flowOf(data),
                 )
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
