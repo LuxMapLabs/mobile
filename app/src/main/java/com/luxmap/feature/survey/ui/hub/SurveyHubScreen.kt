@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -22,16 +22,25 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -43,7 +52,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -54,12 +62,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BrandHeroGradient
+import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.DisplayTextStyle
+import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Navy700
+import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
@@ -86,10 +95,10 @@ import java.util.Locale
 
 @Composable
 fun SurveyHubRoute(
-    onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -113,17 +122,10 @@ fun SurveyHubRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // After a successful start from either Hub button, follow through into the right screen -
-    // same pattern as F09's own startedSurveyWorkOrderId collection in WorkOrderDetailRoute. The
-    // 2 survey methods stay parallel (CLAUDE.md 2026-10-29), so this only picks a destination,
-    // it never starts one flow from the other.
+    // After a successful start, follow through into the pole-capture screen - same pattern as
+    // F09's own startedSurveyWorkOrderId collection in WorkOrderDetailRoute.
     LaunchedEffect(Unit) {
-        viewModel.startedRoute.collect { navigation ->
-            when (navigation.destination) {
-                SurveyRouteStartDestination.POLE_CAPTURE -> onCapturePolePhotos(navigation.workOrderId)
-                SurveyRouteStartDestination.READINESS_CHECK -> onCheckReadiness(navigation.workOrderId)
-            }
-        }
+        viewModel.startedRoute.collect { workOrderId -> onCapturePolePhotos(workOrderId) }
     }
     LaunchedEffect(Unit) {
         viewModel.startedImportTrip.collect { tripId -> onOpenImportCapture(tripId) }
@@ -143,7 +145,6 @@ fun SurveyHubRoute(
         ) {
             SurveyHubScreen(
                 state = uiState,
-                onCheckReadiness = onCheckReadiness,
                 onCapturePolePhotos = onCapturePolePhotos,
                 highlightWorkOrderId = highlightWorkOrderId,
                 modifier = modifier,
@@ -152,6 +153,7 @@ fun SurveyHubRoute(
                 onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
+                onOpenWorkOrderDetail = onOpenWorkOrderDetail,
             )
         }
     }
@@ -160,51 +162,40 @@ fun SurveyHubRoute(
 @Composable
 fun SurveyHubScreen(
     state: SurveyHubUiState,
-    onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
-    onStartRoute: (workOrderId: String, destination: SurveyRouteStartDestination) -> Unit = { _, _ -> },
+    onStartRoute: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
-    val routeCount = assignedRouteCountOf(state)
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
     var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
+    // Which route's overflow (3-dot) sheet is open, if any - separate from the cancel sheet
+    // above since tapping "Yeu cau huy lenh" inside it closes this one and opens that one.
+    var menuSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            SurveyHubHeader(routeCount = routeCount)
-            // Overlaps the hero's bottom edge by Spacing.xl, same as HomeScreen's HomeHeader overlap -
-            // reads as a sheet floating over the navy hero instead of a hard seam between the two.
-            // The clip (not just background) matters once the list scrolls - background alone paints
-            // the rounded shape but never cuts the LazyColumn's own square corners, so a scrolled
-            // row's edge shows past the rounding at the top instead of following it.
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .offset(y = -Spacing.xl)
-                        .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                        .background(MaterialTheme.colorScheme.background),
-            ) {
+            SurveyHubHeader()
+            Box(modifier = Modifier.fillMaxSize()) {
                 when (state) {
                     is SurveyHubUiState.Loading -> HubLoadingSkeleton()
 
                     is SurveyHubUiState.Success ->
                         SurveyHubContent(
                             state = state,
-                            onCheckReadiness = onCheckReadiness,
                             onCapturePolePhotos = onCapturePolePhotos,
                             onStartRoute = onStartRoute,
                             onReviewAiConfirmation = onReviewAiConfirmation,
                             onResurvey = onResurvey,
-                            onOpenCancelSheet = { cancelSheetWorkOrderId = it },
+                            onOpenMenuSheet = { menuSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
                         )
@@ -248,6 +239,25 @@ fun SurveyHubScreen(
         )
     }
 
+    val menuWorkOrderId = menuSheetWorkOrderId
+    if (menuWorkOrderId != null && state is SurveyHubUiState.Success) {
+        val route = state.assignedRoutes.firstOrNull { it.workOrderId == menuWorkOrderId }
+        if (route != null) {
+            RouteOverflowSheet(
+                route = route,
+                onDismiss = { menuSheetWorkOrderId = null },
+                onViewDetail = {
+                    menuSheetWorkOrderId = null
+                    onOpenWorkOrderDetail(menuWorkOrderId)
+                },
+                onRequestCancellation = {
+                    menuSheetWorkOrderId = null
+                    cancelSheetWorkOrderId = menuWorkOrderId
+                },
+            )
+        }
+    }
+
     val sheetWorkOrderId = cancelSheetWorkOrderId
     if (sheetWorkOrderId != null && state is SurveyHubUiState.Success) {
         CancelRequestSheet(
@@ -266,6 +276,76 @@ fun SurveyHubScreen(
             cancelSheetWorkOrderId = null
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RouteOverflowSheet(
+    route: AssignedSurveyRoute,
+    onDismiss: () -> Unit,
+    onViewDetail: () -> Unit,
+    onRequestCancellation: () -> Unit,
+) {
+    val canRequestCancellation = workOrderStatusFromWire(route.woStatus) == WorkOrderStatus.ASSIGNED
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
+            Text(
+                text = "${route.workOrderId} · Tuyến khảo sát",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = route.title,
+                style = BodyStrongTextStyle,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = Spacing.sm),
+            )
+            RouteOverflowSheetRow(
+                icon = Icons.Filled.Description,
+                label = "Xem chi tiết lệnh",
+                color = MaterialTheme.colorScheme.onSurface,
+                onClick = onViewDetail,
+            )
+            if (canRequestCancellation) {
+                RouteOverflowSheetRow(
+                    icon = Icons.Filled.Block,
+                    label = "Yêu cầu hủy lệnh",
+                    color = MaterialTheme.colorScheme.error,
+                    onClick = onRequestCancellation,
+                )
+            }
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.sm).heightIn(min = Dimens.minTouchTarget),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+            ) {
+                Text("Đóng")
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteOverflowSheetRow(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = Dimens.minTouchTarget)
+                .clickable(onClick = onClick)
+                .padding(horizontal = Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = color)
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, color = color)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 }
 
 // Shaped like the real content below it (a thin section-label bar + 3 route-card-shaped rows)
@@ -328,21 +408,11 @@ private fun SkeletonBar(
     Box(modifier = widthModifier.height(height).background(color, shape))
 }
 
-// Loading/Error show null (hero falls back to a neutral line), Empty is 0 since every section
-// is confirmed empty by then.
-private fun assignedRouteCountOf(state: SurveyHubUiState): Int? =
-    when (state) {
-        is SurveyHubUiState.Success -> state.assignedRoutes.size
-        is SurveyHubUiState.Empty -> 0
-        is SurveyHubUiState.Loading, is SurveyHubUiState.Error -> null
-    }
-
-// Matches the Khao Sat v4 mock's hero exactly (CLAUDE.md 2026-10-29) - no metric block, just the
-// date, title, and a plain "N tuyen duoc giao cho ban" line. The notification bell+badge seen in
-// the mock is not drawn here - the real app already renders one globally in NavGraph's Scaffold
-// across all 4 tabs, not per-screen.
+// Compact flat bar instead of a tall hero (matches the mockup's own header, not stretched to fit
+// a metric block). The notification bell+badge seen in the mockup is not drawn here - the real
+// app already renders one globally in NavGraph's Scaffold across all 4 tabs, not per-screen.
 @Composable
-private fun SurveyHubHeader(routeCount: Int?) {
+private fun SurveyHubHeader() {
     val today =
         remember {
             LocalDate.now().format(
@@ -353,25 +423,16 @@ private fun SurveyHubHeader(routeCount: Int?) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(BrandHeroGradient)
+                .background(Navy900)
                 .statusBarsPadding()
-                .padding(horizontal = Spacing.lg)
-                // Same top offset as HomeHeader's own title, to line up with the shared bell bar.
-                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Column {
-            Text(
-                text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
-                style = LabelTextStyle,
-                color = Color.White.copy(alpha = 0.75f),
-            )
-            Text(text = "Khảo sát", style = DisplayTextStyle, color = Color.White)
-        }
+        Text(text = "Khảo sát", style = HeadlineTextStyle, color = Color.White)
         Text(
-            text = if (routeCount != null) "$routeCount tuyến được giao cho bạn" else "Đang tải tuyến…",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.8f),
+            text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
+            style = LabelTextStyle,
+            color = Color.White.copy(alpha = 0.75f),
         )
     }
 }
@@ -379,12 +440,11 @@ private fun SurveyHubHeader(routeCount: Int?) {
 @Composable
 private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
-    onCheckReadiness: (workOrderId: String) -> Unit,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
-    onStartRoute: (workOrderId: String, destination: SurveyRouteStartDestination) -> Unit,
+    onStartRoute: (workOrderId: String) -> Unit,
     onReviewAiConfirmation: (surveySweepId: String) -> Unit,
     onResurvey: (surveySweepId: String) -> Unit,
-    onOpenCancelSheet: (workOrderId: String) -> Unit,
+    onOpenMenuSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
 ) {
@@ -393,17 +453,28 @@ private fun SurveyHubContent(
             state.pendingAiConfirmation.isNotEmpty() ||
             state.uploadingSessions.isNotEmpty()
     val listState = rememberLazyListState()
+    val inProgressRoutes =
+        state.assignedRoutes.filter {
+            workOrderStatusFromWire(it.woStatus) == WorkOrderStatus.IN_PROGRESS
+        }
+    val todoRoutes = state.assignedRoutes - inProgressRoutes.toSet()
     LaunchedEffect(state.assignedRoutes, highlightWorkOrderId) {
-        val routeIndex = state.assignedRoutes.indexOfFirst { it.workOrderId == highlightWorkOrderId }
-        if (routeIndex == -1) return@LaunchedEffect
+        val highlighted =
+            state.assignedRoutes.firstOrNull { it.workOrderId == highlightWorkOrderId } ?: return@LaunchedEffect
         var index = 0
         if (state.isStale) index++
         if (state.startError != null) index++
         if (hasAttentionCards) {
             index += 1 + state.rejectedSweeps.size + state.pendingAiConfirmation.size + state.uploadingSessions.size
         }
-        index++
-        listState.animateScrollToItem(index + routeIndex)
+        val inProgressHeaderOffset = if (inProgressRoutes.isNotEmpty()) 1 + inProgressRoutes.size else 0
+        index +=
+            if (highlighted in inProgressRoutes) {
+                1 + inProgressRoutes.indexOf(highlighted)
+            } else {
+                inProgressHeaderOffset + 1 + todoRoutes.indexOf(highlighted)
+            }
+        listState.animateScrollToItem(index)
     }
     LazyColumn(
         state = listState,
@@ -441,25 +512,21 @@ private fun SurveyHubContent(
             }
             items(state.uploadingSessions) { session -> UploadingSessionRow(session) }
         }
-        if (state.assignedRoutes.isNotEmpty()) {
-            item { AssignedRoutesSectionHeader(count = state.assignedRoutes.size) }
-            items(state.assignedRoutes) { route ->
-                AssignedRouteCard(
-                    route,
-                    isStarting = state.startingWorkOrderId == route.workOrderId,
-                    isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
-                    isLocallyCompleted = route.workOrderId in state.locallyCompletedWorkOrderIds,
-                    isHighlighted = route.workOrderId == highlightWorkOrderId,
-                    onCheckReadiness = { onCheckReadiness(route.workOrderId) },
-                    onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
-                    onStartForPoleCapture = {
-                        onStartRoute(route.workOrderId, SurveyRouteStartDestination.POLE_CAPTURE)
-                    },
-                    onStartForReadinessCheck = {
-                        onStartRoute(route.workOrderId, SurveyRouteStartDestination.READINESS_CHECK)
-                    },
-                    onRequestCancellation = { onOpenCancelSheet(route.workOrderId) },
-                )
+        listOf("Đang thực hiện" to inProgressRoutes, "Chưa bắt đầu" to todoRoutes).forEach { (title, routes) ->
+            if (routes.isNotEmpty()) {
+                item { SurveyHubSectionHeader(title = title, count = routes.size) }
+                items(routes) { route ->
+                    AssignedRouteCard(
+                        route,
+                        isStarting = state.startingWorkOrderId == route.workOrderId,
+                        isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
+                        isLocallyCompleted = route.workOrderId in state.locallyCompletedWorkOrderIds,
+                        isHighlighted = route.workOrderId == highlightWorkOrderId,
+                        onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
+                        onStartForPoleCapture = { onStartRoute(route.workOrderId) },
+                        onOpenMenu = { onOpenMenuSheet(route.workOrderId) },
+                    )
+                }
             }
         }
     }
@@ -474,42 +541,55 @@ private fun AssignedImportAreaCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surface),
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().background(Navy700).padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(
+                modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
             ) {
-                Text(text = area.communeLabel, style = OverlineTextStyle, color = Color.White.copy(alpha = 0.8f))
-                StatusBadge(text = "Đã giao", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+                Icon(
+                    imageVector = Icons.Filled.AddLocationAlt,
+                    contentDescription = null,
+                    tint = ImportAreaTileForeground,
+                )
             }
-            Text(text = area.title, style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        text = "${area.areaCode} · Khu vực mới",
+                        style = LabelTextStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatusBadge(text = "Đã giao", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+                }
+                Text(text = area.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            }
         }
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            StatusBadge(text = "Chưa có bản đồ số", colors = SyncStatus.QUEUED_OFFLINE.badgeColors())
+            StatusBadge(text = "Hạn ${area.dueDateLabel}", colors = SyncStatus.QUEUED_ONLINE.badgeColors())
+        }
+        Button(
+            onClick = onStartTrip,
+            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+            colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                StatusBadge(text = "Chưa có bản đồ số", colors = SyncStatus.QUEUED_OFFLINE.badgeColors())
-                StatusBadge(text = "Hạn ${area.dueDateLabel}", colors = SyncStatus.QUEUED_ONLINE.badgeColors())
-            }
-            Button(
-                onClick = onStartTrip,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-            ) {
-                Text(text = "Bắt đầu chuyến")
-            }
+            Text(text = "Bắt đầu chuyến")
         }
     }
 }
+
+private val ImportAreaTileBackground = Color(0xFFF1EEFB)
+private val ImportAreaTileForeground = Color(0xFF5B3FB4)
 
 @Composable
 private fun RejectedSweepCard(
@@ -600,30 +680,17 @@ private fun UploadingSessionRow(session: UploadingSurveySession) {
 // Navy700 icon avatar + a count badge, matching the design mock's section header treatment
 // (replaces the plain "TUYẾN ĐƯỢC GIAO" overline this section used before).
 @Composable
-private fun AssignedRoutesSectionHeader(count: Int) {
+private fun SurveyHubSectionHeader(
+    title: String,
+    count: Int,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Box(
-                modifier = Modifier.size(32.dp).background(Navy700, RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Route,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Text(text = "Tuyến được giao", style = MaterialTheme.typography.titleMedium)
-        }
-        StatusBadge(text = "$count tuyến", colors = WorkOrderStatus.ASSIGNED.badgeColors())
+        Text(text = title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+        StatusBadge(text = "$count", colors = WorkOrderStatus.OPEN.badgeColors())
     }
 }
 
@@ -636,165 +703,137 @@ private fun scheduledDateIsToday(scheduledDate: String?): Boolean =
 private fun scheduledDateText(scheduledDate: String?): String =
     if (scheduledDateIsToday(scheduledDate)) "Hôm nay" else DateFormatUtils.formatPlainDate(scheduledDate)
 
+private val RouteTileBackground = Color(0xFFEEF3FB)
+private val RouteTileForeground = Color(0xFF1A4FA0)
+
 @Composable
 private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     isStarting: Boolean,
     isCancelled: Boolean,
     isLocallyCompleted: Boolean,
-    onCheckReadiness: () -> Unit,
     onCapturePolePhotos: () -> Unit,
     onStartForPoleCapture: () -> Unit,
-    onStartForReadinessCheck: () -> Unit,
-    onRequestCancellation: () -> Unit,
+    onOpenMenu: () -> Unit,
     isHighlighted: Boolean = false,
 ) {
     val status = workOrderStatusFromWire(route.woStatus)
-    // Same rule WorkOrderDetailScreen (F09) uses (CLAUDE.md WO-CANCEL-REQUEST): only while
-    // still assigned, not yet started. The list endpoint has no allowed_actions field to read
-    // this from (unlike WorkOrderDetail), so this applies the documented rule directly instead
-    // of guessing a different one.
-    val canRequestCancellation = status == WorkOrderStatus.ASSIGNED && !isCancelled
     val dateColor =
         if (scheduledDateIsToday(route.scheduledDate)) DueTodayColor else MaterialTheme.colorScheme.onSurface
+    val borderColor = if (isHighlighted) Navy700 else MaterialTheme.colorScheme.outline
+    val borderWidth = if (isHighlighted) 2.dp else 1.dp
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surface)
-                .let {
-                    if (isHighlighted) it.border(2.dp, Navy700, RoundedCornerShape(Radius.card)) else it
-                },
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(borderWidth, borderColor, RoundedCornerShape(Radius.card))
+                .padding(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        // Navy header block (route id + commune, status, title) - matches the mock's card
-        // header, which groups the "which route, what state" info on its own dark band instead
-        // of mixing it into the white body with the action buttons.
-        Column(
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Box(
+                modifier = Modifier.size(40.dp).background(RouteTileBackground, RoundedCornerShape(Radius.chip)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = Icons.Filled.Route, contentDescription = null, tint = RouteTileForeground)
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Text(
+                        text = "${route.workOrderId} · Tuyến khảo sát",
+                        style = LabelTextStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    StatusBadge(text = status.label(), colors = status.badgeColors())
+                }
+                Text(text = route.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+        RouteInfoCell(
+            icon = Icons.Filled.Event,
+            label = "Ngày dự kiến",
+            value = scheduledDateText(route.scheduledDate),
+            valueColor = dateColor,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(Navy700)
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusMedium))
+                    .padding(Spacing.md),
+        )
+        // Mirrors F09's own rule (CLAUDE.md WO-CANCEL-REQUEST): once a cancellation request is
+        // sent, hide the action row - the manager still needs to decide, so starting or
+        // capturing anything for this route in the meantime would just be wasted work.
+        if (isCancelled) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "${route.workOrderId} · ${route.communeId}",
-                    style = OverlineTextStyle,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
-                StatusBadge(text = status.label(), colors = status.badgeColors())
-            }
-            Text(
-                text = route.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            RouteInfoCell(
-                icon = Icons.Filled.Event,
-                label = "Ngày dự kiến",
-                value = scheduledDateText(route.scheduledDate),
-                valueColor = dateColor,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusMedium))
-                        .padding(Spacing.md),
-            )
-            // Mirrors F09's own rule (CLAUDE.md WO-CANCEL-REQUEST): once a cancellation request is
-            // sent, hide every action button - the manager still needs to decide, so starting or
-            // capturing anything for this route in the meantime would just be wasted work.
-            if (isCancelled) {
-                Row(
+                        .heightIn(min = Dimens.minTouchTarget)
+                        .background(
+                            AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
+                            RoundedCornerShape(Radius.control),
+                        ),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Đã gửi yêu cầu hủy · chờ duyệt",
+                    color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                )
+            }
+        } else if (isLocallyCompleted) {
+            // Found on a real device 2026-10-29: this route's card looked completely
+            // unchanged after completing its survey at the pole list - wo_status itself only
+            // catches up once sync_queue actually uploads the completion, same local-state
+            // gap WorkOrderDetailScreen already guards against for repair/inspection
+            // ("localCompletion?.submitStatus == pending").
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Dimens.minTouchTarget)
+                        .background(
+                            WorkOrderStatus.ASSIGNED.badgeColors().background,
+                            RoundedCornerShape(Radius.control),
+                        ),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Đã nộp kết quả khảo sát · chờ đồng bộ",
+                    color = WorkOrderStatus.ASSIGNED.badgeColors().text,
+                )
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                IconButton(
+                    onClick = onOpenMenu,
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = Dimens.minTouchTarget)
-                            .background(
-                                AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
-                                RoundedCornerShape(Radius.control),
-                            ),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                            .size(Dimens.minTouchTarget)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.control)),
                 ) {
-                    Text(
-                        text = "Đã gửi yêu cầu hủy · chờ duyệt",
-                        color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                    Icon(
+                        imageVector = Icons.Filled.MoreHoriz,
+                        contentDescription = "Tuỳ chọn khác",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else if (isLocallyCompleted) {
-                // Found on a real device 2026-10-29: this route's card looked completely
-                // unchanged after completing its survey at the pole list - wo_status itself only
-                // catches up once sync_queue actually uploads the completion, same local-state
-                // gap WorkOrderDetailScreen already guards against for repair/inspection
-                // ("localCompletion?.submitStatus == pending").
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = Dimens.minTouchTarget)
-                            .background(
-                                WorkOrderStatus.ASSIGNED.badgeColors().background,
-                                RoundedCornerShape(Radius.control),
-                            ),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "Đã nộp kết quả khảo sát · chờ đồng bộ",
-                        color = WorkOrderStatus.ASSIGNED.badgeColors().text,
-                    )
-                }
-            } else {
-                if (canRequestCancellation) {
-                    OutlinedButton(
-                        onClick = onRequestCancellation,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    ) {
-                        Text(text = "Yêu cầu hủy")
-                    }
-                }
-                // "Quay video toan tuyen" (CLAUDE.md 2026-10-29, renamed from "Kiem tra san
-                // sang" for clarity - that name described only the first screen it leads to).
-                // Runs in parallel with the pole-capture CTA below, never merged (CLAUDE.md
-                // "song song, khong gop"). Same as that CTA, tapping this while still "assigned"
-                // starts the route first (via SurveyHubViewModel.startedRoute), then continues
-                // into the readiness check - previously this button skipped straight to the
-                // checklist without starting the route, which could lose an entire recorded
-                // video at upload time (POST /sweeps requires wo_status = in_progress server-side).
-                Button(
-                    onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForReadinessCheck else onCheckReadiness,
-                    enabled = !isStarting,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-                ) {
-                    Text(text = if (isStarting) "Đang bắt đầu…" else "Quay video toàn tuyến")
-                }
-                // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29): a freshly-created work
-                // order starts "assigned" - pole-photo uploads need in_progress server-side
-                // (409 WORK_ORDER_NOT_IN_PROGRESS otherwise). Home deliberately hides survey
-                // orders, so this is the only reachable place to call the start API for one.
-                // Tapping this while still "assigned" starts the route, then
-                // SurveyHubViewModel's startedRoute flow (observed by SurveyHubRoute) navigates
-                // to the pole list on success - the button itself only ever calls one of the two
-                // callbacks, never both.
+                // Only reachable way to call the start API for a survey work order - Home
+                // deliberately hides survey orders (see HomeScreen.kt). Tapping this while still
+                // "assigned" starts the route first (POST /sweeps needs wo_status = in_progress
+                // server-side), then SurveyHubViewModel's startedRoute flow navigates to the
+                // pole list on success.
                 val canAct = status == WorkOrderStatus.ASSIGNED || status == WorkOrderStatus.IN_PROGRESS
                 Button(
                     onClick = if (status == WorkOrderStatus.ASSIGNED) onStartForPoleCapture else onCapturePolePhotos,
                     enabled = canAct && !isStarting,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
                     shape = RoundedCornerShape(Radius.control),
                     colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
                 ) {

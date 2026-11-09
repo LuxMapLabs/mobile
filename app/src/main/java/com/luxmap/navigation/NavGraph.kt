@@ -234,9 +234,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 SurveyHubRoute(
                     highlightWorkOrderId = backStackEntry.arguments?.getString("highlightWorkOrderId"),
-                    onCheckReadiness = { surveySweepId ->
-                        navController.navigate(Routes.SurveyPlan.createRoute(surveySweepId))
-                    },
                     onReviewAiConfirmation = { surveySweepId ->
                         navController.navigate(Routes.AiConfirmation.createRoute(surveySweepId))
                     },
@@ -245,6 +242,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     },
                     onOpenImportCapture = { tripId ->
                         navController.navigate(Routes.AssetImportCapture.createRoute(tripId))
+                    },
+                    onOpenWorkOrderDetail = { workOrderId ->
+                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
                 )
             }
