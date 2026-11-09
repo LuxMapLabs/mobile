@@ -231,7 +231,10 @@ private fun HomeContent(
     locallyCompletedWorkOrderIds: Set<String>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    var selectedTab by remember { mutableStateOf(TaskFilterTab.ALL) }
+    // No "Tất cả" tab anymore - defaults to Sửa chữa (repair is this screen's primary work kind)
+    // rather than Khảo sát, which would always open on an empty state since survey items never
+    // flow into this list (see allVisibleItems()).
+    var selectedTab by remember { mutableStateOf(TaskFilterTab.REPAIR) }
     val counts = data.taskFilterTabCounts()
     Column(modifier = Modifier.fillMaxSize()) {
         // Fixed, does not scroll with the list below - matches the mockup's own
@@ -241,7 +244,7 @@ private fun HomeContent(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             SummaryStatsRow(
-                total = counts[TaskFilterTab.ALL] ?: 0,
+                total = data.allVisibleItems().size,
                 overdue = data.metrics.overdueCount,
                 inProgress = data.metrics.inProgressCount,
             )
@@ -279,10 +282,9 @@ private fun HomeContent(
     }
 }
 
-// Reuses WorkOrderTaskKind so the tab set never drifts from the badge/icon mapping used
-// elsewhere - a null kind means "no filter" (the ALL tab).
-private enum class TaskFilterTab(val label: String, val kind: WorkOrderTaskKind?) {
-    ALL("Tất cả", null),
+// No "Tất cả" tab - reuses WorkOrderTaskKind directly so the tab set never drifts from the
+// badge/icon mapping used elsewhere.
+private enum class TaskFilterTab(val label: String, val kind: WorkOrderTaskKind) {
     SURVEY("Khảo sát", WorkOrderTaskKind.SURVEY),
     INSPECTION("Kiểm tra", WorkOrderTaskKind.INSPECTION),
     REPAIR("Sửa chữa", WorkOrderTaskKind.REPAIR),
@@ -291,8 +293,8 @@ private enum class TaskFilterTab(val label: String, val kind: WorkOrderTaskKind?
 // Survey work orders are deliberately left out of this screen's own data (clusters never
 // contain task_kind=survey items) - the dedicated Khảo sát tab (SurveyHubScreen) already lists
 // them with richer, survey-specific actions (readiness check, rejected/AI-pending states) that
-// this plain task row can't offer. The SURVEY tab still exists here to match the mockup's 4
-// tabs, but it always shows a count of 0 and its own empty state.
+// this plain task row can't offer. The SURVEY tab still exists here to match the mockup's tabs,
+// but it always shows a count of 0 and its own empty state.
 private val TASK_KIND_SECTION_ORDER = listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
 
 private fun HomeData.allVisibleItems(): List<WorkOrderSummaryItem> =
@@ -301,7 +303,7 @@ private fun HomeData.allVisibleItems(): List<WorkOrderSummaryItem> =
 private fun HomeData.taskFilterTabCounts(): Map<TaskFilterTab, Int> {
     val all = allVisibleItems()
     return TaskFilterTab.entries.associateWith { tab ->
-        all.count { tab.kind == null || workOrderTaskKindFromWire(it.taskKind) == tab.kind }
+        all.count { workOrderTaskKindFromWire(it.taskKind) == tab.kind }
     }
 }
 
@@ -309,7 +311,7 @@ private fun HomeData.taskFilterTabCounts(): Map<TaskFilterTab, Int> {
 // the mockup's separate "high priority" tier is dropped, same reasoning as before: the backend
 // item shape has no severity/urgent flag, only a raw priorityScore.
 private fun HomeData.filteredSortedItems(tab: TaskFilterTab): List<WorkOrderSummaryItem> {
-    val filtered = allVisibleItems().filter { tab.kind == null || workOrderTaskKindFromWire(it.taskKind) == tab.kind }
+    val filtered = allVisibleItems().filter { workOrderTaskKindFromWire(it.taskKind) == tab.kind }
     return filtered.sortedWith(
         compareByDescending<WorkOrderSummaryItem> { dueDateLabel(it.dueDate).isOverdue }
             .thenByDescending { dueDateLabel(it.dueDate).isToday }
@@ -409,13 +411,6 @@ private fun TaskFilterTabs(
 private fun TabEmptyState(tab: TaskFilterTab) {
     val (icon, iconTint, title, body) =
         when (tab) {
-            TaskFilterTab.ALL ->
-                EmptyContent(
-                    Icons.Filled.EventAvailable,
-                    MaterialTheme.colorScheme.primary,
-                    "Chưa có nhiệm vụ nào",
-                    "Nhiệm vụ do Manager giao sẽ hiện ở đây. Kéo xuống để làm mới.",
-                )
             TaskFilterTab.SURVEY ->
                 EmptyContent(
                     WorkOrderTaskKind.SURVEY.icon(),
