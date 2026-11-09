@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -89,6 +90,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -101,14 +103,14 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
-import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.Navy700
+import com.luxmap.core.theme.Navy900
+import com.luxmap.core.theme.OverlineTextStyle
+import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
-import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
@@ -133,6 +135,7 @@ import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.OutcomeSegment
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
@@ -144,6 +147,7 @@ import com.luxmap.feature.workorder.data.hasLocation
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
+import java.util.Locale
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -213,23 +217,26 @@ fun WorkOrderDetailScreen(
                     if (cta != null) {
                         val scheduleWindow =
                             workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
-                        Column {
-                            val showCancelRequest =
-                                "request_cancellation" in uiState.detail.allowedActions &&
-                                    scheduleWindow.canActOnSchedule &&
-                                    (uiState.localCompletion == null || isReturnedForRework(uiState))
-                            if (showCancelRequest) {
-                                CancelRequestButton(
-                                    onClick = { showCancelSheet = true },
-                                    modifier = Modifier.padding(horizontal = ScreenMargin).padding(top = Spacing.sm),
-                                )
-                            }
+                        val showCancelRequest =
+                            "request_cancellation" in uiState.detail.allowedActions &&
+                                scheduleWindow.canActOnSchedule &&
+                                (uiState.localCompletion == null || isReturnedForRework(uiState))
+                        val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
+                        if (showCancelRequest) {
+                            SideBySideBottomBar(
+                                hint = cta.hint,
+                                hintColor = cta.hintColor,
+                                primaryText = cta.text,
+                                primaryIcon = cta.icon,
+                                primaryEnabled = cta.enabled,
+                                onPrimaryClick = onCtaClick,
+                                onCancelClick = { showCancelSheet = true },
+                            )
+                        } else {
                             BottomActionBar(
                                 ctaText = cta.text,
                                 ctaIcon = cta.icon,
-                                onCtaClick = {
-                                    if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick()
-                                },
+                                onCtaClick = onCtaClick,
                                 ctaEnabled = cta.enabled,
                                 hint = cta.hint,
                                 hintColor = cta.hintColor,
@@ -330,6 +337,66 @@ private data class WorkOrderCtaState(
     val progressSegments: List<Boolean>? = null,
     val requiresConfirmation: Boolean = false,
 )
+
+@Composable
+private fun SideBySideBottomBar(
+    hint: String?,
+    hintColor: Color?,
+    primaryText: String,
+    primaryIcon: ImageVector,
+    primaryEnabled: Boolean,
+    onPrimaryClick: () -> Unit,
+    onCancelClick: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.md, start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (hint != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    modifier = Modifier.padding(bottom = Spacing.sm),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = hintColor ?: MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = hint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = hintColor ?: MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().height(PrimaryButtonHeight),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                CancelRequestButton(
+                    onClick = onCancelClick,
+                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                    contentPadding = PaddingValues(horizontal = Spacing.sm),
+                )
+                PrimaryButton(
+                    text = primaryText,
+                    onClick = onPrimaryClick,
+                    enabled = primaryEnabled,
+                    trailingIcon = primaryIcon,
+                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
+                )
+            }
+        }
+    }
+}
 
 private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean =
     !state.justSubmitted &&
@@ -598,11 +665,9 @@ private fun WorkOrderDetailContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .offset(y = -Spacing.lg)
-                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(start = Spacing.lg, top = Spacing.lg, end = Spacing.lg, bottom = Spacing.xxl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+                    .padding(start = Spacing.md, top = Spacing.md, end = Spacing.md, bottom = Spacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             WorkOrderSummaryCard(detail)
             WorkOrderHeaderSection(detail)
@@ -655,11 +720,8 @@ private fun WorkOrderDetailContent(
     }
 }
 
-// Navy hero (BrandHeroGradient, same fixed-color pattern as F02) holding the back button,
-// badges, title/id, due/schedule panel, and lifecycle tracker - everything the F09 redesign
-// mockup groups into one dark block above the light content sheet. Manager note/review note
-// move to WorkOrderHeaderSection below instead, since the mockup puts those in the light area.
-private val HeroContentHeight = 200.dp
+private val HeroBackButtonSize = 40.dp
+private val HeroMinHeight = 120.dp
 
 @Composable
 private fun WorkOrderHeroSection(
@@ -669,61 +731,62 @@ private fun WorkOrderHeroSection(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val kindColors = kind.badgeColors()
-    Box(modifier = Modifier.fillMaxWidth().background(BrandHeroGradient).statusBarsPadding()) {
-        Column(
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(Navy900)
+                .statusBarsPadding()
+                .heightIn(min = HeroMinHeight)
+                .padding(horizontal = Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(
+            onClick = onBack,
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .height(HeroContentHeight)
-                    .padding(horizontal = Spacing.lg)
-                    .padding(top = Spacing.sm),
+                    .size(HeroBackButtonSize)
+                    .clip(RoundedCornerShape(Radius.control))
+                    .background(Color.White.copy(alpha = 0.12f)),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.ArrowBack,
+                contentDescription = "Quay lại",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f).padding(start = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
-                IconButton(onClick = onBack) {
-                    Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-                }
-                Text(
-                    text = detail.workOrderId,
-                    style = BodyStrongTextStyle,
-                    color = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(HeroKindIconSize)
-                            .background(kindColors.background, RoundedCornerShape(Radius.chip)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(imageVector = kind.icon(), contentDescription = null, tint = kindColors.text)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(text = detail.title, style = HeadlineTextStyle, color = Color.White)
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        StatusBadge(
-                            text = kind.label(),
-                            colors = BadgeColors(Color.White.copy(alpha = 0.14f), Color.White),
-                        )
-                        if (showSubmittedBadge) {
-                            StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-                        } else if (status != WorkOrderStatus.ASSIGNED) {
-                            StatusBadge(text = status.label(), colors = status.badgeColors())
-                        }
-                    }
+                Text(
+                    text = "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi")),
+                    style = OverlineTextStyle,
+                    color = Color.White.copy(alpha = 0.75f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showSubmittedBadge) {
+                    StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                } else if (status != WorkOrderStatus.ASSIGNED) {
+                    StatusBadge(text = status.label(), colors = status.badgeColors())
                 }
             }
+            Text(
+                text = detail.title,
+                style = TitleTextStyle,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
-
-private val HeroKindIconSize = 56.dp
 
 @Composable
 private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
