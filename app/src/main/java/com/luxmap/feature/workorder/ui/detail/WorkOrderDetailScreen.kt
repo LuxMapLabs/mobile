@@ -108,6 +108,7 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.BodyStrongTextStyle
+import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
@@ -428,8 +429,20 @@ private fun workOrderCtaState(
                 enabled = !state.isStarting,
                 onClick = onStart,
             )
-        // scheduleWindow.unlocksOn is only null when there is no scheduled_date, and that case
-        // always has canActOnSchedule = true, so it never reaches this branch.
+        // Two different reasons the window is closed - too early (unlocksOn still set) vs the
+        // work order went overdue without ever being started (unlocksOn cleared, see
+        // workOrderScheduleWindow). scheduleWindow.unlocksOn is only null when there is no
+        // scheduled_date (canActOnSchedule = true then, never reaching this branch) or when
+        // isOverdueToComplete is true, so the two conditions never both apply.
+        "start" in detail.allowedActions && scheduleWindow.isOverdueToComplete ->
+            WorkOrderCtaState(
+                text = "Bắt đầu",
+                icon = Icons.Filled.Lock,
+                enabled = false,
+                onClick = {},
+                hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
+                hintColor = Danger600,
+            )
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
@@ -896,14 +909,14 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
         if (isOverdueToStart) {
             val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
             InlineBanner(
-                message = "Quá hạn bắt đầu (dự kiến $dueText) · vẫn bắt đầu được bình thường",
+                message = "Quá hạn bắt đầu (dự kiến $dueText) · Không thể bắt đầu, liên hệ Kỹ sư bảo trì để được giao lại",
                 tone = InlineBannerTone.ERROR,
             )
         }
         if (isOverdueToComplete) {
             val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
             InlineBanner(
-                message = "Quá hạn hoàn thành (dự kiến $dueText) · vẫn nộp được bình thường",
+                message = "Quá hạn nộp báo cáo (dự kiến $dueText) · Form đã khoá, liên hệ Kỹ sư bảo trì để xử lý",
                 tone = InlineBannerTone.ERROR,
             )
         }
