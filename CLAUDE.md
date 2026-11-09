@@ -453,9 +453,6 @@ Backend đang làm song song. Quy tắc:
 - Sau khi code xong 1 task, tự chạy `./gradlew ktlintCheck` và sửa lỗi format trước khi coi là xong.
 - Nếu 1 màn hình có 4 trạng thái bắt buộc theo đặc tả (đang tải / có dữ liệu / rỗng / lỗi), phải làm đủ cả 4, không được bỏ qua trạng thái rỗng/lỗi vì "ít quan trọng".
 - Với các màn hình thao tác chính (F03, F04, F05, F06, F10, F11), luôn tự kiểm tra lại: thao tác có ghi Room trước khi gọi API không, có bị chặn bởi trạng thái mạng không — nếu có, đó là vi phạm nguyên tắc offline-first.
-- **Comment trong code viết bằng tiếng Anh, không dùng tiếng Việt** — kể cả comment giải thích lý do/quyết định kỹ thuật (dạng "vì sao chọn cách này"), không chỉ comment mô tả đơn thuần. Áp dụng cho mọi file code (`.kt`, `.kts`...). Tài liệu (`CLAUDE.md`, đặc tả, PR description, commit message) vẫn viết tiếng Việt/tiếng Anh như quy ước riêng của từng loại đã nêu ở trên, không đổi.
-  - **Dùng từ tiếng Anh đơn giản, thông dụng** — loại ai trong nhóm cũng biết nghĩa ngay không cần tra từ điển (VD: `use`/`need`/`because`/`before`/`instead of`), tránh từ học thuật/ít gặp (VD: tránh `leverage`, `utilize`, `henceforth`, `aforementioned` — dùng `use`, `use`, `from now on`, `mentioned above`). Câu ngắn, đúng ngữ pháp cơ bản, không viết văn hoa. Mục tiêu: người đọc code (kể cả người không giỏi tiếng Anh) đọc lướt qua là hiểu ngay, không phải để chứng tỏ vốn từ.
-
 ### Làm theo từng bước nhỏ, không viết một mạch rồi đưa hết
 
 **Bắt buộc**, kể cả với task nhìn có vẻ đơn giản: khi triển khai một function/màn hình/luồng, chia nhỏ thành các bước hợp lý (VD: dựng UI tĩnh trước → nối state → nối Room/mock → nối API/sync queue → xử lý lỗi/loading/offline). Sau **mỗi bước**:
