@@ -22,13 +22,6 @@ import javax.inject.Inject
 
 internal const val SHOW_UNCONFIRMED_HUB_CARDS = false
 
-// Which screen to navigate to after a successful start - the 2 survey methods run in parallel,
-// never merged (CLAUDE.md "Quyet dinh nghiep vu moi da chot 2026-10-15"), so the same start API
-// call can be followed by either destination depending on which Hub button triggered it.
-enum class SurveyRouteStartDestination { POLE_CAPTURE, READINESS_CHECK }
-
-data class StartedRouteNavigation(val workOrderId: String, val destination: SurveyRouteStartDestination)
-
 private val FAKE_REJECTED_SWEEPS =
     listOf(
         LocalRejectedSweep(
@@ -58,12 +51,9 @@ class SurveyHubViewModel
         private var loadJob: Job? = null
 
         // Same pattern as F09's own startedSurveyWorkOrderId (WorkOrderDetailViewModel) - the
-        // Route collects this once to navigate right after a successful start, instead of the
-        // button calling 2 callbacks itself. Carries a destination since 2 different Hub
-        // buttons (pole capture CTA, "Quay video toan tuyen") both start the route then go
-        // somewhere different (CLAUDE.md 2026-10-29).
-        private val _startedRoute = MutableSharedFlow<StartedRouteNavigation>(extraBufferCapacity = 1)
-        val startedRoute: SharedFlow<StartedRouteNavigation> = _startedRoute.asSharedFlow()
+        // Route collects this once to navigate right after a successful start.
+        private val _startedRoute = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val startedRoute: SharedFlow<String> = _startedRoute.asSharedFlow()
 
         private val _startedImportTrip = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val startedImportTrip: SharedFlow<String> = _startedImportTrip.asSharedFlow()
@@ -93,13 +83,8 @@ class SurveyHubViewModel
 
         // No reachable "Bat dau" for a survey work order otherwise: Home deliberately hides
         // survey orders (see HomeScreen.kt). Reuses the same generic POST /work-orders/{id}/start
-        // WorkOrderDetailScreen (F09) already uses. Both Hub buttons that can start a route
-        // (pole capture CTA, "Quay video toan tuyen") call this with their own destination so
-        // the Route knows where to navigate once the call succeeds.
-        fun onStartRoute(
-            workOrderId: String,
-            destination: SurveyRouteStartDestination,
-        ) {
+        // WorkOrderDetailScreen (F09) already uses.
+        fun onStartRoute(workOrderId: String) {
             val current = _uiState.value as? SurveyHubUiState.Success ?: return
             if (current.startingWorkOrderId != null) return
             _uiState.value = current.copy(startingWorkOrderId = workOrderId, startError = null)
@@ -107,7 +92,7 @@ class SurveyHubViewModel
                 repository.startRoute(workOrderId).fold(
                     onSuccess = {
                         load()
-                        _startedRoute.tryEmit(StartedRouteNavigation(workOrderId, destination))
+                        _startedRoute.tryEmit(workOrderId)
                     },
                     onFailure = { e ->
                         val latest = _uiState.value as? SurveyHubUiState.Success ?: current

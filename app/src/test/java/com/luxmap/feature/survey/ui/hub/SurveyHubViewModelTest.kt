@@ -240,7 +240,7 @@ class SurveyHubViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success (assigned)
-                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.POLE_CAPTURE)
+                viewModel.onStartRoute("WO-1")
                 val starting = awaitItem() as SurveyHubUiState.Success
                 assertEquals("WO-1", starting.startingWorkOrderId)
                 val success = awaitItem() as SurveyHubUiState.Success
@@ -250,7 +250,7 @@ class SurveyHubViewModelTest {
         }
 
     @Test
-    fun `a successful onStartRoute emits startedRoute with the given destination`() =
+    fun `a successful onStartRoute emits startedRoute with the work order id`() =
         runTest {
             val startedRoute = route.copy(woStatus = "in_progress")
             val repository = mockk<SurveyRepository>()
@@ -274,10 +274,8 @@ class SurveyHubViewModelTest {
             dispatcher.scheduler.advanceUntilIdle()
 
             viewModel.startedRoute.test {
-                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.READINESS_CHECK)
-                val navigation = awaitItem()
-                assertEquals("WO-1", navigation.workOrderId)
-                assertEquals(SurveyRouteStartDestination.READINESS_CHECK, navigation.destination)
+                viewModel.onStartRoute("WO-1")
+                assertEquals("WO-1", awaitItem())
             }
         }
 
@@ -299,7 +297,7 @@ class SurveyHubViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success
-                viewModel.onStartRoute("WO-1", SurveyRouteStartDestination.POLE_CAPTURE)
+                viewModel.onStartRoute("WO-1")
                 awaitItem() // Success (starting)
                 val failed = awaitItem() as SurveyHubUiState.Success
                 assertEquals(null, failed.startingWorkOrderId)

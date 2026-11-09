@@ -234,9 +234,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 SurveyHubRoute(
                     highlightWorkOrderId = backStackEntry.arguments?.getString("highlightWorkOrderId"),
-                    onCheckReadiness = { surveySweepId ->
-                        navController.navigate(Routes.SurveyPlan.createRoute(surveySweepId))
-                    },
                     onReviewAiConfirmation = { surveySweepId ->
                         navController.navigate(Routes.AiConfirmation.createRoute(surveySweepId))
                     },
