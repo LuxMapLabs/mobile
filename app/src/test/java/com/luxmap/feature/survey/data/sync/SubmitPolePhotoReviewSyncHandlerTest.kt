@@ -139,7 +139,7 @@ class SubmitPolePhotoReviewSyncHandlerTest {
         }
 
     @Test
-    fun `a row with no draft returns Failed`() =
+    fun `a row with no draft returns Done, not Failed`() =
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
@@ -148,7 +148,7 @@ class SubmitPolePhotoReviewSyncHandlerTest {
 
             val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
 
-            assertTrue(result is SyncOpResult.Failed)
+            assertTrue(result is SyncOpResult.Done)
         }
 
     @Test

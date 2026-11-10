@@ -29,8 +29,7 @@ class SubmitPolePhotoReviewSyncHandler
             val photo = dao.byId(payload.photoId) ?: return SyncOpResult.Failed("Local pole photo row missing")
             val serverPhotoId =
                 photo.serverPhotoId ?: return SyncOpResult.Failed("Local pole photo missing server photo id")
-            val draftFinalCvState =
-                photo.draftFinalCvState ?: return SyncOpResult.Failed("No draft review to send")
+            val draftFinalCvState = photo.draftFinalCvState ?: return SyncOpResult.Done
 
             return try {
                 val response =
