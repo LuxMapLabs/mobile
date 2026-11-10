@@ -27,11 +27,12 @@ class PoleListScreenTest {
     fun loading_state_shows_the_hero_header() {
         composeRule.setContent {
             LuxMapTheme {
-                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Loading, onCapturePole = {
-                        _,
-                        _,
-                    ->
-                }, onBack = {})
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Loading,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
             }
         }
         composeRule.onNodeWithText("Chụp ảnh cột đèn").assertExists()
@@ -298,11 +299,12 @@ class PoleListScreenTest {
     fun empty_state_shows_the_no_poles_message() {
         composeRule.setContent {
             LuxMapTheme {
-                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Empty, onCapturePole = {
-                        _,
-                        _,
-                    ->
-                }, onBack = {})
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Empty,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
             }
         }
         composeRule.onNodeWithText("Tuyến này chưa có cột đèn nào").assertExists()

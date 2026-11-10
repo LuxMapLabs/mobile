@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +64,7 @@ import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import kotlinx.coroutines.launch
 import java.io.File
 
 // Near-black navy, matches the design doc's own bg (#0B1526) - a bespoke tone for this immersive
@@ -87,6 +89,7 @@ fun PolePhotoCaptureRoute(
     viewModel: PolePhotoCaptureViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var previewFile by remember { mutableStateOf<File?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -107,14 +110,19 @@ fun PolePhotoCaptureRoute(
 
     val pickMediaLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-            if (uri != null) {
-                val file = viewModel.outputFile(context.filesDir)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    file.outputStream().use { output -> input.copyTo(output) }
-                }
-                previewFile = file
-            } else {
+            if (uri == null) {
                 onDone()
+            } else {
+                val file = viewModel.outputFile(context.filesDir)
+                scope.launch {
+                    val copied = copyGalleryImageToFile(context.contentResolver.openInputStream(uri), file)
+                    if (copied) {
+                        previewFile = file
+                    } else {
+                        file.delete()
+                        onDone()
+                    }
+                }
             }
         }
 
@@ -151,6 +159,11 @@ fun PolePhotoCaptureRoute(
             }
         }
 
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            launchGalleryPicker()
+        }
+
     LaunchedEffect(Unit) {
         when (source) {
             PolePhotoCaptureSource.CAMERA -> {
@@ -168,7 +181,14 @@ fun PolePhotoCaptureRoute(
                     }
                 }
             }
-            PolePhotoCaptureSource.GALLERY -> launchGalleryPicker()
+            PolePhotoCaptureSource.GALLERY -> {
+                if (hasRequestedPermissions) {
+                    launchGalleryPicker()
+                } else {
+                    hasRequestedPermissions = true
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
+            }
         }
     }
 
