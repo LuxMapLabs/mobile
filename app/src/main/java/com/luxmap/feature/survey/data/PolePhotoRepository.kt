@@ -29,15 +29,17 @@ interface PolePhotoRepository {
     // immediately (offline-first) before/instead of waiting on fetchResult.
     suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity?
 
-    // Field Engineer corrects/confirms the AI's cvState before a Manager decides.
-    // finalCvState must be "on" or "off". Server requires reviewNote whenever
-    // finalCvState != cvState (including when cvState is null/inconclusive) - a 400
-    // HttpException surfaces that, same as 409 POLE_PHOTO_ALREADY_DECIDED once a Manager
-    // has already decided. See docs/contract-drift.md "PATCH .../review".
-    suspend fun reviewPhoto(
-        workOrderId: String,
+    // Saves the Field Engineer's correction/agreement on cvState locally only — nothing is sent
+    // to the server here. See RealPolePhotoRepository.enqueuePendingReviews for when it is sent.
+    suspend fun saveDraftReview(
         serverPhotoId: String,
         finalCvState: String,
         reviewNote: String?,
-    ): Result<LocalPolePhotoEntity>
+    )
+
+    // Scans this work order's photos for an unsent draft review and enqueues one
+    // "submit_pole_photo_review" sync op per draft found. Returns how many were enqueued, so the
+    // caller (PoleListViewModel.onComplete) can report it. Called exactly once, when "Hoàn tất"
+    // is tapped — never at saveDraftReview time, so a draft is never sent before that.
+    suspend fun enqueuePendingReviews(workOrderId: String): Int
 }

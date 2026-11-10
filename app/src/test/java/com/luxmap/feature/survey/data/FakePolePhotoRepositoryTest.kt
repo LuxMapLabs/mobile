@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.data
 
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -54,5 +55,52 @@ class FakePolePhotoRepositoryTest {
             val repository = FakePolePhotoRepository(dao)
 
             repository.observePhotos("WO-1").collect { assertEquals(rows, it) }
+        }
+
+    @Test
+    fun `saveDraftReview writes both draft columns`() =
+        runTest {
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            coEvery { dao.byServerPhotoId("SERVER-1") } returns
+                LocalPolePhotoEntity(
+                    photoId = "PH-1",
+                    workOrderId = "WO-1",
+                    poleId = "POLE-1",
+                    filePath = "/data/x.jpg",
+                    capturedAt = java.time.Instant.parse("2026-10-15T10:00:00Z"),
+                    lat = 10.0,
+                    lng = 106.0,
+                    serverPhotoId = "SERVER-1",
+                )
+            val repository = FakePolePhotoRepository(dao)
+
+            repository.saveDraftReview("SERVER-1", "off", "Thấy đèn tắt")
+
+            coVerify { dao.updateDraftReview("PH-1", "off", "Thấy đèn tắt") }
+        }
+
+    @Test
+    fun `enqueuePendingReviews resolves every draft and clears it`() =
+        runTest {
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            val withDraft =
+                LocalPolePhotoEntity(
+                    photoId = "PH-1",
+                    workOrderId = "WO-1",
+                    poleId = "POLE-1",
+                    filePath = "/data/x.jpg",
+                    capturedAt = java.time.Instant.parse("2026-10-15T10:00:00Z"),
+                    lat = 10.0,
+                    lng = 106.0,
+                    draftFinalCvState = "off",
+                    draftReviewNote = "Thấy đèn tắt",
+                )
+            every { dao.observeByWorkOrder("WO-1") } returns flowOf(listOf(withDraft))
+            val repository = FakePolePhotoRepository(dao)
+
+            val count = repository.enqueuePendingReviews("WO-1")
+
+            assertEquals(1, count)
+            coVerify { dao.updateDraftReview("PH-1", null, null) }
         }
 }

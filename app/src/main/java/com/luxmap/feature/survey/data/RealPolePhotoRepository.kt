@@ -5,10 +5,10 @@ import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
-import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import com.luxmap.feature.survey.data.sync.PolePhotoSyncPayload
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
@@ -63,6 +63,27 @@ class RealPolePhotoRepository
             return entity
         }
 
+        override suspend fun saveDraftReview(
+            serverPhotoId: String,
+            finalCvState: String,
+            reviewNote: String?,
+        ) {
+            val localPhotoId = dao.byServerPhotoId(serverPhotoId)?.photoId ?: return
+            dao.updateDraftReview(localPhotoId, finalCvState, reviewNote)
+        }
+
+        override suspend fun enqueuePendingReviews(workOrderId: String): Int {
+            val pending = dao.observeByWorkOrder(workOrderId).first().filter { it.draftFinalCvState != null }
+            pending.forEach { photo ->
+                syncQueueManager.enqueue(
+                    opType = "submit_pole_photo_review",
+                    payloadJson = json.encodeToString(PolePhotoSyncPayload(photo.photoId)),
+                    clientOpId = "${photo.photoId}:review",
+                )
+            }
+            return pending.size
+        }
+
         override suspend fun fetchResult(
             workOrderId: String,
             serverPhotoId: String,
@@ -78,26 +99,6 @@ class RealPolePhotoRepository
 
         override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? =
             dao.byServerPhotoId(serverPhotoId)
-
-        override suspend fun reviewPhoto(
-            workOrderId: String,
-            serverPhotoId: String,
-            finalCvState: String,
-            reviewNote: String?,
-        ): Result<LocalPolePhotoEntity> =
-            runCatching {
-                val item =
-                    api.reviewPolePhoto(
-                        workOrderId,
-                        serverPhotoId,
-                        PolePhotoReviewRequestDto(finalCvState = finalCvState, reviewNote = reviewNote),
-                    )
-                val localPhotoId =
-                    dao.byServerPhotoId(serverPhotoId)?.photoId
-                        ?: error("Local pole photo row missing for server photo $serverPhotoId")
-                persist(localPhotoId, item)
-                dao.byId(localPhotoId) ?: error("Local pole photo row missing after review update")
-            }
 
         // Writes a server PolePhotoItemDto (from either the GET detail or PATCH review response -
         // both return the same full item shape) into Room.
