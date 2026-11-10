@@ -14,9 +14,11 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -83,6 +85,20 @@ interface WorkOrdersApi {
         @Part("lat") lat: RequestBody,
         @Part("lng") lng: RequestBody,
         @Part("client_op_id") clientOpId: RequestBody,
+    ): PolePhotoUploadResponseDto
+
+    // POLE-VIDEO PV-4: raw MP4 body (not multipart), query params instead of form fields,
+    // client_op_id in the path. See docs/contract-drift.md "POLE-VIDEO".
+    @PUT("api/v1/work-orders/{id}/pole-videos/{client_op_id}")
+    suspend fun uploadPoleVideo(
+        @Path("id") id: String,
+        @Path("client_op_id") clientOpId: String,
+        @Query("pole_id") poleId: String,
+        @Query("captured_at") capturedAt: String,
+        @Query("lat") lat: String,
+        @Query("lng") lng: String,
+        @Header("X-Content-SHA256") sha256: String,
+        @Body body: RequestBody,
     ): PolePhotoUploadResponseDto
 
     @GET("api/v1/work-orders/{id}/pole-photos/{photo_id}")

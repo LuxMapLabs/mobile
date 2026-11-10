@@ -7,6 +7,7 @@ import com.luxmap.feature.survey.data.sync.CreateSurveySweepSyncHandler
 import com.luxmap.feature.survey.data.sync.SubmitPolePhotoReviewSyncHandler
 import com.luxmap.feature.survey.data.sync.SubmitSurveySweepSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPolePhotoSyncHandler
+import com.luxmap.feature.survey.data.sync.UploadPoleVideoSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadSurveyClipSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadSurveyRawSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
@@ -58,4 +59,8 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindSubmitPolePhotoReviewSyncHandler(impl: SubmitPolePhotoReviewSyncHandler): SyncOpHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindUploadPoleVideoSyncHandler(impl: UploadPoleVideoSyncHandler): SyncOpHandler
 }
