@@ -203,6 +203,7 @@ fun PolePhotoCaptureRoute(
                 poleId = poleId,
                 isSaving = isSaving,
                 retakeLabel = if (source == PolePhotoCaptureSource.GALLERY) "Chọn ảnh khác" else "Chụp lại",
+                contentScale = if (source == PolePhotoCaptureSource.GALLERY) ContentScale.Fit else ContentScale.Crop,
                 onConfirm = {
                     isSaving = true
                     viewModel.onPhotoCaptured(fileToPreview, onDone)
@@ -231,6 +232,7 @@ private fun PolePhotoPreview(
     poleId: String,
     isSaving: Boolean,
     retakeLabel: String,
+    contentScale: ContentScale,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onClose: () -> Unit,
@@ -273,7 +275,7 @@ private fun PolePhotoPreview(
             AsyncImage(
                 model = file,
                 contentDescription = "Ảnh cột đèn vừa chụp",
-                contentScale = ContentScale.Crop,
+                contentScale = contentScale,
                 modifier =
                     Modifier
                         .fillMaxWidth()

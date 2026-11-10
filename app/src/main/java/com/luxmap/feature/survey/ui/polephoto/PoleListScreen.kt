@@ -409,7 +409,10 @@ private fun ReportMethodOption(
     Column(
         modifier =
             modifier
-                .heightIn(min = 72.dp)
+                // Fixed, not just a minimum - "Chọn từ thư viện" wraps to 2 lines at this column
+                // width while the other 2 labels fit on 1, so a min-height let the 3 options sit
+                // at different heights in the same row (found on a real device, 2026-11-10).
+                .height(96.dp)
                 .clickable(enabled = enabled, onClick = onClick)
                 .border(
                     1.dp,
@@ -418,11 +421,18 @@ private fun ReportMethodOption(
                 )
                 .padding(Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = contentColor)
+        Spacer(Modifier.height(Spacing.xs))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = label, color = contentColor, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = label,
+                color = contentColor,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
             if (!enabled) {
                 Icon(
                     imageVector = Icons.Filled.Lock,
