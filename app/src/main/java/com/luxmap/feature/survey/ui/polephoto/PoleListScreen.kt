@@ -115,8 +115,14 @@ fun PoleListRoute(
         }
     }
     LaunchedEffect(Unit) {
-        viewModel.surveyCompleted.collect {
-            scope.launch { toastState.show("Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì") }
+        viewModel.surveyCompleted.collect { pendingReviews ->
+            val message =
+                if (pendingReviews > 0) {
+                    "Đã hoàn tất $workOrderId · $pendingReviews review đang gửi lên Kỹ sư bảo trì"
+                } else {
+                    "Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì"
+                }
+            scope.launch { toastState.show(message) }
         }
     }
 
@@ -618,6 +624,13 @@ private fun PoleRow(
                         text = polePhotoSyncLabel(pole.syncStatus),
                         colors = pole.syncStatus.badgeColors(),
                         icon = pole.syncStatus.icon(),
+                    )
+                }
+                if (pole.hasPendingReview) {
+                    StatusBadge(
+                        text = "Đã review, chờ gửi",
+                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
+                        icon = SyncStatus.QUEUED_ONLINE.icon(),
                     )
                 }
             }

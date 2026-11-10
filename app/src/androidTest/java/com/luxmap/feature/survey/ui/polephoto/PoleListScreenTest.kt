@@ -333,4 +333,27 @@ class PoleListScreenTest {
         }
         composeRule.onNodeWithText("AI chưa phân loại được ảnh này").assertExists()
     }
+
+    @Test
+    fun success_state_shows_the_pending_review_tag_when_hasPendingReview_is_true() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE).copy(
+                                        hasPendingReview = true,
+                                    ),
+                                ),
+                        ),
+                    onCapturePole = {},
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã review, chờ gửi").assertExists()
+    }
 }
