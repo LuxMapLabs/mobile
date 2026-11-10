@@ -8,6 +8,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -409,7 +411,10 @@ private fun ReportMethodOption(
     Column(
         modifier =
             modifier
-                .heightIn(min = 72.dp)
+                // Fixed, not just a minimum - "Chọn từ thư viện" wraps to 2 lines at this column
+                // width while the other 2 labels fit on 1, so a min-height let the 3 options sit
+                // at different heights in the same row (found on a real device, 2026-11-10).
+                .height(96.dp)
                 .clickable(enabled = enabled, onClick = onClick)
                 .border(
                     1.dp,
@@ -418,11 +423,18 @@ private fun ReportMethodOption(
                 )
                 .padding(Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalArrangement = Arrangement.Center,
     ) {
         Icon(imageVector = icon, contentDescription = null, tint = contentColor)
+        Spacer(Modifier.height(Spacing.xs))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = label, color = contentColor, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = label,
+                color = contentColor,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+            )
             if (!enabled) {
                 Icon(
                     imageVector = Icons.Filled.Lock,
@@ -594,6 +606,7 @@ private fun PoleListSectionHeader(count: Int) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PoleRow(
     pole: PoleListRowState,
@@ -630,7 +643,12 @@ private fun PoleRow(
             // Condition + sync badges share one row here instead of the sync badge sitting in
             // the row's trailing slot - with the AI-result icon button also in that slot, 2
             // variable-width badges plus a button no longer fit on screen width without wrapping.
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            // FlowRow (not Row) so a 3rd badge (hasPendingReview) wraps onto a second line
+            // instead of overflowing the column width (found on a real device, 2026-11-10).
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
                 StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
                 if (pole.syncStatus != null) {
                     StatusBadge(

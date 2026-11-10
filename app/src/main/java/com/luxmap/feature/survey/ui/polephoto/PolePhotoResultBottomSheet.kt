@@ -264,7 +264,9 @@ private fun PolePhotoResultContent(
             ReviewCard(poleId = poleId, state = state, onSubmit = onSubmitReview)
         }
 
-        PolePhotoDecisionCard(state)
+        if (state.decision != null) {
+            PolePhotoDecisionCard(state)
+        }
 
         RetakeButton(onClick = onRetake, modifier = Modifier.fillMaxWidth())
     }
@@ -324,6 +326,14 @@ private fun ReviewCard(
                 text = "Cần ghi chú vì khác với nhận định của AI",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        if (state.draftFinalCvState != null && !hasChange) {
+            Text(
+                text = "Đã lưu, sẽ gửi khi Hoàn tất",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -434,7 +444,7 @@ private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
         AsyncImage(
             model = File(state.filePath),
             contentDescription = "Ảnh cột đèn đã chụp",
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
         )
         if (state.analyzedAt != null) {

@@ -126,7 +126,7 @@ class PolePhotoResultBottomSheetTest {
     }
 
     @Test
-    fun success_state_shows_no_decision_yet_when_decision_is_null() {
+    fun success_state_hides_the_decision_card_when_decision_is_null() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
@@ -138,7 +138,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertExists()
+        composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertDoesNotExist()
     }
 
     @Test
@@ -281,6 +281,23 @@ class PolePhotoResultBottomSheetTest {
             }
         }
         composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Đã lưu, sẽ gửi khi Hoàn tất").assertExists()
+    }
+
+    @Test
+    fun review_card_shows_no_saved_hint_when_there_is_no_draft_yet() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã lưu, sẽ gửi khi Hoàn tất").assertDoesNotExist()
     }
 
     @Test
