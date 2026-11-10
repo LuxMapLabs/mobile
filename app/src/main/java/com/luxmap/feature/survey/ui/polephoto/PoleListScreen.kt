@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
@@ -88,7 +89,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun PoleListRoute(
     workOrderId: String,
-    onCapturePole: (poleId: String) -> Unit,
+    onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onDone: () -> Unit,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
@@ -152,7 +153,7 @@ fun PoleListRoute(
             onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
             onRetake = {
                 viewModel.onDismissAiResult()
-                lastViewedPoleId?.let(onCapturePole)
+                lastViewedPoleId?.let { onCapturePole(it, PolePhotoCaptureSource.CAMERA) }
             },
             onSubmitReview = { finalCvState, reviewNote ->
                 lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
@@ -173,7 +174,7 @@ fun PoleListRoute(
 fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
-    onCapturePole: (poleId: String) -> Unit,
+    onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -326,7 +327,11 @@ fun PoleListScreen(
             onDismiss = { reportMethodSheetPoleId = null },
             onChoosePhoto = {
                 reportMethodSheetPoleId = null
-                onCapturePole(methodSheetPoleId)
+                onCapturePole(methodSheetPoleId, PolePhotoCaptureSource.CAMERA)
+            },
+            onChooseGallery = {
+                reportMethodSheetPoleId = null
+                onCapturePole(methodSheetPoleId, PolePhotoCaptureSource.GALLERY)
             },
         )
     }
@@ -344,6 +349,7 @@ private fun ReportMethodSheet(
     poleId: String,
     onDismiss: () -> Unit,
     onChoosePhoto: () -> Unit,
+    onChooseGallery: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
@@ -364,6 +370,13 @@ private fun ReportMethodSheet(
                     label = "Chụp ảnh",
                     enabled = true,
                     onClick = onChoosePhoto,
+                    modifier = Modifier.weight(1f),
+                )
+                ReportMethodOption(
+                    icon = Icons.Filled.PhotoLibrary,
+                    label = "Chọn từ thư viện",
+                    enabled = true,
+                    onClick = onChooseGallery,
                     modifier = Modifier.weight(1f),
                 )
                 ReportMethodOption(
