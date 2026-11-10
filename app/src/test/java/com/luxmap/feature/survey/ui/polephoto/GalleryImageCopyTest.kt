@@ -45,4 +45,42 @@ class GalleryImageCopyTest {
 
             assertFalse(result)
         }
+
+    @Test
+    fun `isJpeg is true for bytes starting with the JPEG signature`() {
+        assertTrue(isJpeg(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 1, 2)))
+    }
+
+    @Test
+    fun `isJpeg is false for a PNG signature`() {
+        assertFalse(isJpeg(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)))
+    }
+
+    @Test
+    fun `isJpeg is false for bytes shorter than the signature`() {
+        assertFalse(isJpeg(byteArrayOf(0xFF.toByte(), 0xD8.toByte())))
+    }
+
+    @Test
+    fun `copyGalleryImageAsJpeg writes already-JPEG bytes through unchanged`() =
+        runTest {
+            val destination = File.createTempFile("gallery-copy-jpeg-test", ".jpg")
+            val jpegBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 1, 2, 3)
+            val input = ByteArrayInputStream(jpegBytes)
+
+            val result = copyGalleryImageAsJpeg(input, destination)
+
+            assertTrue(result)
+            assertTrue(destination.readBytes().toList() == jpegBytes.toList())
+        }
+
+    @Test
+    fun `copyGalleryImageAsJpeg returns false without throwing when the stream is null`() =
+        runTest {
+            val destination = File.createTempFile("gallery-copy-jpeg-test", ".jpg")
+
+            val result = copyGalleryImageAsJpeg(null, destination)
+
+            assertFalse(result)
+        }
 }

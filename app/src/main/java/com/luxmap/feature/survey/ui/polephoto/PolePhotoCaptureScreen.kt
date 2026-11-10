@@ -115,7 +115,7 @@ fun PolePhotoCaptureRoute(
             } else {
                 val file = viewModel.outputFile(context.filesDir)
                 scope.launch {
-                    val copied = copyGalleryImageToFile(context.contentResolver.openInputStream(uri), file)
+                    val copied = copyGalleryImageAsJpeg(context.contentResolver.openInputStream(uri), file)
                     if (copied) {
                         previewFile = file
                     } else {
