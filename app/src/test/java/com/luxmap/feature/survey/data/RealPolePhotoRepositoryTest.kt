@@ -6,6 +6,7 @@ import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
+import com.luxmap.feature.survey.data.dto.PolePhotoVideoDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,6 +39,7 @@ private fun polePhotoItemDto(
     aiStatus: String = "available",
     cvState: String? = "on",
     confidence: Double? = 0.92,
+    video: PolePhotoVideoDto? = null,
 ) = PolePhotoItemDto(
     photoId = photoId,
     workOrderId = "WO-1",
@@ -54,6 +56,7 @@ private fun polePhotoItemDto(
     modelVersion = "cv-v1",
     artifactVersion = "art-v1",
     analyzedAt = "2026-10-16T10:00:10Z",
+    video = video,
 )
 
 private fun queueRow(
@@ -205,6 +208,43 @@ class RealPolePhotoRepositoryTest {
                     decisionNote = null,
                     decidedBy = null,
                     decidedAt = null,
+                )
+            }
+        }
+
+    @Test
+    fun `fetchResult writes the video url onto the row when the server includes a video`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            val syncQueueManager = mockk<SyncQueueManager>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            val videoUrl = "/api/v1/work-orders/WO-1/pole-photos/PPH-000001/video"
+            coEvery { api.polePhotoDetail("WO-1", "PPH-000001") } returns
+                polePhotoItemDto(video = PolePhotoVideoDto(videoUrl = videoUrl))
+            coEvery { dao.byServerPhotoId("PPH-000001") } returns localPhoto(serverPhotoId = "PPH-000001")
+            coEvery { dao.byId("PHOTO-1") } returns localPhoto(serverPhotoId = "PPH-000001")
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
+
+            repository.fetchResult("WO-1", "PPH-000001")
+
+            coVerify {
+                dao.updateAiResult(
+                    photoId = "PHOTO-1",
+                    aiStatus = "available",
+                    cvState = "on",
+                    confidence = 0.92,
+                    modelVersion = "cv-v1",
+                    analyzedAt = Instant.parse("2026-10-16T10:00:10Z"),
+                    finalCvState = null,
+                    reviewNote = null,
+                    reviewedBy = null,
+                    reviewedAt = null,
+                    decision = null,
+                    decisionNote = null,
+                    decidedBy = null,
+                    decidedAt = null,
+                    videoUrl = "/api/v1/work-orders/WO-1/pole-photos/PPH-000001/video",
                 )
             }
         }

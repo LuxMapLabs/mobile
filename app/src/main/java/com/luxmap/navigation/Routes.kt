@@ -73,12 +73,13 @@ sealed interface Routes {
     }
 
     data object PoleVideoCapture : Routes {
-        override val route = "survey/pole-videos/{workOrderId}/capture/{poleId}"
+        override val route = "survey/pole-videos/{workOrderId}/capture/{poleId}?source={source}"
 
         fun createRoute(
             workOrderId: String,
             poleId: String,
-        ) = "survey/pole-videos/$workOrderId/capture/$poleId"
+            source: String = "camera",
+        ) = "survey/pole-videos/$workOrderId/capture/$poleId?source=$source"
     }
 
     data object AssetImportCapture : Routes {

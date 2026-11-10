@@ -57,6 +57,7 @@ import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureSource
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
+import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
@@ -259,8 +260,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             Routes.PolePhotoCapture.createRoute(polePhotoWorkOrderId, poleId, source.name.lowercase()),
                         )
                     },
-                    onCaptureVideo = { poleId ->
-                        navController.navigate(Routes.PoleVideoCapture.createRoute(polePhotoWorkOrderId, poleId))
+                    onCaptureVideo = { poleId, source ->
+                        navController.navigate(
+                            Routes.PoleVideoCapture.createRoute(polePhotoWorkOrderId, poleId, source.name.lowercase()),
+                        )
                     },
                     onDone = { navController.popBackStack() },
                 )
@@ -294,10 +297,22 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     listOf(
                         navArgument("workOrderId") { type = NavType.StringType },
                         navArgument("poleId") { type = NavType.StringType },
+                        navArgument("source") {
+                            type = NavType.StringType
+                            defaultValue = "camera"
+                        },
                     ),
             ) { backStackEntry ->
                 val captureVideoPoleId = backStackEntry.arguments?.getString("poleId") ?: return@composable
-                PoleVideoCaptureRoute(poleId = captureVideoPoleId, onDone = { navController.popBackStack() })
+                val captureVideoSource =
+                    PoleVideoCaptureSource.entries.firstOrNull {
+                        it.name.equals(backStackEntry.arguments?.getString("source"), ignoreCase = true)
+                    } ?: PoleVideoCaptureSource.CAMERA
+                PoleVideoCaptureRoute(
+                    poleId = captureVideoPoleId,
+                    source = captureVideoSource,
+                    onDone = { navController.popBackStack() },
+                )
             }
             composable(
                 route = Routes.AssetImportCapture.route,

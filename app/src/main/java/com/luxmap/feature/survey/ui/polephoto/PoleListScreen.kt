@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,7 +93,7 @@ import kotlinx.coroutines.launch
 fun PoleListRoute(
     workOrderId: String,
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
-    onCaptureVideo: (poleId: String) -> Unit,
+    onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit,
     onDone: () -> Unit,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
@@ -162,6 +163,7 @@ fun PoleListRoute(
             onSubmitReview = { finalCvState, reviewNote ->
                 lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
             },
+            onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
         )
         TopSlideToast(
             state = toastState,
@@ -179,7 +181,7 @@ fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
-    onCaptureVideo: (poleId: String) -> Unit = {},
+    onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -191,12 +193,10 @@ fun PoleListScreen(
     onRetryAiResult: () -> Unit = {},
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
+    onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
     // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
-    // the design mock's sheet trigger, but only offers the choice itself here. The real upload
-    // flow (PolePhotoCaptureScreen) only exists for photos - see CLAUDE.md/contract-drift.md:
-    // POST .../pole-photos validates strictly for a JPEG file named "photo", so there is no
-    // server-side way to send video for a pole yet.
+    // the design mock's sheet trigger, but only offers the choice itself here.
     // Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet - added 2026-10-29, this used
     // to call onComplete() and navigate away in the same tap, no confirmation and no way to tell
     // afterward that it worked (see CLAUDE.md).
@@ -322,6 +322,7 @@ fun PoleListScreen(
             onRetry = onRetryAiResult,
             onRetake = onRetake,
             onSubmitReview = onSubmitReview,
+            onRequestAuthorizationHeader = onRequestAuthorizationHeader,
         )
     }
 
@@ -340,7 +341,11 @@ fun PoleListScreen(
             },
             onChooseVideo = {
                 reportMethodSheetPoleId = null
-                onCaptureVideo(methodSheetPoleId)
+                onCaptureVideo(methodSheetPoleId, PoleVideoCaptureSource.CAMERA)
+            },
+            onChooseVideoGallery = {
+                reportMethodSheetPoleId = null
+                onCaptureVideo(methodSheetPoleId, PoleVideoCaptureSource.GALLERY)
             },
         )
     }
@@ -358,6 +363,7 @@ private fun ReportMethodSheet(
     onChoosePhoto: () -> Unit,
     onChooseGallery: () -> Unit,
     onChooseVideo: () -> Unit,
+    onChooseVideoGallery: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
@@ -372,28 +378,39 @@ private fun ReportMethodSheet(
                 )
                 Text(text = poleId, style = MaterialTheme.typography.titleLarge)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                ReportMethodOption(
-                    icon = Icons.Filled.PhotoCamera,
-                    label = "Chụp ảnh",
-                    enabled = true,
-                    onClick = onChoosePhoto,
-                    modifier = Modifier.weight(1f),
-                )
-                ReportMethodOption(
-                    icon = Icons.Filled.PhotoLibrary,
-                    label = "Chọn từ thư viện",
-                    enabled = true,
-                    onClick = onChooseGallery,
-                    modifier = Modifier.weight(1f),
-                )
-                ReportMethodOption(
-                    icon = Icons.Filled.Videocam,
-                    label = "Quay video",
-                    enabled = true,
-                    onClick = onChooseVideo,
-                    modifier = Modifier.weight(1f),
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    ReportMethodOption(
+                        icon = Icons.Filled.PhotoCamera,
+                        label = "Chụp ảnh",
+                        enabled = true,
+                        onClick = onChoosePhoto,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ReportMethodOption(
+                        icon = Icons.Filled.PhotoLibrary,
+                        label = "Chọn từ thư viện",
+                        enabled = true,
+                        onClick = onChooseGallery,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    ReportMethodOption(
+                        icon = Icons.Filled.Videocam,
+                        label = "Quay video",
+                        enabled = true,
+                        onClick = onChooseVideo,
+                        modifier = Modifier.weight(1f),
+                    )
+                    ReportMethodOption(
+                        icon = Icons.Filled.VideoLibrary,
+                        label = "Video từ thư viện",
+                        enabled = true,
+                        onClick = onChooseVideoGallery,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -661,6 +678,12 @@ private fun PoleRow(
                 if (pole.hasPendingReview) {
                     StatusBadge(
                         text = "Đã review, chờ gửi",
+                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
+                        icon = SyncStatus.QUEUED_ONLINE.icon(),
+                    )
+                } else if (pole.hasPendingDecision) {
+                    StatusBadge(
+                        text = "Chờ duyệt",
                         colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
                         icon = SyncStatus.QUEUED_ONLINE.icon(),
                     )

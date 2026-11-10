@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,8 +44,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,9 +57,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.luxmap.BuildConfig
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BrandHeroGradient
@@ -92,6 +104,7 @@ fun PolePhotoResultBottomSheet(
     onRetry: () -> Unit,
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
+    onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
     val sheetState = rememberModalBottomSheetState()
 
@@ -115,7 +128,7 @@ fun PolePhotoResultBottomSheet(
                     is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
                     is PolePhotoResultUiState.Success ->
-                        PolePhotoResultContent(poleId, state, onRetake, onSubmitReview)
+                        PolePhotoResultContent(poleId, state, onRetake, onSubmitReview, onRequestAuthorizationHeader)
 
                     // heightIn (not a fixed height) - MessageState's action button (Error) makes this
                     // content taller than the skeleton needs, and a fixed height here clipped
@@ -238,9 +251,10 @@ private fun PolePhotoResultContent(
     state: PolePhotoResultUiState.Success,
     onRetake: () -> Unit,
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit,
+    onRequestAuthorizationHeader: suspend () -> String?,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        PolePhotoPreview(state)
+        PolePhotoPreview(state, onRequestAuthorizationHeader)
 
         if (state.isStale) {
             InlineBanner(
@@ -440,10 +454,17 @@ private fun ReviewChoiceCard(
 }
 
 @Composable
-private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
+private fun PolePhotoPreview(
+    state: PolePhotoResultUiState.Success,
+    onRequestAuthorizationHeader: suspend () -> String?,
+) {
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(PHOTO_ASPECT_RATIO)) {
         if (state.mediaType == "video") {
-            VideoPreviewPlaceholder()
+            VideoPlayer(
+                localFilePath = state.filePath,
+                videoUrl = state.videoUrl,
+                onRequestAuthorizationHeader = onRequestAuthorizationHeader,
+            )
         } else {
             AsyncImage(
                 model = File(state.filePath),
@@ -491,6 +512,76 @@ private fun VideoPreviewPlaceholder() {
             )
         }
     }
+}
+
+private fun String.toAbsoluteVideoUrl(): String {
+    if (startsWith("http://") || startsWith("https://")) return this
+    val base = BuildConfig.API_BASE_URL.trimEnd('/')
+    val path = if (startsWith("/")) this else "/$this"
+    return base + path
+}
+
+@Composable
+private fun VideoPlayer(
+    localFilePath: String,
+    videoUrl: String?,
+    onRequestAuthorizationHeader: suspend () -> String?,
+) {
+    val context = LocalContext.current
+    val localFile = remember(localFilePath) { File(localFilePath) }
+    var authorizationHeader by remember(videoUrl) { mutableStateOf<String?>(null) }
+    var authorizationHeaderReady by remember(videoUrl) { mutableStateOf(localFile.exists()) }
+
+    LaunchedEffect(videoUrl, localFile) {
+        if (!localFile.exists() && videoUrl != null) {
+            authorizationHeader = onRequestAuthorizationHeader()
+            authorizationHeaderReady = true
+        }
+    }
+
+    if (!authorizationHeaderReady) {
+        VideoPreviewPlaceholder()
+        return
+    }
+
+    val mediaItem =
+        remember(localFile, videoUrl) {
+            if (localFile.exists()) {
+                MediaItem.fromUri(Uri.fromFile(localFile))
+            } else if (videoUrl != null) {
+                MediaItem.fromUri(Uri.parse(videoUrl.toAbsoluteVideoUrl()))
+            } else {
+                null
+            }
+        }
+
+    if (mediaItem == null) {
+        VideoPreviewPlaceholder()
+        return
+    }
+
+    val player =
+        remember(mediaItem, authorizationHeader) {
+            val dataSourceFactory =
+                DefaultHttpDataSource.Factory().apply {
+                    authorizationHeader?.let { setDefaultRequestProperties(mapOf("Authorization" to it)) }
+                }
+            ExoPlayer.Builder(context)
+                .setMediaSourceFactory(ProgressiveMediaSource.Factory(dataSourceFactory))
+                .build()
+                .apply {
+                    setMediaItem(mediaItem)
+                    prepare()
+                }
+        }
+    DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+
+    AndroidView(
+        factory = { viewContext -> PlayerView(viewContext).apply { this.player = player } },
+        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
+    )
 }
 
 // Single card (Khao Sat v4 - Ket Qua AI mock, CLAUDE.md 2026-10-30) replacing the previous
@@ -637,7 +728,7 @@ private fun cvStateLabel(cvState: String?): String =
     when (cvState) {
         "on" -> "Đèn sáng"
         "off" -> "Đèn tắt"
-        "inconclusive" -> "AI không chắc"
+        "inconclusive" -> "Không rõ ràng"
         null -> "AI không xử lý được"
         else -> "Không rõ"
     }

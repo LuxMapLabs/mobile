@@ -14,6 +14,7 @@ data class PoleListRowState(
     // True when this pole's latest photo has a draft review not yet sent (Task 3's
     // enqueuePendingReviews is what sends it, on "Hoàn tất").
     val hasPendingReview: Boolean = false,
+    val hasPendingDecision: Boolean = false,
 )
 
 sealed interface PoleListUiState {
@@ -70,6 +71,7 @@ sealed interface PolePhotoResultUiState {
         // (offline-first: shown immediately instead of a Loading spinner when a cache exists).
         val isStale: Boolean = false,
         val mediaType: String = "photo",
+        val videoUrl: String? = null,
     ) : PolePhotoResultUiState
 
     // Defensive-only fallback, kept for the mandatory 4-state UiState pattern (CLAUDE.md) - the

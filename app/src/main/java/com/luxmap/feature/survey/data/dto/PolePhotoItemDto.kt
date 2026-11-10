@@ -37,6 +37,12 @@ data class PolePhotoItemDto(
     @SerialName("status_reason") val statusReason: String? = null,
     @SerialName("thumbnail_url") val thumbnailUrl: String? = null,
     @SerialName("original_url") val originalUrl: String? = null,
+    val video: PolePhotoVideoDto? = null,
+)
+
+@Serializable
+data class PolePhotoVideoDto(
+    @SerialName("video_url") val videoUrl: String,
 )
 
 // PATCH .../pole-photos/{photo_id}/review body - see docs/contract-drift.md "PATCH .../review".

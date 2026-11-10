@@ -70,6 +70,7 @@ class PoleListScreenTest {
         composeRule.onNodeWithText("Chụp ảnh").assertExists()
         composeRule.onNodeWithText("Chọn từ thư viện").assertExists()
         composeRule.onNodeWithText("Quay video").assertExists()
+        composeRule.onNodeWithText("Video từ thư viện").assertExists()
     }
 
     @Test
@@ -91,15 +92,19 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun report_method_sheet_choosing_video_calls_onCaptureVideo_with_its_id() {
+    fun report_method_sheet_choosing_video_calls_onCaptureVideo_with_CAMERA() {
         var capturedPoleId: String? = null
+        var capturedSource: PoleVideoCaptureSource? = null
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
                     onCapturePole = { _, _ -> },
-                    onCaptureVideo = { capturedPoleId = it },
+                    onCaptureVideo = { poleId, source ->
+                        capturedPoleId = poleId
+                        capturedSource = source
+                    },
                     onBack = {},
                 )
             }
@@ -107,6 +112,26 @@ class PoleListScreenTest {
         composeRule.onNodeWithText("POLE-1").performClick()
         composeRule.onNodeWithText("Quay video").performClick()
         assertEquals("POLE-1", capturedPoleId)
+        assertEquals(PoleVideoCaptureSource.CAMERA, capturedSource)
+    }
+
+    @Test
+    fun report_method_sheet_choosing_video_from_the_gallery_calls_onCaptureVideo_with_GALLERY() {
+        var capturedSource: PoleVideoCaptureSource? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
+                    onCapturePole = { _, _ -> },
+                    onCaptureVideo = { _, source -> capturedSource = source },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("POLE-1").performClick()
+        composeRule.onNodeWithText("Video từ thư viện").performClick()
+        assertEquals(PoleVideoCaptureSource.GALLERY, capturedSource)
     }
 
     @Test
@@ -366,6 +391,29 @@ class PoleListScreenTest {
             }
         }
         composeRule.onNodeWithText("Đã review, chờ gửi").assertExists()
+    }
+
+    @Test
+    fun success_state_shows_the_pending_decision_tag_when_hasPendingDecision_is_true() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE).copy(
+                                        hasPendingDecision = true,
+                                    ),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chờ duyệt").assertExists()
     }
 
     @Test
