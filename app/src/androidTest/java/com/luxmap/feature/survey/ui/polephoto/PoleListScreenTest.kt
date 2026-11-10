@@ -27,7 +27,12 @@ class PoleListScreenTest {
     fun loading_state_shows_the_hero_header() {
         composeRule.setContent {
             LuxMapTheme {
-                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Loading, onCapturePole = {}, onBack = {})
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Loading,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
             }
         }
         composeRule.onNodeWithText("Chụp ảnh cột đèn").assertExists()
@@ -40,7 +45,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1", fixtureStatus = "dim"))),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
@@ -56,13 +61,14 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("POLE-1").performClick()
         composeRule.onNodeWithText("Chụp ảnh").assertExists()
+        composeRule.onNodeWithText("Chọn từ thư viện").assertExists()
         composeRule.onNodeWithText("Quay video").assertExists()
     }
 
@@ -74,7 +80,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
-                    onCapturePole = { capturedPoleId = it },
+                    onCapturePole = { poleId, _ -> capturedPoleId = poleId },
                     onBack = {},
                 )
             }
@@ -92,7 +98,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
-                    onCapturePole = { capturedPoleId = it },
+                    onCapturePole = { poleId, _ -> capturedPoleId = poleId },
                     onBack = {},
                 )
             }
@@ -113,7 +119,7 @@ class PoleListScreenTest {
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
                         ),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
@@ -132,7 +138,7 @@ class PoleListScreenTest {
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
                         ),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                     onViewAiResult = { viewedServerPhotoId = it },
                 )
@@ -152,7 +158,7 @@ class PoleListScreenTest {
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.SYNCING)),
                         ),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
@@ -167,7 +173,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole()), isStale = true),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
@@ -193,7 +199,7 @@ class PoleListScreenTest {
                                     pole(poleId = "POLE-1", serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE),
                                 ),
                         ),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                     onComplete = { completed = true },
                 )
@@ -213,7 +219,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole())),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                     onComplete = { completed = true },
                 )
@@ -233,7 +239,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole())),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                     onComplete = { completed = true },
                 )
@@ -261,7 +267,7 @@ class PoleListScreenTest {
                         PoleListUiState.Success(
                             poles = listOf(pole(serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)),
                         ),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = { backCalled = true },
                     onComplete = { completed = true },
                 )
@@ -279,7 +285,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1")), isCompleted = true),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
@@ -293,7 +299,12 @@ class PoleListScreenTest {
     fun empty_state_shows_the_no_poles_message() {
         composeRule.setContent {
             LuxMapTheme {
-                PoleListScreen(workOrderId = "WO-1", state = PoleListUiState.Empty, onCapturePole = {}, onBack = {})
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Empty,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
             }
         }
         composeRule.onNodeWithText("Tuyến này chưa có cột đèn nào").assertExists()
@@ -307,7 +318,7 @@ class PoleListScreenTest {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Error("network down"),
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                     onRetry = { retried = true },
                 )
@@ -326,11 +337,52 @@ class PoleListScreenTest {
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole())),
                     aiResultState = PolePhotoResultUiState.Empty,
-                    onCapturePole = {},
+                    onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("AI chưa phân loại được ảnh này").assertExists()
+    }
+
+    @Test
+    fun success_state_shows_the_pending_review_tag_when_hasPendingReview_is_true() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE).copy(
+                                        hasPendingReview = true,
+                                    ),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã review, chờ gửi").assertExists()
+    }
+
+    @Test
+    fun report_method_sheet_choosing_the_gallery_option_calls_onCapturePole_with_GALLERY() {
+        var capturedSource: PolePhotoCaptureSource? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
+                    onCapturePole = { _, source -> capturedSource = source },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("POLE-1").performClick()
+        composeRule.onNodeWithText("Chọn từ thư viện").performClick()
+        assertEquals(PolePhotoCaptureSource.GALLERY, capturedSource)
     }
 }

@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -40,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +64,7 @@ import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import kotlinx.coroutines.launch
 import java.io.File
 
 // Near-black navy, matches the design doc's own bg (#0B1526) - a bespoke tone for this immersive
@@ -81,10 +84,12 @@ private val PolePhotoButtonContentPadding = PaddingValues(horizontal = Spacing.s
 @Composable
 fun PolePhotoCaptureRoute(
     poleId: String,
+    source: PolePhotoCaptureSource = PolePhotoCaptureSource.CAMERA,
     onDone: () -> Unit,
     viewModel: PolePhotoCaptureViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var previewFile by remember { mutableStateOf<File?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -100,6 +105,24 @@ fun PolePhotoCaptureRoute(
                 previewFile = file
             } else {
                 onDone()
+            }
+        }
+
+    val pickMediaLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri == null) {
+                onDone()
+            } else {
+                val file = viewModel.outputFile(context.filesDir)
+                scope.launch {
+                    val copied = copyGalleryImageToFile(context.contentResolver.openInputStream(uri), file)
+                    if (copied) {
+                        previewFile = file
+                    } else {
+                        file.delete()
+                        onDone()
+                    }
+                }
             }
         }
 
@@ -119,6 +142,10 @@ fun PolePhotoCaptureRoute(
         takePictureLauncher.launch(uri)
     }
 
+    fun launchGalleryPicker() {
+        pickMediaLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
     // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
     // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
     // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
@@ -132,18 +159,35 @@ fun PolePhotoCaptureRoute(
             }
         }
 
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            launchGalleryPicker()
+        }
+
     LaunchedEffect(Unit) {
-        val cameraGranted =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        when {
-            cameraGranted -> launchCamera()
-            hasRequestedPermissions -> onDone()
-            else -> {
-                hasRequestedPermissions = true
-                permissionsLauncher.launch(
-                    arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
-                )
+        when (source) {
+            PolePhotoCaptureSource.CAMERA -> {
+                val cameraGranted =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED
+                when {
+                    cameraGranted -> launchCamera()
+                    hasRequestedPermissions -> onDone()
+                    else -> {
+                        hasRequestedPermissions = true
+                        permissionsLauncher.launch(
+                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
+                        )
+                    }
+                }
+            }
+            PolePhotoCaptureSource.GALLERY -> {
+                if (hasRequestedPermissions) {
+                    launchGalleryPicker()
+                } else {
+                    hasRequestedPermissions = true
+                    locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                }
             }
         }
     }
@@ -158,6 +202,7 @@ fun PolePhotoCaptureRoute(
                 file = fileToPreview,
                 poleId = poleId,
                 isSaving = isSaving,
+                retakeLabel = if (source == PolePhotoCaptureSource.GALLERY) "Chọn ảnh khác" else "Chụp lại",
                 onConfirm = {
                     isSaving = true
                     viewModel.onPhotoCaptured(fileToPreview, onDone)
@@ -165,7 +210,10 @@ fun PolePhotoCaptureRoute(
                 onRetake = {
                     fileToPreview.delete()
                     previewFile = null
-                    launchCamera()
+                    when (source) {
+                        PolePhotoCaptureSource.CAMERA -> launchCamera()
+                        PolePhotoCaptureSource.GALLERY -> launchGalleryPicker()
+                    }
                 },
                 onClose = ::closePreview,
             )
@@ -182,6 +230,7 @@ private fun PolePhotoPreview(
     file: File,
     poleId: String,
     isSaving: Boolean,
+    retakeLabel: String,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onClose: () -> Unit,
@@ -240,7 +289,7 @@ private fun PolePhotoPreview(
                     .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            RetakeButton(enabled = !isSaving, onClick = onRetake, modifier = Modifier.weight(1f))
+            RetakeButton(label = retakeLabel, enabled = !isSaving, onClick = onRetake, modifier = Modifier.weight(1f))
             ConfirmButton(isSaving = isSaving, onClick = onConfirm, modifier = Modifier.weight(1f))
         }
     }
@@ -248,6 +297,7 @@ private fun PolePhotoPreview(
 
 @Composable
 private fun RetakeButton(
+    label: String,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -265,7 +315,7 @@ private fun RetakeButton(
     ) {
         Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(Spacing.sm))
-        Text("Chụp lại")
+        Text(label)
     }
 }
 

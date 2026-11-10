@@ -35,4 +35,9 @@ data class LocalPolePhotoEntity(
     val decisionNote: String? = null,
     val decidedBy: String? = null,
     val decidedAt: Instant? = null,
+    // Field Engineer's not-yet-sent review correction, saved by ReviewCard's "Lưu xác nhận"
+    // action. Separate from finalCvState/reviewNote, which only hold a server-confirmed review.
+    // Cleared back to null by SubmitPolePhotoReviewSyncHandler once the send succeeds.
+    val draftFinalCvState: String? = null,
+    val draftReviewNote: String? = null,
 )

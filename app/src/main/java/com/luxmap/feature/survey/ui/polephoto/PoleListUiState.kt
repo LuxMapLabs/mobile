@@ -11,6 +11,9 @@ data class PoleListRowState(
     // the upload response - not the local row's own id. Null until then.
     val serverPhotoId: String?,
     val syncStatus: SyncStatus?,
+    // True when this pole's latest photo has a draft review not yet sent (Task 3's
+    // enqueuePendingReviews is what sends it, on "Hoàn tất").
+    val hasPendingReview: Boolean = false,
 )
 
 sealed interface PoleListUiState {
@@ -54,6 +57,11 @@ sealed interface PolePhotoResultUiState {
         val reviewNote: String? = null,
         val reviewedBy: String? = null,
         val reviewedAt: Instant? = null,
+        // The Field Engineer's not-yet-sent draft correction (ReviewCard's local save) - distinct
+        // from finalCvState/reviewNote above, which only hold a server-confirmed review. Null
+        // once sent (SubmitPolePhotoReviewSyncHandler clears it) or if never reviewed.
+        val draftFinalCvState: String? = null,
+        val draftReviewNote: String? = null,
         val decision: String?,
         val decisionNote: String?,
         val decidedBy: String?,
@@ -61,12 +69,6 @@ sealed interface PolePhotoResultUiState {
         // True while showing a cached Room value and a network refresh hasn't confirmed it yet
         // (offline-first: shown immediately instead of a Loading spinner when a cache exists).
         val isStale: Boolean = false,
-        // True while a review submission is in flight - disables the submit button so a second
-        // tap can't fire a duplicate PATCH before the first one's response comes back.
-        val isSubmittingReview: Boolean = false,
-        // Set when a review submission fails (e.g. 409 POLE_PHOTO_ALREADY_DECIDED), cleared on
-        // the next successful fetch/submit - shown inline under the review editor.
-        val reviewError: String? = null,
     ) : PolePhotoResultUiState
 
     // Defensive-only fallback, kept for the mandatory 4-state UiState pattern (CLAUDE.md) - the

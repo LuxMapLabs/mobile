@@ -3,7 +3,6 @@ package com.luxmap.feature.survey.ui.polephoto
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luxmap.core.network.errorCodeOrNull
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -51,8 +49,8 @@ class PoleListViewModel
         // "Hoan tat" used to navigate back immediately with zero feedback, and the Hub card
         // looked completely unchanged on return - found on a real device, 2026-10-29. This
         // one-shot event lets the Route show a toast right on this screen instead.
-        private val _surveyCompleted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-        val surveyCompleted: SharedFlow<Unit> = _surveyCompleted.asSharedFlow()
+        private val _surveyCompleted = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+        val surveyCompleted: SharedFlow<Int> = _surveyCompleted.asSharedFlow()
 
         init {
             load()
@@ -106,6 +104,8 @@ class PoleListViewModel
                     decisionNote = decisionNote,
                     decidedBy = decidedBy,
                     decidedAt = decidedAt,
+                    draftFinalCvState = draftFinalCvState,
+                    draftReviewNote = draftReviewNote,
                     isStale = isStale,
                 )
             }
@@ -127,6 +127,7 @@ class PoleListViewModel
             val captured = state.poles.count { it.syncStatus != null }
             if (captured == 0) return
             viewModelScope.launch {
+                val pendingReviews = polePhotoRepository.enqueuePendingReviews(workOrderId)
                 completionRepository.submitCompletion(
                     workOrderId = workOrderId,
                     taskKind = "survey",
@@ -134,41 +135,30 @@ class PoleListViewModel
                     materialsUsed = null,
                     faultOutcomes = null,
                 )
-                _surveyCompleted.tryEmit(Unit)
+                _surveyCompleted.tryEmit(pendingReviews)
             }
         }
 
-        // Field Engineer corrects/confirms cvState before a Manager decides (ticket PHOTO-REVIEW,
-        // 2026-10-20). Direct call like fetchResult/start - not queued through sync_queue, since
-        // it is a foreground state-correction action, not a file upload needing offline resilience.
+        // Saves the Field Engineer's correction locally only - sent later, in bulk, by
+        // enqueuePendingReviews when "Hoan tat" is tapped (ticket batch-submit-review, 2026-11-10).
         fun onSubmitReview(
             serverPhotoId: String,
             finalCvState: String,
             reviewNote: String?,
         ) {
             val current = _aiResultState.value as? PolePhotoResultUiState.Success ?: return
-            _aiResultState.value = current.copy(isSubmittingReview = true, reviewError = null)
             viewModelScope.launch {
-                polePhotoRepository.reviewPhoto(workOrderId, serverPhotoId, finalCvState, reviewNote).fold(
-                    onSuccess = { photo ->
-                        _aiResultState.value = photo.toResultUiState(isStale = false) ?: PolePhotoResultUiState.Empty
-                        _reviewSubmitted.tryEmit(Unit)
-                    },
-                    onFailure = { e ->
-                        val latest = _aiResultState.value as? PolePhotoResultUiState.Success ?: current
-                        _aiResultState.value =
-                            latest.copy(isSubmittingReview = false, reviewError = reviewErrorMessage(e))
-                    },
-                )
+                polePhotoRepository.saveDraftReview(serverPhotoId, finalCvState, reviewNote)
+                _aiResultState.value = current.copy(draftFinalCvState = finalCvState, draftReviewNote = reviewNote)
+                _reviewSubmitted.tryEmit(Unit)
             }
         }
 
-        private fun reviewErrorMessage(e: Throwable): String =
-            when ((e as? HttpException)?.errorCodeOrNull()) {
-                "POLE_PHOTO_ALREADY_DECIDED" -> "Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa"
-                "WORK_ORDER_NOT_IN_PROGRESS" -> "Phiếu công việc không còn ở trạng thái đang xử lý"
-                else -> e.message ?: "Không gửi được, thử lại"
-            }
+        private data class PoleSyncInfo(
+            val serverPhotoId: String?,
+            val status: String?,
+            val hasPendingReview: Boolean,
+        )
 
         private fun load() {
             viewModelScope.launch {
@@ -186,12 +176,13 @@ class PoleListViewModel
                                     val latestByPole = photos.groupBy { it.poleId }.mapValues { it.value.first() }
                                     polePhotoRepository
                                         .observeUploadStatuses(latestByPole.values.map { it.photoId })
-                                        .map {
-                                                statuses ->
-                                            // Keyed by local photoId (sync_queue.client_op_id) to look up status, but
-                                            // the row only needs serverPhotoId - the local id is never shown in the UI.
+                                        .map { statuses ->
                                             latestByPole.mapValues { (_, photo) ->
-                                                photo.serverPhotoId to statuses[photo.photoId]
+                                                PoleSyncInfo(
+                                                    serverPhotoId = photo.serverPhotoId,
+                                                    status = statuses[photo.photoId],
+                                                    hasPendingReview = photo.draftFinalCvState != null,
+                                                )
                                             }
                                         }
                                 }
@@ -202,13 +193,14 @@ class PoleListViewModel
                             PoleListUiState.Success(
                                 poles =
                                     poles.map { pole ->
-                                        val (serverPhotoId, status) = infoByPole[pole.poleId] ?: (null to null)
+                                        val info = infoByPole[pole.poleId]
                                         PoleListRowState(
                                             poleId = pole.poleId,
                                             position = pole.position,
                                             fixtureStatus = pole.fixtureStatus,
-                                            serverPhotoId = serverPhotoId,
-                                            syncStatus = status?.let(::toSyncStatus),
+                                            serverPhotoId = info?.serverPhotoId,
+                                            syncStatus = info?.status?.let(::toSyncStatus),
+                                            hasPendingReview = info?.hasPendingReview ?: false,
                                         )
                                     },
                                 isStale = result.isStale,

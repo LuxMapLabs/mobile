@@ -65,4 +65,18 @@ interface PolePhotoDao {
         decidedBy: String?,
         decidedAt: Instant?,
     )
+
+    @Query(
+        """
+        UPDATE local_pole_photo SET
+            draftFinalCvState = :draftFinalCvState,
+            draftReviewNote = :draftReviewNote
+        WHERE photoId = :photoId
+        """,
+    )
+    suspend fun updateDraftReview(
+        photoId: String,
+        draftFinalCvState: String?,
+        draftReviewNote: String?,
+    )
 }

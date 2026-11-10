@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
@@ -88,7 +89,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun PoleListRoute(
     workOrderId: String,
-    onCapturePole: (poleId: String) -> Unit,
+    onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onDone: () -> Unit,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
@@ -111,12 +112,18 @@ fun PoleListRoute(
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.reviewSubmitted.collect {
-            scope.launch { toastState.show("Đã gửi xác nhận") }
+            scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
         }
     }
     LaunchedEffect(Unit) {
-        viewModel.surveyCompleted.collect {
-            scope.launch { toastState.show("Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì") }
+        viewModel.surveyCompleted.collect { pendingReviews ->
+            val message =
+                if (pendingReviews > 0) {
+                    "Đã hoàn tất $workOrderId · $pendingReviews review đang gửi lên Kỹ sư bảo trì"
+                } else {
+                    "Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì"
+                }
+            scope.launch { toastState.show(message) }
         }
     }
 
@@ -146,7 +153,7 @@ fun PoleListRoute(
             onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
             onRetake = {
                 viewModel.onDismissAiResult()
-                lastViewedPoleId?.let(onCapturePole)
+                lastViewedPoleId?.let { onCapturePole(it, PolePhotoCaptureSource.CAMERA) }
             },
             onSubmitReview = { finalCvState, reviewNote ->
                 lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
@@ -167,7 +174,7 @@ fun PoleListRoute(
 fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
-    onCapturePole: (poleId: String) -> Unit,
+    onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onBack: () -> Unit,
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -320,7 +327,11 @@ fun PoleListScreen(
             onDismiss = { reportMethodSheetPoleId = null },
             onChoosePhoto = {
                 reportMethodSheetPoleId = null
-                onCapturePole(methodSheetPoleId)
+                onCapturePole(methodSheetPoleId, PolePhotoCaptureSource.CAMERA)
+            },
+            onChooseGallery = {
+                reportMethodSheetPoleId = null
+                onCapturePole(methodSheetPoleId, PolePhotoCaptureSource.GALLERY)
             },
         )
     }
@@ -338,6 +349,7 @@ private fun ReportMethodSheet(
     poleId: String,
     onDismiss: () -> Unit,
     onChoosePhoto: () -> Unit,
+    onChooseGallery: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
@@ -358,6 +370,13 @@ private fun ReportMethodSheet(
                     label = "Chụp ảnh",
                     enabled = true,
                     onClick = onChoosePhoto,
+                    modifier = Modifier.weight(1f),
+                )
+                ReportMethodOption(
+                    icon = Icons.Filled.PhotoLibrary,
+                    label = "Chọn từ thư viện",
+                    enabled = true,
+                    onClick = onChooseGallery,
                     modifier = Modifier.weight(1f),
                 )
                 ReportMethodOption(
@@ -618,6 +637,13 @@ private fun PoleRow(
                         text = polePhotoSyncLabel(pole.syncStatus),
                         colors = pole.syncStatus.badgeColors(),
                         icon = pole.syncStatus.icon(),
+                    )
+                }
+                if (pole.hasPendingReview) {
+                    StatusBadge(
+                        text = "Đã review, chờ gửi",
+                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
+                        icon = SyncStatus.QUEUED_ONLINE.icon(),
                     )
                 }
             }
