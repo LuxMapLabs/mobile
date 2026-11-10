@@ -111,7 +111,7 @@ fun PoleListRoute(
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.reviewSubmitted.collect {
-            scope.launch { toastState.show("Đã gửi xác nhận") }
+            scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
         }
     }
     LaunchedEffect(Unit) {

@@ -258,7 +258,7 @@ class PolePhotoResultBottomSheetTest {
             }
         }
         composeRule.onNodeWithTag("review_choice_on").performScrollTo().performClick()
-        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
+        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().performClick()
         assertEquals("on" to null, submitted)
     }
 
@@ -267,20 +267,20 @@ class PolePhotoResultBottomSheetTest {
     // the exact same values was both pointless (server treats it as a no-op) and looked like the
     // first tap never registered.
     @Test
-    fun review_card_disables_submit_right_after_a_successful_submit_with_no_further_edit() {
+    fun review_card_disables_submit_right_after_saving_a_draft_with_no_further_edit() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
                     poleId = "P-0103",
                     position = 3,
-                    state = successState(cvState = "on").copy(finalCvState = "on", reviewNote = null),
+                    state = successState(cvState = "on").copy(draftFinalCvState = "on", draftReviewNote = null),
                     onDismiss = {},
                     onRetry = {},
                     onSubmitReview = { _, _ -> },
                 )
             }
         }
-        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().assertIsNotEnabled()
     }
 
     @Test
@@ -300,29 +300,10 @@ class PolePhotoResultBottomSheetTest {
         }
         composeRule.onNodeWithTag("review_choice_off").performScrollTo().performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
-        composeRule.onNodeWithText("Gửi xác nhận").assertIsNotEnabled()
+        composeRule.onNodeWithText("Lưu xác nhận").assertIsNotEnabled()
 
         composeRule.onNodeWithText("Ghi chú").performTextInput("Thấy đèn tắt khi kiểm tra")
-        composeRule.onNodeWithText("Gửi xác nhận").performScrollTo().performClick()
+        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().performClick()
         assertEquals(true, submitted)
-    }
-
-    @Test
-    fun review_card_shows_a_message_when_the_submission_fails() {
-        composeRule.setContent {
-            LuxMapTheme {
-                PolePhotoResultBottomSheet(
-                    poleId = "P-0103",
-                    position = 3,
-                    state =
-                        successState(cvState = "on").copy(
-                            reviewError = "Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa",
-                        ),
-                    onDismiss = {},
-                    onRetry = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("Ảnh này đã được Kỹ sư bảo trì công bố, không thể sửa nhãn nữa").assertExists()
     }
 }

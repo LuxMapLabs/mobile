@@ -279,25 +279,21 @@ private fun ReviewCard(
     state: PolePhotoResultUiState.Success,
     onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
+    val baselineCvState = state.draftFinalCvState ?: state.finalCvState
+    val baselineNote = state.draftReviewNote ?: state.reviewNote
     var selected by
         rememberSaveable(poleId) {
-            mutableStateOf(state.finalCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
+            mutableStateOf(baselineCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
         }
-    var note by rememberSaveable(poleId) { mutableStateOf(state.reviewNote.orEmpty()) }
+    var note by rememberSaveable(poleId) { mutableStateOf(baselineNote.orEmpty()) }
     // Required whenever the chosen label differs from the AI's own cvState, including when
     // cvState is "inconclusive" or null (server rule, see docs/contract-drift.md "PATCH
     // .../review" - review_note is mandatory even when AI never reached on/off or failed
     // outright, not only when it disagrees).
     val noteRequired = selected != null && selected != state.cvState
-    // Disabled right after a successful submit (not just while in flight) - selected/note are
-    // local drafts that do not reset on their own, so without this the button stayed tappable
-    // forever with nothing new to send (found on a real device, 2026-10-29). A real edit (either
-    // field) re-enables it, matching the server's own support for re-reviewing before a Manager
-    // decision (contract-drift.md "PATCH .../review").
     val normalizedNote = note.trim().ifBlank { null }
-    val hasChange = selected != state.finalCvState || normalizedNote != state.reviewNote
-    val canSubmit =
-        selected != null && !state.isSubmittingReview && (!noteRequired || note.isNotBlank()) && hasChange
+    val hasChange = selected != baselineCvState || normalizedNote != baselineNote
+    val canSubmit = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
 
     Column(
         modifier =
@@ -338,19 +334,11 @@ private fun ReviewCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (state.reviewError != null) {
-            Text(
-                text = state.reviewError,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
 
         PrimaryButton(
-            text = if (state.isSubmittingReview) "Đang gửi..." else "Gửi xác nhận",
+            text = "Lưu xác nhận",
             onClick = { selected?.let { onSubmit(it, note.trim().ifBlank { null }) } },
             enabled = canSubmit,
-            isLoading = state.isSubmittingReview,
             modifier = Modifier.fillMaxWidth(),
         )
     }
