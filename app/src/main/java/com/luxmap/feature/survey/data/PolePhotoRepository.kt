@@ -16,6 +16,16 @@ interface PolePhotoRepository {
         lng: Double,
     ): LocalPolePhotoEntity
 
+    // Same shape as capture(), for a recorded video clip instead of a still photo. Writes
+    // mediaType = "video" and enqueues "upload_pole_video" instead of "upload_pole_photo".
+    suspend fun captureVideo(
+        workOrderId: String,
+        poleId: String,
+        filePath: String,
+        lat: Double,
+        lng: Double,
+    ): LocalPolePhotoEntity
+
     // Fetches the AI classification result for an already-uploaded photo and persists it
     // into Room, so it is still visible offline next time this photo is viewed.
     // serverPhotoId is the real backend photo_id (LocalPolePhotoEntity.serverPhotoId), NOT the

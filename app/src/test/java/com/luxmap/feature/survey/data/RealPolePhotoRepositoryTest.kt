@@ -108,6 +108,41 @@ class RealPolePhotoRepositoryTest {
         }
 
     @Test
+    fun `captureVideo writes the local row with mediaType video then enqueues an upload_pole_video op`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>(relaxed = true)
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
+            val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
+
+            val result =
+                repository.captureVideo(
+                    workOrderId = "WO-1",
+                    poleId = "POLE-1",
+                    filePath = "/data/clip.mp4",
+                    lat = 10.97,
+                    lng = 106.49,
+                )
+
+            coVerify {
+                dao.insert(
+                    match {
+                        it.photoId == result.photoId && it.workOrderId == "WO-1" &&
+                            it.poleId == "POLE-1" && it.filePath == "/data/clip.mp4" && it.mediaType == "video"
+                    },
+                )
+            }
+            coVerify {
+                syncQueueManager.enqueue(
+                    opType = "upload_pole_video",
+                    payloadJson = "{\"photo_id\":\"${result.photoId}\"}",
+                    clientOpId = result.photoId,
+                )
+            }
+        }
+
+    @Test
     fun `observeUploadStatuses maps sync_queue rows by clientOpId`() =
         runTest {
             val api = mockk<WorkOrdersApi>()

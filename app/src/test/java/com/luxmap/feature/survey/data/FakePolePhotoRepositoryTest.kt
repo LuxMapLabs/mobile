@@ -36,6 +36,26 @@ class FakePolePhotoRepositoryTest {
         }
 
     @Test
+    fun `captureVideo writes a row with mediaType video`() =
+        runTest {
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            val repository = FakePolePhotoRepository(dao)
+
+            val result =
+                repository.captureVideo(
+                    workOrderId = "WO-1",
+                    poleId = "POLE-1",
+                    filePath = "/data/pole-videos/x.mp4",
+                    lat = 10.0,
+                    lng = 106.0,
+                )
+
+            assertEquals("video", result.mediaType)
+            assertEquals("/data/pole-videos/x.mp4", result.filePath)
+            coVerify(exactly = 1) { dao.insert(result) }
+        }
+
+    @Test
     fun `observePhotos delegates straight to the DAO`() =
         runTest {
             val dao = mockk<PolePhotoDao>()

@@ -40,4 +40,7 @@ data class LocalPolePhotoEntity(
     // Cleared back to null by SubmitPolePhotoReviewSyncHandler once the send succeeds.
     val draftFinalCvState: String? = null,
     val draftReviewNote: String? = null,
+    // "photo" (camera or gallery) or "video" - decides which sync op capture()/captureVideo()
+    // enqueues. Added for the pole-video feature; existing rows default to "photo".
+    val mediaType: String = "photo",
 )
