@@ -24,4 +24,24 @@ class PoleVideoDurationTest {
     fun `a clip just over 30_5 seconds is invalid`() {
         assertFalse(isValidPoleVideoDuration(30_501))
     }
+
+    @Test
+    fun `a zero-byte file is invalid`() {
+        assertFalse(isValidPoleVideoSize(0))
+    }
+
+    @Test
+    fun `a 1-byte file is valid`() {
+        assertTrue(isValidPoleVideoSize(1))
+    }
+
+    @Test
+    fun `a file at exactly 100 MiB is valid`() {
+        assertTrue(isValidPoleVideoSize(100L * 1024 * 1024))
+    }
+
+    @Test
+    fun `a file one byte over 100 MiB is invalid`() {
+        assertFalse(isValidPoleVideoSize(100L * 1024 * 1024 + 1))
+    }
 }

@@ -21,6 +21,7 @@ private fun successState(
     decision: String? = null,
     decisionNote: String? = null,
     isStale: Boolean = false,
+    mediaType: String = "photo",
 ) = PolePhotoResultUiState.Success(
     filePath = "/data/pole-photo.jpg",
     cvState = cvState,
@@ -32,6 +33,7 @@ private fun successState(
     decidedBy = "U-9",
     decidedAt = Instant.parse("2026-10-16T11:00:00Z"),
     isStale = isStale,
+    mediaType = mediaType,
 )
 
 class PolePhotoResultBottomSheetTest {
@@ -105,6 +107,22 @@ class PolePhotoResultBottomSheetTest {
         }
         composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
         assertEquals(true, retaken)
+    }
+
+    @Test
+    fun success_state_with_video_media_type_shows_a_video_placeholder_not_a_broken_image() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(mediaType = "video"),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Video clip").assertExists()
     }
 
     @Test

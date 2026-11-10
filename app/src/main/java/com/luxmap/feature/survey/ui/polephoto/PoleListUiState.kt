@@ -69,6 +69,7 @@ sealed interface PolePhotoResultUiState {
         // True while showing a cached Room value and a network refresh hasn't confirmed it yet
         // (offline-first: shown immediately instead of a Loading spinner when a cache exists).
         val isStale: Boolean = false,
+        val mediaType: String = "photo",
     ) : PolePhotoResultUiState
 
     // Defensive-only fallback, kept for the mandatory 4-state UiState pattern (CLAUDE.md) - the

@@ -44,6 +44,7 @@ class UploadPoleVideoSyncHandler
                         body = file.asRequestBody("video/mp4".toMediaType()),
                     )
                 dao.updateServerPhotoId(photo.photoId, response.photoId)
+                file.delete()
                 SyncOpResult.Done
             } catch (e: HttpException) {
                 when (e.code()) {

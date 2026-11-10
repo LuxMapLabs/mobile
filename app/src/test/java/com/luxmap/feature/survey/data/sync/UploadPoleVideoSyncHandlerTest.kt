@@ -14,6 +14,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
@@ -62,6 +63,41 @@ class UploadPoleVideoSyncHandlerTest {
 
             assertTrue(result is SyncOpResult.Done)
             coVerify { dao.updateServerPhotoId("PHOTO-1", "PPH-000002") }
+        }
+
+    @Test
+    fun `a successful upload deletes the local clip file`() =
+        runTest {
+            val tempFile = File.createTempFile("pole-video", ".mp4").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byId("PHOTO-1") } returns videoEntity(tempFile.absolutePath)
+            coEvery {
+                api.uploadPoleVideo(any(), any(), any(), any(), any(), any(), any(), any())
+            } returns PolePhotoUploadResponseDto(photoId = "PPH-000002")
+            coJustRun { dao.updateServerPhotoId("PHOTO-1", "PPH-000002") }
+            val handler = UploadPoleVideoSyncHandler(api, dao)
+
+            handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
+
+            assertFalse(tempFile.exists())
+        }
+
+    @Test
+    fun `a 500 that will be retried does not delete the local clip file`() =
+        runTest {
+            val tempFile = File.createTempFile("pole-video", ".mp4").apply { writeBytes(byteArrayOf(1)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byId("PHOTO-1") } returns videoEntity(tempFile.absolutePath)
+            coEvery {
+                api.uploadPoleVideo(any(), any(), any(), any(), any(), any(), any(), any())
+            } throws httpException(500)
+            val handler = UploadPoleVideoSyncHandler(api, dao)
+
+            handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
+
+            assertTrue(tempFile.exists())
         }
 
     @Test

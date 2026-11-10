@@ -107,6 +107,7 @@ class PoleListViewModel
                     draftFinalCvState = draftFinalCvState,
                     draftReviewNote = draftReviewNote,
                     isStale = isStale,
+                    mediaType = mediaType,
                 )
             }
 

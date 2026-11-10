@@ -103,11 +103,13 @@ private class CaptureVideoWithDurationLimit(
     ): Boolean = resultCode == Activity.RESULT_OK
 }
 
-private fun readVideoDurationMs(file: File): Long {
+internal fun readVideoDurationMs(file: File): Long {
     val retriever = MediaMetadataRetriever()
     return try {
-        retriever.setDataSource(file.absolutePath)
-        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+        runCatching {
+            retriever.setDataSource(file.absolutePath)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+        }.getOrNull() ?: 0L
     } finally {
         retriever.release()
     }
@@ -213,10 +215,15 @@ private fun PoleVideoPreview(
 ) {
     val context = LocalContext.current
     var durationMs by remember(file) { mutableStateOf<Long?>(null) }
+    var sizeBytes by remember(file) { mutableStateOf<Long?>(null) }
     LaunchedEffect(file) {
         durationMs = withContext(Dispatchers.IO) { readVideoDurationMs(file) }
+        sizeBytes = withContext(Dispatchers.IO) { file.length() }
     }
     val isValidDuration = durationMs?.let(::isValidPoleVideoDuration) ?: false
+    val isValidSize = sizeBytes?.let(::isValidPoleVideoSize) ?: false
+    val isReady = durationMs != null && sizeBytes != null
+    val isValidForUpload = isValidDuration && isValidSize
 
     val player =
         remember(file) {
@@ -273,9 +280,14 @@ private fun PoleVideoPreview(
                         .clip(RoundedCornerShape(Radius.block)),
             )
         }
-        if (durationMs != null && !isValidDuration) {
+        if (isReady && !isValidForUpload) {
             Text(
-                text = "Clip quá ngắn hoặc quá dài (cần 3-30 giây), vui lòng quay lại",
+                text =
+                    if (!isValidDuration) {
+                        "Clip quá ngắn hoặc quá dài (cần 3-30 giây), vui lòng quay lại"
+                    } else {
+                        "Clip quá nặng (tối đa 100MB), vui lòng quay lại với video ngắn hơn"
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
@@ -292,7 +304,7 @@ private fun PoleVideoPreview(
             RetakeButton(enabled = !isSaving, onClick = onRetake, modifier = Modifier.weight(1f))
             ConfirmButton(
                 isSaving = isSaving,
-                enabled = isValidDuration,
+                enabled = isValidForUpload,
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
             )
