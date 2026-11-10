@@ -138,4 +138,57 @@ class PolePhotoDaoTest {
             assertEquals("U-9", row?.decidedBy)
             assertEquals(decidedAt, row?.decidedAt)
         }
+
+    @Test
+    fun updateDraftReviewSetsBothDraftColumns() =
+        runTest {
+            dao.insert(photo("PH-1"))
+
+            dao.updateDraftReview("PH-1", "off", "Thấy đèn tắt khi kiểm tra")
+
+            val row = dao.byId("PH-1")
+            assertEquals("off", row?.draftFinalCvState)
+            assertEquals("Thấy đèn tắt khi kiểm tra", row?.draftReviewNote)
+        }
+
+    @Test
+    fun updateDraftReviewWithNullsClearsAPreviouslySavedDraft() =
+        runTest {
+            dao.insert(photo("PH-1"))
+            dao.updateDraftReview("PH-1", "off", "Thấy đèn tắt khi kiểm tra")
+
+            dao.updateDraftReview("PH-1", null, null)
+
+            val row = dao.byId("PH-1")
+            assertEquals(null, row?.draftFinalCvState)
+            assertEquals(null, row?.draftReviewNote)
+        }
+
+    @Test
+    fun updateAiResultDoesNotTouchAPreviouslySavedDraft() =
+        runTest {
+            dao.insert(photo("PH-1"))
+            dao.updateDraftReview("PH-1", "off", "Thấy đèn tắt khi kiểm tra")
+
+            dao.updateAiResult(
+                photoId = "PH-1",
+                aiStatus = "available",
+                cvState = "on",
+                confidence = 0.92,
+                modelVersion = "cv-v1",
+                analyzedAt = Instant.parse("2026-10-16T10:00:10Z"),
+                finalCvState = null,
+                reviewNote = null,
+                reviewedBy = null,
+                reviewedAt = null,
+                decision = null,
+                decisionNote = null,
+                decidedBy = null,
+                decidedAt = null,
+            )
+
+            val row = dao.byId("PH-1")
+            assertEquals("off", row?.draftFinalCvState)
+            assertEquals("Thấy đèn tắt khi kiểm tra", row?.draftReviewNote)
+        }
 }
