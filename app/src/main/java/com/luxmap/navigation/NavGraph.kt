@@ -56,6 +56,7 @@ import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureSource
+import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
@@ -258,6 +259,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             Routes.PolePhotoCapture.createRoute(polePhotoWorkOrderId, poleId, source.name.lowercase()),
                         )
                     },
+                    onCaptureVideo = { poleId ->
+                        navController.navigate(Routes.PoleVideoCapture.createRoute(polePhotoWorkOrderId, poleId))
+                    },
                     onDone = { navController.popBackStack() },
                 )
             }
@@ -283,6 +287,17 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     source = captureSource,
                     onDone = { navController.popBackStack() },
                 )
+            }
+            composable(
+                route = Routes.PoleVideoCapture.route,
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("poleId") { type = NavType.StringType },
+                    ),
+            ) { backStackEntry ->
+                val captureVideoPoleId = backStackEntry.arguments?.getString("poleId") ?: return@composable
+                PoleVideoCaptureRoute(poleId = captureVideoPoleId, onDone = { navController.popBackStack() })
             }
             composable(
                 route = Routes.AssetImportCapture.route,

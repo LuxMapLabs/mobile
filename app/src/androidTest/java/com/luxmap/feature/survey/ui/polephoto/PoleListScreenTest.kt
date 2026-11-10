@@ -91,22 +91,22 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun report_method_sheet_quay_video_is_disabled() {
+    fun report_method_sheet_choosing_video_calls_onCaptureVideo_with_its_id() {
         var capturedPoleId: String? = null
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1"))),
-                    onCapturePole = { poleId, _ -> capturedPoleId = poleId },
+                    onCapturePole = { _, _ -> },
+                    onCaptureVideo = { capturedPoleId = it },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("POLE-1").performClick()
         composeRule.onNodeWithText("Quay video").performClick()
-        composeRule.onNodeWithText("Chưa hỗ trợ gửi video, dùng ảnh thay thế").assertExists()
-        assertEquals(null, capturedPoleId)
+        assertEquals("POLE-1", capturedPoleId)
     }
 
     @Test
