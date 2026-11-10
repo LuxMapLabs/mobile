@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.ui.polephoto
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.security.TokenStore
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
@@ -32,6 +33,7 @@ class PoleListViewModel
         private val poleListRepository: PoleListRepository,
         private val polePhotoRepository: PolePhotoRepository,
         private val completionRepository: WorkOrderCompletionRepository,
+        private val tokenStore: TokenStore,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val _uiState = MutableStateFlow<PoleListUiState>(PoleListUiState.Loading)
@@ -108,8 +110,12 @@ class PoleListViewModel
                     draftReviewNote = draftReviewNote,
                     isStale = isStale,
                     mediaType = mediaType,
+                    videoUrl = videoUrl,
                 )
             }
+
+        suspend fun currentAuthorizationHeader(): String? =
+            tokenStore.currentTokens()?.let { "Bearer ${it.accessToken}" }
 
         fun onDismissAiResult() {
             _aiResultState.value = null
@@ -159,6 +165,7 @@ class PoleListViewModel
             val serverPhotoId: String?,
             val status: String?,
             val hasPendingReview: Boolean,
+            val hasPendingDecision: Boolean,
         )
 
         private fun load() {
@@ -183,6 +190,8 @@ class PoleListViewModel
                                                     serverPhotoId = photo.serverPhotoId,
                                                     status = statuses[photo.photoId],
                                                     hasPendingReview = photo.draftFinalCvState != null,
+                                                    hasPendingDecision =
+                                                        photo.reviewedBy != null && photo.decision == null,
                                                 )
                                             }
                                         }
@@ -202,6 +211,7 @@ class PoleListViewModel
                                             serverPhotoId = info?.serverPhotoId,
                                             syncStatus = info?.status?.let(::toSyncStatus),
                                             hasPendingReview = info?.hasPendingReview ?: false,
+                                            hasPendingDecision = info?.hasPendingDecision ?: false,
                                         )
                                     },
                                 isStale = result.isStale,

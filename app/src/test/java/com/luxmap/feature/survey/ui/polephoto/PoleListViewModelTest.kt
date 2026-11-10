@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.luxmap.core.security.TokenStore
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.survey.data.PoleListRepository
@@ -37,6 +38,7 @@ private fun photo(
     aiStatus: String? = null,
     cvState: String? = null,
     mediaType: String = "photo",
+    videoUrl: String? = null,
 ) = LocalPolePhotoEntity(
     photoId = "PH-$poleId",
     workOrderId = WORK_ORDER_ID,
@@ -49,6 +51,7 @@ private fun photo(
     aiStatus = aiStatus,
     cvState = cvState,
     mediaType = mediaType,
+    videoUrl = videoUrl,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -87,7 +90,13 @@ class PoleListViewModelTest {
                 flowOf(mapOf("PH-POLE-1" to "done"))
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 assertEquals(PoleListUiState.Loading, awaitItem())
@@ -130,7 +139,13 @@ class PoleListViewModelTest {
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 0
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 awaitItem() // Loading
@@ -167,7 +182,13 @@ class PoleListViewModelTest {
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 0
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
             dispatcher.scheduler.advanceUntilIdle()
 
             vm.surveyCompleted.test {
@@ -202,7 +223,13 @@ class PoleListViewModelTest {
                     ),
                 )
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 awaitItem() // Loading
@@ -223,7 +250,13 @@ class PoleListViewModelTest {
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 awaitItem() // Loading
@@ -247,7 +280,13 @@ class PoleListViewModelTest {
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 assertEquals(PoleListUiState.Loading, awaitItem())
@@ -269,6 +308,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.uiState.test {
@@ -290,6 +330,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.uiState.test {
@@ -315,6 +356,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -345,6 +387,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -353,6 +396,42 @@ class PoleListViewModelTest {
                 awaitItem()
                 val result = awaitItem() as PolePhotoResultUiState.Success
                 assertEquals("video", result.mediaType)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult maps videoUrl through for a video row`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(
+                    photo(
+                        "POLE-1",
+                        serverPhotoId = "SERVER-PH-1",
+                        aiStatus = "available",
+                        mediaType = "video",
+                        videoUrl = "/api/v1/work-orders/WO-1/pole-photos/SERVER-PH-1/video",
+                    ),
+                )
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
+                )
+
+            vm.aiResultState.test {
+                awaitItem()
+                vm.onViewAiResult("SERVER-PH-1")
+                awaitItem()
+                val result = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("/api/v1/work-orders/WO-1/pole-photos/SERVER-PH-1/video", result.videoUrl)
             }
         }
 
@@ -373,6 +452,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -404,6 +484,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -433,6 +514,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -462,6 +544,7 @@ class PoleListViewModelTest {
                     poleListRepository,
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
                 )
 
             vm.aiResultState.test {
@@ -494,7 +577,13 @@ class PoleListViewModelTest {
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 2
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
             vm.uiState.test {
                 awaitItem() // Loading
                 awaitItem() // Success
@@ -526,12 +615,87 @@ class PoleListViewModelTest {
                 flowOf(mapOf("PH-POLE-1" to "done"))
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             val vm =
-                PoleListViewModel(savedStateHandle(), poleListRepository, polePhotoRepository, completionRepository)
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
 
             vm.uiState.test {
                 awaitItem() // Loading
                 val success = awaitItem() as PoleListUiState.Success
                 assertEquals(true, success.poles.single().hasPendingReview)
+            }
+        }
+
+    @Test
+    fun `a pole's row carries hasPendingDecision once reviewed and sent, before a Manager decides`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
+                flowOf(
+                    listOf(
+                        photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(reviewedBy = "U-1", decision = null),
+                    ),
+                )
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done"))
+            every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
+
+            vm.uiState.test {
+                awaitItem() // Loading
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(false, success.poles.single().hasPendingReview)
+                assertEquals(true, success.poles.single().hasPendingDecision)
+            }
+        }
+
+    @Test
+    fun `a pole's row has neither pending badge once a Manager has decided`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
+                flowOf(
+                    listOf(
+                        photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")
+                            .copy(reviewedBy = "U-1", decision = "confirm"),
+                    ),
+                )
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done"))
+            every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                )
+
+            vm.uiState.test {
+                awaitItem() // Loading
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(false, success.poles.single().hasPendingReview)
+                assertEquals(false, success.poles.single().hasPendingDecision)
             }
         }
 }

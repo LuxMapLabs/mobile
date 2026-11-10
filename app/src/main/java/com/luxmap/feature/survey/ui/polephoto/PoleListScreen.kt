@@ -163,6 +163,7 @@ fun PoleListRoute(
             onSubmitReview = { finalCvState, reviewNote ->
                 lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
             },
+            onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
         )
         TopSlideToast(
             state = toastState,
@@ -192,6 +193,7 @@ fun PoleListScreen(
     onRetryAiResult: () -> Unit = {},
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
+    onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
     // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
     // the design mock's sheet trigger, but only offers the choice itself here.
@@ -320,6 +322,7 @@ fun PoleListScreen(
             onRetry = onRetryAiResult,
             onRetake = onRetake,
             onSubmitReview = onSubmitReview,
+            onRequestAuthorizationHeader = onRequestAuthorizationHeader,
         )
     }
 
@@ -675,6 +678,12 @@ private fun PoleRow(
                 if (pole.hasPendingReview) {
                     StatusBadge(
                         text = "Đã review, chờ gửi",
+                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
+                        icon = SyncStatus.QUEUED_ONLINE.icon(),
+                    )
+                } else if (pole.hasPendingDecision) {
+                    StatusBadge(
+                        text = "Chờ duyệt",
                         colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
                         icon = SyncStatus.QUEUED_ONLINE.icon(),
                     )

@@ -394,6 +394,29 @@ class PoleListScreenTest {
     }
 
     @Test
+    fun success_state_shows_the_pending_decision_tag_when_hasPendingDecision_is_true() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE).copy(
+                                        hasPendingDecision = true,
+                                    ),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chờ duyệt").assertExists()
+    }
+
+    @Test
     fun report_method_sheet_choosing_the_gallery_option_calls_onCapturePole_with_GALLERY() {
         var capturedSource: PolePhotoCaptureSource? = null
         composeRule.setContent {

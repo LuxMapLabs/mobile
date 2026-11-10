@@ -148,6 +148,7 @@ class RealPolePhotoRepository
                 decisionNote = item.decisionNote,
                 decidedBy = item.decidedBy,
                 decidedAt = item.decidedAt?.let(Instant::parse),
+                videoUrl = item.video?.videoUrl,
             )
         }
 

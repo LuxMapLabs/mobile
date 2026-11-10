@@ -45,7 +45,8 @@ interface PolePhotoDao {
             decision = :decision,
             decisionNote = :decisionNote,
             decidedBy = :decidedBy,
-            decidedAt = :decidedAt
+            decidedAt = :decidedAt,
+            videoUrl = :videoUrl
         WHERE photoId = :photoId
         """,
     )
@@ -64,6 +65,7 @@ interface PolePhotoDao {
         decisionNote: String?,
         decidedBy: String?,
         decidedAt: Instant?,
+        videoUrl: String? = null,
     )
 
     @Query(

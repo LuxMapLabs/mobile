@@ -53,6 +53,7 @@ class SubmitPolePhotoReviewSyncHandler
                     decisionNote = response.decisionNote,
                     decidedBy = response.decidedBy,
                     decidedAt = response.decidedAt?.let(Instant::parse),
+                    videoUrl = response.video?.videoUrl,
                 )
                 dao.updateDraftReview(photo.photoId, null, null)
                 SyncOpResult.Done
