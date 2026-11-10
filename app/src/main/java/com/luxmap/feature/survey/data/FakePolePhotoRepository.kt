@@ -42,6 +42,28 @@ class FakePolePhotoRepository
             return entity
         }
 
+        override suspend fun captureVideo(
+            workOrderId: String,
+            poleId: String,
+            filePath: String,
+            lat: Double,
+            lng: Double,
+        ): LocalPolePhotoEntity {
+            val entity =
+                LocalPolePhotoEntity(
+                    photoId = UUID.randomUUID().toString(),
+                    workOrderId = workOrderId,
+                    poleId = poleId,
+                    filePath = filePath,
+                    capturedAt = Instant.now(),
+                    lat = lat,
+                    lng = lng,
+                    mediaType = "video",
+                )
+            dao.insert(entity)
+            return entity
+        }
+
         override suspend fun saveDraftReview(
             serverPhotoId: String,
             finalCvState: String,

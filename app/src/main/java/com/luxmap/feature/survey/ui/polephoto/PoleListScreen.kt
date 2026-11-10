@@ -92,6 +92,7 @@ import kotlinx.coroutines.launch
 fun PoleListRoute(
     workOrderId: String,
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
+    onCaptureVideo: (poleId: String) -> Unit,
     onDone: () -> Unit,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
@@ -137,6 +138,7 @@ fun PoleListRoute(
             aiResultPoleId = lastViewedPoleId.orEmpty(),
             aiResultPosition = lastViewedPosition ?: 0,
             onCapturePole = onCapturePole,
+            onCaptureVideo = onCaptureVideo,
             // Pure navigation - this used to also silently call onComplete() (found on a real
             // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
             // mark the whole survey complete even if the user only meant to leave.
@@ -177,6 +179,7 @@ fun PoleListScreen(
     workOrderId: String,
     state: PoleListUiState,
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
+    onCaptureVideo: (poleId: String) -> Unit = {},
     onBack: () -> Unit,
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
@@ -335,16 +338,18 @@ fun PoleListScreen(
                 reportMethodSheetPoleId = null
                 onCapturePole(methodSheetPoleId, PolePhotoCaptureSource.GALLERY)
             },
+            onChooseVideo = {
+                reportMethodSheetPoleId = null
+                onCaptureVideo(methodSheetPoleId)
+            },
         )
     }
 }
 
 // Mock's "Bao loi cot" sheet, trimmed to just the method choice - the mock's multi-file picker
 // (up to 5 photos/videos staged before one combined submit) does not match how upload actually
-// works today, where POST .../pole-photos takes exactly 1 JPEG per call (see contract-drift.md).
-// "Quay video" stays visible per the mock's layout but disabled, since that endpoint rejects
-// anything that is not a JPEG named "photo" - there is no server-side way to send video for a
-// pole yet, so it must not look like it already works.
+// works today, where POST .../pole-photos and POST .../pole-videos each take exactly 1 file per
+// call (see contract-drift.md).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportMethodSheet(
@@ -352,6 +357,7 @@ private fun ReportMethodSheet(
     onDismiss: () -> Unit,
     onChoosePhoto: () -> Unit,
     onChooseGallery: () -> Unit,
+    onChooseVideo: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
@@ -384,16 +390,11 @@ private fun ReportMethodSheet(
                 ReportMethodOption(
                     icon = Icons.Filled.Videocam,
                     label = "Quay video",
-                    enabled = false,
-                    onClick = {},
+                    enabled = true,
+                    onClick = onChooseVideo,
                     modifier = Modifier.weight(1f),
                 )
             }
-            Text(
-                text = "Chưa hỗ trợ gửi video, dùng ảnh thay thế",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

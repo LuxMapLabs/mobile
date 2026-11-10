@@ -36,6 +36,7 @@ private fun photo(
     serverPhotoId: String? = null,
     aiStatus: String? = null,
     cvState: String? = null,
+    mediaType: String = "photo",
 ) = LocalPolePhotoEntity(
     photoId = "PH-$poleId",
     workOrderId = WORK_ORDER_ID,
@@ -47,6 +48,7 @@ private fun photo(
     serverPhotoId = serverPhotoId,
     aiStatus = aiStatus,
     cvState = cvState,
+    mediaType = mediaType,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -322,6 +324,35 @@ class PoleListViewModelTest {
                 val result = awaitItem() as PolePhotoResultUiState.Success
                 assertEquals("on", result.cvState)
                 assertEquals(false, result.isStale)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult maps mediaType through for a video row`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(
+                    photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available", mediaType = "video"),
+                )
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    mockk<WorkOrderCompletionRepository>(relaxed = true),
+                )
+
+            vm.aiResultState.test {
+                awaitItem()
+                vm.onViewAiResult("SERVER-PH-1")
+                awaitItem()
+                val result = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals("video", result.mediaType)
             }
         }
 

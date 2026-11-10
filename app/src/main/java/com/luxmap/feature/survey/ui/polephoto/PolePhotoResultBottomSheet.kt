@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -441,12 +442,16 @@ private fun ReviewChoiceCard(
 @Composable
 private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
     Box(modifier = Modifier.fillMaxWidth().aspectRatio(PHOTO_ASPECT_RATIO)) {
-        AsyncImage(
-            model = File(state.filePath),
-            contentDescription = "Ảnh cột đèn đã chụp",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
-        )
+        if (state.mediaType == "video") {
+            VideoPreviewPlaceholder()
+        } else {
+            AsyncImage(
+                model = File(state.filePath),
+                contentDescription = "Ảnh cột đèn đã chụp",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
+            )
+        }
         if (state.analyzedAt != null) {
             Text(
                 text = state.analyzedAt.atZone(ZoneId.systemDefault()).format(photoOverlayFormatter),
@@ -458,6 +463,31 @@ private fun PolePhotoPreview(state: PolePhotoResultUiState.Success) {
                         .padding(Spacing.sm)
                         .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(Radius.badge))
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VideoPreviewPlaceholder() {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Filled.Videocam,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "Video clip",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
