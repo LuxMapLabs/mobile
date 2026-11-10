@@ -23,7 +23,7 @@ In scope:
 - Change "Hoàn tất" on the Pole List screen to first enqueue a sync job per pending review, then proceed with the existing work-order completion call.
 
 Out of scope (explicitly):
-- A dedicated per-row sync-status badge for the review-send job after "Hoàn tất" is tapped (confirmed cut 2026-11-10 — reuse the existing F13 Sync Queue screen for visibility into failed/pending review sends instead).
+- A dedicated per-row sync-status badge for the review-send job after "Hoàn tất" is tapped (confirmed cut 2026-11-10). **Correction, found in final review 2026-11-10: there is no "existing F13 Sync Queue screen"** — `feature/sync/` in `CLAUDE.md`'s folder sketch was never actually built. The only real visibility into a failed review-send today is the aggregate "Đồng bộ lỗi" counter on `ProfileScreen` (fed by `SyncQueueManager.errorCount`), which names no pole and offers no recovery action. A FE whose review correction permanently fails to send (409 `POLE_PHOTO_ALREADY_DECIDED`) has no way to discover which pole it was. Accepted as-is for this feature (no fix applied, no new UI built) — flagged here as a real, user-visible gap for the project owner to decide on, not a resolved one.
 - Any change to the Manager-side `/decision` flow, or to the photo capture → upload → AI pipeline itself.
 - Reading EXIF GPS/timestamp from a gallery-picked image — tagging stays "current device location at the moment the photo is saved," identical to the existing camera-capture behavior, even though a gallery pick may be an older photo taken elsewhere. Same accepted limitation as today's camera flow, now also applied to gallery picks.
 
