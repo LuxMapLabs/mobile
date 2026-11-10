@@ -329,6 +329,14 @@ private fun ReviewCard(
             )
         }
 
+        if (state.draftFinalCvState != null && !hasChange) {
+            Text(
+                text = "Đã lưu, sẽ gửi khi Hoàn tất",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         if (state.reviewedBy != null) {
             Text(
                 text = "Đã review lúc ${DateFormatUtils.formatInstant(state.reviewedAt)}",

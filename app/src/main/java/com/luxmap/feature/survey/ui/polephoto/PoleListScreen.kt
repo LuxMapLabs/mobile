@@ -8,6 +8,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -604,6 +606,7 @@ private fun PoleListSectionHeader(count: Int) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PoleRow(
     pole: PoleListRowState,
@@ -640,7 +643,12 @@ private fun PoleRow(
             // Condition + sync badges share one row here instead of the sync badge sitting in
             // the row's trailing slot - with the AI-result icon button also in that slot, 2
             // variable-width badges plus a button no longer fit on screen width without wrapping.
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            // FlowRow (not Row) so a 3rd badge (hasPendingReview) wraps onto a second line
+            // instead of overflowing the column width (found on a real device, 2026-11-10).
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
                 StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
                 if (pole.syncStatus != null) {
                     StatusBadge(
