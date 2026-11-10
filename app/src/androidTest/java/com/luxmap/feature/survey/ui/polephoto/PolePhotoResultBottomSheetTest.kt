@@ -126,7 +126,7 @@ class PolePhotoResultBottomSheetTest {
     }
 
     @Test
-    fun success_state_shows_no_decision_yet_when_decision_is_null() {
+    fun success_state_hides_the_decision_card_when_decision_is_null() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultBottomSheet(
@@ -138,7 +138,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertExists()
+        composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertDoesNotExist()
     }
 
     @Test
