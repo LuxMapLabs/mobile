@@ -39,7 +39,8 @@ class RealMapRepository
                     val poles = mapApi.poles(bbox = bboxParam).features.map { it.toPoleMarker() }
                     val segments = mapApi.segments(bbox = bboxParam).features.map { it.toRoadSegmentLine() }
                     val center = mapBounds.center.lat to mapBounds.center.lng
-                    emit(GisMapDataset(poles = poles, segments = segments, center = center))
+                    val gisBbox = GisMapBbox(bbox.minLng, bbox.minLat, bbox.maxLng, bbox.maxLat)
+                    emit(GisMapDataset(poles = poles, segments = segments, center = center, bbox = gisBbox))
                 } catch (e: MapBoundsUnavailableException) {
                     throw e
                 } catch (e: HttpException) {

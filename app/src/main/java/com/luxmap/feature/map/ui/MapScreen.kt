@@ -82,6 +82,7 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.map.data.GisMapBbox
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
 import kotlinx.coroutines.delay
@@ -433,9 +434,19 @@ fun MapScreen(
         // Moves the camera to the real area the first time it's known (FM-15 "Hướng B") — only
         // when the user has not already moved the map (savedCamera stays null until the first
         // camera idle event) and only once, so this never fights a camera position the user chose.
+        // Fits to the commune's real bbox instead of a fixed zoom — a commune's actual extent
+        // varies far more than one hardcoded zoom level can cover, and zooming tighter than the
+        // real data forces poles that are genuinely only 10-20m apart (a normal rural spacing) to
+        // render a few screen pixels apart, well past where they'd otherwise cluster.
         LaunchedEffect(maplibreMap, uiState) {
             val map = maplibreMap ?: return@LaunchedEffect
             if (hasCenteredOnRealData || userMovedCamera) return@LaunchedEffect
+            val bbox = uiState.bboxOrNull()
+            if (bbox != null) {
+                hasCenteredOnRealData = true
+                map.moveCamera(CameraUpdateFactory.newLatLngBounds(bbox.toLatLngBounds(), SEGMENT_FIT_CAMERA_PADDING))
+                return@LaunchedEffect
+            }
             val center = uiState.centerOrNull() ?: return@LaunchedEffect
             hasCenteredOnRealData = true
             map.cameraPosition =
@@ -769,6 +780,14 @@ private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?
 
 private fun MapUiState.centerOrNull() = (this as? MapUiState.Success)?.dataset?.center
 
+private fun MapUiState.bboxOrNull() = (this as? MapUiState.Success)?.dataset?.bbox
+
+private fun GisMapBbox.toLatLngBounds(): LatLngBounds =
+    LatLngBounds.Builder()
+        .include(LatLng(minLat, minLng))
+        .include(LatLng(maxLat, maxLng))
+        .build()
+
 private fun Set<AssetCondition>.toggled(condition: AssetCondition): Set<AssetCondition> =
     if (condition in this) this - condition else this + condition
 
@@ -790,27 +809,14 @@ private fun setupMapLayers(
 ) {
     registerMarkerBadgeIcons(context, style)
 
-    val segmentSource = GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson())
-    style.addSource(segmentSource)
-    // Add before the pole layer so the route draws below, markers on top. Glow first so the
-    // solid core sits on top of it, same order as the pole glow/dot pair below.
-    style.addLayer(buildRoadSegmentsGlowLineLayer())
-    style.addLayer(buildRoadSegmentsLineLayer())
+    // Sources are added once here and never removed — only their layers get added/removed on a
+    // toggle (see applyLayerVisibility), so re-adding a GeoJsonSource with the same id never
+    // happens.
+    style.addSource(GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson()))
+    style.addSource(GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions()))
 
-    val source = GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions())
-    style.addSource(source)
-    style.addLayer(buildClusterCircleLayer())
-    style.addLayer(buildClusterCountLayer())
-    // Halo below the glow (biggest radius at the bottom), glow below the icon — same idea as a
-    // physical stack, each layer visible only where the one above it doesn't cover it.
-    style.addLayer(buildPoleSelectedHaloLayer())
-    style.addLayer(buildPoleGlowCircleLayer())
-    style.addLayer(buildPoleIconLayer())
-    style.addLayer(buildStatusBadgeLayer())
-    style.addLayer(buildPoiBadgeLayer())
-    style.addLayer(buildIotBadgeLayer())
-
-    applyLayerVisibility(style, showFixtures, showRoadSegments)
+    if (showRoadSegments) addRoadSegmentLayers(style)
+    if (showFixtures) addFixtureLayers(style)
 }
 
 // Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
@@ -896,25 +902,67 @@ private fun buildRoadSegmentsLineLayer(): LineLayer =
             PropertyFactory.lineOpacity(0.9f),
         )
 
-// Re-apply visibility every time a toggle changes or AndroidView's update runs again — much
-// cheaper than add/remove layer, and no need to reset the GeoJSON.
+// Toggling a SymbolLayer's visibility property off then back on does not repaint it on a real
+// device (confirmed FM-37 field test: the layer's own visibility property reads back "visible"
+// correctly, but the icons never reappear) — removing and re-adding the layer instead, the same
+// recovery setStyle() already needs for the basemap toggle, reliably redraws it. Sources are
+// never removed/re-added here: only FakeMapRepository/RealMapRepository emit new GeoJSON, and
+// re-adding a GeoJsonSource with the same id would throw.
 private fun applyLayerVisibility(
     style: Style,
     showFixtures: Boolean,
     showRoadSegments: Boolean,
 ) {
-    val fixtureVisibility = if (showFixtures) Property.VISIBLE else Property.NONE
-    val roadSegmentVisibility = if (showRoadSegments) Property.VISIBLE else Property.NONE
-    style.getLayer(POLES_SELECTED_HALO_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_GLOW_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_STATUS_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_POI_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(POLES_IOT_BADGE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(CLUSTER_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(CLUSTER_COUNT_LAYER_ID)?.setProperties(PropertyFactory.visibility(fixtureVisibility))
-    style.getLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
-    style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID)?.setProperties(PropertyFactory.visibility(roadSegmentVisibility))
+    val fixturesPresent = style.getLayer(POLES_CIRCLE_LAYER_ID) != null
+    when {
+        showFixtures && !fixturesPresent -> addFixtureLayers(style)
+        !showFixtures && fixturesPresent -> removeFixtureLayers(style)
+    }
+    val roadSegmentsPresent = style.getLayer(ROAD_SEGMENTS_LINE_LAYER_ID) != null
+    when {
+        showRoadSegments && !roadSegmentsPresent -> addRoadSegmentLayers(style)
+        !showRoadSegments && roadSegmentsPresent -> removeRoadSegmentLayers(style)
+    }
+}
+
+private fun addFixtureLayers(style: Style) {
+    style.addLayer(buildClusterCircleLayer())
+    style.addLayer(buildClusterCountLayer())
+    style.addLayer(buildPoleSelectedHaloLayer())
+    style.addLayer(buildPoleGlowCircleLayer())
+    style.addLayer(buildPoleIconLayer())
+    style.addLayer(buildStatusBadgeLayer())
+    style.addLayer(buildPoiBadgeLayer())
+    style.addLayer(buildIotBadgeLayer())
+}
+
+private fun removeFixtureLayers(style: Style) {
+    style.removeLayer(CLUSTER_CIRCLE_LAYER_ID)
+    style.removeLayer(CLUSTER_COUNT_LAYER_ID)
+    style.removeLayer(POLES_SELECTED_HALO_LAYER_ID)
+    style.removeLayer(POLES_GLOW_CIRCLE_LAYER_ID)
+    style.removeLayer(POLES_CIRCLE_LAYER_ID)
+    style.removeLayer(POLES_STATUS_BADGE_LAYER_ID)
+    style.removeLayer(POLES_POI_BADGE_LAYER_ID)
+    style.removeLayer(POLES_IOT_BADGE_LAYER_ID)
+}
+
+// Routes must sit below the pole layers — if fixtures are currently shown, insert directly
+// below their bottom-most layer (the cluster circle) instead of appending on top of everything.
+private fun addRoadSegmentLayers(style: Style) {
+    val insertBelowId = CLUSTER_CIRCLE_LAYER_ID.takeIf { style.getLayer(it) != null }
+    if (insertBelowId != null) {
+        style.addLayerBelow(buildRoadSegmentsGlowLineLayer(), insertBelowId)
+        style.addLayerBelow(buildRoadSegmentsLineLayer(), insertBelowId)
+    } else {
+        style.addLayer(buildRoadSegmentsGlowLineLayer())
+        style.addLayer(buildRoadSegmentsLineLayer())
+    }
+}
+
+private fun removeRoadSegmentLayers(style: Style) {
+    style.removeLayer(ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)
+    style.removeLayer(ROAD_SEGMENTS_LINE_LAYER_ID)
 }
 
 // Soft glow around each pole marker (F12) — matches the glow effect on Web GIS. Static, no
@@ -1122,12 +1170,17 @@ private fun buildClusterCircleLayer(): CircleLayer =
         ).apply { setFilter(Expression.has("point_count")) }
 
 // Count text switches from white to navy to stay readable on the now-white cluster fill.
+// textFont must be a font this style's own glyphs endpoint actually hosts (confirmed: the
+// liberty style serves "Noto Sans *", not MapLibre's SDK-default "Open Sans Regular,Arial
+// Unicode MS Regular") — leaving textFont unset 404s on every glyph fetch, which silently
+// fails this layer's whole symbol bucket instead of just the text.
 private fun buildClusterCountLayer(): SymbolLayer =
     SymbolLayer(CLUSTER_COUNT_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.textField(Expression.toString(Expression.get("point_count"))),
+            PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
             PropertyFactory.textSize(12f),
-            PropertyFactory.textColor("#FF1F3864"),
+            PropertyFactory.textColor("#1F3864"),
             PropertyFactory.textIgnorePlacement(true),
             PropertyFactory.textAllowOverlap(true),
         ).apply { setFilter(Expression.has("point_count")) }

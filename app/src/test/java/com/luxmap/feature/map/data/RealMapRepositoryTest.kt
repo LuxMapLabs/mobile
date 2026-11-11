@@ -85,6 +85,7 @@ class RealMapRepositoryTest {
                 assertEquals(1, dataset.poles.size)
                 assertEquals("POLE-1", dataset.poles[0].poleId)
                 assertEquals(10.55 to 105.85, dataset.center)
+                assertEquals(GisMapBbox(minLng = 105.8, minLat = 10.5, maxLng = 105.9, maxLat = 10.6), dataset.bbox)
                 awaitComplete()
             }
         }

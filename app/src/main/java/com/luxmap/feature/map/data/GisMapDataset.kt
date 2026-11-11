@@ -9,4 +9,15 @@ data class GisMapDataset(
     // (lat, lng) to open the map camera on — null for FakeMapRepository and any other source
     // with no real centre to offer; MapScreen falls back to its existing hardcoded default.
     val center: Pair<Double, Double>? = null,
+    // Real extent the center was computed from — null under the same conditions as center.
+    // MapScreen uses this to fit the initial camera to the whole commune instead of a fixed
+    // zoom, since a commune's real area varies a lot more than one hardcoded zoom can cover.
+    val bbox: GisMapBbox? = null,
+)
+
+data class GisMapBbox(
+    val minLng: Double,
+    val minLat: Double,
+    val maxLng: Double,
+    val maxLat: Double,
 )
