@@ -557,5 +557,6 @@ private fun errorPlacementFor(error: LoginUiState.Error): ErrorPlacement =
         LoginFailureReason.AccountLocked,
         LoginFailureReason.Network,
         LoginFailureReason.Unknown,
+        LoginFailureReason.GoogleSignInFailed,
         -> ErrorPlacement(bannerMessage = error.message)
     }

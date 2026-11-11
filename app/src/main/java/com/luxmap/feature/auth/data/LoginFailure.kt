@@ -10,6 +10,12 @@ enum class LoginFailureReason {
     AccountLocked,
     Network,
     Unknown,
+
+    // The backend answers an unrecognized/unverified/not-yet-eligible Google account with the
+    // same INVALID_CREDENTIALS code as a wrong password (ACCT-4) — but there is no username/
+    // password field to blame here, so this gets its own banner-only message instead of being
+    // folded into InvalidCredentials.
+    GoogleSignInFailed,
 }
 
 class LoginFailedException(

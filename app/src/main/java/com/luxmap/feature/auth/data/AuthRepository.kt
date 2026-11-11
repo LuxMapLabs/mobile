@@ -9,6 +9,15 @@ interface AuthRepository {
         rememberMe: Boolean,
     ): Result<Unit>
 
+    // ACCT-4: signs in with a Google ID token already obtained from Credential Manager.
+    // displayName is shown on the Profile screen the same way the typed identifier is for a
+    // password sign-in (there is no typed username here).
+    suspend fun loginWithGoogle(
+        idToken: String,
+        rememberMe: Boolean,
+        displayName: String,
+    ): Result<Unit>
+
     // Best-effort: always clears the local session even if the logout API call fails
     // (offline) — FM-26 will reuse this function for the Profile screen's logout button,
     // no repository changes needed.
