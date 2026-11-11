@@ -349,14 +349,15 @@ private fun SurveyHubContent(
             state.pendingAiConfirmation.isNotEmpty() ||
             state.uploadingSessions.isNotEmpty()
     val listState = rememberLazyListState()
+    val visibleRoutes = state.assignedRoutes.filterNot { it.workOrderId in state.locallyCompletedWorkOrderIds }
     val inProgressRoutes =
-        state.assignedRoutes.filter {
+        visibleRoutes.filter {
             workOrderStatusFromWire(it.woStatus) == WorkOrderStatus.IN_PROGRESS
         }
-    val todoRoutes = state.assignedRoutes - inProgressRoutes.toSet()
+    val todoRoutes = visibleRoutes - inProgressRoutes.toSet()
     LaunchedEffect(state.assignedRoutes, highlightWorkOrderId) {
         val highlighted =
-            state.assignedRoutes.firstOrNull { it.workOrderId == highlightWorkOrderId } ?: return@LaunchedEffect
+            visibleRoutes.firstOrNull { it.workOrderId == highlightWorkOrderId } ?: return@LaunchedEffect
         var index = 0
         if (state.isStale) index++
         if (state.startError != null) index++
@@ -416,7 +417,6 @@ private fun SurveyHubContent(
                         route,
                         isStarting = state.startingWorkOrderId == route.workOrderId,
                         isCancelled = route.workOrderId in state.cancelledWorkOrderIds,
-                        isLocallyCompleted = route.workOrderId in state.locallyCompletedWorkOrderIds,
                         isHighlighted = route.workOrderId == highlightWorkOrderId,
                         onCapturePolePhotos = { onCapturePolePhotos(route.workOrderId) },
                         onStartForPoleCapture = { onStartRoute(route.workOrderId) },
@@ -607,7 +607,6 @@ private fun AssignedRouteCard(
     route: AssignedSurveyRoute,
     isStarting: Boolean,
     isCancelled: Boolean,
-    isLocallyCompleted: Boolean,
     onCapturePolePhotos: () -> Unit,
     onStartForPoleCapture: () -> Unit,
     onRequestCancellation: () -> Unit,
@@ -685,29 +684,6 @@ private fun AssignedRouteCard(
                 Text(
                     text = "Đã gửi yêu cầu hủy · chờ duyệt",
                     color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
-                )
-            }
-        } else if (isLocallyCompleted) {
-            // Found on a real device 2026-10-29: this route's card looked completely
-            // unchanged after completing its survey at the pole list - wo_status itself only
-            // catches up once sync_queue actually uploads the completion, same local-state
-            // gap WorkOrderDetailScreen already guards against for repair/inspection
-            // ("localCompletion?.submitStatus == pending").
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Dimens.minTouchTarget)
-                        .background(
-                            WorkOrderStatus.ASSIGNED.badgeColors().background,
-                            RoundedCornerShape(Radius.control),
-                        ),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Đã nộp kết quả khảo sát · chờ đồng bộ",
-                    color = WorkOrderStatus.ASSIGNED.badgeColors().text,
                 )
             }
         } else {

@@ -390,7 +390,7 @@ class PoleListScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đã review, chờ gửi").assertExists()
+        composeRule.onNodeWithText("Đã xác nhận").assertExists()
     }
 
     @Test

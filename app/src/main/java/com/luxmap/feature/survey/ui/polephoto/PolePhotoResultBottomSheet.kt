@@ -49,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -81,6 +82,9 @@ import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.TopSlideToast
+import com.luxmap.core.ui.components.TopToastState
+import kotlinx.coroutines.launch
 import java.io.File
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -107,60 +111,81 @@ fun PolePhotoResultBottomSheet(
     onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
     val sheetState = rememberModalBottomSheetState()
+    // ModalBottomSheet renders in its own Android Window - a toast shown anywhere outside this
+    // composable (e.g. over the trigger screen behind it) stays hidden until the sheet closes
+    // (found on a real device, 2026-11-11). This toast lives inside the sheet's own content so
+    // "Lưu xác nhận" gets visible feedback immediately, without closing the sheet first.
+    val toastState = remember { TopToastState() }
+    val scope = rememberCoroutineScope()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
 
-            // The photo now shows at its real 3:4 aspect ratio (tall), plus ReviewCard added more
-            // content below it, so this can now reach the bottom of the screen on real devices -
-            // navigationBarsPadding keeps the last button (retake/submit) clear of the system
-            // nav bar area instead of its tap target sitting flush against it.
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                        .navigationBarsPadding(),
-            ) {
-                when (state) {
-                    is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
+                // The photo now shows at its real 3:4 aspect ratio (tall), plus ReviewCard added more
+                // content below it, so this can now reach the bottom of the screen on real devices -
+                // navigationBarsPadding keeps the last button (retake/submit) clear of the system
+                // nav bar area instead of its tap target sitting flush against it.
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                            .navigationBarsPadding(),
+                ) {
+                    when (state) {
+                        is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
-                    is PolePhotoResultUiState.Success ->
-                        PolePhotoResultContent(poleId, state, onRetake, onSubmitReview, onRequestAuthorizationHeader)
-
-                    // heightIn (not a fixed height) - MessageState's action button (Error) makes this
-                    // content taller than the skeleton needs, and a fixed height here clipped
-                    // the button outside the touchable area.
-                    // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
-                    // A real "AI model failed" result (ai_status = "unavailable") now renders as
-                    // Success with cvState = null instead, so review stays possible.
-                    is PolePhotoResultUiState.Empty ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.SmartToy,
-                                iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                                title = "AI chưa phân loại được ảnh này",
-                                subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                                action = {},
+                        is PolePhotoResultUiState.Success ->
+                            PolePhotoResultContent(
+                                poleId,
+                                state,
+                                onRetake,
+                                onSubmitReview = { finalCvState, reviewNote ->
+                                    scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
+                                    onSubmitReview(finalCvState, reviewNote)
+                                },
+                                onRequestAuthorizationHeader,
                             )
-                        }
 
-                    is PolePhotoResultUiState.Error ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.CloudOff,
-                                iconColors = SyncStatus.FAILED.badgeColors(),
-                                title = "Không tải được kết quả AI",
-                                subtitle = state.message,
-                                action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
-                            )
-                        }
+                        // heightIn (not a fixed height) - MessageState's action button (Error) makes this
+                        // content taller than the skeleton needs, and a fixed height here clipped
+                        // the button outside the touchable area.
+                        // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
+                        // A real "AI model failed" result (ai_status = "unavailable") now renders as
+                        // Success with cvState = null instead, so review stays possible.
+                        is PolePhotoResultUiState.Empty ->
+                            Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                                MessageState(
+                                    icon = Icons.Filled.SmartToy,
+                                    iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
+                                    title = "AI chưa phân loại được ảnh này",
+                                    subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                                    action = {},
+                                )
+                            }
+
+                        is PolePhotoResultUiState.Error ->
+                            Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                                MessageState(
+                                    icon = Icons.Filled.CloudOff,
+                                    iconColors = SyncStatus.FAILED.badgeColors(),
+                                    title = "Không tải được kết quả AI",
+                                    subtitle = state.message,
+                                    action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                                )
+                            }
+                    }
+
+                    Spacer(Modifier.height(Spacing.lg))
                 }
-
-                Spacer(Modifier.height(Spacing.lg))
             }
+            TopSlideToast(
+                state = toastState,
+                modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            )
         }
     }
 }
