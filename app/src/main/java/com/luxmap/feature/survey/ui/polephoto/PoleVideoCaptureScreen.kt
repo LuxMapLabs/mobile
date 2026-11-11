@@ -19,12 +19,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -81,7 +84,11 @@ import java.io.File
 
 private val PoleVideoPreviewBackground = Color(0xFF0B1526)
 private val PoleVideoConfirmSavingColor = Color(0xFF3B5A8A)
-private val PoleVideoButtonContentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.md)
+
+// Horizontal padding trimmed to xs (not sm) - "Chọn video khác" (gallery retake label) needs
+// every spare dp to stay on one line at this button width, same reason the icon is 18dp here
+// instead of the usual 20dp.
+private val PoleVideoButtonContentPadding = PaddingValues(horizontal = Spacing.xs, vertical = Spacing.md)
 private const val MAX_DURATION_LIMIT_SECONDS = 30
 
 // MediaStore.ACTION_VIDEO_CAPTURE via a custom contract, because the stock
@@ -347,20 +354,26 @@ private fun PoleVideoPreview(
                 Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg)
+                    // Without this, each button only measures as tall as its own text needs -
+                    // "Chọn video khác" (gallery source) wraps to 2 lines while "Dùng video này"
+                    // fits on 1, leaving the two buttons visibly different heights.
+                    // IntrinsicSize.Min + fillMaxHeight below stretches both to match the taller
+                    // one.
+                    .height(IntrinsicSize.Min),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             RetakeButton(
                 label = retakeLabel,
                 enabled = !isSaving,
                 onClick = onRetake,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
             ConfirmButton(
                 isSaving = isSaving,
                 enabled = isValidForUpload,
                 onClick = onConfirm,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
     }
@@ -382,9 +395,9 @@ private fun RetakeButton(
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White, disabledContentColor = Color.White),
         contentPadding = PoleVideoButtonContentPadding,
     ) {
-        Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(Spacing.sm))
-        Text(label)
+        Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(Spacing.xs))
+        Text(label, maxLines = 1)
     }
 }
 
@@ -412,9 +425,9 @@ private fun ConfirmButton(
         if (isSaving) {
             CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
         } else {
-            Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        Spacer(Modifier.width(Spacing.sm))
-        Text(if (isSaving) "Đang lưu…" else "Dùng video này")
+        Spacer(Modifier.width(Spacing.xs))
+        Text(if (isSaving) "Đang lưu…" else "Dùng video này", maxLines = 1)
     }
 }

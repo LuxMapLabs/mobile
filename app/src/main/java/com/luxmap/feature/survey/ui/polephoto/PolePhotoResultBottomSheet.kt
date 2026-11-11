@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.polephoto
 
 import android.net.Uri
+import android.view.LayoutInflater
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -69,6 +70,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.luxmap.BuildConfig
+import com.luxmap.R
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BrandHeroGradient
@@ -604,7 +606,15 @@ private fun VideoPlayer(
     }
 
     AndroidView(
-        factory = { viewContext -> PlayerView(viewContext).apply { this.player = player } },
+        // ModalBottomSheet renders in its own Window, with a scrim drawn on top of this sheet's
+        // content - PlayerView's default SurfaceView composites in its own hardware layer and
+        // punches through that scrim/the sheet's own header instead of respecting normal view
+        // z-order (found on a real device, 2026-11-11). TextureView is a regular view that
+        // participates in the usual view hierarchy, which fixes it.
+        factory = { viewContext ->
+            (LayoutInflater.from(viewContext).inflate(R.layout.view_player_texture, null) as PlayerView)
+                .apply { this.player = player }
+        },
         modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
     )
 }
