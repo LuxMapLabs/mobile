@@ -59,6 +59,29 @@ class MapApiTest {
         }
 
     @Test
+    fun `poleDetail requests the pole-specific path and parses the detail shape`() =
+        runTest {
+            server.enqueue(
+                MockResponse().setBody(
+                    """
+                    {"pole_id":"POLE-1","segment_id":null,"segment_name":null,"commune_id":"COM-001",
+                     "location":null,"fixture":null,
+                     "current_status":{"fixture_status":"unknown","status_confidence":null,"determined_at":null,"source_channel":null},
+                     "iot_node":null,"luminance_history":[],"runtime_history":[],"open_faults":[],"recent_frames":[],"note":null}
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = api.poleDetail(poleId = "POLE-1")
+
+            assertEquals("POLE-1", result.poleId)
+            assertEquals(null, result.location)
+            assertEquals(null, result.fixture)
+            val request = server.takeRequest()
+            assertEquals("/api/v1/map/poles/POLE-1", request.path)
+        }
+
+    @Test
     fun `segments sends bbox as a single query param and parses the FeatureCollection`() =
         runTest {
             server.enqueue(

@@ -3,25 +3,27 @@ package com.luxmap.feature.map.data.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Field/endpoint theo Contract v1.1 §2.2 (GET /api/v1/poles/{pole_id}) — khớp
-// docs/mock-pole-detail.json, không tự đặt tên khác.
+// GET /api/v1/map/poles/{pole_id} (luxmap_backend MapController.cs/PoleMapDetail.cs) - confirmed
+// directly from source, not the older mock-pole-detail.json shape this file used to follow.
 @Serializable
 data class PoleDetailDto(
     @SerialName("pole_id") val poleId: String,
-    @SerialName("segment_id") val segmentId: String,
-    @SerialName("segment_name") val segmentName: String,
+    @SerialName("segment_id") val segmentId: String? = null,
+    @SerialName("segment_name") val segmentName: String? = null,
     @SerialName("commune_id") val communeId: String,
-    val location: PoleDetailLocationDto,
-    val fixture: PoleDetailFixtureDto,
+    // Null for a pole known from the books that has no position yet (POLE-GEOM-NULL).
+    val location: PoleDetailLocationDto? = null,
+    // Null when the pole has no active fixture installed.
+    val fixture: PoleDetailFixtureDto? = null,
     @SerialName("current_status") val currentStatus: PoleDetailCurrentStatusDto,
-    // null when the pole has no IoT node — most poles, per the contract note.
+    // null when the pole has no IoT node - always null in practice (IoT sits at the cabinet).
     @SerialName("iot_node") val iotNode: PoleDetailIotNodeDto? = null,
-    @SerialName("luminance_baseline") val luminanceBaseline: PoleDetailLuminanceBaselineDto,
     @SerialName("luminance_history") val luminanceHistory: List<PoleDetailLuminancePointDto> = emptyList(),
-    // Only present when the pole has an IoT node.
+    // Always empty in practice - runtime is measured per feeder, not per pole.
     @SerialName("runtime_history") val runtimeHistory: List<PoleDetailRuntimePointDto> = emptyList(),
     @SerialName("open_faults") val openFaults: List<PoleDetailFaultDto> = emptyList(),
     @SerialName("recent_frames") val recentFrames: List<PoleDetailFrameDto> = emptyList(),
+    val note: String? = null,
 )
 
 @Serializable
@@ -36,17 +38,16 @@ data class PoleDetailFixtureDto(
     @SerialName("power_source") val powerSource: String,
     @SerialName("lamp_watt") val lampWatt: Int,
     @SerialName("install_date") val installDate: String,
-    @SerialName("warranty_expiry") val warrantyExpiry: String,
-    val supplier: String,
+    @SerialName("warranty_expiry") val warrantyExpiry: String? = null,
 )
 
 @Serializable
 data class PoleDetailCurrentStatusDto(
     @SerialName("fixture_status") val fixtureStatus: String,
-    @SerialName("status_confidence") val statusConfidence: Double,
-    @SerialName("determined_at") val determinedAt: String,
-    // "cv" or "iot" — which channel produced this status.
-    @SerialName("source_channel") val sourceChannel: String,
+    // Null when the pole has never been observed (no published sweep yet).
+    @SerialName("status_confidence") val statusConfidence: Double? = null,
+    @SerialName("determined_at") val determinedAt: String? = null,
+    @SerialName("source_channel") val sourceChannel: String? = null,
 )
 
 @Serializable
@@ -57,20 +58,10 @@ data class PoleDetailIotNodeDto(
 )
 
 @Serializable
-data class PoleDetailLuminanceBaselineDto(
-    @SerialName("baseline_value") val baselineValue: Double,
-    @SerialName("baseline_window_nights") val baselineWindowNights: Int,
-    @SerialName("dim_threshold_ratio") val dimThresholdRatio: Double,
-    @SerialName("out_threshold_ratio") val outThresholdRatio: Double,
-    @SerialName("computed_at") val computedAt: String,
-)
-
-@Serializable
 data class PoleDetailLuminancePointDto(
     @SerialName("observed_at") val observedAt: String,
-    @SerialName("sweep_id") val sweepId: String,
-    @SerialName("normalized_luminance") val normalizedLuminance: Double,
-    @SerialName("baseline_ratio") val baselineRatio: Double,
+    // Null when the pole had no usable baseline or was not observed at this point.
+    @SerialName("baseline_ratio") val baselineRatio: Double? = null,
     @SerialName("classified_as") val classifiedAs: String,
 )
 
@@ -89,15 +80,11 @@ data class PoleDetailFaultDto(
     @SerialName("fault_type") val faultType: String,
     val severity: String,
     @SerialName("fault_status") val faultStatus: String,
-    @SerialName("priority_score") val priorityScore: Double,
 )
 
 @Serializable
 data class PoleDetailFrameDto(
     @SerialName("frame_id") val frameId: String,
-    @SerialName("sweep_id") val sweepId: String,
     @SerialName("captured_at") val capturedAt: String,
     @SerialName("thumbnail_url") val thumbnailUrl: String,
-    @SerialName("distance_m") val distanceM: Double,
-    @SerialName("heading_deg") val headingDeg: Double,
 )
