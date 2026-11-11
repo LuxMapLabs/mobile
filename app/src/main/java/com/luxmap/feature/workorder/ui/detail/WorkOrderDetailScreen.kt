@@ -422,14 +422,22 @@ private fun workOrderCtaState(
     val scheduleWindow = workOrderScheduleWindow(detail.scheduledDate, today)
     val canSubmitNow = state.canSubmit() && !state.isSubmitting && !scheduleWindow.isOverdueToComplete
     return when {
+        "start" in detail.allowedActions && scheduleWindow.canActOnSchedule &&
+            detail.cancellationRequestStatus == "pending" ->
+            WorkOrderCtaState(
+                text = "Bắt đầu",
+                icon = Icons.Filled.Lock,
+                enabled = false,
+                onClick = {},
+                hint = "Đang chờ duyệt yêu cầu hủy",
+                hintColor = SyncStatus.QUEUED_ONLINE.badgeColors().text,
+            )
         "start" in detail.allowedActions && scheduleWindow.canActOnSchedule ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
                 icon = Icons.Filled.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
-                hint = "Đang chờ duyệt yêu cầu hủy".takeIf { detail.cancellationRequestStatus == "pending" },
-                hintColor = SyncStatus.QUEUED_ONLINE.badgeColors().text,
             )
         // Two different reasons the window is closed - too early (unlocksOn still set) vs the
         // work order went overdue without ever being started (unlocksOn cleared, see
