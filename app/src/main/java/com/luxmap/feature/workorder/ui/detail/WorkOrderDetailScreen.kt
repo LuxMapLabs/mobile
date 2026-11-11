@@ -428,6 +428,8 @@ private fun workOrderCtaState(
                 icon = Icons.Filled.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
+                hint = "Đang chờ duyệt yêu cầu hủy".takeIf { detail.cancellationRequestStatus == "pending" },
+                hintColor = SyncStatus.QUEUED_ONLINE.badgeColors().text,
             )
         // Two different reasons the window is closed - too early (unlocksOn still set) vs the
         // work order went overdue without ever being started (unlocksOn cleared, see
@@ -953,7 +955,7 @@ private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
             "pending" ->
                 InlineBanner(
                     message = "Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt",
-                    tone = InlineBannerTone.OFFLINE,
+                    tone = InlineBannerTone.PENDING,
                 )
             "rejected" ->
                 InlineBanner(
