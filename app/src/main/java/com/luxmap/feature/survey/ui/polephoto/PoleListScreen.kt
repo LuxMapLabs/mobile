@@ -108,17 +108,12 @@ fun PoleListRoute(
     var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    // A successful review submit, or completing the survey, otherwise gives no visible feedback
-    // at all (found on a real device, 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material
-    // Snackbar) matches the Khao Sat v4 mock's own toast, which slides down from above the
-    // content instead of appearing at the bottom where a bottom-sheet action is easy to miss.
+    // Completing the survey otherwise gives no visible feedback at all (found on a real device,
+    // 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material Snackbar) matches the Khao Sat
+    // v4 mock's own toast, which slides down from above the content instead of appearing at the
+    // bottom where it would be easy to miss.
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        viewModel.reviewSubmitted.collect {
-            scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
-        }
-    }
     LaunchedEffect(Unit) {
         viewModel.surveyCompleted.collect { pendingReviews ->
             val message =
@@ -677,7 +672,7 @@ private fun PoleRow(
                 }
                 if (pole.hasPendingReview) {
                     StatusBadge(
-                        text = "Đã review, chờ gửi",
+                        text = "Đã xác nhận",
                         colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
                         icon = SyncStatus.QUEUED_ONLINE.icon(),
                     )

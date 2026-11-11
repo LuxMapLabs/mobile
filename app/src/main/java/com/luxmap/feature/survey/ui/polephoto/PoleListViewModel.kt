@@ -45,8 +45,6 @@ class PoleListViewModel
         // A successful PATCH .../review only changes a small "Da review luc ..." timestamp in
         // the sheet, easy to miss - checked on a real device 2026-10-29 (the request returns 200
         // but nothing visibly confirms it). This one-shot event lets the Route show a snackbar.
-        private val _reviewSubmitted = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-        val reviewSubmitted: SharedFlow<Unit> = _reviewSubmitted.asSharedFlow()
 
         // "Hoan tat" used to navigate back immediately with zero feedback, and the Hub card
         // looked completely unchanged on return - found on a real device, 2026-10-29. This
@@ -157,7 +155,6 @@ class PoleListViewModel
             viewModelScope.launch {
                 polePhotoRepository.saveDraftReview(serverPhotoId, finalCvState, reviewNote)
                 _aiResultState.value = current.copy(draftFinalCvState = finalCvState, draftReviewNote = reviewNote)
-                _reviewSubmitted.tryEmit(Unit)
             }
         }
 
