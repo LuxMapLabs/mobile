@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,7 +30,7 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 
-enum class InlineBannerTone { OFFLINE, ERROR }
+enum class InlineBannerTone { OFFLINE, ERROR, PENDING }
 
 @Composable
 fun InlineBanner(
@@ -42,16 +43,19 @@ fun InlineBanner(
         when (tone) {
             InlineBannerTone.OFFLINE -> SyncStatus.QUEUED_OFFLINE.badgeColors()
             InlineBannerTone.ERROR -> AssetCondition.OUT.badgeColors(isDark)
+            InlineBannerTone.PENDING -> SyncStatus.QUEUED_ONLINE.badgeColors()
         }
     val icon =
         when (tone) {
             InlineBannerTone.OFFLINE -> Icons.Filled.CloudOff
             InlineBannerTone.ERROR -> Icons.Filled.ErrorOutline
+            InlineBannerTone.PENDING -> Icons.Filled.HourglassTop
         }
     val textStyle =
         when (tone) {
             InlineBannerTone.OFFLINE -> LabelTextStyle
             InlineBannerTone.ERROR -> BodyTextStyle
+            InlineBannerTone.PENDING -> BodyTextStyle
         }
     Row(
         modifier =

@@ -1,6 +1,7 @@
 package com.luxmap.feature.workorder.ui.detail
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -123,6 +124,20 @@ class WorkOrderDetailScreenTest {
         val detail = repairDetail().copy(reviewNote = "Chụp thêm ảnh góc rộng")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("Manager yêu cầu bổ sung: Chụp thêm ảnh góc rộng").assertExists()
+    }
+
+    // Server rule (CLAUDE.md WO-CANCEL-REQUEST): a pending cancellation request does not lock
+    // "start" - found confusing on a real device, 2026-11-11, with the banner and an enabled
+    // Start button telling 2 different stories with nothing tying them together.
+    @Test
+    fun a_pending_cancellation_still_allows_starting_and_hints_why() {
+        val detail =
+            repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
+                .copy(cancellationRequestStatus = "pending")
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt").assertExists()
+        composeRule.onNodeWithText("Đang chờ duyệt yêu cầu hủy").assertExists()
+        composeRule.onNodeWithText("Bắt đầu").assertIsEnabled()
     }
 
     @Test
