@@ -692,7 +692,16 @@ private fun AssignedRouteCard(
             // unchanged after completing its survey at the pole list - wo_status itself only
             // catches up once sync_queue actually uploads the completion, same local-state
             // gap WorkOrderDetailScreen already guards against for repair/inspection
-            // ("localCompletion?.submitStatus == pending").
+            // ("localCompletion?.submitStatus == pending"). Found again 2026-11-11: once that
+            // sync does land (or a Manager has even already verified it), this kept saying
+            // "chờ đồng bộ" forever - it never looked past the local flag at the real wo_status
+            // this same composable already reads.
+            val completionText =
+                when (status) {
+                    WorkOrderStatus.VERIFIED -> "Đã nghiệm thu · tuyến hoàn tất"
+                    WorkOrderStatus.IN_PROGRESS -> "Đã nộp kết quả khảo sát · chờ đồng bộ"
+                    else -> "Đã đồng bộ · chờ Kỹ sư bảo trì duyệt"
+                }
             Row(
                 modifier =
                     Modifier
@@ -706,7 +715,7 @@ private fun AssignedRouteCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "Đã nộp kết quả khảo sát · chờ đồng bộ",
+                    text = completionText,
                     color = WorkOrderStatus.ASSIGNED.badgeColors().text,
                 )
             }

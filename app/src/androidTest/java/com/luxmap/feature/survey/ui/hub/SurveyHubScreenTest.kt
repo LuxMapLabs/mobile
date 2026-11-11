@@ -72,13 +72,13 @@ class SurveyHubScreenTest {
     // completing its survey at the pole list, since nothing locally tracked a pending completion
     // for it.
     @Test
-    fun a_locally_completed_route_shows_a_locked_row_and_hides_the_action_buttons() {
+    fun a_locally_completed_route_still_syncing_shows_cho_dong_bo_and_hides_the_action_buttons() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
                     state =
                         SurveyHubUiState.Success(
-                            assignedRoutes = listOf(route()),
+                            assignedRoutes = listOf(route(woStatus = "in_progress")),
                             locallyCompletedWorkOrderIds = setOf("WO-1"),
                         ),
                 )
@@ -86,6 +86,39 @@ class SurveyHubScreenTest {
         }
         composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertExists()
         composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_locally_completed_route_already_synced_shows_cho_quan_ly_duyet() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route(woStatus = "done")),
+                            locallyCompletedWorkOrderIds = setOf("WO-1"),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã đồng bộ · chờ Kỹ sư bảo trì duyệt").assertExists()
+        composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_locally_completed_route_already_verified_shows_da_nghiem_thu() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route(woStatus = "verified")),
+                            locallyCompletedWorkOrderIds = setOf("WO-1"),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đã nghiệm thu · tuyến hoàn tất").assertExists()
     }
 
     @Test
