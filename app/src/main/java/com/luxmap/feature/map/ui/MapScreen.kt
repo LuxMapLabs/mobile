@@ -82,6 +82,7 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.map.data.GisMapBbox
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
 import kotlinx.coroutines.delay
@@ -433,9 +434,19 @@ fun MapScreen(
         // Moves the camera to the real area the first time it's known (FM-15 "Hướng B") — only
         // when the user has not already moved the map (savedCamera stays null until the first
         // camera idle event) and only once, so this never fights a camera position the user chose.
+        // Fits to the commune's real bbox instead of a fixed zoom — a commune's actual extent
+        // varies far more than one hardcoded zoom level can cover, and zooming tighter than the
+        // real data forces poles that are genuinely only 10-20m apart (a normal rural spacing) to
+        // render a few screen pixels apart, well past where they'd otherwise cluster.
         LaunchedEffect(maplibreMap, uiState) {
             val map = maplibreMap ?: return@LaunchedEffect
             if (hasCenteredOnRealData || userMovedCamera) return@LaunchedEffect
+            val bbox = uiState.bboxOrNull()
+            if (bbox != null) {
+                hasCenteredOnRealData = true
+                map.moveCamera(CameraUpdateFactory.newLatLngBounds(bbox.toLatLngBounds(), SEGMENT_FIT_CAMERA_PADDING))
+                return@LaunchedEffect
+            }
             val center = uiState.centerOrNull() ?: return@LaunchedEffect
             hasCenteredOnRealData = true
             map.cameraPosition =
@@ -768,6 +779,14 @@ private fun MapUiState.allPolesOrEmpty() = (this as? MapUiState.Success)?.datase
 private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
 
 private fun MapUiState.centerOrNull() = (this as? MapUiState.Success)?.dataset?.center
+
+private fun MapUiState.bboxOrNull() = (this as? MapUiState.Success)?.dataset?.bbox
+
+private fun GisMapBbox.toLatLngBounds(): LatLngBounds =
+    LatLngBounds.Builder()
+        .include(LatLng(minLat, minLng))
+        .include(LatLng(maxLat, maxLng))
+        .build()
 
 private fun Set<AssetCondition>.toggled(condition: AssetCondition): Set<AssetCondition> =
     if (condition in this) this - condition else this + condition
