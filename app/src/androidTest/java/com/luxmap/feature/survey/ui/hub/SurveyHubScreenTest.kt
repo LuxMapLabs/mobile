@@ -68,11 +68,13 @@ class SurveyHubScreenTest {
         composeRule.onNodeWithText("Tiếp tục").assertDoesNotExist()
     }
 
-    // Found on a real device 2026-10-29: a route's card looked completely unchanged after
-    // completing its survey at the pole list, since nothing locally tracked a pending completion
-    // for it.
+    // A route whose survey was already completed at the pole list has nothing left for the
+    // Field Engineer to do on it here - showing it (previously it fell into the "Chưa bắt đầu"
+    // section, which is actively wrong for a finished route) was found unnecessary on a real
+    // device, 2026-11-11. Hidden entirely instead, regardless of how far its wo_status has
+    // caught up (in_progress/done/verified all hide the same way).
     @Test
-    fun a_locally_completed_route_still_syncing_shows_cho_dong_bo_and_hides_the_action_buttons() {
+    fun a_locally_completed_route_does_not_appear_in_either_section() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
@@ -84,41 +86,9 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertExists()
-        composeRule.onNodeWithText("Bắt đầu").assertDoesNotExist()
-    }
-
-    @Test
-    fun a_locally_completed_route_already_synced_shows_cho_quan_ly_duyet() {
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyHubScreen(
-                    state =
-                        SurveyHubUiState.Success(
-                            assignedRoutes = listOf(route(woStatus = "done")),
-                            locallyCompletedWorkOrderIds = setOf("WO-1"),
-                        ),
-                )
-            }
-        }
-        composeRule.onNodeWithText("Đã đồng bộ · chờ Kỹ sư bảo trì duyệt").assertExists()
-        composeRule.onNodeWithText("Đã nộp kết quả khảo sát · chờ đồng bộ").assertDoesNotExist()
-    }
-
-    @Test
-    fun a_locally_completed_route_already_verified_shows_da_nghiem_thu() {
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyHubScreen(
-                    state =
-                        SurveyHubUiState.Success(
-                            assignedRoutes = listOf(route(woStatus = "verified")),
-                            locallyCompletedWorkOrderIds = setOf("WO-1"),
-                        ),
-                )
-            }
-        }
-        composeRule.onNodeWithText("Đã nghiệm thu · tuyến hoàn tất").assertExists()
+        composeRule.onNodeWithText("Khảo sát đường A").assertDoesNotExist()
+        composeRule.onNodeWithText("Đang thực hiện").assertDoesNotExist()
+        composeRule.onNodeWithText("Chưa bắt đầu").assertDoesNotExist()
     }
 
     @Test
