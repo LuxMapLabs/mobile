@@ -45,8 +45,9 @@ fun LuminanceTrendCard(
 ) {
     // Trim once here so the chart and the caption always agree on the same window — the chart
     // used to draw only the last 7 points while the caption read the full history, so a caption
-    // could say "trong 30 ngày" over a chart that only showed 7.
-    val points = detail.luminanceHistory.takeLast(MAX_TREND_POINTS)
+    // could say "trong 30 ngày" over a chart that only showed 7. Points with no usable baseline
+    // (baselineRatio null) are dropped here too, so the chart/caption below never see one.
+    val points = detail.luminanceHistory.filter { it.baselineRatio != null }.takeLast(MAX_TREND_POINTS)
     Column(
         modifier =
             modifier
@@ -89,7 +90,7 @@ private fun LuminanceTrendChart(
     // Caller (LuminanceTrendCard) already trims to at most MAX_TREND_POINTS — draw exactly
     // what's passed in, never assume exactly 7.
     val points = history
-    val values = points.map { it.baselineRatio * 100.0 }
+    val values = points.map { it.baselineRatio!! * 100.0 }
     val latestPercent = values.last().toInt()
     val lineColor = status.trendColor()
 
@@ -152,7 +153,7 @@ private fun LuminanceTrendChart(
 // even though only DIM/OUT show this card in practice.
 private fun trendCaption(history: List<PoleLuminancePoint>): String {
     if (history.size < 2) return "Chưa đủ dữ liệu để tính xu hướng"
-    val deltaPercent = ((history.last().baselineRatio - history.first().baselineRatio) * 100).toInt()
+    val deltaPercent = ((history.last().baselineRatio!! - history.first().baselineRatio!!) * 100).toInt()
     return when {
         deltaPercent <= -TREND_FLAT_THRESHOLD_PERCENT -> "Giảm ${-deltaPercent}% trong ${history.size} ngày gần nhất"
         deltaPercent >= TREND_FLAT_THRESHOLD_PERCENT -> "Tăng $deltaPercent% trong ${history.size} ngày gần nhất"

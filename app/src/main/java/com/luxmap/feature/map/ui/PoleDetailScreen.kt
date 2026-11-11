@@ -213,7 +213,7 @@ private fun PoleHeaderSection(detail: PoleDetail) {
         Text(text = detail.poleId, style = MaterialTheme.typography.displayLarge)
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            text = detail.segmentName,
+            text = detail.segmentName ?: "Chưa gắn tuyến đường",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -222,14 +222,16 @@ private fun PoleHeaderSection(detail: PoleDetail) {
             text = detail.fixtureStatus.label().uppercase(),
             colors = detail.fixtureStatus.badgeColors(isDark),
         )
-        Spacer(Modifier.height(Spacing.sm))
-        val updatedAt = DateFormatUtils.formatIsoInstant(detail.determinedAt)
-        val sourceLabel = detail.sourceChannel.toSourceChannelLabel()
-        Text(
-            text = "Cập nhật $updatedAt · Phát hiện từ $sourceLabel",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (detail.determinedAt != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            val updatedAt = DateFormatUtils.formatIsoInstant(detail.determinedAt)
+            val sourceLabel = detail.sourceChannel?.toSourceChannelLabel() ?: "-"
+            Text(
+                text = "Cập nhật $updatedAt · Phát hiện từ $sourceLabel",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -286,7 +288,8 @@ private fun PriorityAlertCard(detail: PoleDetail) {
 // baseline_ratio of the latest luminance point — same value the trend chart's endpoint dot
 // shows — falls back to a percentage-free sentence when there is no history yet.
 private fun dimAlertBody(detail: PoleDetail): String {
-    val latestPercent = detail.luminanceHistory.lastOrNull()?.let { (it.baselineRatio * 100).toInt() }
+    val latestPercent =
+        detail.luminanceHistory.lastOrNull { it.baselineRatio != null }?.baselineRatio?.let { (it * 100).toInt() }
     return if (latestPercent != null) {
         "Độ sáng còn $latestPercent% so với mức chuẩn. Đèn có dấu hiệu suy giảm quang thông."
     } else {
@@ -310,6 +313,7 @@ private fun ActionButtonsRow(
     onCreateWorkOrder: () -> Unit,
     onViewLocation: () -> Unit,
 ) {
+    val hasLocation = detail.lat != null && detail.lng != null
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         when (detail.fixtureStatus) {
             AssetCondition.OUT -> {
@@ -326,10 +330,10 @@ private fun ActionButtonsRow(
                     onClick = onOpenRouteToSurvey,
                     modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
                 )
-                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation, enabled = hasLocation)
             }
             AssetCondition.NORMAL -> {
-                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation)
+                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation, enabled = hasLocation)
             }
         }
     }
@@ -339,9 +343,11 @@ private fun ActionButtonsRow(
 private fun SecondaryOutlinedButton(
     text: String,
     onClick: () -> Unit,
+    enabled: Boolean = true,
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
         shape = RoundedCornerShape(Dimens.radiusMedium),
         border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
@@ -365,27 +371,44 @@ private fun FixtureInfoSection(detail: PoleDetail) {
     ) {
         Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
-        InfoRow(icon = Icons.Filled.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
-        InfoRow(
-            icon = if (detail.powerSource == "solar") Icons.Filled.WbSunny else Icons.Filled.Power,
-            label = "Nguồn điện",
-            value = if (detail.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
-        )
+        if (detail.fixtureType == null) {
+            InfoRow(icon = Icons.Filled.Bolt, label = "Bóng đèn", value = "Chưa lắp đèn")
+        } else {
+            InfoRow(icon = Icons.Filled.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
+            InfoRow(
+                icon = if (detail.powerSource == "solar") Icons.Filled.WbSunny else Icons.Filled.Power,
+                label = "Nguồn điện",
+                value = if (detail.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
+            )
+            InfoRow(
+                icon = Icons.Filled.VerifiedUser,
+                label = "Bảo hành",
+                value = "Đến ${DateFormatUtils.formatPlainDate(detail.warrantyExpiry)}",
+            )
+        }
         InfoRow(
             icon = Icons.Filled.Wifi,
             label = "IoT",
             value = if (detail.hasIotNode) detail.toIotValueLabel() else "Không có",
         )
         InfoRow(
-            icon = Icons.Filled.VerifiedUser,
-            label = "Bảo hành",
-            value = "Đến ${DateFormatUtils.formatPlainDate(detail.warrantyExpiry)}",
-        )
-        InfoRow(
             icon = Icons.Filled.LocationOn,
             label = "Vị trí",
-            value = "%.4f, %.4f".format(Locale.US, detail.lat, detail.lng),
+            value =
+                if (detail.lat != null && detail.lng != null) {
+                    "%.4f, %.4f".format(Locale.US, detail.lat, detail.lng)
+                } else {
+                    "Chưa có toạ độ"
+                },
         )
+        if (detail.note != null) {
+            Spacer(Modifier.height(Spacing.sm))
+            Text(
+                text = detail.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -662,6 +685,7 @@ private fun sampleDetailDim() =
             listOf(
                 PoleDetailFrame("FRM-88213", "2026-08-19T12:00:00Z", "/api/v1/frames/FRM-88213/thumbnail"),
             ),
+        note = null,
     )
 
 private fun sampleDetailNormal() =
@@ -699,6 +723,7 @@ private fun sampleDetailNormal() =
             listOf(
                 PoleDetailFrame("FRM-88301", "2026-08-19T12:00:00Z", "/api/v1/frames/FRM-88301/thumbnail"),
             ),
+        note = null,
     )
 
 private fun sampleDetailOut() =
@@ -736,6 +761,7 @@ private fun sampleDetailOut() =
                 PoleDetailFault("FAULT-0031", "no_light_output", "high", "detected"),
             ),
         recentFrames = emptyList(),
+        note = null,
     )
 
 @Preview(showBackground = true)
