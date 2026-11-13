@@ -463,9 +463,11 @@ Giai đoạn 0 đứng riêng và nên lên `dev` trước — đó là lỗi đ
 
 ---
 
-## 12. Việc cần chủ dự án quyết
+## 12. Quyết định của chủ dự án (2026-11-13)
 
-1. **Duyệt spec này** trước khi lên implementation plan.
-2. **Tham chiếu "v3.0.1"** trong code: bạn có tài liệu gốc không, hay cho phép gỡ tham chiếu và hợp nhất vào spec này?
-3. **Giai đoạn 0 (sửa lỗi P0)** có nên tách PR riêng lên `dev` ngay, không chờ phần còn lại?
-4. **Mục 8.1** — bỏ hẳn tab "Khảo sát" ở Home có ảnh hưởng gì tới kỳ vọng của mentor/hội đồng không?
+Bốn điểm chờ quyết đã được chủ dự án trả lời, chốt như sau:
+
+1. **Spec được duyệt.** Tiến hành lập implementation plan.
+2. **Không còn tài liệu gốc "v3.0.1".** Được phép **gỡ toàn bộ tham chiếu** "Design System v3.0.1" trong code (`Type.kt:11`, `PoleDetailScreen.kt:202,211,245`, `LuminanceTrendChart.kt:36`) và hợp nhất mọi quy tắc vào spec này. Spec này trở thành **nguồn sự thật duy nhất** cho lớp trình bày; `LuxMap_Mobile_Design_System_v2.0.md` giữ vai trò tài liệu nền, `v2.1`/`Redesign_Spec_v0.1` chỉ còn giá trị lịch sử.
+3. **Giai đoạn 0 tách PR riêng lên `dev` ngay**, không chờ phần còn lại. Lý do: đây là lỗi đang ảnh hưởng người dùng thật.
+4. **Được phép bỏ hẳn tab "Khảo sát" ở Home** (mục 8.1) — không ảnh hưởng kỳ vọng của mentor/hội đồng.
