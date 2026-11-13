@@ -8,6 +8,7 @@ import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
+import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,6 +30,7 @@ class WorkOrderDetailViewModel
         savedStateHandle: SavedStateHandle,
         private val detailRepository: WorkOrderDetailRepository,
         private val completionRepository: WorkOrderCompletionRepository,
+        private val poleGpsRepository: PoleGpsRepository,
         private val connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
@@ -37,6 +39,8 @@ class WorkOrderDetailViewModel
         val uiState: StateFlow<WorkOrderDetailUiState> = _uiState.asStateFlow()
 
         private val detailState = MutableStateFlow<WorkOrderDetail?>(null)
+        private val poleReferencesState =
+            MutableStateFlow<List<com.luxmap.feature.workorder.polegps.data.PoleReference>>(emptyList())
 
         private val _startedSurveyWorkOrderId = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val startedSurveyWorkOrderId: SharedFlow<String> = _startedSurveyWorkOrderId.asSharedFlow()
@@ -60,6 +64,9 @@ class WorkOrderDetailViewModel
                     if (detail == null) {
                         _uiState.value = WorkOrderDetailUiState.Empty
                     } else {
+                        if (detail.taskKind == "pole_gps_update") {
+                            poleReferencesState.value = poleGpsRepository.poleReferences(workOrderId)
+                        }
                         detailState.value = detail
                     }
                 }
@@ -69,7 +76,22 @@ class WorkOrderDetailViewModel
                     completionRepository.observeCompletion(workOrderId),
                     connectivityObserver.isOnline,
                 ) { latestDetail, evidence, completion, isOnline -> Quad(latestDetail, evidence, completion, isOnline) }
-                    .collect { (latestDetail, evidence, completion, isOnline) ->
+                    .combine(
+                        poleGpsRepository.observeMeasurements(workOrderId),
+                    ) { quad, measurements -> quad to measurements }
+                    .combine(poleGpsRepository.observeAttachments(workOrderId)) { (quad, measurements), attachments ->
+                        Triple(quad, measurements, attachments)
+                    }
+                    .combine(poleReferencesState) { (quad, measurements, attachments), references ->
+                        Quint(
+                            quad.first,
+                            quad.second,
+                            quad.third,
+                            quad.fourth,
+                            PoleGpsData(measurements, attachments, references),
+                        )
+                    }
+                    .collect { (latestDetail, evidence, completion, isOnline, poleGpsData) ->
                         if (latestDetail != null) {
                             val current = _uiState.value as? WorkOrderDetailUiState.Success
                             _uiState.value =
@@ -78,15 +100,25 @@ class WorkOrderDetailViewModel
                                     localEvidence = evidence,
                                     localCompletion = completion,
                                     isOnline = isOnline,
+                                    poleMeasurements = poleGpsData.measurements,
+                                    poleAttachments = poleGpsData.attachments,
+                                    poleReferences = poleGpsData.references,
                                 ) ?: WorkOrderDetailUiState.Success(
                                     detail = latestDetail,
                                     localEvidence = evidence,
                                     localCompletion = completion,
                                     isOnline = isOnline,
+                                    poleMeasurements = poleGpsData.measurements,
+                                    poleAttachments = poleGpsData.attachments,
+                                    poleReferences = poleGpsData.references,
                                 )
                         }
                     }
             }
+        }
+
+        fun retryAttachment(attachmentId: String) {
+            viewModelScope.launch { poleGpsRepository.retryAttachment(workOrderId, attachmentId) }
         }
 
         fun start() {
@@ -194,6 +226,14 @@ class WorkOrderDetailViewModel
             if (e is IOException) "Mất kết nối. Vui lòng thử lại." else "Không gửi được yêu cầu hủy"
 
         private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+        private data class Quint<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)
+
+        private data class PoleGpsData(
+            val measurements: List<com.luxmap.feature.workorder.polegps.data.PoleMeasurement>,
+            val attachments: List<com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment>,
+            val references: List<com.luxmap.feature.workorder.polegps.data.PoleReference>,
+        )
 
         companion object {
             const val WORK_ORDER_ID_ARG = "workOrderId"

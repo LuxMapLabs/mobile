@@ -4,6 +4,9 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
+import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
+import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
+import com.luxmap.feature.workorder.polegps.data.PoleReference
 
 sealed interface WorkOrderDetailUiState {
     data object Loading : WorkOrderDetailUiState
@@ -23,6 +26,9 @@ sealed interface WorkOrderDetailUiState {
         val isRequestingCancellation: Boolean = false,
         val cancellationError: String? = null,
         val justSubmitted: Boolean = false,
+        val poleReferences: List<PoleReference> = emptyList(),
+        val poleMeasurements: List<PoleMeasurement> = emptyList(),
+        val poleAttachments: List<PoleGpsAttachment> = emptyList(),
     ) : WorkOrderDetailUiState
 
     data object Empty : WorkOrderDetailUiState
@@ -35,6 +41,7 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
     return when (detail.taskKind) {
         "repair" -> noteValid && localEvidence != null
         "inspection" -> noteValid && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
+        "pole_gps_update" -> noteValid && poleMeasurements.isNotEmpty()
         else -> false
     }
 }
