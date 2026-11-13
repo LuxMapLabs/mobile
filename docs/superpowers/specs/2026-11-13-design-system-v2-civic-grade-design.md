@@ -46,18 +46,25 @@ Nguyên nhân: commit `2187ba1` (Phase 0 redesign v2.1) thêm hai role này; com
 
 Nơi bị ảnh hưởng: `BottomNavBar.kt:37,38,39`, `CoverageScreen.kt:108,116,122`, `SubmitScreen.kt:142,150,156`, `MapScreen.kt:653`.
 
-**P0-2. Ba trong bốn màu nhãn mức ưu tiên Work Order không đạt WCAG AA.**
+**P0-2. Màu mức ưu tiên "Cao" không đạt ngưỡng tương phản, và tài liệu mâu thuẫn với code.**
 
-Các màu này dùng làm **màu chữ trần trên nền surface**, không có nền riêng (theo `WorkOrderPriority.color()`).
+*Ghi chú đính chính (2026-11-13): bản đầu của spec này mô tả sai rằng các màu ưu tiên được dùng làm màu chữ, dẫn tới kết luận "3/4 không đạt AA". Đọc lại code cho thấy cách dùng thật khác. Phần dưới đây là bản đã sửa.*
 
-| Mức | Màu | Tương phản trên nền trắng | Kết quả |
+**Cách dùng thật:** `WorkOrderPriority.color()` chỉ được gọi ở **một** nơi — `WorkOrderDetailScreen.kt:1136` (`PriorityDotLabel`) — làm **chấm tròn 7dp**. Chữ nhãn kèm theo dùng `onSurfaceVariant`, không phải màu ưu tiên. Vì vậy ngưỡng áp dụng là **WCAG 1.4.11 (phi văn bản): 3:1**, không phải 4.5:1.
+
+| Mức | Màu | Tương phản trên nền trắng | Ngưỡng 3:1 |
 |---|---|---:|---|
-| Thấp | `#64748B` | 4.76:1 | Đạt AA (sát ngưỡng) |
-| Bình thường | `#3E86C9` | 3.85:1 | **Không đạt** |
-| Cao | `#E9A23B` | **2.17:1** | **Hỏng nặng** |
-| Khẩn | `#D64545` | 4.38:1 | **Không đạt** |
+| Thấp | `#64748B` | 4.76:1 | Đạt |
+| Bình thường | `#3E86C9` | 3.85:1 | Đạt |
+| Cao | `#E9A23B` | **2.17:1** | **Không đạt** |
+| Khẩn | `#D64545` | 4.38:1 | Đạt |
 
-Nhãn "Cao" ở mức 2.17:1 gần như không đọc được ngoài trời. Nghịch lý: mức ưu tiên càng cao thì nhãn càng khó đọc.
+**Hai vấn đề thật:**
+
+1. **Màu "Cao" `#E9A23B` ở 2.17:1 không đạt cả ngưỡng 3:1** — chấm chỉ báo gần như biến mất trên nền trắng, đúng vào mức ưu tiên cần nổi bật.
+2. **Tài liệu mâu thuẫn với code.** CLAUDE.md (bảng "Badge ưu tiên Work Order") và `Color.kt:212` đều mô tả đây là *"một màu chữ trên nền surface, không có nền riêng"*. Nếu ai đó triển khai đúng như tài liệu viết, ngưỡng sẽ là 4.5:1 và **3 trong 4 màu sẽ không đạt** (`#3E86C9` 3.85, `#E9A23B` 2.17, `#D64545` 4.38). Đây là mìn hẹn giờ: tài liệu đang mời gọi một cách dùng không đạt chuẩn.
+
+Cách sửa ở mục 4.1 (chuyển sang badge nền+chữ) xử lý dứt điểm cả hai: màu "Cao" đạt 6.37:1, và xoá bỏ sự mơ hồ giữa tài liệu và code.
 
 **P0-3. Chữ phụ sát ngưỡng.** `Gray500 #64748B` trên nền `Gray25 #F8FAFC` đạt **4.55:1** — vừa đủ AA, không còn dư địa cho điều kiện ánh sáng thực địa.
 
@@ -198,16 +205,18 @@ Nguyên nhân gốc của P0-1 là khai báo thiếu. Spec này yêu cầu đị
 
 **Quy tắc bắt buộc:** thêm kiểm thử tự động chặn hồi quy — mọi role M3 được tham chiếu trong code phải có mặt trong cả hai color scheme. Lỗi P0-1 tồn tại một tháng vì không có lưới an toàn nào.
 
-#### Sửa P0-2: mức ưu tiên chuyển từ chữ trần sang badge
+#### Sửa P0-2: mức ưu tiên chuyển từ chấm màu sang badge
 
-Thay vì sửa từng mã màu, sửa **cấu trúc**: mức ưu tiên dùng cặp nền+chữ như mọi hệ trạng thái khác. Tái dùng các cặp đã kiểm chứng, không phát minh màu mới.
+Thay vì sửa từng mã màu, sửa **cấu trúc**: mức ưu tiên dùng cặp nền+chữ như mọi hệ trạng thái khác. Tái dùng các cặp đã kiểm chứng, không phát minh màu mới. Cách này vừa đưa màu "Cao" vượt ngưỡng, vừa xoá mâu thuẫn tài liệu/code nêu ở P0-2.
 
-| Mức | Nền | Chữ | Tương phản | Trước |
+| Mức | Nền | Chữ | Tương phản mới | Màu chấm cũ trên nền trắng |
 |---|---|---|---:|---:|
 | Thấp | `#F1F5F9` | `#475569` | **6.91:1** | 4.76:1 |
 | Bình thường | `#E8EEF7` | `#1F3864` | **9.96:1** | 3.85:1 |
-| Cao | `#FEF3C7` | `#92400E` | **6.37:1** | 2.17:1 |
+| Cao | `#FEF3C7` | `#92400E` | **6.37:1** | **2.17:1** |
 | Khẩn | `#FEE2E2` | `#991B1B` | **6.80:1** | 4.38:1 |
+
+Cột cuối là tương phản của chấm 7dp hiện tại (ngưỡng áp dụng 3:1); cột "Tương phản mới" là tương phản chữ trong badge (ngưỡng 4.5:1). Hai cột khác ngưỡng nên không so sánh trực tiếp — bảng này cho thấy sau khi sửa, mọi mức đều vượt ngưỡng chặt hơn.
 
 ### 4.2 Elevation — thang 5 bậc có ngữ nghĩa
 
