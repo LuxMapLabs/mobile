@@ -480,7 +480,7 @@ private fun ReviewFooter(
     // .../review" - review_note is mandatory even when AI never reached on/off or failed
     // outright, not only when it disagrees).
     val noteRequired = selected != null && selected != state.cvState
-    val normalizedNote = if (noteRequired) note.trim().ifBlank { null } else null
+    val normalizedNote = note.trim().ifBlank { null }
     val hasChange = selected != baselineCvState || normalizedNote != baselineNote
     val canSubmit = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
 
