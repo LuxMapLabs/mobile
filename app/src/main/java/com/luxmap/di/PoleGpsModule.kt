@@ -1,6 +1,8 @@
 package com.luxmap.di
 
 import com.luxmap.feature.workorder.polegps.data.AttachmentDownloadScheduler
+import com.luxmap.feature.workorder.polegps.data.FusedGpsFixSource
+import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.WorkManagerAttachmentDownloadScheduler
 import dagger.Binds
 import dagger.Module
@@ -14,4 +16,7 @@ abstract class PoleGpsModule {
     abstract fun bindAttachmentDownloadScheduler(
         impl: WorkManagerAttachmentDownloadScheduler,
     ): AttachmentDownloadScheduler
+
+    @Binds
+    abstract fun bindGpsFixSource(impl: FusedGpsFixSource): GpsFixSource
 }
