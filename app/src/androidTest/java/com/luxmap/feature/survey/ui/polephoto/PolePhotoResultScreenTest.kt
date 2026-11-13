@@ -36,18 +36,18 @@ private fun successState(
     mediaType = mediaType,
 )
 
-class PolePhotoResultBottomSheetTest {
+class PolePhotoResultScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
     fun loading_state_shows_the_skeleton() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = PolePhotoResultUiState.Loading,
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -59,11 +59,11 @@ class PolePhotoResultBottomSheetTest {
     fun header_shows_the_pole_id_and_the_position_badge_in_every_state() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = PolePhotoResultUiState.Loading,
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -73,21 +73,21 @@ class PolePhotoResultBottomSheetTest {
     }
 
     @Test
-    fun closing_the_header_button_invokes_onDismiss() {
-        var dismissed = false
+    fun pressing_the_back_arrow_invokes_onBack() {
+        var wentBack = false
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = PolePhotoResultUiState.Empty,
-                    onDismiss = { dismissed = true },
+                    onBack = { wentBack = true },
                     onRetry = {},
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Đóng").performClick()
-        assertEquals(true, dismissed)
+        composeRule.onNodeWithContentDescription("Quay lại").performClick()
+        assertEquals(true, wentBack)
     }
 
     @Test
@@ -95,11 +95,11 @@ class PolePhotoResultBottomSheetTest {
         var retaken = false
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                     onRetake = { retaken = true },
                 )
@@ -117,11 +117,11 @@ class PolePhotoResultBottomSheetTest {
         var retaken = false
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                     onRetake = { retaken = true },
                 )
@@ -134,14 +134,31 @@ class PolePhotoResultBottomSheetTest {
     }
 
     @Test
+    fun retake_button_is_hidden_once_a_manager_decision_already_exists() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(decision = "confirm"),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithText("Chụp lại cột này").assertDoesNotExist()
+    }
+
+    @Test
     fun success_state_tapping_the_photo_opens_the_zoom_viewer() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -154,11 +171,11 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_with_video_media_type_shows_a_video_placeholder_not_a_broken_image() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(mediaType = "video"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -170,11 +187,11 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_shows_the_cv_state_label_and_confidence() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = "on", confidence = 0.92),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -188,11 +205,11 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_hides_the_decision_card_when_decision_is_null() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(decision = null),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -204,11 +221,11 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_shows_the_manager_decision_and_note_when_present() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(decision = "confirm", decisionNote = "Đã kiểm tra thực tế"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -221,11 +238,11 @@ class PolePhotoResultBottomSheetTest {
     fun success_state_shows_the_stale_banner_only_when_isStale_is_true() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(isStale = true),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -237,11 +254,11 @@ class PolePhotoResultBottomSheetTest {
     fun empty_state_shows_the_ai_unavailable_message() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = PolePhotoResultUiState.Empty,
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -254,11 +271,11 @@ class PolePhotoResultBottomSheetTest {
         var retried = false
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = PolePhotoResultUiState.Error("network down"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = { retried = true },
                 )
             }
@@ -272,11 +289,11 @@ class PolePhotoResultBottomSheetTest {
     fun review_card_is_hidden_once_a_manager_decision_already_exists() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(decision = "confirm"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -288,11 +305,11 @@ class PolePhotoResultBottomSheetTest {
     fun review_card_shows_even_when_the_ai_model_failed_outright() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = null, confidence = null),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -307,11 +324,11 @@ class PolePhotoResultBottomSheetTest {
         var submitted: Pair<String, String?>? = null
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = "on"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                     onSubmitReview = { finalCvState, reviewNote -> submitted = finalCvState to reviewNote },
                 )
@@ -330,11 +347,11 @@ class PolePhotoResultBottomSheetTest {
     fun review_card_disables_submit_right_after_saving_a_draft_with_no_further_edit() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = "on").copy(draftFinalCvState = "on", draftReviewNote = null),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                     onSubmitReview = { _, _ -> },
                 )
@@ -348,11 +365,11 @@ class PolePhotoResultBottomSheetTest {
     fun review_card_shows_no_saved_hint_when_there_is_no_draft_yet() {
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = "on"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                 )
             }
@@ -365,11 +382,11 @@ class PolePhotoResultBottomSheetTest {
         var submitted = false
         composeRule.setContent {
             LuxMapTheme {
-                PolePhotoResultBottomSheet(
+                PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
                     state = successState(cvState = "on"),
-                    onDismiss = {},
+                    onBack = {},
                     onRetry = {},
                     onSubmitReview = { _, _ -> submitted = true },
                 )

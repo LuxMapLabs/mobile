@@ -94,19 +94,11 @@ fun PoleListRoute(
     workOrderId: String,
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit,
+    onViewAiResult: (serverPhotoId: String) -> Unit,
     onDone: () -> Unit,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val aiResultState by viewModel.aiResultState.collectAsState()
-    // Remembered so the bottom sheet's "Thử lại" button can re-fetch the same photo on error -
-    // the sheet itself only knows the current PolePhotoResultUiState, not which photo it's for.
-    var lastViewedServerPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
-    // Remembered the same way, for the sheet's header (pole number + id) and "Chụp lại" button -
-    // PolePhotoResultUiState stays free of pole identity on purpose (it only describes the AI
-    // result itself), so the Route looks the pole up from the already-loaded list instead.
-    var lastViewedPoleId by rememberSaveable { mutableStateOf<String?>(null) }
-    var lastViewedPosition by rememberSaveable { mutableStateOf<Int?>(null) }
 
     // Completing the survey otherwise gives no visible feedback at all (found on a real device,
     // 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material Snackbar) matches the Khao Sat
@@ -130,9 +122,6 @@ fun PoleListRoute(
         PoleListScreen(
             workOrderId = workOrderId,
             state = uiState,
-            aiResultState = aiResultState,
-            aiResultPoleId = lastViewedPoleId.orEmpty(),
-            aiResultPosition = lastViewedPosition ?: 0,
             onCapturePole = onCapturePole,
             onCaptureVideo = onCaptureVideo,
             // Pure navigation - this used to also silently call onComplete() (found on a real
@@ -141,24 +130,7 @@ fun PoleListRoute(
             onBack = onDone,
             onComplete = viewModel::onComplete,
             onRetry = viewModel::onRetry,
-            onViewAiResult = { serverPhotoId ->
-                val pole =
-                    (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == serverPhotoId }
-                lastViewedServerPhotoId = serverPhotoId
-                lastViewedPoleId = pole?.poleId
-                lastViewedPosition = pole?.position
-                viewModel.onViewAiResult(serverPhotoId)
-            },
-            onDismissAiResult = viewModel::onDismissAiResult,
-            onRetryAiResult = { lastViewedServerPhotoId?.let(viewModel::onViewAiResult) },
-            onRetake = {
-                viewModel.onDismissAiResult()
-                lastViewedPoleId?.let { onCapturePole(it, PolePhotoCaptureSource.CAMERA) }
-            },
-            onSubmitReview = { finalCvState, reviewNote ->
-                lastViewedServerPhotoId?.let { viewModel.onSubmitReview(it, finalCvState, reviewNote) }
-            },
-            onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
+            onViewAiResult = onViewAiResult,
         )
         TopSlideToast(
             state = toastState,
@@ -180,15 +152,7 @@ fun PoleListScreen(
     onBack: () -> Unit,
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
-    aiResultState: PolePhotoResultUiState? = null,
-    aiResultPoleId: String = "",
-    aiResultPosition: Int = 0,
     onViewAiResult: (serverPhotoId: String) -> Unit = {},
-    onDismissAiResult: () -> Unit = {},
-    onRetryAiResult: () -> Unit = {},
-    onRetake: () -> Unit = {},
-    onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
-    onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
     // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
     // the design mock's sheet trigger, but only offers the choice itself here.
@@ -305,19 +269,6 @@ fun PoleListScreen(
                 showCompleteConfirm = false
                 onComplete()
             },
-        )
-    }
-
-    if (aiResultState != null) {
-        PolePhotoResultBottomSheet(
-            poleId = aiResultPoleId,
-            position = aiResultPosition,
-            state = aiResultState,
-            onDismiss = onDismissAiResult,
-            onRetry = onRetryAiResult,
-            onRetake = onRetake,
-            onSubmitReview = onSubmitReview,
-            onRequestAuthorizationHeader = onRequestAuthorizationHeader,
         )
     }
 

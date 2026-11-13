@@ -20,6 +20,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,8 +55,10 @@ import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
+import com.luxmap.feature.survey.ui.polephoto.PoleListViewModel
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureSource
+import com.luxmap.feature.survey.ui.polephoto.PolePhotoResultRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
@@ -265,7 +268,39 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             Routes.PoleVideoCapture.createRoute(polePhotoWorkOrderId, poleId, source.name.lowercase()),
                         )
                     },
+                    onViewAiResult = { photoId ->
+                        navController.navigate(Routes.PolePhotoResult.createRoute(polePhotoWorkOrderId, photoId))
+                    },
                     onDone = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = Routes.PolePhotoResult.route,
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("photoId") { type = NavType.StringType },
+                    ),
+            ) { backStackEntry ->
+                val resultWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
+                val resultPhotoId = backStackEntry.arguments?.getString("photoId") ?: return@composable
+                // Shares the PoleListViewModel instance already running for the list screen below
+                // this one on the back stack, instead of re-fetching into a second ViewModel - the
+                // list's cache/submit-review logic (PoleListViewModel.onViewAiResult/onSubmitReview)
+                // already does exactly what this screen needs.
+                val parentEntry =
+                    remember(backStackEntry) {
+                        navController.getBackStackEntry(Routes.PolePhotoList.createRoute(resultWorkOrderId))
+                    }
+                val sharedViewModel: PoleListViewModel = hiltViewModel(parentEntry)
+                PolePhotoResultRoute(
+                    photoId = resultPhotoId,
+                    onBack = { navController.popBackStack() },
+                    onRetake = { poleId ->
+                        navController.popBackStack()
+                        navController.navigate(Routes.PolePhotoCapture.createRoute(resultWorkOrderId, poleId, "camera"))
+                    },
+                    viewModel = sharedViewModel,
                 )
             }
             composable(
