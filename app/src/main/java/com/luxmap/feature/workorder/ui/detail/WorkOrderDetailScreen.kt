@@ -744,6 +744,7 @@ private fun WorkOrderDetailContent(
                                 onFaultOutcomeSelected = onFaultOutcomeSelected,
                             )
                         WorkOrderTaskKind.SURVEY -> Unit
+                        WorkOrderTaskKind.POLE_GPS_UPDATE -> Unit
                     }
                 }
             }
@@ -859,7 +860,12 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
             due.isToday -> DueTodayColor
             else -> MaterialTheme.colorScheme.onSurface
         }
-    val scheduleLabel = if (kind == WorkOrderTaskKind.REPAIR) "Lịch sửa chữa" else "Lịch kiểm tra"
+    val scheduleLabel =
+        when (kind) {
+            WorkOrderTaskKind.REPAIR -> "Lịch sửa chữa"
+            WorkOrderTaskKind.POLE_GPS_UPDATE -> "Lịch đo GPS"
+            else -> "Lịch kiểm tra"
+        }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     Column(
         modifier =
@@ -885,7 +891,10 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
             )
         }
         if (status != WorkOrderStatus.CANCELLED) {
-            LifecycleTracker(steps = workOrderLifecycleSteps(status, kind))
+            val lifecycleSteps = workOrderLifecycleSteps(status, kind)
+            if (lifecycleSteps.isNotEmpty()) {
+                LifecycleTracker(steps = lifecycleSteps)
+            }
         }
     }
 }

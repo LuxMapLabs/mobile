@@ -24,12 +24,14 @@ fun workOrderLifecycleSteps(
     taskKind: WorkOrderTaskKind,
 ): List<LifecycleStep> {
     check(woStatus != WorkOrderStatus.CANCELLED) { "A cancelled work order has no lifecycle steps to show" }
+    if (taskKind == WorkOrderTaskKind.POLE_GPS_UPDATE) return emptyList()
     val labels = listOf(STEP_SURVEY, STEP_REVIEW_1, STEP_INSPECT, STEP_REVIEW_2, STEP_REPAIR)
     val currentIndex =
         when (taskKind) {
             WorkOrderTaskKind.SURVEY -> 0
             WorkOrderTaskKind.INSPECTION -> 2
             WorkOrderTaskKind.REPAIR -> 4
+            WorkOrderTaskKind.POLE_GPS_UPDATE -> 0
         }
     // This WorkOrder's own done/verified status only closes its OWN step in the case, it says
     // nothing about the later steps (a verified inspection does not mean the repair happened yet).

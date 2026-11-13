@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
@@ -295,13 +296,14 @@ fun workOrderStatusFromWire(value: String): WorkOrderStatus =
 // Component - task_kind badge (F02 cluster list), distinguishes an inspection ticket from a
 // repair ticket on the same work_order entity. Colors reuse the existing ASSIGNED/IN_PROGRESS
 // pairs above rather than adding new ones.
-enum class WorkOrderTaskKind { INSPECTION, REPAIR, SURVEY }
+enum class WorkOrderTaskKind { INSPECTION, REPAIR, SURVEY, POLE_GPS_UPDATE }
 
 fun WorkOrderTaskKind.label(): String =
     when (this) {
         WorkOrderTaskKind.INSPECTION -> "Kiểm tra"
         WorkOrderTaskKind.REPAIR -> "Sửa chữa"
         WorkOrderTaskKind.SURVEY -> "Khảo sát"
+        WorkOrderTaskKind.POLE_GPS_UPDATE -> "Cập nhật GPS cột"
     }
 
 fun WorkOrderTaskKind.icon(): ImageVector =
@@ -309,6 +311,7 @@ fun WorkOrderTaskKind.icon(): ImageVector =
         WorkOrderTaskKind.INSPECTION -> Icons.Filled.Search
         WorkOrderTaskKind.REPAIR -> Icons.Filled.Build
         WorkOrderTaskKind.SURVEY -> Icons.Filled.Videocam
+        WorkOrderTaskKind.POLE_GPS_UPDATE -> Icons.Filled.LocationOn
     }
 
 fun WorkOrderTaskKind.badgeColors(): BadgeColors =
@@ -316,6 +319,7 @@ fun WorkOrderTaskKind.badgeColors(): BadgeColors =
         WorkOrderTaskKind.INSPECTION -> WorkOrderStatus.ASSIGNED.badgeColors()
         WorkOrderTaskKind.REPAIR -> WorkOrderStatus.IN_PROGRESS.badgeColors()
         WorkOrderTaskKind.SURVEY -> WorkOrderStatus.DONE.badgeColors()
+        WorkOrderTaskKind.POLE_GPS_UPDATE -> WorkOrderStatus.VERIFIED.badgeColors()
     }
 
 // task_kind arrives from the backend as a snake_case wire string ("inspection"/"repair"/
@@ -325,5 +329,6 @@ fun workOrderTaskKindFromWire(value: String): WorkOrderTaskKind =
     when (value) {
         "repair" -> WorkOrderTaskKind.REPAIR
         "survey" -> WorkOrderTaskKind.SURVEY
+        "pole_gps_update" -> WorkOrderTaskKind.POLE_GPS_UPDATE
         else -> WorkOrderTaskKind.INSPECTION
     }
