@@ -15,7 +15,10 @@ class RealPoleListRepository
     ) : PoleListRepository {
         override suspend fun poles(workOrderId: String): Result<PoleListResult> =
             runCatching {
-                val items = api.poles(workOrderId).items.map { PoleListItem(it.poleId, it.position, it.fixtureStatus) }
+                val items =
+                    api.poles(workOrderId).items.map {
+                        PoleListItem(it.poleId, it.position, it.location?.lat, it.location?.lng, it.fixtureStatus)
+                    }
                 dao.replaceForWorkOrder(workOrderId, items.map { it.toEntity(workOrderId) })
                 PoleListResult(items, isStale = false)
             }.recoverCatching { e ->
@@ -27,7 +30,7 @@ class RealPoleListRepository
             }
 
         private fun PoleListItem.toEntity(workOrderId: String) =
-            LocalPoleListItemEntity(workOrderId, poleId, position, fixtureStatus)
+            LocalPoleListItemEntity(workOrderId, poleId, position, lat, lng, fixtureStatus)
 
-        private fun LocalPoleListItemEntity.toDomain() = PoleListItem(poleId, position, fixtureStatus)
+        private fun LocalPoleListItemEntity.toDomain() = PoleListItem(poleId, position, lat, lng, fixtureStatus)
     }

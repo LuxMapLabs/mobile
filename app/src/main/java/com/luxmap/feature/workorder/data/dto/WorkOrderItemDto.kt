@@ -28,4 +28,5 @@ data class WorkOrderItemDto(
     @SerialName("updated_at") val updatedAt: String,
     @SerialName("due_date") val dueDate: String? = null,
     @SerialName("scheduled_date") val scheduledDate: String? = null,
+    @SerialName("pole_ids") val poleIds: List<String> = emptyList(),
 )

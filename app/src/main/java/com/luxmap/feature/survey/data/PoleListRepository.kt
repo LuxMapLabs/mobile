@@ -2,7 +2,9 @@ package com.luxmap.feature.survey.data
 
 data class PoleListItem(
     val poleId: String,
-    val position: Int,
+    val position: Int?,
+    val lat: Double?,
+    val lng: Double?,
     val fixtureStatus: String,
 )
 

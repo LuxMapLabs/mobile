@@ -10,6 +10,8 @@ import androidx.room.Entity
 data class LocalPoleListItemEntity(
     val workOrderId: String,
     val poleId: String,
-    val position: Int,
+    val position: Int?,
+    val lat: Double?,
+    val lng: Double?,
     val fixtureStatus: String,
 )
