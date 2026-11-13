@@ -105,8 +105,49 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
+        composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
         composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
+        assertEquals(false, retaken)
+        composeRule.onNodeWithText("Chụp lại").performClick()
         assertEquals(true, retaken)
+    }
+
+    @Test
+    fun success_state_cancelling_the_retake_dialog_does_not_invoke_onRetake() {
+        var retaken = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(),
+                    onDismiss = {},
+                    onRetry = {},
+                    onRetake = { retaken = true },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
+        composeRule.onNodeWithText("Hủy").performClick()
+        assertEquals(false, retaken)
+    }
+
+    @Test
+    fun success_state_tapping_the_photo_opens_the_zoom_viewer() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultBottomSheet(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(),
+                    onDismiss = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("photo_preview").performClick()
+        composeRule.onNodeWithTag("photo_viewer").assertExists()
     }
 
     @Test
@@ -138,9 +179,9 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        // Tagged, not plain text - ReviewCard's own "Đèn sáng" chip renders at the same time.
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Đèn sáng")
-        composeRule.onNodeWithText("Tin cậy 92%").assertExists()
+        composeRule.onNodeWithText("AI nhận định").assertExists()
+        composeRule.onNodeWithText("Tin cậy cao · 92%").assertExists()
     }
 
     @Test
@@ -256,7 +297,8 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("AI không xử lý được").assertExists()
+        composeRule.onNodeWithText("AI không xử lý được · cần bạn chọn nhãn").assertExists()
+        composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Chưa có kết luận")
         composeRule.onNodeWithText("KỸ SƯ XÁC NHẬN NHÃN").assertExists()
     }
 
@@ -275,8 +317,8 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_on").performScrollTo().performClick()
-        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().performClick()
+        composeRule.onNodeWithTag("review_choice_on").performClick()
+        composeRule.onNodeWithText("Đồng ý với AI").performClick()
         assertEquals("on" to null, submitted)
     }
 
@@ -298,7 +340,7 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().assertIsNotEnabled()
+        composeRule.onNodeWithText("Đồng ý với AI").assertIsNotEnabled()
         composeRule.onNodeWithText("Đã lưu, sẽ gửi khi Hoàn tất").assertExists()
     }
 
@@ -333,12 +375,12 @@ class PolePhotoResultBottomSheetTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_off").performScrollTo().performClick()
+        composeRule.onNodeWithTag("review_choice_off").performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
-        composeRule.onNodeWithText("Lưu xác nhận").assertIsNotEnabled()
+        composeRule.onNodeWithText("Lưu nhãn đã sửa").assertIsNotEnabled()
 
         composeRule.onNodeWithText("Ghi chú").performTextInput("Thấy đèn tắt khi kiểm tra")
-        composeRule.onNodeWithText("Lưu xác nhận").performScrollTo().performClick()
+        composeRule.onNodeWithText("Lưu nhãn đã sửa").performClick()
         assertEquals(true, submitted)
     }
 }
