@@ -123,7 +123,6 @@ import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.theme.color
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.severityFromWire
@@ -1104,7 +1103,7 @@ private fun FaultRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.titleMedium)
-                PriorityDotLabel(priority = priority)
+                PriorityBadgeLabel(priority = priority)
             }
             Text(
                 text = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
@@ -1131,11 +1130,8 @@ private fun FaultRow(
 }
 
 @Composable
-private fun PriorityDotLabel(priority: WorkOrderPriority) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Box(modifier = Modifier.size(7.dp).background(priority.color(), CircleShape))
-        Text(text = priority.label(), style = BadgeTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+private fun PriorityBadgeLabel(priority: WorkOrderPriority) {
+    StatusBadge(text = priority.label(), colors = priority.badgeColors())
 }
 
 @Composable

@@ -224,12 +224,12 @@ fun WorkOrderPriority.label(): String =
         WorkOrderPriority.URGENT -> "Khẩn"
     }
 
-fun WorkOrderPriority.color(): Color =
+fun WorkOrderPriority.badgeColors(): BadgeColors =
     when (this) {
-        WorkOrderPriority.LOW -> Gray500
-        WorkOrderPriority.NORMAL -> Blue500
-        WorkOrderPriority.HIGH -> Amber500
-        WorkOrderPriority.URGENT -> Rose600
+        WorkOrderPriority.LOW -> BadgeColors(Color(0xFFF1F5F9), Color(0xFF475569))
+        WorkOrderPriority.NORMAL -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
+        WorkOrderPriority.HIGH -> BadgeColors(Color(0xFFFEF3C7), Color(0xFF92400E))
+        WorkOrderPriority.URGENT -> BadgeColors(Color(0xFFFEE2E2), Color(0xFF991B1B))
     }
 
 fun severityFromWire(value: String): WorkOrderPriority =
