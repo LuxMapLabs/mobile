@@ -33,6 +33,7 @@ val Gray25 = Color(0xFFF8FAFC)
 val Gray50 = Color(0xFFF1F5F9)
 val Gray200 = Color(0xFFE2E8F0)
 val Gray500 = Color(0xFF64748B)
+val Slate600 = Color(0xFF475569)
 val Gray700 = Color(0xFF334155)
 val Gray900 = Color(0xFF0F172A)
 val Dark950 = Color(0xFF0D0D0D)
@@ -104,11 +105,11 @@ val LightSemanticColors =
         surface = Color(0xFFFFFFFF),
         surfaceSubtle = Gray50,
         textPrimary = Gray900,
-        textSecondary = Gray500,
+        textSecondary = Slate600,
         border = Gray200,
         focus = Blue500,
         navigationActive = Navy700,
-        navigationInactive = Gray500,
+        navigationInactive = Slate600,
     )
 
 val DarkSemanticColors =
