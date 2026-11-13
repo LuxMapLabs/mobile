@@ -443,12 +443,13 @@ private fun TechnicalDetails(
         }
         if (expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                DetailRow("Model AI", state.modelVersion ?: "—")
                 DetailRow("Phân tích lúc", state.analyzedAt?.let { DateFormatUtils.formatInstant(it) } ?: "—")
                 if (state.reviewedBy != null) {
                     DetailRow("Đã review lúc", DateFormatUtils.formatInstant(state.reviewedAt))
                 }
-                RetakeButton(onClick = { confirmRetake = true }, modifier = Modifier.fillMaxWidth())
+                if (state.decision == null) {
+                    RetakeButton(onClick = { confirmRetake = true }, modifier = Modifier.fillMaxWidth())
+                }
             }
         }
     }
