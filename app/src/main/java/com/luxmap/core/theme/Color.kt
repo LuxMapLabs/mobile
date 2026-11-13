@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 // Primitive — giá trị màu gốc (mục 2.1 Design System v2.0)
 val Navy700 = Color(0xFF1F3864)
+val Navy50 = Color(0xFFEEF2F8)
+val Navy100 = Color(0xFFD9E2EF)
+val Navy800 = Color(0xFF172B4D)
 val Blue500 = Color(0xFF3E86C9)
 val Green400 = Color(0xFF5FC4B0)
 val Amber500 = Color(0xFFE9A23B)
@@ -30,6 +33,7 @@ val Gray25 = Color(0xFFF8FAFC)
 val Gray50 = Color(0xFFF1F5F9)
 val Gray200 = Color(0xFFE2E8F0)
 val Gray500 = Color(0xFF64748B)
+val Slate600 = Color(0xFF475569)
 val Gray700 = Color(0xFF334155)
 val Gray900 = Color(0xFF0F172A)
 val Dark950 = Color(0xFF0D0D0D)
@@ -38,6 +42,7 @@ val Dark800 = Color(0xFF1A1A1A)
 val Dark700 = Color(0xFF2A2A2A)
 val DarkText = Color(0xFFF5F5F5)
 val DarkMuted = Color(0xFFA0A0A0)
+val DarkSecondary = Color(0xFFB3B3B3)
 
 // "Night Ledger" palette (v2.1 redesign attempt, rolled back — brand/semantic layer below is
 // v2.0 again). Kept here only because HudChip.kt and LoginScreen.kt still reference a few of
@@ -101,11 +106,11 @@ val LightSemanticColors =
         surface = Color(0xFFFFFFFF),
         surfaceSubtle = Gray50,
         textPrimary = Gray900,
-        textSecondary = Gray500,
+        textSecondary = Slate600,
         border = Gray200,
         focus = Blue500,
         navigationActive = Navy700,
-        navigationInactive = Gray500,
+        navigationInactive = Slate600,
     )
 
 val DarkSemanticColors =
@@ -114,7 +119,7 @@ val DarkSemanticColors =
         surface = Dark800,
         surfaceSubtle = Dark900,
         textPrimary = DarkText,
-        textSecondary = DarkMuted,
+        textSecondary = DarkSecondary,
         border = Dark700,
         focus = Green400,
         navigationActive = Green400,
@@ -209,7 +214,6 @@ fun SyncStatus.icon(): ImageVector =
         SyncStatus.DONE -> Icons.Filled.CloudDone
     }
 
-// Component — badge ưu tiên Work Order (mục 2.5), một màu chữ trên nền surface, không có nền riêng
 enum class WorkOrderPriority { LOW, NORMAL, HIGH, URGENT }
 
 // Nhãn đúng chữ trong CLAUDE.md "Badge ưu tiên Work Order" — dùng chung cho mọi nơi hiển thị priority.
@@ -221,12 +225,12 @@ fun WorkOrderPriority.label(): String =
         WorkOrderPriority.URGENT -> "Khẩn"
     }
 
-fun WorkOrderPriority.color(): Color =
+fun WorkOrderPriority.badgeColors(): BadgeColors =
     when (this) {
-        WorkOrderPriority.LOW -> Gray500
-        WorkOrderPriority.NORMAL -> Blue500
-        WorkOrderPriority.HIGH -> Amber500
-        WorkOrderPriority.URGENT -> Rose600
+        WorkOrderPriority.LOW -> BadgeColors(Color(0xFFF1F5F9), Color(0xFF475569))
+        WorkOrderPriority.NORMAL -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
+        WorkOrderPriority.HIGH -> BadgeColors(Color(0xFFFEF3C7), Color(0xFF92400E))
+        WorkOrderPriority.URGENT -> BadgeColors(Color(0xFFFEE2E2), Color(0xFF991B1B))
     }
 
 fun severityFromWire(value: String): WorkOrderPriority =

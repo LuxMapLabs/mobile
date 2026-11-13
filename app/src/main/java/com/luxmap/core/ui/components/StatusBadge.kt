@@ -1,22 +1,17 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.BadgeColors
@@ -48,34 +43,5 @@ fun StatusBadge(
             Spacer(Modifier.width(4.dp))
         }
         Text(text = text, color = colors.text, style = BadgeTextStyle)
-    }
-}
-
-// Bordered pill, same padding/shape as StatusBadge - previously bare dot+text with no box, which
-// looked uneven sitting next to StatusBadge's filled pills in the same row (e.g. the work order
-// hero's "Kiểm tra"/"Hoàn tất" badges next to "Ưu tiên Bình thường").
-@Composable
-fun PriorityDot(
-    text: String,
-    dotColor: Color,
-    modifier: Modifier = Modifier,
-    textColor: Color = MaterialTheme.colorScheme.onSurface,
-    borderColor: Color = MaterialTheme.colorScheme.outline,
-) {
-    Row(
-        modifier =
-            modifier
-                .border(1.dp, borderColor, RoundedCornerShape(Radius.badge))
-                .padding(horizontal = Spacing.sm, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(8.dp)
-                    .background(color = dotColor, shape = CircleShape),
-        )
-        Spacer(Modifier.width(Spacing.xs))
-        Text(text = text, style = BadgeTextStyle, color = textColor, maxLines = 1)
     }
 }
