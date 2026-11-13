@@ -42,6 +42,7 @@ val Dark800 = Color(0xFF1A1A1A)
 val Dark700 = Color(0xFF2A2A2A)
 val DarkText = Color(0xFFF5F5F5)
 val DarkMuted = Color(0xFFA0A0A0)
+val DarkSecondary = Color(0xFFB3B3B3)
 
 // "Night Ledger" palette (v2.1 redesign attempt, rolled back — brand/semantic layer below is
 // v2.0 again). Kept here only because HudChip.kt and LoginScreen.kt still reference a few of
@@ -118,7 +119,7 @@ val DarkSemanticColors =
         surface = Dark800,
         surfaceSubtle = Dark900,
         textPrimary = DarkText,
-        textSecondary = DarkMuted,
+        textSecondary = DarkSecondary,
         border = Dark700,
         focus = Green400,
         navigationActive = Green400,
@@ -213,7 +214,6 @@ fun SyncStatus.icon(): ImageVector =
         SyncStatus.DONE -> Icons.Filled.CloudDone
     }
 
-// Component — badge ưu tiên Work Order (mục 2.5), một màu chữ trên nền surface, không có nền riêng
 enum class WorkOrderPriority { LOW, NORMAL, HIGH, URGENT }
 
 // Nhãn đúng chữ trong CLAUDE.md "Badge ưu tiên Work Order" — dùng chung cho mọi nơi hiển thị priority.

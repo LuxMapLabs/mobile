@@ -35,6 +35,16 @@ class SemanticTextContrastTest {
     }
 
     @Test
+    fun `dark secondary text clears AAA on a card surface`() {
+        val ratio =
+            contrastRatio(
+                LuxMapDarkColorScheme.onSurfaceVariant,
+                LuxMapDarkColorScheme.surface,
+            )
+        assertTrue("contrast was $ratio", ratio >= 7.0)
+    }
+
+    @Test
     fun `primary text clears AAA in both themes`() {
         val light = contrastRatio(LuxMapLightColorScheme.onSurface, LuxMapLightColorScheme.surface)
         val dark = contrastRatio(LuxMapDarkColorScheme.onSurface, LuxMapDarkColorScheme.surface)
