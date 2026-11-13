@@ -354,7 +354,7 @@ private fun ReviewCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        ReviewChoiceSegment(selected = selected, aiCvState = state.cvState, onSelected = { selected = it })
+        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
 
         OutlinedTextField(
             value = note,
@@ -397,13 +397,12 @@ private fun ReviewCard(
 }
 
 // 2-card grid (Khao Sat v4 - Ket Qua AI mock's "Chon ket qua dung" panel, CLAUDE.md 2026-10-30) -
-// same visual language as the mock's option grid (icon tile + label + "AI" tag on the AI's own
-// pick), but trimmed to exactly the 2 values the real review endpoint accepts
-// (final_cv_state: on|off) instead of the mock's 7-option fault-type list.
+// same visual language as the mock's option grid (icon tile + label), but trimmed to exactly the
+// 2 values the real review endpoint accepts (final_cv_state: on|off) instead of the mock's
+// 7-option fault-type list.
 @Composable
 private fun ReviewChoiceSegment(
     selected: String?,
-    aiCvState: String?,
     onSelected: (String) -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -412,7 +411,6 @@ private fun ReviewChoiceSegment(
                 value = value,
                 label = label,
                 isSelected = selected == value,
-                isAiPick = aiCvState == value,
                 onClick = { onSelected(value) },
                 modifier = Modifier.weight(1f),
             )
@@ -425,7 +423,6 @@ private fun ReviewChoiceCard(
     value: String,
     label: String,
     isSelected: Boolean,
-    isAiPick: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -470,13 +467,6 @@ private fun ReviewChoiceCard(
             color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        if (isAiPick) {
-            Text(
-                text = "AI",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
