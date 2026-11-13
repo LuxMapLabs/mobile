@@ -3,6 +3,7 @@ package com.luxmap.feature.workorder.ui.detail
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,6 +159,8 @@ fun WorkOrderDetailRoute(
     onBack: () -> Unit,
     onCaptureEvidence: () -> Unit,
     onStartSurvey: (workOrderId: String) -> Unit,
+    onOpenPdf: (attachmentId: String) -> Unit = {},
+    onMeasurePole: (poleId: String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
 ) {
@@ -180,6 +183,9 @@ fun WorkOrderDetailRoute(
         onRequestCancellation = viewModel::requestCancellation,
         onCaptureEvidence = onCaptureEvidence,
         onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
+        onOpenPdf = onOpenPdf,
+        onMeasurePole = onMeasurePole,
+        onRetryAttachment = viewModel::retryAttachment,
         modifier = modifier,
     )
 }
@@ -197,6 +203,9 @@ fun WorkOrderDetailScreen(
     onRequestCancellation: (reason: String) -> Unit = {},
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
+    onOpenPdf: (String) -> Unit = {},
+    onMeasurePole: (String) -> Unit = {},
+    onRetryAttachment: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
@@ -266,6 +275,9 @@ fun WorkOrderDetailScreen(
                             onFaultOutcomeSelected = onFaultOutcomeSelected,
                             onCaptureEvidence = onCaptureEvidence,
                             onRetakeEvidence = onRetakeEvidence,
+                            onOpenPdf = onOpenPdf,
+                            onMeasurePole = onMeasurePole,
+                            onRetryAttachment = onRetryAttachment,
                         )
                     is WorkOrderDetailUiState.Empty ->
                         MessageState(
@@ -503,6 +515,24 @@ private fun workOrderCtaState(
                 requiresConfirmation = true,
             )
         }
+        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.POLE_GPS_UPDATE -> {
+            val measured = state.poleMeasurements.map { it.poleId }.toSet().size
+            val missing = state.poleReferences.size - measured
+            WorkOrderCtaState(
+                text = "Nộp báo cáo",
+                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
+                enabled = canSubmitNow,
+                onClick = onSubmit,
+                hint =
+                    when {
+                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                        missing > 0 -> "Còn $missing cột chưa đo"
+                        else -> null
+                    },
+                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                requiresConfirmation = true,
+            )
+        }
         workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Đã nộp báo cáo",
@@ -557,6 +587,13 @@ private fun submitSummaryRows(
                 "Chưa xác định",
                 outcomes.count { it == "inconclusive" }.toString(),
             ),
+        )
+    } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
+        val measured = state.poleMeasurements.map { it.poleId }.toSet().size
+        listOf(
+            SubmitSummaryRow(Icons.Filled.Navigation, Navy700, "Cột đã đo", "$measured/${state.poleReferences.size}"),
+            SubmitSummaryRow(Icons.Filled.StickyNote2, Navy700, "Tệp PDF", state.poleAttachments.size.toString()),
+            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
     } else {
         listOf(
@@ -689,6 +726,9 @@ private fun WorkOrderDetailContent(
     onFaultOutcomeSelected: (String, String) -> Unit,
     onCaptureEvidence: () -> Unit,
     onRetakeEvidence: () -> Unit,
+    onOpenPdf: (String) -> Unit,
+    onMeasurePole: (String) -> Unit,
+    onRetryAttachment: (String) -> Unit,
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
@@ -715,6 +755,20 @@ private fun WorkOrderDetailContent(
             }
             if (kind == WorkOrderTaskKind.SURVEY) {
                 Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
+            } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
+                PoleGpsOverviewSection(
+                    state = state,
+                    onOpenPdf = onOpenPdf,
+                    onMeasurePole = onMeasurePole,
+                    onRetryAttachment = onRetryAttachment,
+                )
+                if (canComplete) {
+                    PoleGpsReportSection(
+                        state = state,
+                        locked = isFormLocked,
+                        onReportNoteChanged = onReportNoteChanged,
+                    )
+                }
             } else {
                 FaultListSection(
                     kind = kind,
@@ -1322,6 +1376,175 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                         } else {
                             WorkOrderStatus.OPEN.badgeColors()
                         },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PoleGpsOverviewSection(
+    state: WorkOrderDetailUiState.Success,
+    onOpenPdf: (String) -> Unit,
+    onMeasurePole: (String) -> Unit,
+    onRetryAttachment: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        CompletionSectionHeader(
+            icon = Icons.Filled.StickyNote2,
+            title = "Tệp PDF",
+            pillText = "${state.poleAttachments.size} file",
+            pillColors = WorkOrderStatus.ASSIGNED.badgeColors(),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            state.poleAttachments.forEach { attachment ->
+                PdfAttachmentRow(
+                    attachment = attachment,
+                    onOpen = { onOpenPdf(attachment.attachmentId) },
+                    onRetry = { onRetryAttachment(attachment.attachmentId) },
+                )
+            }
+        }
+        val measuredIds = state.poleMeasurements.map { it.poleId }.toSet()
+        CompletionSectionHeader(
+            icon = Icons.Filled.Navigation,
+            title = "Cột đèn",
+            pillText = "${measuredIds.size}/${state.poleReferences.size} đã đo",
+            pillColors = WorkOrderStatus.ASSIGNED.badgeColors(),
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            state.poleReferences.forEach { reference ->
+                PoleGpsRow(
+                    reference = reference,
+                    measurement = state.poleMeasurements.firstOrNull { it.poleId == reference.poleId },
+                    onClick = { onMeasurePole(reference.poleId) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PdfAttachmentRow(
+    attachment: com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment,
+    onOpen: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    val (label, canTap, onTap) =
+        when (attachment.status) {
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> Triple("Sẵn sàng", true, onOpen)
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED ->
+                Triple("Lỗi · Nhấn để thử lại", true, onRetry)
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> Triple("Đang tải", false) {}
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> Triple("Chờ tải", false) {}
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onTap, enabled = canTap)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.StickyNote2,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(text = attachment.fileName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PoleGpsRow(
+    reference: com.luxmap.feature.workorder.polegps.data.PoleReference,
+    measurement: com.luxmap.feature.workorder.polegps.data.PoleMeasurement?,
+    onClick: () -> Unit,
+) {
+    val oldPosition =
+        if (reference.lat != null && reference.lng != null) {
+            "%.6f, %.6f".format(reference.lat, reference.lng)
+        } else {
+            "Chưa có"
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onClick)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(text = reference.poleId, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "GPS cũ: $oldPosition",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (measurement != null) {
+            StatusBadge(
+                text = "±${"%.1f".format(measurement.accuracyM)} m",
+                colors = WorkOrderStatus.VERIFIED.badgeColors(),
+            )
+        } else {
+            StatusBadge(text = "Chưa đo", colors = WorkOrderStatus.OPEN.badgeColors())
+        }
+    }
+}
+
+@Composable
+private fun PoleGpsReportSection(
+    state: WorkOrderDetailUiState.Success,
+    locked: Boolean,
+    onReportNoteChanged: (String) -> Unit,
+) {
+    val noteValid = state.reportNote.trim().length >= 10
+    val focusManager = LocalFocusManager.current
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        CompletionSectionHeader(
+            icon = Icons.Filled.FactCheck,
+            title = "Báo cáo",
+            pillText = if (noteValid) "Đã đủ" else "Cần ghi chú",
+            pillColors =
+                if (noteValid) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors(),
+        )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .padding(Spacing.md),
+        ) {
+            WorkflowStepRow(
+                number = 1,
+                title = "Kết quả đo GPS",
+                required = true,
+                done = noteValid,
+                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
+                isLast = true,
+            ) {
+                OutlinedTextField(
+                    value = state.reportNote,
+                    onValueChange = onReportNoteChanged,
+                    placeholder = { Text("VD: Đã đo xong các cột, 1 cột chưa bắt được tín hiệu GPS") },
+                    enabled = !locked,
+                    minLines = 2,
+                    maxLines = 5,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
