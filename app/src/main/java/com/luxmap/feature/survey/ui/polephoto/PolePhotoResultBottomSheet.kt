@@ -749,15 +749,6 @@ private fun RetakeButton(
     }
 }
 
-private fun cvStateLabel(cvState: String?): String =
-    when (cvState) {
-        "on" -> "Đèn sáng"
-        "off" -> "Đèn tắt"
-        "inconclusive" -> "Không rõ ràng"
-        null -> "AI không xử lý được"
-        else -> "Không rõ"
-    }
-
 private fun cvStateBadgeColors(cvState: String?): BadgeColors =
     when (cvState) {
         "on" -> SyncStatus.DONE.badgeColors()
