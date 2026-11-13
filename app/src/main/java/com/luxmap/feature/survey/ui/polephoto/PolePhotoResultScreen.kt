@@ -20,11 +20,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
@@ -40,19 +42,17 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -101,123 +101,151 @@ import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
 import java.io.File
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-private const val PHOTO_HEIGHT_FRACTION = 0.38f
+private const val PHOTO_HEIGHT_FRACTION = 0.45f
 private val StatePlaceholderHeight = 160.dp
 private val SkeletonBlockHeight = 60.dp
 private val HeaderBadgeSize = 44.dp
-private val photoOverlayFormatter = DateTimeFormatter.ofPattern("dd/MM · HH:mm")
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PolePhotoResultBottomSheet(
+fun PolePhotoResultScreen(
     poleId: String,
     position: Int,
     state: PolePhotoResultUiState,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
     onRetry: () -> Unit,
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
     onRequestAuthorizationHeader: suspend () -> String? = { null },
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // ModalBottomSheet renders in its own Android Window - a toast shown anywhere outside this
-    // composable (e.g. over the trigger screen behind it) stays hidden until the sheet closes
-    // (found on a real device, 2026-11-11). This toast lives inside the sheet's own content so
-    // the review button gets visible feedback immediately, without closing the sheet first.
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     val reviewable = state as? PolePhotoResultUiState.Success
     val showFooter = reviewable != null && reviewable.decision == null
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                PolePhotoResultHeader(poleId = poleId, position = position, onDismiss = onDismiss)
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            PolePhotoResultHeader(poleId = poleId, position = position, onBack = onBack)
 
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f, fill = false)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                            .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
-                ) {
-                    when (state) {
-                        is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                        .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
+            ) {
+                when (state) {
+                    is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
-                        is PolePhotoResultUiState.Success ->
-                            PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader)
+                    is PolePhotoResultUiState.Success ->
+                        PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader)
 
-                        // heightIn (not a fixed height) - MessageState's action button (Error) makes this
-                        // content taller than the skeleton needs, and a fixed height here clipped
-                        // the button outside the touchable area.
-                        // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
-                        // A real "AI model failed" result (ai_status = "unavailable") now renders as
-                        // Success with cvState = null instead, so review stays possible.
-                        is PolePhotoResultUiState.Empty ->
-                            Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                                MessageState(
-                                    icon = Icons.Filled.SmartToy,
-                                    iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                                    title = "AI chưa phân loại được ảnh này",
-                                    subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                                    action = {},
-                                )
-                            }
+                    // heightIn (not a fixed height) - MessageState's action button (Error) makes this
+                    // content taller than the skeleton needs, and a fixed height here clipped
+                    // the button outside the touchable area.
+                    // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
+                    // A real "AI model failed" result (ai_status = "unavailable") now renders as
+                    // Success with cvState = null instead, so review stays possible.
+                    is PolePhotoResultUiState.Empty ->
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                            MessageState(
+                                icon = Icons.Filled.SmartToy,
+                                iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
+                                title = "AI chưa phân loại được ảnh này",
+                                subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                                action = {},
+                            )
+                        }
 
-                        is PolePhotoResultUiState.Error ->
-                            Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                                MessageState(
-                                    icon = Icons.Filled.CloudOff,
-                                    iconColors = SyncStatus.FAILED.badgeColors(),
-                                    title = "Không tải được kết quả AI",
-                                    subtitle = state.message,
-                                    action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
-                                )
-                            }
-                    }
-
-                    Spacer(Modifier.height(Spacing.lg))
+                    is PolePhotoResultUiState.Error ->
+                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
+                            MessageState(
+                                icon = Icons.Filled.CloudOff,
+                                iconColors = SyncStatus.FAILED.badgeColors(),
+                                title = "Không tải được kết quả AI",
+                                subtitle = state.message,
+                                action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                            )
+                        }
                 }
 
-                if (reviewable != null && showFooter) {
-                    ReviewFooter(
-                        poleId = poleId,
-                        state = reviewable,
-                        onSubmit = { finalCvState, reviewNote ->
-                            scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
-                            onSubmitReview(finalCvState, reviewNote)
-                        },
-                    )
-                }
+                Spacer(Modifier.height(Spacing.lg))
             }
-            TopSlideToast(
-                state = toastState,
-                modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-            )
+
+            if (reviewable != null && showFooter) {
+                ReviewFooter(
+                    poleId = poleId,
+                    state = reviewable,
+                    onSubmit = { finalCvState, reviewNote ->
+                        scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
+                        onSubmitReview(finalCvState, reviewNote)
+                    },
+                )
+            }
         }
+        TopSlideToast(
+            state = toastState,
+            modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        )
     }
+}
+
+@Composable
+fun PolePhotoResultRoute(
+    photoId: String,
+    onBack: () -> Unit,
+    onRetake: (poleId: String) -> Unit,
+    viewModel: PoleListViewModel,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val aiResultState by viewModel.aiResultState.collectAsState()
+    val pole = (uiState as? PoleListUiState.Success)?.poles?.firstOrNull { it.serverPhotoId == photoId }
+
+    LaunchedEffect(photoId) {
+        viewModel.onViewAiResult(photoId)
+    }
+
+    PolePhotoResultScreen(
+        poleId = pole?.poleId.orEmpty(),
+        position = pole?.position ?: 0,
+        state = aiResultState ?: PolePhotoResultUiState.Loading,
+        onBack = {
+            viewModel.onDismissAiResult()
+            onBack()
+        },
+        onRetry = { viewModel.onViewAiResult(photoId) },
+        onRetake = {
+            viewModel.onDismissAiResult()
+            pole?.poleId?.let(onRetake)
+        },
+        onSubmitReview = { finalCvState, reviewNote ->
+            viewModel.onSubmitReview(photoId, finalCvState, reviewNote)
+        },
+        onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
+    )
 }
 
 @Composable
 private fun PolePhotoResultHeader(
     poleId: String,
     position: Int,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(BrandHeroGradient, RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
+                .background(BrandHeroGradient)
+                .statusBarsPadding()
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        IconButton(onClick = onBack) {
+            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
+        }
         Box(
             modifier =
                 Modifier
@@ -230,9 +258,6 @@ private fun PolePhotoResultHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = Color.White.copy(alpha = 0.75f))
             Text(text = poleId, style = MaterialTheme.typography.titleMedium, color = Color.White)
-        }
-        IconButton(onClick = onDismiss) {
-            Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
         }
     }
 }
@@ -788,11 +813,11 @@ private fun VideoPlayer(
     }
 
     AndroidView(
-        // ModalBottomSheet renders in its own Window, with a scrim drawn on top of this sheet's
-        // content - PlayerView's default SurfaceView composites in its own hardware layer and
-        // punches through that scrim/the sheet's own header instead of respecting normal view
-        // z-order (found on a real device, 2026-11-11). TextureView is a regular view that
-        // participates in the usual view hierarchy, which fixes it.
+        // PlayerView's default SurfaceView composites in its own hardware layer and punches
+        // through other overlays (e.g. this screen's own header) instead of respecting normal
+        // view z-order (found on a real device, 2026-11-11, back when this screen was still a
+        // ModalBottomSheet). TextureView is a regular view that participates in the usual view
+        // hierarchy, which fixes it.
         factory = { viewContext ->
             (LayoutInflater.from(viewContext).inflate(R.layout.view_player_texture, null) as PlayerView)
                 .apply { this.player = player }
