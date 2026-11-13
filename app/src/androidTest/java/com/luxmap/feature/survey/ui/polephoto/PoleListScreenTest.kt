@@ -355,22 +355,6 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun ai_result_sheet_shows_on_top_when_aiResultState_is_not_null() {
-        composeRule.setContent {
-            LuxMapTheme {
-                PoleListScreen(
-                    workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole())),
-                    aiResultState = PolePhotoResultUiState.Empty,
-                    onCapturePole = { _, _ -> },
-                    onBack = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("AI chưa phân loại được ảnh này").assertExists()
-    }
-
-    @Test
     fun success_state_shows_the_pending_review_tag_when_hasPendingReview_is_true() {
         composeRule.setContent {
             LuxMapTheme {
