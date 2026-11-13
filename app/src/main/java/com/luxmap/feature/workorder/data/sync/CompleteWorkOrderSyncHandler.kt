@@ -7,6 +7,7 @@ import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.FaultOutcomeRequestDto
+import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -18,6 +19,7 @@ class CompleteWorkOrderSyncHandler
     constructor(
         private val api: WorkOrdersApi,
         private val dao: WorkOrderCompletionDao,
+        private val poleGpsRepository: PoleGpsRepository,
     ) : SyncOpHandler {
         override val opType = "complete_work_order"
 
@@ -39,6 +41,7 @@ class CompleteWorkOrderSyncHandler
                             reportNote = completion.reportNote,
                             materialsUsed = completion.materialsUsed,
                             faultOutcomes = outcomes?.map { FaultOutcomeRequestDto(it.faultId, it.outcome) },
+                            poleLocations = poleGpsRepository.completionPoleLocations(payload.workOrderId),
                         ),
                 )
                 dao.updateCompletionSubmitStatus(payload.workOrderId, "synced")

@@ -1,6 +1,7 @@
 package com.luxmap.feature.workorder.polegps.data
 
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
+import com.luxmap.feature.workorder.data.dto.PoleLocationRequestDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant
@@ -113,10 +114,23 @@ class PoleGpsRepository
         suspend fun poleReference(
             workOrderId: String,
             poleId: String,
-        ): PoleReference? {
-            val order = detailSync.cached(workOrderId) ?: return null
-            if (poleId !in order.poleIds) return null
-            val row = poleCache.byWorkOrder(workOrderId).firstOrNull { it.poleId == poleId }
-            return PoleReference(poleId, row?.position, row?.lat, row?.lng)
+        ): PoleReference? = poleReferences(workOrderId).firstOrNull { it.poleId == poleId }
+
+        suspend fun poleReferences(workOrderId: String): List<PoleReference> {
+            val order = detailSync.cached(workOrderId) ?: return emptyList()
+            val rows = poleCache.byWorkOrder(workOrderId).associateBy { it.poleId }
+            return order.poleIds.map { poleId ->
+                val row = rows[poleId]
+                PoleReference(poleId, row?.position, row?.lat, row?.lng)
+            }
+        }
+
+        suspend fun completionPoleLocations(workOrderId: String): List<PoleLocationRequestDto>? {
+            if (detailSync.cached(workOrderId) == null) return null
+            val now = Instant.now()
+            return allMeasurements(workOrderId).map {
+                val capturedAt = if (it.capturedAt.isAfter(now)) now else it.capturedAt
+                PoleLocationRequestDto(it.poleId, it.lat, it.lng, it.accuracyM, capturedAt.toString())
+            }
         }
     }
