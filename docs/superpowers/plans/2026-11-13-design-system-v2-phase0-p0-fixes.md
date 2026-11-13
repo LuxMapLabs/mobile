@@ -211,7 +211,7 @@ Khi một màn hình bắt đầu dùng role mới, thêm role đó vào map nà
 
 - [ ] **Step 5: Chạy test để xác nhận thất bại**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.LuxMapColorSchemeTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.LuxMapColorSchemeTest"`
 
 Expected: FAIL. Test đầu báo kỳ vọng `Navy50` nhưng nhận được `Color(0xFFEADDFF)` — chính là màu tím baseline Material, chứng minh lỗi có thật.
 
@@ -233,13 +233,13 @@ Và vào `LuxMapDarkColorScheme` ngay sau dòng `onPrimary = ...`:
 
 - [ ] **Step 7: Chạy test để xác nhận đã đạt**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.LuxMapColorSchemeTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.LuxMapColorSchemeTest"`
 
 Expected: PASS, 8/8. Tương phản Light đạt 10.34:1, Dark đạt 10.79:1.
 
 - [ ] **Step 8: Chạy toàn bộ unit test của `core.theme` để chắc không vỡ chỗ khác**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.*"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.*"`
 
 Expected: PASS toàn bộ.
 
@@ -332,7 +332,7 @@ class WorkOrderPriorityBadgeTest {
 
 - [ ] **Step 2: Chạy test để xác nhận thất bại**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.WorkOrderPriorityBadgeTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.WorkOrderPriorityBadgeTest"`
 
 Expected: FAIL khi biên dịch — `badgeColors()` chưa tồn tại trên `WorkOrderPriority`.
 
@@ -352,7 +352,7 @@ fun WorkOrderPriority.badgeColors(): BadgeColors =
 
 - [ ] **Step 4: Chạy test để xác nhận đã đạt**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.WorkOrderPriorityBadgeTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.WorkOrderPriorityBadgeTest"`
 
 Expected: PASS, 5/5. Tương phản lần lượt 6.91 · 9.96 · 6.37 · 6.80.
 
@@ -384,7 +384,7 @@ Xác minh bằng: `grep -rn "\.color()" app/src/main/java/com/luxmap --include=*
 Run: `./gradlew :app:assembleDebug`
 Expected: BUILD SUCCESSFUL.
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.*" --tests "com.luxmap.feature.workorder.*"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.*" --tests "com.luxmap.feature.workorder.*"`
 Expected: PASS toàn bộ.
 
 - [ ] **Step 9: ktlint**
@@ -478,7 +478,7 @@ class SemanticTextContrastTest {
 
 - [ ] **Step 3: Chạy test để xác nhận thất bại**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.SemanticTextContrastTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.SemanticTextContrastTest"`
 
 Expected: FAIL ở test đầu — tương phản thực tế 4.55, dưới ngưỡng 7.0. Ba test còn lại đạt sẵn.
 
@@ -497,13 +497,13 @@ Không đụng `DarkSemanticColors` — chữ phụ Dark hiện đạt 7.43:1, �
 
 - [ ] **Step 5: Chạy test để xác nhận đã đạt**
 
-Run: `./gradlew :app:testDebugUnitTest --tests "com.luxmap.core.theme.SemanticTextContrastTest"`
+Run: `./gradlew :app:testLocalDebugUnitTest --tests "com.luxmap.core.theme.SemanticTextContrastTest"`
 
 Expected: PASS, 4/4. Light nền trang 7.24:1, nền thẻ 7.58:1.
 
 - [ ] **Step 6: Chạy toàn bộ unit test**
 
-Run: `./gradlew :app:testDebugUnitTest`
+Run: `./gradlew :app:testLocalDebugUnitTest`
 
 Expected: PASS toàn bộ. `onSurfaceVariant` có 129 nơi gọi — thay đổi chỉ làm chữ đậm hơn, nhưng cần xác nhận không test nào đang khoá cứng giá trị cũ. Nếu có test nào so sánh trực tiếp `Gray500`, cập nhật test đó theo giá trị mới và ghi rõ lý do trong commit.
 
@@ -565,7 +565,7 @@ Spec: `docs/superpowers/specs/2026-11-13-design-system-v2-civic-grade-design.md`
 Không đụng nghiệp vụ, API, Room, sync queue hay pipeline camera/GPS.
 
 ## Test plan
-- [ ] `./gradlew :app:testDebugUnitTest` xanh toàn bộ
+- [ ] `./gradlew :app:testLocalDebugUnitTest` xanh toàn bộ
 - [ ] `./gradlew ktlintCheck` sạch
 - [ ] Máy thật, Light Mode: viên chỉ báo tab navy ở cả 4 tab
 - [ ] Máy thật, Dark Mode: viên chỉ báo tab và badge ưu tiên đúng màu

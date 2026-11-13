@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 // Primitive — giá trị màu gốc (mục 2.1 Design System v2.0)
 val Navy700 = Color(0xFF1F3864)
+val Navy50 = Color(0xFFEEF2F8)
+val Navy100 = Color(0xFFD9E2EF)
+val Navy800 = Color(0xFF172B4D)
 val Blue500 = Color(0xFF3E86C9)
 val Green400 = Color(0xFF5FC4B0)
 val Amber500 = Color(0xFFE9A23B)

@@ -7,10 +7,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val LuxMapLightColorScheme =
+internal val LuxMapLightColorScheme =
     lightColorScheme(
         primary = LightSemanticColors.navigationActive,
         onPrimary = LightSemanticColors.surface,
+        primaryContainer = Navy50,
+        onPrimaryContainer = Navy700,
         secondary = LightSemanticColors.focus,
         onSecondary = LightSemanticColors.surface,
         tertiary = Green400,
@@ -26,10 +28,12 @@ private val LuxMapLightColorScheme =
         onError = Color(0xFFFFFFFF),
     )
 
-private val LuxMapDarkColorScheme =
+internal val LuxMapDarkColorScheme =
     darkColorScheme(
         primary = DarkSemanticColors.navigationActive,
         onPrimary = Dark950,
+        primaryContainer = Navy800,
+        onPrimaryContainer = Navy100,
         secondary = DarkSemanticColors.focus,
         onSecondary = Dark950,
         tertiary = Green400,
