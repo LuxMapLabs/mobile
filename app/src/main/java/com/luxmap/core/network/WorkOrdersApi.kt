@@ -12,6 +12,7 @@ import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -22,6 +23,8 @@ import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
+import retrofit2.http.Url
 
 // Route checked against WorkOrdersController.cs: [Route("api/v{version:apiVersion}/work-orders")].
 interface WorkOrdersApi {
@@ -115,4 +118,10 @@ interface WorkOrdersApi {
         @Path("photo_id") photoId: String,
         @Body body: PolePhotoReviewRequestDto,
     ): PolePhotoItemDto
+
+    @Streaming
+    @GET
+    suspend fun downloadAttachment(
+        @Url url: String,
+    ): ResponseBody
 }
