@@ -361,14 +361,14 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
         Text(text = "KẾT LUẬN", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Box(
-                modifier = Modifier.size(44.dp).background(colors.background, RoundedCornerShape(Radius.control)),
+                modifier = Modifier.size(56.dp).background(colors.background, RoundedCornerShape(Radius.control)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
             }
             Text(
                 text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.testTag("ai_verdict_label"),
             )
         }
@@ -638,6 +638,8 @@ private fun PolePhotoPreview(
 ) {
     var viewing by remember { mutableStateOf(false) }
     val isVideo = state.mediaType == "video"
+    val reviewed = state.draftFinalCvState ?: state.finalCvState
+    val effective = effectiveCvState(state.cvState, reviewed)
     Box(
         modifier =
             Modifier
@@ -661,16 +663,17 @@ private fun PolePhotoPreview(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (state.analyzedAt != null) {
+        if (!isVideo && effective != null) {
+            val pillColors = cvStateColors(effective)
             Text(
-                text = state.analyzedAt.atZone(ZoneId.systemDefault()).format(photoOverlayFormatter),
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
+                text = cvStateLabel(effective),
+                style = MaterialTheme.typography.labelLarge,
+                color = pillColors.text,
                 modifier =
                     Modifier
                         .align(Alignment.BottomStart)
                         .padding(Spacing.sm)
-                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(Radius.badge))
+                        .background(pillColors.background, RoundedCornerShape(Radius.chip))
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             )
         }
