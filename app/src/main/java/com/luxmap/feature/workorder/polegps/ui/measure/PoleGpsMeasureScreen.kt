@@ -30,9 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.survey.domain.GpsAccuracyGate
 import com.luxmap.feature.workorder.polegps.domain.FixQuality
@@ -71,13 +73,17 @@ fun PoleGpsMeasureContent(
     onMeasureAgain: () -> Unit,
     onRetryPermission: () -> Unit,
 ) {
-    when (state) {
-        PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị đo GPS...", showProgress = true)
-        PoleGpsMeasureUiState.Empty ->
-            CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
-        is PoleGpsMeasureUiState.Error ->
-            CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
-        is PoleGpsMeasureUiState.Success -> MeasureBody(state, onSave, onMeasureAgain)
+    Column(Modifier.fillMaxSize()) {
+        val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Đo GPS cột đèn"
+        AppTopBar(title = title, onBack = onBack)
+        when (state) {
+            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị đo GPS...", showProgress = true)
+            PoleGpsMeasureUiState.Empty ->
+                CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
+            is PoleGpsMeasureUiState.Error ->
+                CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
+            is PoleGpsMeasureUiState.Success -> MeasureBody(state, onSave, onMeasureAgain)
+        }
     }
 }
 
@@ -106,10 +112,18 @@ private fun MeasureBody(
                 .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        Text(text = state.poleLabel, style = MaterialTheme.typography.headlineSmall)
         InfoCard(title = "Vị trí GIS hiện tại") {
             Text(text = "Lat: ${formatCoordinate(state.previous?.lat)}")
             Text(text = "Lng: ${formatCoordinate(state.previous?.lng)}")
+        }
+        if (!state.saved && state.stored != null) {
+            Text(
+                text =
+                    "Đã đo trước đó lúc ${DateFormatUtils.formatInstant(state.stored.capturedAt)} · " +
+                        "±${"%.1f".format(state.stored.accuracyM)} m",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         InfoCard(title = "Vị trí đo được") {
             Text(text = "Lat: ${formatCoordinate(state.liveFix?.lat)}")

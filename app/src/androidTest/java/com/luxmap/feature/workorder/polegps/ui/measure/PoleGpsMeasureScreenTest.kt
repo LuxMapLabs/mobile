@@ -3,11 +3,14 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.polegps.data.GpsFix
+import com.luxmap.feature.workorder.polegps.data.MeasurementSource
+import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import com.luxmap.feature.workorder.polegps.domain.FixQuality
 import org.junit.Assert.assertTrue
@@ -39,6 +42,40 @@ class PoleGpsMeasureScreenTest {
         LuxMapTheme {
             PoleGpsMeasureContent(state, onBack = {}, onSave = onSave, onMeasureAgain = {}, onRetryPermission = {})
         }
+    }
+
+    @Test
+    fun back_button_invokes_onBack() {
+        var backed = false
+        rule.setContent {
+            LuxMapTheme {
+                PoleGpsMeasureContent(
+                    PoleGpsMeasureUiState.Loading,
+                    onBack = { backed = true },
+                    onSave = {},
+                    onMeasureAgain = {},
+                    onRetryPermission = {},
+                )
+            }
+        }
+        rule.onNodeWithContentDescription("Quay lại").performClick()
+        assertTrue(backed)
+    }
+
+    @Test
+    fun top_bar_shows_the_pole_label_while_measuring() {
+        show(success(FixQuality.WAITING, canSave = false))
+        rule.onNodeWithText("Cột 3").assertExists()
+    }
+
+    @Test
+    fun shows_a_previously_stored_measurement_for_the_pole() {
+        show(
+            success(FixQuality.WAITING, canSave = false).copy(
+                stored = PoleMeasurement("P-1", 10.0, 106.0, 5.0, Instant.EPOCH, MeasurementSource.DEVICE),
+            ),
+        )
+        rule.onNodeWithText("Đã đo trước đó", substring = true).assertExists()
     }
 
     @Test
