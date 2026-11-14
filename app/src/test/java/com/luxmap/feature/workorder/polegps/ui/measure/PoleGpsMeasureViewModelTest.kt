@@ -120,4 +120,54 @@ class PoleGpsMeasureViewModelTest {
             coVerify { repository.saveCapturedPhoto("WO-1", "P-1", file.absolutePath, 0.0, 0.0, 0.0, any()) }
             assertTrue(done)
         }
+
+    @Test
+    fun `startWatchingLocation keeps currentFix updated with the latest gps fix`() =
+        runTest {
+            fixesFlow = flowOf(GpsFix(11.0, 107.0, 5.0, Instant.ofEpochSecond(99)))
+            val vm = viewModel()
+            vm.startWatchingLocation()
+            assertEquals(GpsFix(11.0, 107.0, 5.0, Instant.ofEpochSecond(99)), vm.currentFix.value)
+        }
+
+    @Test
+    fun `onPhotoCaptured reuses an already-known fix without subscribing to the gps source again`() =
+        runTest {
+            var subscriptions = 0
+            val trackedSource =
+                object : GpsFixSource {
+                    override fun fixes(): Flow<GpsFix> =
+                        flow {
+                            subscriptions++
+                            emit(GpsFix(12.0, 108.0, 6.0, Instant.ofEpochSecond(7)))
+                            awaitCancellation()
+                        }
+                }
+            val vm =
+                PoleGpsMeasureViewModel(
+                    SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
+                    repository,
+                    trackedSource,
+                )
+            vm.startWatchingLocation()
+            assertEquals(GpsFix(12.0, 108.0, 6.0, Instant.ofEpochSecond(7)), vm.currentFix.value)
+
+            val file = File("p1.jpg")
+            var done = false
+            vm.onPhotoCaptured(file, hasLocationPermission = true) { done = true }
+
+            assertEquals(1, subscriptions)
+            coVerify {
+                repository.saveCapturedPhoto(
+                    "WO-1",
+                    "P-1",
+                    file.absolutePath,
+                    12.0,
+                    108.0,
+                    6.0,
+                    Instant.ofEpochSecond(7),
+                )
+            }
+            assertTrue(done)
+        }
 }

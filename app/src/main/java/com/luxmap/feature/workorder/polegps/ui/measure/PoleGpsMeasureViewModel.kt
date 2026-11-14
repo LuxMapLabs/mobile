@@ -3,6 +3,7 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import com.luxmap.feature.workorder.polegps.data.PoleReference
@@ -30,6 +31,20 @@ class PoleGpsMeasureViewModel
         private val poleId: String = checkNotNull(savedStateHandle["poleId"])
         private val _state = MutableStateFlow<PoleGpsMeasureUiState>(PoleGpsMeasureUiState.Loading)
         val state: StateFlow<PoleGpsMeasureUiState> = _state.asStateFlow()
+        private val _currentFix = MutableStateFlow<GpsFix?>(null)
+        val currentFix: StateFlow<GpsFix?> = _currentFix.asStateFlow()
+        private var watchingLocation = false
+
+        // Starts as soon as permission is known, in parallel with the camera, instead of only
+        // being asked for once the photo is confirmed - a fix already has a few seconds to settle
+        // by the time the engineer reviews the photo and taps "Dùng ảnh này".
+        fun startWatchingLocation() {
+            if (watchingLocation) return
+            watchingLocation = true
+            viewModelScope.launch {
+                fixSource.fixes().collect { _currentFix.value = it }
+            }
+        }
 
         fun onPermissionGranted() {
             viewModelScope.launch {
@@ -61,7 +76,7 @@ class PoleGpsMeasureViewModel
             viewModelScope.launch {
                 val fix =
                     if (hasLocationPermission) {
-                        withTimeoutOrNull(FIX_TIMEOUT_MILLIS) { fixSource.fixes().first() }
+                        currentFix.value ?: withTimeoutOrNull(FIX_TIMEOUT_MILLIS) { fixSource.fixes().first() }
                     } else {
                         null
                     }
