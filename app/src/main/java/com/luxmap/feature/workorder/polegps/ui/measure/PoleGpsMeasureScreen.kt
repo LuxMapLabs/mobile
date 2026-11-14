@@ -4,20 +4,20 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -25,19 +25,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.core.common.DateFormatUtils
+import coil.compose.AsyncImage
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.feature.survey.domain.GpsAccuracyGate
-import com.luxmap.feature.workorder.polegps.domain.FixQuality
+import java.io.File
 
 @Composable
 fun PoleGpsMeasureRoute(
@@ -46,128 +53,166 @@ fun PoleGpsMeasureRoute(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    val launcher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) viewModel.onPermissionGranted() else viewModel.onPermissionDenied()
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+    var previewFile by remember { mutableStateOf<File?>(null) }
+    var hasLocationPermission by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+
+    val takePictureLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val file = pendingFile
+            if (success && file != null) {
+                previewFile = file
+            } else {
+                onBack()
+            }
         }
-    LaunchedEffect(Unit) {
-        val granted =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
-        if (granted) viewModel.onPermissionGranted() else launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+
+    fun launchCamera() {
+        val file = viewModel.outputFile(context.filesDir)
+        pendingFile = file
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        takePictureLauncher.launch(uri)
     }
-    PoleGpsMeasureContent(
-        state = state,
-        onBack = onBack,
-        onSave = viewModel::onSave,
-        onMeasureAgain = viewModel::onMeasureAgain,
-        onRetryPermission = { launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
-    )
+
+    // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
+    // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
+    // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
+    // stays best-effort, matching EvidenceCaptureScreen/PolePhotoCaptureScreen.
+    val permissionsLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+            hasLocationPermission = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            if (result[Manifest.permission.CAMERA] == true) {
+                viewModel.onPermissionGranted()
+                launchCamera()
+            } else {
+                viewModel.onPermissionDenied()
+            }
+        }
+
+    fun requestPermissionsAndStart() {
+        val cameraGranted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        hasLocationPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        when {
+            cameraGranted -> {
+                viewModel.onPermissionGranted()
+                launchCamera()
+            }
+            hasRequestedPermissions -> viewModel.onPermissionDenied()
+            else -> {
+                hasRequestedPermissions = true
+                permissionsLauncher.launch(
+                    arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
+                )
+            }
+        }
+    }
+
+    fun retryPermissions() {
+        val cameraGranted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (cameraGranted) {
+            viewModel.onPermissionGranted()
+            launchCamera()
+        } else {
+            permissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+        }
+    }
+
+    LaunchedEffect(Unit) { requestPermissionsAndStart() }
+
+    val fileToPreview = previewFile
+    if (fileToPreview != null) {
+        PhotoPreview(
+            file = fileToPreview,
+            isSaving = isSaving,
+            onConfirm = {
+                isSaving = true
+                viewModel.onPhotoCaptured(fileToPreview, hasLocationPermission, onBack)
+            },
+            onRetake = {
+                fileToPreview.delete()
+                previewFile = null
+                launchCamera()
+            },
+        )
+    } else {
+        PoleGpsMeasureContent(state = state, onBack = onBack, onRetryPermission = ::retryPermissions)
+    }
 }
 
 @Composable
 fun PoleGpsMeasureContent(
     state: PoleGpsMeasureUiState,
     onBack: () -> Unit,
-    onSave: () -> Unit,
-    onMeasureAgain: () -> Unit,
     onRetryPermission: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Đo GPS cột đèn"
+        val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Chụp ảnh cột đèn"
         AppTopBar(title = title, onBack = onBack)
         when (state) {
-            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị đo GPS...", showProgress = true)
+            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị chụp ảnh...", showProgress = true)
             PoleGpsMeasureUiState.Empty ->
                 CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
             is PoleGpsMeasureUiState.Error ->
                 CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
-            is PoleGpsMeasureUiState.Success -> MeasureBody(state, onSave, onMeasureAgain)
+            is PoleGpsMeasureUiState.Success ->
+                CenteredMessage("Đang mở camera...", showProgress = true)
         }
     }
 }
 
-private fun formatCoordinate(value: Double?): String = value?.let { "%.6f".format(it) } ?: "Chưa có"
-
-private fun qualityLabel(quality: FixQuality): String =
-    when (quality) {
-        FixQuality.WAITING -> "Đang chờ tín hiệu GPS"
-        FixQuality.WEAK ->
-            "Sai số cao hơn ${"%.0f".format(GpsAccuracyGate.PROPOSED_THRESHOLD_METERS)} m. Di chuyển ra nơi thoáng hơn"
-        FixQuality.HOLDING -> "Giữ yên thiết bị..."
-        FixQuality.READY -> "Đủ độ chính xác"
+@Composable
+private fun PhotoPreview(
+    file: File,
+    isSaving: Boolean,
+    onConfirm: () -> Unit,
+    onRetake: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+        AsyncImage(
+            model = file,
+            contentDescription = "Ảnh cột đèn vừa chụp",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(RoundedCornerShape(Radius.card)),
+        )
+        CaptureActions(enabled = !isSaving, isSaving = isSaving, onRetake = onRetake, onConfirm = onConfirm)
     }
+}
 
 @Composable
-private fun MeasureBody(
-    state: PoleGpsMeasureUiState.Success,
-    onSave: () -> Unit,
-    onMeasureAgain: () -> Unit,
+private fun CaptureActions(
+    enabled: Boolean,
+    isSaving: Boolean,
+    onRetake: () -> Unit,
+    onConfirm: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    Row(
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        InfoCard(title = "Vị trí GIS hiện tại") {
-            Text(text = "Lat: ${formatCoordinate(state.previous?.lat)}")
-            Text(text = "Lng: ${formatCoordinate(state.previous?.lng)}")
-        }
-        if (!state.saved && state.stored != null) {
-            Text(
-                text =
-                    "Đã đo trước đó lúc ${DateFormatUtils.formatInstant(state.stored.capturedAt)} · " +
-                        "±${"%.1f".format(state.stored.accuracyM)} m",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        InfoCard(title = "Vị trí đo được") {
-            Text(text = "Lat: ${formatCoordinate(state.liveFix?.lat)}")
-            Text(text = "Lng: ${formatCoordinate(state.liveFix?.lng)}")
-            val accuracyText = state.liveFix?.let { "±${"%.1f".format(it.accuracyM)} m" } ?: "Chưa có"
-            Text(text = "Độ chính xác: $accuracyText")
-            Text(text = qualityLabel(state.quality), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (state.saved) {
-            Text(text = "Đã lưu vị trí cột", style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(
-                onClick = onMeasureAgain,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) {
-                Text(text = "Đo lại")
+        OutlinedButton(
+            onClick = onRetake,
+            enabled = enabled,
+            modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+        ) { Text("Chụp lại") }
+        Button(
+            onClick = onConfirm,
+            enabled = enabled,
+            modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
+            shape = RoundedCornerShape(Radius.control),
+        ) {
+            if (isSaving) {
+                CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Dùng ảnh này")
             }
-        } else {
-            PrimaryButton(
-                text = "Lưu vị trí",
-                onClick = onSave,
-                enabled = state.canSave && !state.saved,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
-    }
-}
-
-@Composable
-private fun InfoCard(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleSmall)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        content()
     }
 }
 

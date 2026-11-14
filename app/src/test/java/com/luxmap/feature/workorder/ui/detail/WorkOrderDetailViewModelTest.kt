@@ -19,6 +19,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -520,6 +521,37 @@ class WorkOrderDetailViewModelTest {
             }
 
             coVerify { poleListRepository.poles(WORK_ORDER_ID) }
+        }
+
+    @Test
+    fun `submit for pole_gps_update enqueues pending photo uploads before completing`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            val measurement =
+                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm =
+                viewModel(
+                    detail = poleGpsDetail(),
+                    poleGpsRepository = poleGpsRepository,
+                    completionRepository = completionRepository,
+                )
+            vm.uiState.test {
+                awaitItem()
+                awaitItem()
+            }
+            vm.onReportNoteChanged("Đã đo xong các cột được giao")
+
+            vm.submit()
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerifyOrder {
+                poleGpsRepository.enqueuePendingPhotoUploads(WORK_ORDER_ID)
+                completionRepository.submitCompletion(any(), any(), any(), any(), any())
+            }
         }
 
     @Test

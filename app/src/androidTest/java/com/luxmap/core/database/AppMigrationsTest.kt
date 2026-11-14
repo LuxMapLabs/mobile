@@ -101,3 +101,76 @@ class AppMigrationsTest {
         )
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class AppMigrations17To18Test {
+    private lateinit var db: SupportSQLiteDatabase
+
+    @Before
+    fun openVersion17() {
+        val config =
+            SupportSQLiteOpenHelper.Configuration
+                .builder(ApplicationProvider.getApplicationContext())
+                .name(null)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(17) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "CREATE TABLE local_pole_gps_measurement (workOrderId TEXT NOT NULL, " +
+                                    "poleId TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, " +
+                                    "accuracyM REAL NOT NULL, capturedAt INTEGER NOT NULL, source TEXT NOT NULL, " +
+                                    "PRIMARY KEY(workOrderId, poleId))",
+                            )
+                            db.execSQL(
+                                "CREATE TABLE local_work_order_evidence (clientOpId TEXT NOT NULL, " +
+                                    "workOrderId TEXT NOT NULL, kind TEXT NOT NULL, filePath TEXT NOT NULL, " +
+                                    "capturedAt INTEGER NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, " +
+                                    "uploadStatus TEXT NOT NULL, PRIMARY KEY(clientOpId))",
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    },
+                ).build()
+        db = FrameworkSQLiteOpenHelperFactory().create(config).writableDatabase
+        db.execSQL(
+            "INSERT INTO local_pole_gps_measurement (workOrderId, poleId, lat, lng, accuracyM, capturedAt, source) " +
+                "VALUES ('WO-1', 'P-1', 10.0, 106.0, 5.0, 1000, 'device')",
+        )
+        db.execSQL(
+            "INSERT INTO local_work_order_evidence (clientOpId, workOrderId, kind, filePath, capturedAt, lat, lng, " +
+                "uploadStatus) VALUES ('OP-1', 'WO-1', 'observation', '/f/a.jpg', 1000, 10.0, 106.0, 'pending')",
+        )
+        MIGRATION_17_18.migrate(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    @Test
+    fun measurement_keeps_its_data_and_gains_null_photo_columns() {
+        db.query(
+            "SELECT lat, photoFilePath, evidenceClientOpId, evidenceUploadStatus FROM local_pole_gps_measurement " +
+                "WHERE poleId = 'P-1'",
+        ).use {
+            it.moveToFirst()
+            assertEquals(10.0, it.getDouble(0), 0.0)
+            assertTrue(it.isNull(1))
+            assertTrue(it.isNull(2))
+            assertTrue(it.isNull(3))
+        }
+    }
+
+    @Test
+    fun evidence_keeps_its_data_and_gains_a_null_pole_id() {
+        db.query("SELECT filePath, poleId FROM local_work_order_evidence WHERE clientOpId = 'OP-1'").use {
+            it.moveToFirst()
+            assertEquals("/f/a.jpg", it.getString(0))
+            assertTrue(it.isNull(1))
+        }
+    }
+}

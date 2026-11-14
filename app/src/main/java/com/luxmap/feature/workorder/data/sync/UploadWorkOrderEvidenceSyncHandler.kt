@@ -48,6 +48,7 @@ class UploadWorkOrderEvidenceSyncHandler
                     lat = evidence.lat.toString().toRequestBody(),
                     lng = evidence.lng.toString().toRequestBody(),
                     clientOpId = evidence.clientOpId.toRequestBody(),
+                    poleId = evidence.poleId?.toRequestBody(),
                 )
                 dao.updateEvidenceUploadStatus(evidence.clientOpId, "synced")
                 SyncOpResult.Done
