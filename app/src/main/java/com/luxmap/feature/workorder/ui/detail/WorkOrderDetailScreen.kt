@@ -1515,9 +1515,16 @@ private fun PoleGpsReportSection(
     locked: Boolean,
     onReportNoteChanged: (String) -> Unit,
 ) {
+    val noteValid = state.reportNote.trim().length >= 10
     val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(icon = Icons.Filled.FactCheck, title = "Báo cáo")
+        CompletionSectionHeader(
+            icon = Icons.Filled.FactCheck,
+            title = "Báo cáo",
+            pillText = if (noteValid) "Đã đủ" else "Cần ghi chú",
+            pillColors =
+                if (noteValid) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors(),
+        )
         Column(
             modifier =
                 Modifier
@@ -1528,14 +1535,16 @@ private fun PoleGpsReportSection(
         ) {
             WorkflowStepRow(
                 number = 1,
-                title = "Ghi chú báo cáo",
-                required = false,
-                done = state.reportNote.isNotBlank(),
+                title = "Kết quả đo GPS",
+                required = true,
+                done = noteValid,
+                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
                 isLast = true,
             ) {
                 OutlinedTextField(
                     value = state.reportNote,
                     onValueChange = onReportNoteChanged,
+                    placeholder = { Text("VD: Đã đo xong các cột, 1 cột chưa bắt được tín hiệu GPS") },
                     enabled = !locked,
                     minLines = 2,
                     maxLines = 5,

@@ -569,7 +569,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `canSubmit for pole_gps_update needs at least 1 measured pole`() =
+    fun `canSubmit for pole_gps_update needs a valid note and at least 1 measured pole`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>()
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
@@ -605,7 +605,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `canSubmit for pole_gps_update is true with no report note, the note is optional`() =
+    fun `canSubmit for pole_gps_update is false with a measured pole but no report note`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>()
             val measurement =
@@ -619,7 +619,7 @@ class WorkOrderDetailViewModelTest {
                 awaitItem()
                 val success = awaitItem() as WorkOrderDetailUiState.Success
                 assertEquals("", success.reportNote)
-                assertTrue(success.canSubmit())
+                assertFalse(success.canSubmit())
             }
         }
 

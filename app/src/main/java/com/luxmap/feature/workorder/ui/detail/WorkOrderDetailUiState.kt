@@ -41,7 +41,7 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
     return when (detail.taskKind) {
         "repair" -> noteValid && localEvidence != null
         "inspection" -> noteValid && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
-        "pole_gps_update" -> poleMeasurements.isNotEmpty()
+        "pole_gps_update" -> noteValid && poleMeasurements.isNotEmpty()
         else -> false
     }
 }
