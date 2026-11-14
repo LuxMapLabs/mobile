@@ -758,6 +758,7 @@ private fun WorkOrderDetailContent(
             } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
                 PoleGpsOverviewSection(
                     state = state,
+                    canCapture = canComplete && !isFormLocked,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -1385,6 +1386,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
 @Composable
 private fun PoleGpsOverviewSection(
     state: WorkOrderDetailUiState.Success,
+    canCapture: Boolean,
     onOpenPdf: (String) -> Unit,
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
@@ -1418,6 +1420,7 @@ private fun PoleGpsOverviewSection(
                 PoleGpsRow(
                     reference = reference,
                     measurement = state.poleMeasurements.firstOrNull { it.poleId == reference.poleId },
+                    enabled = canCapture,
                     onClick = { onMeasurePole(reference.poleId) },
                 )
             }
@@ -1465,6 +1468,7 @@ private fun PdfAttachmentRow(
 private fun PoleGpsRow(
     reference: com.luxmap.feature.workorder.polegps.data.PoleReference,
     measurement: com.luxmap.feature.workorder.polegps.data.PoleMeasurement?,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val oldPosition =
@@ -1480,7 +1484,7 @@ private fun PoleGpsRow(
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -1493,13 +1497,14 @@ private fun PoleGpsRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (measurement != null) {
-            StatusBadge(
-                text = "±${"%.1f".format(measurement.accuracyM)} m",
-                colors = WorkOrderStatus.VERIFIED.badgeColors(),
-            )
-        } else {
-            StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
+        when {
+            measurement != null ->
+                StatusBadge(
+                    text = "±${"%.1f".format(measurement.accuracyM)} m",
+                    colors = WorkOrderStatus.VERIFIED.badgeColors(),
+                )
+            !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
+            else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
         }
     }
 }
@@ -1510,16 +1515,9 @@ private fun PoleGpsReportSection(
     locked: Boolean,
     onReportNoteChanged: (String) -> Unit,
 ) {
-    val noteValid = state.reportNote.trim().length >= 10
     val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.FactCheck,
-            title = "Báo cáo",
-            pillText = if (noteValid) "Đã đủ" else "Cần ghi chú",
-            pillColors =
-                if (noteValid) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors(),
-        )
+        CompletionSectionHeader(icon = Icons.Filled.FactCheck, title = "Báo cáo")
         Column(
             modifier =
                 Modifier
@@ -1530,16 +1528,14 @@ private fun PoleGpsReportSection(
         ) {
             WorkflowStepRow(
                 number = 1,
-                title = "Kết quả đo GPS",
-                required = true,
-                done = noteValid,
-                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
+                title = "Ghi chú báo cáo",
+                required = false,
+                done = state.reportNote.isNotBlank(),
                 isLast = true,
             ) {
                 OutlinedTextField(
                     value = state.reportNote,
                     onValueChange = onReportNoteChanged,
-                    placeholder = { Text("VD: Đã đo xong các cột, 1 cột chưa bắt được tín hiệu GPS") },
                     enabled = !locked,
                     minLines = 2,
                     maxLines = 5,
