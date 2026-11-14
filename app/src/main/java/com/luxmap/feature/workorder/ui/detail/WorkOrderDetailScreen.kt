@@ -526,7 +526,7 @@ private fun workOrderCtaState(
                 hint =
                     when {
                         scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
-                        missing > 0 -> "Còn $missing cột chưa đo"
+                        missing > 0 -> "Còn $missing cột chưa chụp"
                         else -> null
                     },
                 hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
@@ -591,7 +591,7 @@ private fun submitSummaryRows(
     } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
         listOf(
-            SubmitSummaryRow(Icons.Filled.Navigation, Navy700, "Cột đã đo", "$measured/${state.poleReferences.size}"),
+            SubmitSummaryRow(Icons.Filled.Navigation, Navy700, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
             SubmitSummaryRow(Icons.Filled.StickyNote2, Navy700, "Tệp PDF", state.poleAttachments.size.toString()),
             SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
@@ -1499,7 +1499,7 @@ private fun PoleGpsRow(
                 colors = WorkOrderStatus.VERIFIED.badgeColors(),
             )
         } else {
-            StatusBadge(text = "Chưa đo", colors = WorkOrderStatus.OPEN.badgeColors())
+            StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
         }
     }
 }

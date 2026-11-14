@@ -164,6 +164,9 @@ class WorkOrderDetailViewModel
             if (current !is WorkOrderDetailUiState.Success || !current.canSubmit() || current.isSubmitting) return
             _uiState.value = current.copy(isSubmitting = true, submitError = null, justSubmitted = true)
             viewModelScope.launch {
+                if (current.detail.taskKind == "pole_gps_update") {
+                    poleGpsRepository.enqueuePendingPhotoUploads(workOrderId)
+                }
                 val faultOutcomes =
                     if (current.detail.taskKind == "inspection" && current.detail.faults.isNotEmpty()) {
                         current.detail.faults.map { fault ->
