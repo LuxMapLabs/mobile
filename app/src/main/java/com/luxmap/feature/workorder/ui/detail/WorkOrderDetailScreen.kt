@@ -1544,11 +1544,7 @@ private fun PoleGpsRow(
             )
         }
         when {
-            measurement != null ->
-                StatusBadge(
-                    text = "±${"%.1f".format(measurement.accuracyM)} m",
-                    colors = WorkOrderStatus.VERIFIED.badgeColors(),
-                )
+            measurement != null -> StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
             !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
             else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
         }
