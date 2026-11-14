@@ -1,7 +1,9 @@
 package com.luxmap.feature.workorder.polegps.data
 
+import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
+import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -22,7 +24,10 @@ class PoleGpsRepositoryTest {
     private val scheduler = mockk<AttachmentDownloadScheduler>(relaxed = true)
     private val sync = mockk<PoleGpsDetailSync>(relaxed = true)
     private val cache = mockk<PoleListCacheDao>(relaxed = true)
-    private val repository = PoleGpsRepository(dao, downloader, scheduler, sync, cache)
+    private val completionDao = mockk<WorkOrderCompletionDao>(relaxed = true)
+    private val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+    private val repository =
+        PoleGpsRepository(dao, downloader, scheduler, sync, cache, completionDao, syncQueueManager)
 
     private fun row(
         poleId: String,
@@ -30,15 +35,48 @@ class PoleGpsRepositoryTest {
     ) = LocalPoleGpsMeasurementEntity("WO-1", poleId, 1.0, 2.0, 3.0, Instant.ofEpochSecond(5), source)
 
     @Test
-    fun `saving a device measurement stores it as DEVICE with the fix values`() =
+    fun `saveCapturedPhoto stores a device measurement with the photo path and a pending upload status`() =
         runTest {
             val saved = slot<LocalPoleGpsMeasurementEntity>()
             coEvery { dao.upsertDeviceMeasurement(capture(saved)) } returns Unit
-            repository.saveDeviceMeasurement("WO-1", "P-1", GpsFix(10.5, 106.5, 4.0, Instant.ofEpochSecond(9)))
-            assertEquals("P-1", saved.captured.poleId)
+            repository.saveCapturedPhoto("WO-1", "P-1", "/f/p1.jpg", 10.0, 106.0, 5.0, Instant.ofEpochSecond(9))
+            assertEquals("/f/p1.jpg", saved.captured.photoFilePath)
+            assertEquals("pending", saved.captured.evidenceUploadStatus)
             assertEquals(MeasurementSourceColumn.DEVICE, saved.captured.source)
-            assertEquals(10.5, saved.captured.lat, 0.0)
-            assertEquals(4.0, saved.captured.accuracyM, 0.0)
+        }
+
+    @Test
+    fun `enqueuePendingPhotoUploads inserts evidence rows and marks them queued`() =
+        runTest {
+            val withPhoto =
+                row("P-1", MeasurementSourceColumn.DEVICE)
+                    .copy(photoFilePath = "/f/p1.jpg", evidenceUploadStatus = "pending")
+            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns listOf(withPhoto)
+            repository.enqueuePendingPhotoUploads("WO-1")
+            coVerify {
+                completionDao.insertEvidence(
+                    withArg {
+                        assertEquals("WO-1", it.workOrderId)
+                        assertEquals("P-1", it.poleId)
+                        assertEquals("/f/p1.jpg", it.filePath)
+                        assertEquals("observation", it.kind)
+                        assertEquals("pending", it.uploadStatus)
+                    },
+                )
+            }
+            coVerify {
+                syncQueueManager.enqueue(opType = "upload_work_order_evidence", payloadJson = any(), clientOpId = any())
+            }
+            coVerify { dao.updateEvidenceUploadStatus("WO-1", "P-1", "queued") }
+        }
+
+    @Test
+    fun `enqueuePendingPhotoUploads does nothing when there are no pending photos`() =
+        runTest {
+            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns emptyList()
+            repository.enqueuePendingPhotoUploads("WO-1")
+            coVerify(exactly = 0) { completionDao.insertEvidence(any()) }
+            coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), any(), any()) }
         }
 
     @Test

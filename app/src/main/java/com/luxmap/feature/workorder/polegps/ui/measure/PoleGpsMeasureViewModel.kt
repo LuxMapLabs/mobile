@@ -75,7 +75,7 @@ class PoleGpsMeasureViewModel
             val fix = latestFix
             if (!current.canSave || fix == null) return
             viewModelScope.launch {
-                repository.saveDeviceMeasurement(workOrderId, poleId, fix)
+                repository.saveCapturedPhoto(workOrderId, poleId, "", fix.lat, fix.lng, fix.accuracyM, fix.capturedAt)
                 _state.value =
                     current.copy(
                         saved = true,

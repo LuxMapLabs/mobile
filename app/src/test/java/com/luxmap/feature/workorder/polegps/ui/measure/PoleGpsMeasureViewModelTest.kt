@@ -130,7 +130,7 @@ class PoleGpsMeasureViewModelTest {
             fixes.emit(fix(4.0, 0))
             fixes.emit(fix(4.0, 3000))
             vm.onSave()
-            coVerify { repository.saveDeviceMeasurement("WO-1", "P-1", fix(4.0, 3000)) }
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", "", 10.1, 106.1, 4.0, Instant.ofEpochMilli(3000)) }
             assertTrue((vm.state.value as PoleGpsMeasureUiState.Success).saved)
         }
 
@@ -141,7 +141,7 @@ class PoleGpsMeasureViewModelTest {
             vm.onPermissionGranted()
             fixes.emit(fix(30.0, 0))
             vm.onSave()
-            coVerify(exactly = 0) { repository.saveDeviceMeasurement(any(), any(), any()) }
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
         }
 
     @Test
