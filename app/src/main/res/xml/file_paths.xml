@@ -3,4 +3,5 @@
     <files-path name="evidence" path="evidence/" />
     <files-path name="pole-photos" path="pole-photos/" />
     <files-path name="pole-videos" path="pole-videos/" />
+    <files-path name="pole-gps" path="pole-gps/" />
 </paths>
