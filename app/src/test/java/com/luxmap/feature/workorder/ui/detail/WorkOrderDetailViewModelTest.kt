@@ -569,7 +569,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `canSubmit for pole_gps_update needs a valid note and at least 1 measured pole`() =
+    fun `canSubmit for pole_gps_update needs at least 1 measured pole`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>()
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
@@ -601,6 +601,25 @@ class WorkOrderDetailViewModelTest {
                 val success = awaitItem() as WorkOrderDetailUiState.Success
                 val valid = success.copy(reportNote = "Đã đo xong 1/2 cột đèn")
                 assertTrue(valid.canSubmit())
+            }
+        }
+
+    @Test
+    fun `canSubmit for pole_gps_update is true with no report note, the note is optional`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val measurement =
+                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm = viewModel(detail = poleGpsDetail(poleIds = listOf("P-1")), poleGpsRepository = poleGpsRepository)
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as WorkOrderDetailUiState.Success
+                assertEquals("", success.reportNote)
+                assertTrue(success.canSubmit())
             }
         }
 
