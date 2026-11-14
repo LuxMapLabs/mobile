@@ -8,17 +8,23 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody
 import okhttp3.ResponseBody.Companion.toResponseBody
+import okio.Buffer
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.File
 import java.time.Instant
+
+private fun RequestBody.readUtf8(): String = Buffer().also { writeTo(it) }.readUtf8()
 
 private fun httpException(
     code: Int,
@@ -138,5 +144,62 @@ class UploadWorkOrderEvidenceSyncHandlerTest {
             val result = handler.handle(Json.encodeToString(EvidenceSyncPayload("OP-1")))
 
             assertTrue(result is SyncOpResult.Conflict)
+        }
+
+    @Test
+    fun `a pole-linked evidence row sends its pole_id`() =
+        runTest {
+            val tempFile = File.createTempFile("evidence", ".jpg").apply { writeBytes(byteArrayOf(1)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val evidence =
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = "OP-1",
+                    workOrderId = "WO-1",
+                    kind = "observation",
+                    filePath = tempFile.absolutePath,
+                    capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+                    lat = 10.97,
+                    lng = 106.49,
+                    uploadStatus = "pending",
+                    poleId = "P-1",
+                )
+            coEvery { dao.evidenceByClientOpId("OP-1") } returns evidence
+            val poleIdPart = slot<RequestBody>()
+            coEvery { api.uploadEvidence(any(), any(), any(), any(), any(), any(), any(), capture(poleIdPart)) } returns
+                EvidenceItemDto("EV-1", "observation", "2026-10-06T10:00:00Z", 10.97, 106.49, "t", "o")
+            val handler = UploadWorkOrderEvidenceSyncHandler(api, dao)
+
+            handler.handle(Json.encodeToString(EvidenceSyncPayload("OP-1")))
+
+            assertEquals("P-1", poleIdPart.captured.readUtf8())
+        }
+
+    @Test
+    fun `an evidence row with no pole sends no pole_id`() =
+        runTest {
+            val tempFile = File.createTempFile("evidence", ".jpg").apply { writeBytes(byteArrayOf(1)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val evidence =
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = "OP-1",
+                    workOrderId = "WO-1",
+                    kind = "after",
+                    filePath = tempFile.absolutePath,
+                    capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+                    lat = 10.97,
+                    lng = 106.49,
+                    uploadStatus = "pending",
+                )
+            coEvery { dao.evidenceByClientOpId("OP-1") } returns evidence
+            coEvery { api.uploadEvidence(any(), any(), any(), any(), any(), any(), any(), null) } returns
+                EvidenceItemDto("EV-1", "after", "2026-10-06T10:00:00Z", 10.97, 106.49, "t", "o")
+            val handler = UploadWorkOrderEvidenceSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(EvidenceSyncPayload("OP-1")))
+
+            assertTrue(result is SyncOpResult.Done)
+            coVerify { api.uploadEvidence(any(), any(), any(), any(), any(), any(), any(), null) }
         }
 }

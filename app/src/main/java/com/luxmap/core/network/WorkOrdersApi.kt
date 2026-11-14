@@ -76,6 +76,7 @@ interface WorkOrdersApi {
         @Part("lat") lat: RequestBody,
         @Part("lng") lng: RequestBody,
         @Part("client_op_id") clientOpId: RequestBody,
+        @Part("pole_id") poleId: RequestBody? = null,
     ): EvidenceItemDto
 
     @Multipart
