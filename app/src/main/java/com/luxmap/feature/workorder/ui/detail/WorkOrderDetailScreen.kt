@@ -886,7 +886,12 @@ private fun WorkOrderHeroSection(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
-                    text = "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi")),
+                    text =
+                        if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
+                            detail.workOrderId.uppercase(Locale.forLanguageTag("vi"))
+                        } else {
+                            "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi"))
+                        },
                     style = HeroMetadataTextStyle,
                     color = Color(0xFF9FB6D6),
                     maxLines = 1,
