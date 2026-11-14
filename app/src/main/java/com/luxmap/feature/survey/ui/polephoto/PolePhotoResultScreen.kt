@@ -659,7 +659,7 @@ private fun PolePhotoPreview(
             AsyncImage(
                 model = File(state.filePath),
                 contentDescription = "Ảnh cột đèn đã chụp",
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
         }
