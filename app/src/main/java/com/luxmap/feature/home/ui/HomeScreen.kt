@@ -48,6 +48,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -235,7 +236,7 @@ private fun HomeContent(
     // No "Tất cả" tab anymore - defaults to Sửa chữa (repair is this screen's primary work kind)
     // rather than Khảo sát, which would always open on an empty state since survey items never
     // flow into this list (see allVisibleItems()).
-    var selectedTab by remember { mutableStateOf(TaskFilterTab.REPAIR) }
+    var selectedTab by rememberSaveable { mutableStateOf(TaskFilterTab.REPAIR) }
     val counts = data.taskFilterTabCounts()
     Column(modifier = Modifier.fillMaxSize()) {
         // Fixed, does not scroll with the list below - matches the mockup's own
