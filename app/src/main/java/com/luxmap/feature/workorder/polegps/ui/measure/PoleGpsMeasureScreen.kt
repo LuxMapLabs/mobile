@@ -4,22 +4,15 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,14 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.feature.survey.domain.GpsAccuracyGate
-import com.luxmap.feature.workorder.polegps.domain.FixQuality
 
 @Composable
 fun PoleGpsMeasureRoute(
@@ -59,8 +47,6 @@ fun PoleGpsMeasureRoute(
     PoleGpsMeasureContent(
         state = state,
         onBack = onBack,
-        onSave = viewModel::onSave,
-        onMeasureAgain = viewModel::onMeasureAgain,
         onRetryPermission = { launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
     )
 }
@@ -69,105 +55,19 @@ fun PoleGpsMeasureRoute(
 fun PoleGpsMeasureContent(
     state: PoleGpsMeasureUiState,
     onBack: () -> Unit,
-    onSave: () -> Unit,
-    onMeasureAgain: () -> Unit,
     onRetryPermission: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Đo GPS cột đèn"
+        val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Chụp ảnh cột đèn"
         AppTopBar(title = title, onBack = onBack)
         when (state) {
-            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị đo GPS...", showProgress = true)
+            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị chụp ảnh...", showProgress = true)
             PoleGpsMeasureUiState.Empty ->
                 CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
             is PoleGpsMeasureUiState.Error ->
                 CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
-            is PoleGpsMeasureUiState.Success -> MeasureBody(state, onSave, onMeasureAgain)
+            is PoleGpsMeasureUiState.Success -> CenteredMessage("Đang mở camera...", showProgress = true)
         }
-    }
-}
-
-private fun formatCoordinate(value: Double?): String = value?.let { "%.6f".format(it) } ?: "Chưa có"
-
-private fun qualityLabel(quality: FixQuality): String =
-    when (quality) {
-        FixQuality.WAITING -> "Đang chờ tín hiệu GPS"
-        FixQuality.WEAK ->
-            "Sai số cao hơn ${"%.0f".format(GpsAccuracyGate.PROPOSED_THRESHOLD_METERS)} m. Di chuyển ra nơi thoáng hơn"
-        FixQuality.HOLDING -> "Giữ yên thiết bị..."
-        FixQuality.READY -> "Đủ độ chính xác"
-    }
-
-@Composable
-private fun MeasureBody(
-    state: PoleGpsMeasureUiState.Success,
-    onSave: () -> Unit,
-    onMeasureAgain: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-    ) {
-        InfoCard(title = "Vị trí GIS hiện tại") {
-            Text(text = "Lat: ${formatCoordinate(state.previous?.lat)}")
-            Text(text = "Lng: ${formatCoordinate(state.previous?.lng)}")
-        }
-        if (!state.saved && state.stored != null) {
-            Text(
-                text =
-                    "Đã đo trước đó lúc ${DateFormatUtils.formatInstant(state.stored.capturedAt)} · " +
-                        "±${"%.1f".format(state.stored.accuracyM)} m",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        InfoCard(title = "Vị trí đo được") {
-            Text(text = "Lat: ${formatCoordinate(state.liveFix?.lat)}")
-            Text(text = "Lng: ${formatCoordinate(state.liveFix?.lng)}")
-            val accuracyText = state.liveFix?.let { "±${"%.1f".format(it.accuracyM)} m" } ?: "Chưa có"
-            Text(text = "Độ chính xác: $accuracyText")
-            Text(text = qualityLabel(state.quality), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        if (state.saved) {
-            Text(text = "Đã lưu vị trí cột", style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(
-                onClick = onMeasureAgain,
-                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) {
-                Text(text = "Đo lại")
-            }
-        } else {
-            PrimaryButton(
-                text = "Lưu vị trí",
-                onClick = onSave,
-                enabled = state.canSave && !state.saved,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoCard(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Text(text = title, style = MaterialTheme.typography.titleSmall)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-        content()
     }
 }
 
