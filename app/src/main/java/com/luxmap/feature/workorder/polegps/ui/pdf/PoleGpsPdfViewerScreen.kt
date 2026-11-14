@@ -13,7 +13,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,7 +30,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.PrimaryButton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -90,8 +91,31 @@ private fun CenteredPdfMessage(
 
 @Composable
 private fun PdfPages(filePath: String) {
-    val renderer = remember(filePath) { PdfPageRenderer(File(filePath)) }
-    DisposableEffect(renderer) { onDispose { renderer.close() } }
+    var renderer by remember(filePath) { mutableStateOf<PdfPageRenderer?>(null) }
+    var openError by remember(filePath) { mutableStateOf<String?>(null) }
+    LaunchedEffect(filePath) {
+        var opened: PdfPageRenderer? = null
+        try {
+            opened = withContext(Dispatchers.IO) { PdfPageRenderer(File(filePath)) }
+            renderer = opened
+            awaitCancellation()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            openError = "Không mở được file PDF này."
+        } finally {
+            opened?.close()
+        }
+    }
+    when {
+        openError != null -> CenteredPdfMessage(openError!!)
+        renderer == null -> CenteredPdfMessage("Đang mở file PDF...", showProgress = true)
+        else -> PdfPagerBody(renderer!!)
+    }
+}
+
+@Composable
+private fun PdfPagerBody(renderer: PdfPageRenderer) {
     val pagerState = rememberPagerState(pageCount = { renderer.pageCount })
     Column(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
