@@ -14,4 +14,5 @@ data class LocalWorkOrderEvidenceEntity(
     val lat: Double,
     val lng: Double,
     val uploadStatus: String,
+    val poleId: String? = null,
 )

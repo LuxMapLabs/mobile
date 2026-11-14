@@ -34,3 +34,13 @@ val MIGRATION_16_17: Migration =
             db.execSQL("ALTER TABLE local_pole_list_item_new RENAME TO local_pole_list_item")
         }
     }
+
+val MIGRATION_17_18: Migration =
+    object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_pole_gps_measurement ADD COLUMN photoFilePath TEXT")
+            db.execSQL("ALTER TABLE local_pole_gps_measurement ADD COLUMN evidenceClientOpId TEXT")
+            db.execSQL("ALTER TABLE local_pole_gps_measurement ADD COLUMN evidenceUploadStatus TEXT")
+            db.execSQL("ALTER TABLE local_work_order_evidence ADD COLUMN poleId TEXT")
+        }
+    }

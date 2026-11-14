@@ -66,4 +66,20 @@ abstract class PoleGpsDao {
 
     @Query("SELECT * FROM local_pole_gps_measurement WHERE workOrderId = :workOrderId")
     abstract suspend fun measurements(workOrderId: String): List<LocalPoleGpsMeasurementEntity>
+
+    @Query(
+        "UPDATE local_pole_gps_measurement SET evidenceUploadStatus = :status " +
+            "WHERE workOrderId = :workOrderId AND poleId = :poleId",
+    )
+    abstract suspend fun updateEvidenceUploadStatus(
+        workOrderId: String,
+        poleId: String,
+        status: String,
+    )
+
+    @Query(
+        "SELECT * FROM local_pole_gps_measurement WHERE workOrderId = :workOrderId " +
+            "AND evidenceUploadStatus = 'pending'",
+    )
+    abstract suspend fun pendingPhotoMeasurements(workOrderId: String): List<LocalPoleGpsMeasurementEntity>
 }

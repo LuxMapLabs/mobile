@@ -43,4 +43,7 @@ data class LocalPoleGpsMeasurementEntity(
     val accuracyM: Double,
     val capturedAt: Instant,
     val source: String,
+    val photoFilePath: String? = null,
+    val evidenceClientOpId: String? = null,
+    val evidenceUploadStatus: String? = null,
 )
