@@ -3,12 +3,12 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luxmap.feature.survey.ui.polephoto.poleNumberLabel
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.MeasurementSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
+import com.luxmap.feature.workorder.polegps.data.PoleReference
 import com.luxmap.feature.workorder.polegps.domain.FixQuality
 import com.luxmap.feature.workorder.polegps.domain.PoleFixGate
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,7 +47,7 @@ class PoleGpsMeasureViewModel
                     val stored = repository.allMeasurements(workOrderId).firstOrNull { it.poleId == poleId }
                     _state.value =
                         PoleGpsMeasureUiState.Success(
-                            poleLabel = poleNumberLabel(reference.position),
+                            poleLabel = poleLabel(reference),
                             previous = reference,
                             liveFix = null,
                             quality = FixQuality.WAITING,
@@ -98,6 +98,9 @@ class PoleGpsMeasureViewModel
             val quality = gate.accept(fix)
             _state.value = current.copy(liveFix = fix, quality = quality, canSave = quality == FixQuality.READY)
         }
+
+        private fun poleLabel(reference: PoleReference): String =
+            reference.position?.let { "Cột $it · ${reference.poleId}" } ?: reference.poleId
 
         private fun GpsFix.toMeasurement() =
             PoleMeasurement(

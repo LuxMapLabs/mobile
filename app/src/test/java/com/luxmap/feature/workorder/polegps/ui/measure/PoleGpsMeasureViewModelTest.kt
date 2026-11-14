@@ -64,6 +64,25 @@ class PoleGpsMeasureViewModelTest {
         }
 
     @Test
+    fun `poleLabel names the actual pole, not a placeholder`() =
+        runTest {
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            val state = vm.state.value as PoleGpsMeasureUiState.Success
+            assertEquals("Cột 3 · P-1", state.poleLabel)
+        }
+
+    @Test
+    fun `poleLabel falls back to just the pole id when there is no cached position`() =
+        runTest {
+            coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", null, null, null)
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            val state = vm.state.value as PoleGpsMeasureUiState.Success
+            assertEquals("P-1", state.poleLabel)
+        }
+
+    @Test
     fun `a pole outside the order is Empty`() =
         runTest {
             coEvery { repository.poleReference("WO-1", "P-1") } returns null

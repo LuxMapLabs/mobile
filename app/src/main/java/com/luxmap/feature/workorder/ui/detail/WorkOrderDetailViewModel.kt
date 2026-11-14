@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.network.ConnectivityObserver
+import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
@@ -31,6 +32,7 @@ class WorkOrderDetailViewModel
         private val detailRepository: WorkOrderDetailRepository,
         private val completionRepository: WorkOrderCompletionRepository,
         private val poleGpsRepository: PoleGpsRepository,
+        private val poleListRepository: PoleListRepository,
         private val connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
@@ -65,6 +67,7 @@ class WorkOrderDetailViewModel
                         _uiState.value = WorkOrderDetailUiState.Empty
                     } else {
                         if (detail.taskKind == "pole_gps_update") {
+                            poleListRepository.poles(workOrderId)
                             poleReferencesState.value = poleGpsRepository.poleReferences(workOrderId)
                         }
                         detailState.value = detail
