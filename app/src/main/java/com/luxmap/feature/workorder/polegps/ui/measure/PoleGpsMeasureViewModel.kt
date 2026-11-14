@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -58,7 +59,12 @@ class PoleGpsMeasureViewModel
             onDone: () -> Unit,
         ) {
             viewModelScope.launch {
-                val fix = if (hasLocationPermission) fixSource.fixes().first() else null
+                val fix =
+                    if (hasLocationPermission) {
+                        withTimeoutOrNull(FIX_TIMEOUT_MILLIS) { fixSource.fixes().first() }
+                    } else {
+                        null
+                    }
                 repository.saveCapturedPhoto(
                     workOrderId = workOrderId,
                     poleId = poleId,
@@ -74,4 +80,8 @@ class PoleGpsMeasureViewModel
 
         private fun poleLabel(reference: PoleReference): String =
             reference.position?.let { "Cột $it · ${reference.poleId}" } ?: reference.poleId
+
+        companion object {
+            const val FIX_TIMEOUT_MILLIS = 10_000L
+        }
     }

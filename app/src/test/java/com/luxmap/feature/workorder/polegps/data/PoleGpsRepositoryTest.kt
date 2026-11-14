@@ -1,5 +1,7 @@
 package com.luxmap.feature.workorder.polegps.data
 
+import androidx.room.withTransaction
+import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
@@ -7,18 +9,39 @@ import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import java.time.Instant
 
 class PoleGpsRepositoryTest {
+    // enqueuePendingPhotoUploads runs its insert+enqueue+status-flip through
+    // AppDatabase.withTransaction, a top-level Room extension function - mockkStatic is the only
+    // way to stub it on a plain mockk<AppDatabase>(), same precedent as RealUploadRepositoryTest.
+    @Before
+    fun setUp() {
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { database.withTransaction(any<suspend () -> Unit>()) } coAnswers {
+            secondArg<suspend () -> Unit>().invoke()
+        }
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic("androidx.room.RoomDatabaseKt")
+    }
+
+    private val database = mockk<AppDatabase>()
     private val dao = mockk<PoleGpsDao>(relaxed = true)
     private val downloader = mockk<AttachmentDownloader>(relaxed = true)
     private val scheduler = mockk<AttachmentDownloadScheduler>(relaxed = true)
@@ -27,7 +50,7 @@ class PoleGpsRepositoryTest {
     private val completionDao = mockk<WorkOrderCompletionDao>(relaxed = true)
     private val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
     private val repository =
-        PoleGpsRepository(dao, downloader, scheduler, sync, cache, completionDao, syncQueueManager)
+        PoleGpsRepository(database, dao, downloader, scheduler, sync, cache, completionDao, syncQueueManager)
 
     private fun row(
         poleId: String,
@@ -68,6 +91,17 @@ class PoleGpsRepositoryTest {
                 syncQueueManager.enqueue(opType = "upload_work_order_evidence", payloadJson = any(), clientOpId = any())
             }
             coVerify { dao.updateEvidenceUploadStatus("WO-1", "P-1", "queued") }
+        }
+
+    @Test
+    fun `enqueuePendingPhotoUploads runs each measurement's insert+enqueue+status-flip in one transaction`() =
+        runTest {
+            val withPhoto =
+                row("P-1", MeasurementSourceColumn.DEVICE)
+                    .copy(photoFilePath = "/f/p1.jpg", evidenceUploadStatus = "pending")
+            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns listOf(withPhoto)
+            repository.enqueuePendingPhotoUploads("WO-1")
+            coVerify(exactly = 1) { database.withTransaction(any()) }
         }
 
     @Test

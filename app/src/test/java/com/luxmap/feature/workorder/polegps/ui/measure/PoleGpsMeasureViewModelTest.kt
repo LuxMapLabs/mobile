@@ -10,9 +10,12 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -101,6 +104,19 @@ class PoleGpsMeasureViewModelTest {
             val file = File("p1.jpg")
             var done = false
             vm.onPhotoCaptured(file, hasLocationPermission = false) { done = true }
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", file.absolutePath, 0.0, 0.0, 0.0, any()) }
+            assertTrue(done)
+        }
+
+    @Test
+    fun `onPhotoCaptured gives up and saves zeroed coordinates when no gps fix ever arrives`() =
+        runTest {
+            fixesFlow = flow { awaitCancellation() }
+            val vm = viewModel()
+            val file = File("p1.jpg")
+            var done = false
+            vm.onPhotoCaptured(file, hasLocationPermission = true) { done = true }
+            advanceTimeBy(PoleGpsMeasureViewModel.FIX_TIMEOUT_MILLIS + 1)
             coVerify { repository.saveCapturedPhoto("WO-1", "P-1", file.absolutePath, 0.0, 0.0, 0.0, any()) }
             assertTrue(done)
         }

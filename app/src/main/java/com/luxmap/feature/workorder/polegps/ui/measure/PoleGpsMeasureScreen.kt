@@ -62,7 +62,11 @@ fun PoleGpsMeasureRoute(
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val file = pendingFile
-            previewFile = if (success && file != null) file else null
+            if (success && file != null) {
+                previewFile = file
+            } else {
+                onBack()
+            }
         }
 
     fun launchCamera() {
@@ -108,6 +112,17 @@ fun PoleGpsMeasureRoute(
         }
     }
 
+    fun retryPermissions() {
+        val cameraGranted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (cameraGranted) {
+            viewModel.onPermissionGranted()
+            launchCamera()
+        } else {
+            permissionsLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+        }
+    }
+
     LaunchedEffect(Unit) { requestPermissionsAndStart() }
 
     val fileToPreview = previewFile
@@ -126,7 +141,7 @@ fun PoleGpsMeasureRoute(
             },
         )
     } else {
-        PoleGpsMeasureContent(state = state, onBack = onBack, onRetryPermission = ::requestPermissionsAndStart)
+        PoleGpsMeasureContent(state = state, onBack = onBack, onRetryPermission = ::retryPermissions)
     }
 }
 

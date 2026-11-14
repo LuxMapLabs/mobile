@@ -1,5 +1,7 @@
 package com.luxmap.feature.workorder.polegps.data
 
+import androidx.room.withTransaction
+import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
@@ -74,6 +76,7 @@ private fun LocalWorkOrderAttachmentEntity.toDomain() =
 class PoleGpsRepository
     @Inject
     constructor(
+        private val database: AppDatabase,
         private val dao: PoleGpsDao,
         private val downloader: AttachmentDownloader,
         private val scheduler: AttachmentDownloadScheduler,
@@ -114,26 +117,28 @@ class PoleGpsRepository
 
         suspend fun enqueuePendingPhotoUploads(workOrderId: String) {
             dao.pendingPhotoMeasurements(workOrderId).forEach { measurement ->
-                val clientOpId = UUID.randomUUID().toString()
-                completionDao.insertEvidence(
-                    LocalWorkOrderEvidenceEntity(
+                database.withTransaction {
+                    val clientOpId = UUID.randomUUID().toString()
+                    completionDao.insertEvidence(
+                        LocalWorkOrderEvidenceEntity(
+                            clientOpId = clientOpId,
+                            workOrderId = workOrderId,
+                            kind = "observation",
+                            filePath = measurement.photoFilePath!!,
+                            capturedAt = measurement.capturedAt,
+                            lat = measurement.lat,
+                            lng = measurement.lng,
+                            uploadStatus = "pending",
+                            poleId = measurement.poleId,
+                        ),
+                    )
+                    syncQueueManager.enqueue(
+                        opType = "upload_work_order_evidence",
+                        payloadJson = Json.encodeToString(EvidenceSyncPayload(clientOpId)),
                         clientOpId = clientOpId,
-                        workOrderId = workOrderId,
-                        kind = "observation",
-                        filePath = measurement.photoFilePath!!,
-                        capturedAt = measurement.capturedAt,
-                        lat = measurement.lat,
-                        lng = measurement.lng,
-                        uploadStatus = "pending",
-                        poleId = measurement.poleId,
-                    ),
-                )
-                syncQueueManager.enqueue(
-                    opType = "upload_work_order_evidence",
-                    payloadJson = Json.encodeToString(EvidenceSyncPayload(clientOpId)),
-                    clientOpId = clientOpId,
-                )
-                dao.updateEvidenceUploadStatus(workOrderId, measurement.poleId, "queued")
+                    )
+                    dao.updateEvidenceUploadStatus(workOrderId, measurement.poleId, "queued")
+                }
             }
         }
 
