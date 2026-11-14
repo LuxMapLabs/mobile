@@ -173,6 +173,42 @@ class PoleGpsRepositoryTest {
         }
 
     @Test
+    fun `completionPoleLocations drops a measurement for a pole no longer in the order's pole_ids`() =
+        runTest {
+            coEvery { sync.cached("WO-1") } returns
+                com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto(
+                    workOrderId = "WO-1",
+                    title = "t",
+                    taskKind = "pole_gps_update",
+                    woStatus = "in_progress",
+                    poleIds = listOf("P-1"),
+                )
+            coEvery { dao.measurements("WO-1") } returns
+                listOf(
+                    LocalPoleGpsMeasurementEntity(
+                        "WO-1",
+                        "P-1",
+                        10.0,
+                        106.0,
+                        3.0,
+                        Instant.ofEpochSecond(5),
+                        MeasurementSourceColumn.DEVICE,
+                    ),
+                    LocalPoleGpsMeasurementEntity(
+                        "WO-1",
+                        "P-2",
+                        11.0,
+                        107.0,
+                        4.0,
+                        Instant.ofEpochSecond(5),
+                        MeasurementSourceColumn.DEVICE,
+                    ),
+                )
+            val result = repository.completionPoleLocations("WO-1")!!
+            assertEquals(listOf("P-1"), result.map { it.poleId })
+        }
+
+    @Test
     fun `poleReferences lists every pole_id of the order, with null coordinates for an unlisted pole`() =
         runTest {
             coEvery { sync.cached("WO-1") } returns

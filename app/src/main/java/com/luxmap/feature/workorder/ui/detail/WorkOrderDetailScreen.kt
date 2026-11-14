@@ -1405,7 +1405,8 @@ private fun PoleGpsOverviewSection(
                 )
             }
         }
-        val measuredIds = state.poleMeasurements.map { it.poleId }.toSet()
+        val referenceIds = state.poleReferences.map { it.poleId }.toSet()
+        val measuredIds = state.poleMeasurements.map { it.poleId }.toSet().intersect(referenceIds)
         CompletionSectionHeader(
             icon = Icons.Filled.Navigation,
             title = "Cột đèn",

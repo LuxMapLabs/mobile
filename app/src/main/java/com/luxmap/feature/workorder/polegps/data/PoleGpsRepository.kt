@@ -126,11 +126,13 @@ class PoleGpsRepository
         }
 
         suspend fun completionPoleLocations(workOrderId: String): List<PoleLocationRequestDto>? {
-            if (detailSync.cached(workOrderId) == null) return null
+            val order = detailSync.cached(workOrderId) ?: return null
             val now = Instant.now()
-            return allMeasurements(workOrderId).map {
-                val capturedAt = if (it.capturedAt.isAfter(now)) now else it.capturedAt
-                PoleLocationRequestDto(it.poleId, it.lat, it.lng, it.accuracyM, capturedAt.toString())
-            }
+            return allMeasurements(workOrderId)
+                .filter { it.poleId in order.poleIds }
+                .map {
+                    val capturedAt = if (it.capturedAt.isAfter(now)) now else it.capturedAt
+                    PoleLocationRequestDto(it.poleId, it.lat, it.lng, it.accuracyM, capturedAt.toString())
+                }
         }
     }
