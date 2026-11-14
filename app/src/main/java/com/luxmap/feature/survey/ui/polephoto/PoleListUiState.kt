@@ -3,9 +3,11 @@ package com.luxmap.feature.survey.ui.polephoto
 import com.luxmap.core.theme.SyncStatus
 import java.time.Instant
 
+fun poleNumberLabel(position: Int?): String = position?.let { "Cột $it" } ?: "Chưa có GPS"
+
 data class PoleListRowState(
     val poleId: String,
-    val position: Int,
+    val position: Int?,
     val fixtureStatus: String,
     // The real backend photo_id, only known once UploadPolePhotoSyncHandler captures it from
     // the upload response - not the local row's own id. Null until then.

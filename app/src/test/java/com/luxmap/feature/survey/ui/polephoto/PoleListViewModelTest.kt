@@ -78,8 +78,8 @@ class PoleListViewModelTest {
                 Result.success(
                     PoleListResult(
                         listOf(
-                            PoleListItem("POLE-1", 1, "normal"),
-                            PoleListItem("POLE-2", 2, "dim"),
+                            PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
+                            PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "dim"),
                         ),
                         isStale = false,
                     ),
@@ -128,7 +128,10 @@ class PoleListViewModelTest {
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(
                     PoleListResult(
-                        listOf(PoleListItem("POLE-1", 1, "normal"), PoleListItem("POLE-2", 2, "dim")),
+                        listOf(
+                            PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
+                            PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "dim"),
+                        ),
                         isStale = false,
                     ),
                 )
@@ -174,7 +177,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -208,7 +216,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns
@@ -245,7 +258,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -275,7 +293,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = true))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = true,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -569,7 +592,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -604,7 +632,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -637,7 +670,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -671,7 +709,12 @@ class PoleListViewModelTest {
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
-                Result.success(PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = false))
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(

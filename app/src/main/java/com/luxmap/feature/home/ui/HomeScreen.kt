@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -285,17 +286,18 @@ private fun HomeContent(
 // No "Tất cả" tab - reuses WorkOrderTaskKind directly so the tab set never drifts from the
 // badge/icon mapping used elsewhere.
 private enum class TaskFilterTab(val label: String, val kind: WorkOrderTaskKind) {
-    SURVEY("Khảo sát", WorkOrderTaskKind.SURVEY),
     INSPECTION("Kiểm tra", WorkOrderTaskKind.INSPECTION),
     REPAIR("Sửa chữa", WorkOrderTaskKind.REPAIR),
+    POLE_GPS_UPDATE("Cập nhật GPS", WorkOrderTaskKind.POLE_GPS_UPDATE),
 }
 
 // Survey work orders are deliberately left out of this screen's own data (clusters never
 // contain task_kind=survey items) - the dedicated Khảo sát tab (SurveyHubScreen) already lists
 // them with richer, survey-specific actions (readiness check, rejected/AI-pending states) that
-// this plain task row can't offer. The SURVEY tab still exists here to match the mockup's tabs,
-// but it always shows a count of 0 and its own empty state.
-private val TASK_KIND_SECTION_ORDER = listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
+// this plain task row can't offer. There is no SURVEY entry in TaskFilterTab at all - it would
+// always show a count of 0 and its own empty state, so it is left out rather than shown disabled.
+internal val TASK_KIND_SECTION_ORDER: List<WorkOrderTaskKind> =
+    listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION, WorkOrderTaskKind.POLE_GPS_UPDATE)
 
 private fun HomeData.allVisibleItems(): List<WorkOrderSummaryItem> =
     clusters.flatMap { it.items }.filter { TASK_KIND_SECTION_ORDER.contains(workOrderTaskKindFromWire(it.taskKind)) }
@@ -393,11 +395,18 @@ private fun TaskFilterTabs(
                         .clip(RoundedCornerShape(Radius.chip))
                         .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                         .clickable { onSelect(tab) }
-                        .padding(vertical = Spacing.sm),
+                        .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = tab.label, style = BodyStrongTextStyle, color = contentColor)
+                Text(
+                    text = tab.label,
+                    style = LabelTextStyle,
+                    color = contentColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(Modifier.width(Spacing.xs))
                 Text(text = "${counts[tab] ?: 0}", style = LabelTextStyle, color = contentColor)
             }
@@ -411,13 +420,6 @@ private fun TaskFilterTabs(
 private fun TabEmptyState(tab: TaskFilterTab) {
     val (icon, iconTint, title, body) =
         when (tab) {
-            TaskFilterTab.SURVEY ->
-                EmptyContent(
-                    WorkOrderTaskKind.SURVEY.icon(),
-                    WorkOrderTaskKind.SURVEY.badgeColors().text,
-                    "Không có nhiệm vụ khảo sát",
-                    "Khi Manager giao tuyến hoặc khu vực khảo sát, nhiệm vụ sẽ hiện ở đây.",
-                )
             TaskFilterTab.INSPECTION ->
                 EmptyContent(
                     WorkOrderTaskKind.INSPECTION.icon(),
@@ -431,6 +433,13 @@ private fun TabEmptyState(tab: TaskFilterTab) {
                     WorkOrderTaskKind.REPAIR.badgeColors().text,
                     "Không có nhiệm vụ sửa chữa",
                     "Lệnh sửa chữa và bảo trì được giao sẽ hiện ở đây.",
+                )
+            TaskFilterTab.POLE_GPS_UPDATE ->
+                EmptyContent(
+                    WorkOrderTaskKind.POLE_GPS_UPDATE.icon(),
+                    WorkOrderTaskKind.POLE_GPS_UPDATE.badgeColors().text,
+                    "Không có nhiệm vụ cập nhật GPS",
+                    "Lệnh đo lại vị trí cột đèn được giao sẽ hiện ở đây.",
                 )
         }
     Column(

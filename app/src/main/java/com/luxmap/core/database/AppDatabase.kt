@@ -23,6 +23,10 @@ import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
+import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsMeasurementEntity
+import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsOrderEntity
+import com.luxmap.feature.workorder.polegps.data.LocalWorkOrderAttachmentEntity
+import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 
 // Entities are added here task by task as each feature's Room schema lands —
 // keeping the list here is the single place that shows the whole local schema.
@@ -40,8 +44,11 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
         LocalAssignedSurveyRouteEntity::class,
         LocalAssetImportTripEntity::class,
         LocalAssetImportPoleEntity::class,
+        LocalPoleGpsOrderEntity::class,
+        LocalWorkOrderAttachmentEntity::class,
+        LocalPoleGpsMeasurementEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
@@ -61,4 +68,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun surveyRouteCacheDao(): SurveyRouteCacheDao
 
     abstract fun assetImportDao(): AssetImportDao
+
+    abstract fun poleGpsDao(): PoleGpsDao
 }

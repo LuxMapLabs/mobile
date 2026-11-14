@@ -8,12 +8,22 @@ data class CompleteWorkOrderRequestDto(
     @SerialName("report_note") val reportNote: String,
     @SerialName("materials_used") val materialsUsed: String? = null,
     @SerialName("fault_outcomes") val faultOutcomes: List<FaultOutcomeRequestDto>? = null,
+    @SerialName("pole_locations") val poleLocations: List<PoleLocationRequestDto>? = null,
 )
 
 @Serializable
 data class FaultOutcomeRequestDto(
     @SerialName("fault_id") val faultId: String,
     val outcome: String,
+)
+
+@Serializable
+data class PoleLocationRequestDto(
+    @SerialName("pole_id") val poleId: String,
+    val lat: Double,
+    val lng: Double,
+    @SerialName("accuracy_m") val accuracyM: Double,
+    @SerialName("captured_at") val capturedAt: String,
 )
 
 @Serializable

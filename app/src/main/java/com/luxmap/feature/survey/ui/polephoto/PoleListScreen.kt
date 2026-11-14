@@ -675,7 +675,7 @@ private fun polePhotoSyncLabel(status: SyncStatus): String =
 // "not reached yet" surfaceVariant default.
 @Composable
 private fun PoleNumberAvatar(
-    position: Int,
+    position: Int?,
     isNext: Boolean,
     hasSync: Boolean,
 ) {
@@ -690,7 +690,7 @@ private fun PoleNumberAvatar(
         modifier = Modifier.size(36.dp).background(background, RoundedCornerShape(Radius.chip)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = position.toString(), style = MaterialTheme.typography.labelLarge, color = textColor)
+        Text(text = position?.toString() ?: "-", style = MaterialTheme.typography.labelLarge, color = textColor)
     }
 }
 

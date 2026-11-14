@@ -1,6 +1,7 @@
 package com.luxmap.feature.workorder.ui.detail
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -12,6 +13,9 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
+import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
+import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
+import com.luxmap.feature.workorder.polegps.data.PoleReference
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -46,6 +50,13 @@ private fun repairDetail(
 private fun inspectionDetail(faults: List<WorkOrderFaultDetail>) =
     repairDetail(allowedActions = listOf("complete")).copy(taskKind = "inspection", faults = faults)
 
+private fun poleGpsDetail(
+    allowedActions: List<String> = listOf("complete"),
+    poleIds: List<String> = listOf("P-1", "P-2"),
+) = repairDetail(
+    allowedActions = allowedActions,
+).copy(taskKind = "pole_gps_update", faults = emptyList(), poleIds = poleIds)
+
 private fun fault(
     id: String,
     poleId: String,
@@ -73,6 +84,9 @@ class WorkOrderDetailScreenTest {
         onSubmit: () -> Unit = {},
         onCaptureEvidence: () -> Unit = {},
         onRetakeEvidence: () -> Unit = {},
+        onOpenPdf: (String) -> Unit = {},
+        onMeasurePole: (String) -> Unit = {},
+        onRetryAttachment: (String) -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
@@ -87,6 +101,9 @@ class WorkOrderDetailScreenTest {
                     onSubmit = onSubmit,
                     onCaptureEvidence = onCaptureEvidence,
                     onRetakeEvidence = onRetakeEvidence,
+                    onOpenPdf = onOpenPdf,
+                    onMeasurePole = onMeasurePole,
+                    onRetryAttachment = onRetryAttachment,
                 )
             }
         }
@@ -241,5 +258,74 @@ class WorkOrderDetailScreenTest {
         )
         composeRule.onAllNodesWithText("Có sự cố")[0].performClick()
         assertEquals("FAULT-1" to "fault_present", picked)
+    }
+
+    @Test
+    fun pole_with_no_cached_position_shows_chua_co() {
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(poleIds = listOf("P-1")),
+                    poleReferences = listOf(PoleReference("P-1", null, null, null)),
+                ),
+        )
+        composeRule.onNodeWithText("GPS cũ: Chưa có").assertExists()
+    }
+
+    @Test
+    fun tapping_a_pdf_row_that_is_ready_opens_the_viewer() {
+        var openedId: String? = null
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(),
+                    poleAttachments =
+                        listOf(
+                            PoleGpsAttachment("A-1", "qr.pdf", 10L, AttachmentStatus.READY, "/f/qr.pdf"),
+                        ),
+                ),
+            onOpenPdf = { openedId = it },
+        )
+        composeRule.onNodeWithText("qr.pdf").performClick()
+        assertEquals("A-1", openedId)
+    }
+
+    @Test
+    fun tapping_a_pole_row_opens_the_measure_screen_for_that_pole() {
+        var measuredId: String? = null
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(poleIds = listOf("P-1")),
+                    poleReferences = listOf(PoleReference("P-1", 4, 10.0, 106.0)),
+                ),
+            onMeasurePole = { measuredId = it },
+        )
+        composeRule.onNodeWithText("P-1").performClick()
+        assertEquals("P-1", measuredId)
+    }
+
+    @Test
+    fun submit_button_is_enabled_with_only_1_of_2_poles_measured() {
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(poleIds = listOf("P-1", "P-2")),
+                    reportNote = "Đã đo 1 trong 2 cột đèn hôm nay",
+                    poleReferences = listOf(PoleReference("P-1", 1, 10.0, 106.0), PoleReference("P-2", 2, 11.0, 107.0)),
+                    poleMeasurements =
+                        listOf(
+                            com.luxmap.feature.workorder.polegps.data.PoleMeasurement(
+                                "P-1",
+                                10.0,
+                                106.0,
+                                3.0,
+                                java.time.Instant.ofEpochSecond(1),
+                                com.luxmap.feature.workorder.polegps.data.MeasurementSource.DEVICE,
+                            ),
+                        ),
+                ),
+        )
+        composeRule.onNodeWithText("Nộp báo cáo").assertIsEnabled()
     }
 }

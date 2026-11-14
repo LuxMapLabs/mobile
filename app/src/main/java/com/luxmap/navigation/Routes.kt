@@ -137,6 +137,24 @@ sealed interface Routes {
         fun createRoute(workOrderId: String) = "work-order/$workOrderId/complete/evidence"
     }
 
+    data object PoleGpsMeasure : Routes {
+        override val route = "work-order/{workOrderId}/pole-gps/{poleId}"
+
+        fun createRoute(
+            workOrderId: String,
+            poleId: String,
+        ) = "work-order/$workOrderId/pole-gps/$poleId"
+    }
+
+    data object PoleGpsPdfViewer : Routes {
+        override val route = "work-order/{workOrderId}/pole-gps/pdf/{attachmentId}"
+
+        fun createRoute(
+            workOrderId: String,
+            attachmentId: String,
+        ) = "work-order/$workOrderId/pole-gps/pdf/$attachmentId"
+    }
+
     data object Notification : Routes {
         override val route = "notification"
     }

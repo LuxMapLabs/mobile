@@ -45,8 +45,8 @@ class RealPoleListRepositoryTest {
             assertEquals(
                 PoleListResult(
                     listOf(
-                        PoleListItem("POLE-1", 1, "normal"),
-                        PoleListItem("POLE-2", 2, "unknown"),
+                        PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
+                        PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "unknown"),
                     ),
                     isStale = false,
                 ),
@@ -56,8 +56,8 @@ class RealPoleListRepositoryTest {
                 dao.replaceForWorkOrder(
                     "WO-1",
                     listOf(
-                        LocalPoleListItemEntity("WO-1", "POLE-1", 1, "normal"),
-                        LocalPoleListItemEntity("WO-1", "POLE-2", 2, "unknown"),
+                        LocalPoleListItemEntity("WO-1", "POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
+                        LocalPoleListItemEntity("WO-1", "POLE-2", 2, lat = null, lng = null, fixtureStatus = "unknown"),
                     ),
                 )
             }
@@ -70,13 +70,16 @@ class RealPoleListRepositoryTest {
             val dao = mockk<PoleListCacheDao>()
             coEvery { api.poles("WO-1") } throws httpException(500)
             coEvery { dao.byWorkOrder("WO-1") } returns
-                listOf(LocalPoleListItemEntity("WO-1", "POLE-1", 1, "normal"))
+                listOf(LocalPoleListItemEntity("WO-1", "POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"))
             val repository = RealPoleListRepository(api, dao)
 
             val result = repository.poles("WO-1")
 
             assertEquals(
-                PoleListResult(listOf(PoleListItem("POLE-1", 1, "normal")), isStale = true),
+                PoleListResult(
+                    listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                    isStale = true,
+                ),
                 result.getOrNull(),
             )
         }

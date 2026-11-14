@@ -3,6 +3,7 @@ package com.luxmap.feature.workorder.data
 import app.cash.turbine.test
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
+import com.luxmap.feature.workorder.polegps.data.PoleGpsDetailSync
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -14,6 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.IOException
 
 private const val WORK_ORDER_ID = "WO-1"
 
@@ -38,8 +40,9 @@ class RealWorkOrderDetailRepositoryTest {
     fun `emits the mapped detail when the backend returns 200`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
             coEvery { workOrdersApi.detail(WORK_ORDER_ID) } returns detailDto()
-            val repository = RealWorkOrderDetailRepository(workOrdersApi)
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
 
             repository.observeWorkOrderDetail(WORK_ORDER_ID).test {
                 val detail = awaitItem()
@@ -52,8 +55,9 @@ class RealWorkOrderDetailRepositoryTest {
     fun `emits null on a 404, not an Error`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
             coEvery { workOrdersApi.detail(WORK_ORDER_ID) } throws httpException(404)
-            val repository = RealWorkOrderDetailRepository(workOrdersApi)
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
 
             repository.observeWorkOrderDetail(WORK_ORDER_ID).test {
                 assertNull(awaitItem())
@@ -65,8 +69,9 @@ class RealWorkOrderDetailRepositoryTest {
     fun `a non-404 HTTP error propagates instead of being treated as not-found`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
             coEvery { workOrdersApi.detail(WORK_ORDER_ID) } throws httpException(500)
-            val repository = RealWorkOrderDetailRepository(workOrdersApi)
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
 
             repository.observeWorkOrderDetail(WORK_ORDER_ID).test {
                 val error = awaitError()
@@ -78,8 +83,9 @@ class RealWorkOrderDetailRepositoryTest {
     fun `start returns the backend's updated detail when it accepts the request`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
             coEvery { workOrdersApi.start(WORK_ORDER_ID) } returns detailDto().copy(woStatus = "in_progress")
-            val repository = RealWorkOrderDetailRepository(workOrdersApi)
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
 
             val result = repository.start(WORK_ORDER_ID)
 
@@ -91,9 +97,47 @@ class RealWorkOrderDetailRepositoryTest {
     fun `start returns failure when the backend rejects it`() =
         runTest {
             val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
             coEvery { workOrdersApi.start(WORK_ORDER_ID) } throws httpException(409)
-            val repository = RealWorkOrderDetailRepository(workOrdersApi)
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
 
             assertTrue(repository.start(WORK_ORDER_ID).isFailure)
+        }
+
+    @Test
+    fun `network failure falls back to the cached pole GPS order`() =
+        runTest {
+            val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
+            val cached =
+                WorkOrderDetailDto(
+                    workOrderId = WORK_ORDER_ID,
+                    title = "t",
+                    taskKind = "pole_gps_update",
+                    woStatus = "assigned",
+                )
+            coEvery { workOrdersApi.detail(WORK_ORDER_ID) } throws IOException("offline")
+            coEvery { sync.cached(WORK_ORDER_ID) } returns cached
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
+
+            repository.observeWorkOrderDetail(WORK_ORDER_ID).test {
+                assertEquals(WORK_ORDER_ID, awaitItem()?.workOrderId)
+                awaitComplete()
+            }
+        }
+
+    @Test
+    fun `network failure without a cache still surfaces the error`() =
+        runTest {
+            val workOrdersApi = mockk<WorkOrdersApi>()
+            val sync = mockk<PoleGpsDetailSync>(relaxed = true)
+            coEvery { workOrdersApi.detail(WORK_ORDER_ID) } throws IOException("offline")
+            coEvery { sync.cached(WORK_ORDER_ID) } returns null
+            val repository = RealWorkOrderDetailRepository(workOrdersApi, sync)
+
+            repository.observeWorkOrderDetail(WORK_ORDER_ID).test {
+                val error = awaitError()
+                assertTrue(error is IOException)
+            }
         }
 }

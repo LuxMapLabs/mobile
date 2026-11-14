@@ -65,6 +65,12 @@ class WorkOrderLifecycleTest {
     }
 
     @Test
+    fun `pole GPS update has no lifecycle steps`() {
+        val steps = workOrderLifecycleSteps(WorkOrderStatus.ASSIGNED, WorkOrderTaskKind.POLE_GPS_UPDATE)
+        assertTrue(steps.isEmpty())
+    }
+
+    @Test
     fun schedule_window_is_closed_more_than_a_day_before_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-08"))
         assertFalse(window.canActOnSchedule)

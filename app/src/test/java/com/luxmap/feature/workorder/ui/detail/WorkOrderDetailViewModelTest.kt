@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.survey.data.PoleListRepository
+import com.luxmap.feature.survey.data.PoleListResult
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
@@ -11,6 +13,10 @@ import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
+import com.luxmap.feature.workorder.polegps.data.MeasurementSource
+import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
+import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
+import com.luxmap.feature.workorder.polegps.data.PoleReference
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -61,6 +67,9 @@ private fun repairDetail(
 private fun inspectionDetail(faults: List<WorkOrderFaultDetail>) =
     repairDetail(allowedActions = listOf("complete"), faults = faults).copy(taskKind = "inspection")
 
+private fun poleGpsDetail(poleIds: List<String> = listOf("P-1", "P-2")) =
+    repairDetail(allowedActions = listOf("complete")).copy(taskKind = "pole_gps_update", poleIds = poleIds)
+
 private fun fault(id: String) =
     WorkOrderFaultDetail(
         faultId = id,
@@ -91,6 +100,8 @@ class WorkOrderDetailViewModelTest {
         detailFlow: Flow<WorkOrderDetail?>,
         detailRepository: WorkOrderDetailRepository = mockk(),
         completionRepository: WorkOrderCompletionRepository = mockk(),
+        poleGpsRepository: PoleGpsRepository? = null,
+        poleListRepository: PoleListRepository? = null,
         isOnline: Boolean = true,
         evidence: LocalWorkOrderEvidenceEntity? = null,
         completion: LocalWorkOrderCompletionEntity? = null,
@@ -98,12 +109,24 @@ class WorkOrderDetailViewModelTest {
         every { detailRepository.observeWorkOrderDetail(WORK_ORDER_ID) } returns detailFlow
         every { completionRepository.observeEvidence(WORK_ORDER_ID) } returns flowOf(evidence)
         every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(completion)
+        val resolvedPoleGpsRepository =
+            poleGpsRepository ?: mockk<PoleGpsRepository>().also {
+                every { it.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
+                every { it.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+                coEvery { it.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            }
+        val resolvedPoleListRepository =
+            poleListRepository ?: mockk<PoleListRepository>().also {
+                coEvery { it.poles(WORK_ORDER_ID) } returns Result.success(PoleListResult(emptyList(), isStale = false))
+            }
         val connectivityObserver = mockk<ConnectivityObserver>()
         every { connectivityObserver.isOnline } returns flowOf(isOnline)
         return WorkOrderDetailViewModel(
             savedStateHandle(),
             detailRepository,
             completionRepository,
+            resolvedPoleGpsRepository,
+            resolvedPoleListRepository,
             connectivityObserver,
         )
     }
@@ -112,10 +135,21 @@ class WorkOrderDetailViewModelTest {
         detail: WorkOrderDetail?,
         detailRepository: WorkOrderDetailRepository = mockk(),
         completionRepository: WorkOrderCompletionRepository = mockk(),
+        poleGpsRepository: PoleGpsRepository? = null,
+        poleListRepository: PoleListRepository? = null,
         isOnline: Boolean = true,
         evidence: LocalWorkOrderEvidenceEntity? = null,
         completion: LocalWorkOrderCompletionEntity? = null,
-    ) = viewModel(flowOf(detail), detailRepository, completionRepository, isOnline, evidence, completion)
+    ) = viewModel(
+        flowOf(detail),
+        detailRepository,
+        completionRepository,
+        poleGpsRepository,
+        poleListRepository,
+        isOnline,
+        evidence,
+        completion,
+    )
 
     @Test
     fun `emits Loading then Success when the repository has the work order`() =
@@ -441,5 +475,115 @@ class WorkOrderDetailViewModelTest {
                 val loaded = awaitItem() as WorkOrderDetailUiState.Success
                 assertEquals(SyncStatus.QUEUED_OFFLINE, loaded.syncStatus())
             }
+        }
+
+    @Test
+    fun `a pole_gps_update order loads its pole references once and its measurements reactively`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val measurement =
+                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns
+                listOf(PoleReference("P-1", 4, 10.0, 106.0))
+            val vm = viewModel(detail = poleGpsDetail(poleIds = listOf("P-1")), poleGpsRepository = poleGpsRepository)
+
+            vm.uiState.test {
+                assertEquals(WorkOrderDetailUiState.Loading, awaitItem())
+                val success = awaitItem() as WorkOrderDetailUiState.Success
+                assertEquals(listOf("P-1"), success.poleReferences.map { it.poleId })
+                assertEquals(1, success.poleMeasurements.size)
+            }
+        }
+
+    @Test
+    fun `a pole_gps_update order refreshes poles from the server before reading pole references`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val poleListRepository = mockk<PoleListRepository>()
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            val vm =
+                viewModel(
+                    detail = poleGpsDetail(),
+                    poleGpsRepository = poleGpsRepository,
+                    poleListRepository = poleListRepository,
+                )
+
+            vm.uiState.test {
+                awaitItem()
+                awaitItem()
+            }
+
+            coVerify { poleListRepository.poles(WORK_ORDER_ID) }
+        }
+
+    @Test
+    fun `a repair order never refreshes the pole list`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>(relaxed = true)
+            val vm = viewModel(detail = repairDetail(), poleListRepository = poleListRepository)
+
+            vm.uiState.test {
+                awaitItem()
+                awaitItem()
+            }
+
+            coVerify(exactly = 0) { poleListRepository.poles(any()) }
+        }
+
+    @Test
+    fun `canSubmit for pole_gps_update needs a valid note and at least 1 measured pole`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm = viewModel(detail = poleGpsDetail(), poleGpsRepository = poleGpsRepository)
+
+            vm.uiState.test {
+                awaitItem()
+                val empty = awaitItem() as WorkOrderDetailUiState.Success
+                assertFalse(empty.canSubmit())
+            }
+        }
+
+    @Test
+    fun `canSubmit for pole_gps_update is true with partial reporting, a single measured pole is enough`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val measurement =
+                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm =
+                viewModel(detail = poleGpsDetail(poleIds = listOf("P-1", "P-2")), poleGpsRepository = poleGpsRepository)
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as WorkOrderDetailUiState.Success
+                val valid = success.copy(reportNote = "Đã đo xong 1/2 cột đèn")
+                assertTrue(valid.canSubmit())
+            }
+        }
+
+    @Test
+    fun `retryAttachment delegates to the pole GPS repository with this work order and attachment id`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm = viewModel(detail = poleGpsDetail(), poleGpsRepository = poleGpsRepository)
+
+            vm.retryAttachment("A-1")
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify { poleGpsRepository.retryAttachment(WORK_ORDER_ID, "A-1") }
         }
 }

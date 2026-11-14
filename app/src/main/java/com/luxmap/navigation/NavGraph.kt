@@ -62,6 +62,8 @@ import com.luxmap.feature.survey.ui.polephoto.PolePhotoResultRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
 import com.luxmap.feature.survey.ui.submit.SubmitScreen
+import com.luxmap.feature.workorder.polegps.ui.measure.PoleGpsMeasureRoute
+import com.luxmap.feature.workorder.polegps.ui.pdf.PoleGpsPdfViewerRoute
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 import kotlinx.coroutines.delay
@@ -185,13 +187,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     items = bottomNavItems,
                     currentRoute = currentRoute,
                     onItemSelected = { item ->
-                        // Map is the root of the main area (Login is removed from the back stack
+                        // Home is the root of the main area (Login is removed from the back stack
                         // after sign-in), so each tab keeps its own state when you come back.
                         if (item.route != currentRoute) {
                             val target =
                                 if (item.route == Routes.Survey.route) Routes.Survey.createRoute() else item.route
                             navController.navigate(target) {
-                                popUpTo(Routes.Map.route) { saveState = true }
+                                popUpTo(Routes.Home.route) { saveState = true }
                                 launchSingleTop = true
                                 restoreState = true
                             }
@@ -215,7 +217,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             composable(Routes.Login.route) {
                 LoginScreen(
                     onLoginSuccess = {
-                        navController.navigate(Routes.Map.route) {
+                        navController.navigate(Routes.Home.route) {
                             popUpTo(Routes.Login.route) { inclusive = true }
                         }
                     },
@@ -542,6 +544,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onStartSurvey = {
                         navController.navigate(Routes.Survey.createRoute(workOrderId))
                     },
+                    onOpenPdf = { attachmentId ->
+                        navController.navigate(Routes.PoleGpsPdfViewer.createRoute(workOrderId, attachmentId))
+                    },
+                    onMeasurePole = { poleId ->
+                        navController.navigate(Routes.PoleGpsMeasure.createRoute(workOrderId, poleId))
+                    },
                 )
             }
             composable(
@@ -549,6 +557,26 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
             ) {
                 EvidenceCaptureRoute(onDone = { navController.popBackStack() })
+            }
+            composable(
+                route = Routes.PoleGpsMeasure.route,
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("poleId") { type = NavType.StringType },
+                    ),
+            ) {
+                PoleGpsMeasureRoute(onBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Routes.PoleGpsPdfViewer.route,
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("attachmentId") { type = NavType.StringType },
+                    ),
+            ) {
+                PoleGpsPdfViewerRoute(onBack = { navController.popBackStack() })
             }
         }
     }

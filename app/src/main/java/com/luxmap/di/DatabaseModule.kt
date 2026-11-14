@@ -3,6 +3,7 @@ package com.luxmap.di
 import android.content.Context
 import androidx.room.Room
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.database.MIGRATION_16_17
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.assetimport.data.dao.AssetImportDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
@@ -10,6 +11,7 @@ import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
+import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,6 +33,7 @@ object DatabaseModule {
             // task in this plan (this task adds v1's tables, Task 13 bumps to v2) — destructive
             // migration is acceptable pre-release. Revisit before the app ships to a real device
             // with data worth preserving across an update.
+            .addMigrations(MIGRATION_16_17)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -64,4 +67,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideAssetImportDao(db: AppDatabase): AssetImportDao = db.assetImportDao()
+
+    @Provides
+    @Singleton
+    fun providePoleGpsDao(db: AppDatabase): PoleGpsDao = db.poleGpsDao()
 }

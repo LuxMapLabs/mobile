@@ -37,4 +37,24 @@ class WorkOrderTaskKindTest {
         assertEquals(WorkOrderStatus.IN_PROGRESS.badgeColors(), WorkOrderTaskKind.REPAIR.badgeColors())
         assertEquals(WorkOrderStatus.DONE.badgeColors(), WorkOrderTaskKind.SURVEY.badgeColors())
     }
+
+    @Test
+    fun `wire value maps to POLE_GPS_UPDATE`() {
+        assertEquals(WorkOrderTaskKind.POLE_GPS_UPDATE, workOrderTaskKindFromWire("pole_gps_update"))
+    }
+
+    @Test
+    fun `unknown wire value still falls back to INSPECTION`() {
+        assertEquals(WorkOrderTaskKind.INSPECTION, workOrderTaskKindFromWire("something_new"))
+    }
+
+    @Test
+    fun `label is the Vietnamese pole GPS name`() {
+        assertEquals("Cập nhật GPS cột", WorkOrderTaskKind.POLE_GPS_UPDATE.label())
+    }
+
+    @Test
+    fun `badge uses the verified status palette`() {
+        assertEquals(WorkOrderStatus.VERIFIED.badgeColors(), WorkOrderTaskKind.POLE_GPS_UPDATE.badgeColors())
+    }
 }
