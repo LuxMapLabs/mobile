@@ -1,5 +1,7 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
@@ -149,7 +152,9 @@ import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import java.util.Locale
@@ -1391,6 +1396,30 @@ private fun PoleGpsOverviewSection(
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingDownload by remember {
+        mutableStateOf<com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment?>(null)
+    }
+    val saveLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+            val localPath = pendingDownload?.localPath
+            pendingDownload = null
+            if (uri != null && localPath != null) {
+                scope.launch {
+                    val saved =
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                context.contentResolver.openOutputStream(uri)?.use { output ->
+                                    File(localPath).inputStream().use { it.copyTo(output) }
+                                }
+                            }.isSuccess
+                        }
+                    val message = if (saved) "Đã lưu file vào thiết bị" else "Không lưu được file"
+                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         CompletionSectionHeader(
             icon = Icons.Filled.StickyNote2,
@@ -1404,6 +1433,10 @@ private fun PoleGpsOverviewSection(
                     attachment = attachment,
                     onOpen = { onOpenPdf(attachment.attachmentId) },
                     onRetry = { onRetryAttachment(attachment.attachmentId) },
+                    onDownload = {
+                        pendingDownload = attachment
+                        saveLauncher.launch(attachment.fileName)
+                    },
                 )
             }
         }
@@ -1433,14 +1466,14 @@ private fun PdfAttachmentRow(
     attachment: com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
+    onDownload: () -> Unit,
 ) {
-    val (label, canTap, onTap) =
+    val (canTap, onTap) =
         when (attachment.status) {
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> Triple("Sẵn sàng", true, onOpen)
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED ->
-                Triple("Lỗi · Nhấn để thử lại", true, onRetry)
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> Triple("Đang tải", false) {}
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> Triple("Chờ tải", false) {}
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> true to onOpen
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED -> true to onRetry
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> false to {}
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> false to {}
         }
     Row(
         modifier =
@@ -1460,7 +1493,15 @@ private fun PdfAttachmentRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(text = attachment.fileName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (attachment.status == com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY) {
+            IconButton(onClick = onDownload) {
+                Icon(
+                    imageVector = Icons.Filled.Download,
+                    contentDescription = "Tải file ${attachment.fileName} về máy",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
