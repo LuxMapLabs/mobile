@@ -2,8 +2,6 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luxmap.core.network.ConnectivityObserver
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.assetimport.data.AssetImportRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
@@ -20,28 +18,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-internal const val SHOW_UNCONFIRMED_HUB_CARDS = false
-
-private val FAKE_REJECTED_SWEEPS =
-    listOf(
-        LocalRejectedSweep(
-            surveySweepId = "SWEEP-2030",
-            rejectionReason = "Video bị rung mạnh ở đoạn đầu, không đọc được cột đèn",
-            rejectedByName = "Kỹ sư bảo trì Trần Văn A",
-        ),
-    )
-
-private val FAKE_PENDING_AI_CONFIRMATION =
-    listOf(
-        LocalPendingAiConfirmation(surveySweepId = "SWEEP-2029", normalCount = 11, dimCount = 2, outCount = 1),
-    )
-
 @HiltViewModel
 class SurveyHubViewModel
     @Inject
     constructor(
         private val repository: SurveyRepository,
-        private val connectivityObserver: ConnectivityObserver,
         private val completionRepository: WorkOrderCompletionRepository,
         private val assetImportRepository: AssetImportRepository,
     ) : ViewModel() {
@@ -59,9 +40,9 @@ class SurveyHubViewModel
         val startedImportTrip: SharedFlow<String> = _startedImportTrip.asSharedFlow()
 
         // Not part of the combine() below on purpose - that flow rebuilds Success from scratch
-        // on every emission (routes, uploads, connectivity), which would otherwise wipe this
-        // session-only marker on an unrelated reload (see SurveyHubUiState's own note on why
-        // this cannot come from the server for list items).
+        // on every emission, which would otherwise wipe this session-only marker on an unrelated
+        // reload (see SurveyHubUiState's own note on why this cannot come from the server for
+        // list items).
         private var cancelledWorkOrderIds: Set<String> = emptySet()
 
         init {
@@ -152,25 +133,12 @@ class SurveyHubViewModel
                             .combine(repository.observeAssignedPoleGpsOrders()) { routes, poleGpsOrders ->
                                 routes to poleGpsOrders
                             },
-                        repository.observeUploadingSessions(),
-                        connectivityObserver.isOnline,
                         completionRepository.observeCompletedWorkOrderIds(),
                         assetImportRepository.observeAssignedAreas(),
-                    ) { routesAndPoleGpsOrders, queuedSessions, isOnline, locallyCompletedWorkOrderIds, importAreas ->
+                    ) { routesAndPoleGpsOrders, locallyCompletedWorkOrderIds, importAreas ->
                         val (routesResult, poleGpsOrders) = routesAndPoleGpsOrders
-                        val uploading =
-                            queuedSessions.map { session ->
-                                UploadingSurveySession(
-                                    sessionId = session.sessionId,
-                                    surveySweepId = session.surveySweepId,
-                                    syncStatus = if (isOnline) SyncStatus.QUEUED_ONLINE else SyncStatus.QUEUED_OFFLINE,
-                                )
-                            }
-                        val rejected = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_REJECTED_SWEEPS else emptyList()
-                        val pending = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_PENDING_AI_CONFIRMATION else emptyList()
                         val hasNothing =
-                            routesResult.routes.isEmpty() && poleGpsOrders.isEmpty() && uploading.isEmpty() &&
-                                rejected.isEmpty() && pending.isEmpty() && importAreas.isEmpty()
+                            routesResult.routes.isEmpty() && poleGpsOrders.isEmpty() && importAreas.isEmpty()
                         if (hasNothing) {
                             SurveyHubUiState.Empty
                         } else {
@@ -178,9 +146,6 @@ class SurveyHubViewModel
                                 assignedRoutes = routesResult.routes,
                                 assignedPoleGpsOrders = poleGpsOrders,
                                 assignedImportAreas = importAreas,
-                                uploadingSessions = uploading,
-                                rejectedSweeps = rejected,
-                                pendingAiConfirmation = pending,
                                 isStale = routesResult.isStale,
                                 cancelledWorkOrderIds = cancelledWorkOrderIds,
                                 locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,

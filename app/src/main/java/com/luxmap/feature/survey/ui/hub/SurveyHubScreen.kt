@@ -64,7 +64,6 @@ import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
-import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -77,7 +76,6 @@ import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
@@ -91,7 +89,6 @@ import java.util.Locale
 @Composable
 fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
@@ -146,7 +143,6 @@ fun SurveyHubRoute(
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
                 onStartRoute = viewModel::onStartRoute,
-                onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
                 onOpenPoleLocationList = onOpenPoleLocationList,
@@ -164,8 +160,6 @@ fun SurveyHubScreen(
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onStartRoute: (workOrderId: String) -> Unit = {},
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
-    onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
@@ -188,8 +182,6 @@ fun SurveyHubScreen(
                             state = state,
                             onCapturePolePhotos = onCapturePolePhotos,
                             onStartRoute = onStartRoute,
-                            onReviewAiConfirmation = onReviewAiConfirmation,
-                            onResurvey = onResurvey,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
@@ -350,18 +342,12 @@ private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
     onStartRoute: (workOrderId: String) -> Unit,
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit,
-    onResurvey: (surveySweepId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
-    val hasAttentionCards =
-        state.rejectedSweeps.isNotEmpty() ||
-            state.pendingAiConfirmation.isNotEmpty() ||
-            state.uploadingSessions.isNotEmpty()
     val listState = rememberLazyListState()
     val visibleRoutes = state.assignedRoutes.filterNot { it.workOrderId in state.locallyCompletedWorkOrderIds }
     val inProgressRoutes =
@@ -376,9 +362,6 @@ private fun SurveyHubContent(
         if (state.isStale) index++
         if (state.startError != null) index++
         index++
-        if (hasAttentionCards) {
-            index += 1 + state.rejectedSweeps.size + state.pendingAiConfirmation.size + state.uploadingSessions.size
-        }
         val inProgressHeaderOffset = if (inProgressRoutes.isNotEmpty()) 1 + inProgressRoutes.size else 0
         index +=
             if (highlighted in inProgressRoutes) {
@@ -411,22 +394,6 @@ private fun SurveyHubContent(
         }
         items(state.assignedPoleGpsOrders) { order ->
             PoleGpsUpdateOrderCard(order, onClick = { onOpenWorkOrderDetail(order.workOrderId) })
-        }
-        if (hasAttentionCards) {
-            item {
-                Text(
-                    text = "CẦN BẠN XỬ LÝ",
-                    style = OverlineTextStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            items(state.rejectedSweeps) { rejected ->
-                RejectedSweepCard(rejected, onResurvey = { onResurvey(rejected.surveySweepId) })
-            }
-            items(state.pendingAiConfirmation) { pending ->
-                AiPendingCard(pending, onReview = { onReviewAiConfirmation(pending.surveySweepId) })
-            }
-            items(state.uploadingSessions) { session -> UploadingSessionRow(session) }
         }
         listOf("Đang thực hiện" to inProgressRoutes, "Chưa bắt đầu" to todoRoutes).forEach { (title, routes) ->
             if (routes.isNotEmpty()) {
@@ -570,92 +537,6 @@ private fun PoleLocationEntryCard(onClick: () -> Unit) {
             )
         }
         Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null)
-    }
-}
-
-@Composable
-private fun RejectedSweepCard(
-    sweep: LocalRejectedSweep,
-    onResurvey: () -> Unit,
-) {
-    val colors = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme())
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, colors.background, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(text = "BỊ TỪ CHỐI · ${sweep.surveySweepId}", style = OverlineTextStyle, color = colors.text)
-        Text(
-            text = sweep.rejectionReason,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "Bởi ${sweep.rejectedByName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        PrimaryButton(text = "Khảo sát lại", onClick = onResurvey, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable
-private fun AiPendingCard(
-    pending: LocalPendingAiConfirmation,
-    onReview: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = "CHỜ XÁC NHẬN AI · ${pending.surveySweepId}",
-            style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StatusBadge(
-                text = "${AssetCondition.NORMAL.label()} ${pending.normalCount}",
-                colors = AssetCondition.NORMAL.badgeColors(isDark = isDark),
-            )
-            StatusBadge(
-                text = "${AssetCondition.DIM.label()} ${pending.dimCount}",
-                colors = AssetCondition.DIM.badgeColors(isDark = isDark),
-            )
-            StatusBadge(
-                text = "${AssetCondition.OUT.label()} ${pending.outCount}",
-                colors = AssetCondition.OUT.badgeColors(isDark = isDark),
-            )
-        }
-        PrimaryButton(text = "Xem & xác nhận", onClick = onReview, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable
-private fun UploadingSessionRow(session: UploadingSurveySession) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(
-            text = "Chờ tải lên · ${session.surveySweepId}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        StatusBadge(text = session.syncStatus.label(), colors = session.syncStatus.badgeColors())
     }
 }
 
