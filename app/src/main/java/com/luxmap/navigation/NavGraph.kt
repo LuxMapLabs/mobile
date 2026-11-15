@@ -51,11 +51,7 @@ import com.luxmap.feature.notification.ui.NotificationListRoute
 import com.luxmap.feature.polelocation.ui.capture.PoleLocationCaptureRoute
 import com.luxmap.feature.polelocation.ui.list.PoleLocationListRoute
 import com.luxmap.feature.profile.ui.ProfileRoute
-import com.luxmap.feature.survey.ui.aiconfirm.AiConfirmationRoute
-import com.luxmap.feature.survey.ui.capture.CaptureScreen
-import com.luxmap.feature.survey.ui.coverage.CoverageScreen
 import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
-import com.luxmap.feature.survey.ui.plan.SurveyPlanScreen
 import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleListViewModel
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
@@ -63,14 +59,12 @@ import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureSource
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoResultRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
-import com.luxmap.feature.survey.ui.submit.SubmitScreen
 import com.luxmap.feature.workorder.polegps.ui.measure.PoleGpsMeasureRoute
 import com.luxmap.feature.workorder.polegps.ui.pdf.PoleGpsPdfViewerRoute
 import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import java.util.UUID
 
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
@@ -244,9 +238,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             ) { backStackEntry ->
                 SurveyHubRoute(
                     highlightWorkOrderId = backStackEntry.arguments?.getString("highlightWorkOrderId"),
-                    onReviewAiConfirmation = { surveySweepId ->
-                        navController.navigate(Routes.AiConfirmation.createRoute(surveySweepId))
-                    },
                     onCapturePolePhotos = { workOrderId ->
                         navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
                     },
@@ -424,101 +415,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 PoleLocationCaptureRoute(
                     onDone = { navController.popBackStack() },
                     onBack = { navController.popBackStack() },
-                )
-            }
-            composable(
-                route = Routes.AiConfirmation.route,
-                arguments = listOf(navArgument("surveySweepId") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
-                AiConfirmationRoute(surveySweepId = surveySweepId, onBack = { navController.popBackStack() })
-            }
-            composable(
-                route = Routes.SurveyPlan.route,
-                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val planWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
-                SurveyPlanScreen(
-                    onBack = { navController.popBackStack() },
-                    onEnterCaptureMode = {
-                        // The sweep doesn't exist server-side yet (POST /sweeps isn't wired into
-                        // the upload flow - tracked separately in docs/contract-drift.md), so this
-                        // id is only a local Room session key, same as the old F09 shortcut used.
-                        navController.navigate(
-                            Routes.SurveyCapture.createRoute(
-                                workOrderId = planWorkOrderId,
-                                surveySweepId = UUID.randomUUID().toString(),
-                            ),
-                        )
-                    },
-                )
-            }
-            composable(
-                route = Routes.SurveyCapture.route,
-                arguments =
-                    listOf(
-                        navArgument("surveySweepId") { type = NavType.StringType },
-                        navArgument("workOrderId") {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                    ),
-            ) { backStackEntry ->
-                val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: ""
-                val surveySweepId = backStackEntry.arguments?.getString("surveySweepId") ?: return@composable
-                CaptureScreen(
-                    surveySweepId = surveySweepId,
-                    workOrderId = workOrderId,
-                    onClose = { navController.popBackStack() },
-                    onSessionPackaged = { sessionId ->
-                        navController.navigate(Routes.SurveyReview.createRoute(sessionId)) {
-                            popUpTo(Routes.Survey.route)
-                        }
-                    },
-                )
-            }
-            composable(
-                route = Routes.SurveyReview.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-                CoverageScreen(
-                    sessionId = sessionId,
-                    onApprove = { approvedSessionId ->
-                        navController.navigate(Routes.SurveySubmit.createRoute(approvedSessionId)) {
-                            popUpTo(Routes.Survey.route)
-                        }
-                    },
-                    // "Redo" re-enters capture for a session that already exists in Room with a
-                    // real workOrderId - CoverageScreen only passes surveySweepId today, so this
-                    // path cannot forward the real value without changing CoverageScreen's own
-                    // callback shape, which is out of scope here (F05 review flow, see the design
-                    // spec's non-goals). SurveyCaptureService only uses workOrderId at session
-                    // CREATION (Task 1/2 of this plan) - redo starts a brand new local session via
-                    // CaptureViewModel, so this empty value is a real gap, not a cosmetic one: a
-                    // session started via "redo" will not be upload-able until this is fixed.
-                    // Tracked in docs/contract-drift.md, not silently left unflagged.
-                    onRedo = { surveySweepId ->
-                        navController.navigate(
-                            Routes.SurveyCapture.createRoute(workOrderId = "", surveySweepId = surveySweepId),
-                        ) {
-                            popUpTo(Routes.Survey.route)
-                        }
-                    },
-                )
-            }
-            composable(
-                route = Routes.SurveySubmit.route,
-                arguments = listOf(navArgument("sessionId") { type = NavType.StringType }),
-            ) { backStackEntry ->
-                val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-                SubmitScreen(
-                    sessionId = sessionId,
-                    onBackToSurveyHub = {
-                        navController.navigate(Routes.Survey.createRoute()) {
-                            popUpTo(Routes.Survey.route) { inclusive = true }
-                        }
-                    },
                 )
             }
             composable(Routes.Map.route) {

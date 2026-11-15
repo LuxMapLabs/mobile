@@ -20,42 +20,6 @@ sealed interface Routes {
             if (highlightWorkOrderId != null) "survey?highlightWorkOrderId=$highlightWorkOrderId" else "survey"
     }
 
-    data object SurveyCapture : Routes {
-        // workOrderId is a query param, not a required path segment, because some entry points
-        // (F03 standalone plan, F05 redo) have no work order to pass yet - a required path
-        // segment with an empty value does not match the route pattern and crashes navigate().
-        override val route = "survey/capture/{surveySweepId}?workOrderId={workOrderId}"
-
-        fun createRoute(
-            workOrderId: String,
-            surveySweepId: String,
-        ) = "survey/capture/$surveySweepId?workOrderId=$workOrderId"
-    }
-
-    data object SurveyPlan : Routes {
-        override val route = "survey/plan/{workOrderId}"
-
-        fun createRoute(workOrderId: String) = "survey/plan/$workOrderId"
-    }
-
-    data object SurveyReview : Routes {
-        override val route = "survey/review/{sessionId}"
-
-        fun createRoute(sessionId: String) = "survey/review/$sessionId"
-    }
-
-    data object SurveySubmit : Routes {
-        override val route = "survey/submit/{sessionId}"
-
-        fun createRoute(sessionId: String) = "survey/submit/$sessionId"
-    }
-
-    data object AiConfirmation : Routes {
-        override val route = "survey/ai-confirmation/{surveySweepId}"
-
-        fun createRoute(surveySweepId: String) = "survey/ai-confirmation/$surveySweepId"
-    }
-
     data object PolePhotoList : Routes {
         override val route = "survey/pole-photos/{workOrderId}"
 
