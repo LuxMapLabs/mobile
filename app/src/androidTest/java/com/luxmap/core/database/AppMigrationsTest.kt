@@ -174,3 +174,68 @@ class AppMigrations17To18Test {
         }
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class AppMigrations18To19Test {
+    private lateinit var db: SupportSQLiteDatabase
+
+    @Before
+    fun openVersion18() {
+        val config =
+            SupportSQLiteOpenHelper.Configuration
+                .builder(ApplicationProvider.getApplicationContext())
+                .name(null)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(18) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "CREATE TABLE sync_queue (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                                    "clientOpId TEXT NOT NULL, opType TEXT NOT NULL, payloadJson TEXT NOT NULL, " +
+                                    "dependsOnClientOpId TEXT, status TEXT NOT NULL, attemptCount INTEGER NOT NULL, " +
+                                    "lastError TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)",
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    },
+                ).build()
+        db = FrameworkSQLiteOpenHelperFactory().create(config).writableDatabase
+        db.execSQL(
+            "INSERT INTO sync_queue (clientOpId, opType, payloadJson, dependsOnClientOpId, status, " +
+                "attemptCount, lastError, createdAt, updatedAt) " +
+                "VALUES ('OP-1', 'update_pole_location', '{}', NULL, 'queued', 0, NULL, 1, 1)",
+        )
+        MIGRATION_18_19.migrate(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    @Test
+    fun unsent_sync_queue_rows_survive() {
+        db.query("SELECT clientOpId, status FROM sync_queue").use {
+            assertEquals(1, it.count)
+            it.moveToFirst()
+            assertEquals("OP-1", it.getString(0))
+            assertEquals("queued", it.getString(1))
+        }
+    }
+
+    @Test
+    fun the_new_table_accepts_a_row() {
+        db.execSQL(
+            "INSERT INTO local_pole_location_update (poleId, photoFilePath, lat, lng, capturedAt, status, " +
+                "clientOpId) VALUES ('POLE-1', '/f/a.jpg', 10.0, 106.0, 1000, 'pending', 'OP-2')",
+        )
+        db.query("SELECT lat, lng, status FROM local_pole_location_update WHERE poleId = 'POLE-1'").use {
+            it.moveToFirst()
+            assertEquals(10.0, it.getDouble(0), 0.0)
+            assertEquals(106.0, it.getDouble(1), 0.0)
+            assertEquals("pending", it.getString(2))
+        }
+    }
+}
