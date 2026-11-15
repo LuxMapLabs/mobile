@@ -28,6 +28,7 @@ sealed interface SurveyHubUiState {
 
     data class Success(
         val assignedRoutes: List<AssignedSurveyRoute>,
+        val assignedPoleGpsOrders: List<AssignedSurveyRoute> = emptyList(),
         val assignedImportAreas: List<AssignedImportArea> = emptyList(),
         val uploadingSessions: List<UploadingSurveySession> = emptyList(),
         val rejectedSweeps: List<LocalRejectedSweep> = emptyList(),

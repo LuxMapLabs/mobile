@@ -148,12 +148,16 @@ class SurveyHubViewModel
             loadJob =
                 viewModelScope.launch {
                     combine(
-                        repository.observeAssignedRoutes(),
+                        repository.observeAssignedRoutes()
+                            .combine(repository.observeAssignedPoleGpsOrders()) { routes, poleGpsOrders ->
+                                routes to poleGpsOrders
+                            },
                         repository.observeUploadingSessions(),
                         connectivityObserver.isOnline,
                         completionRepository.observeCompletedWorkOrderIds(),
                         assetImportRepository.observeAssignedAreas(),
-                    ) { routesResult, queuedSessions, isOnline, locallyCompletedWorkOrderIds, importAreas ->
+                    ) { routesAndPoleGpsOrders, queuedSessions, isOnline, locallyCompletedWorkOrderIds, importAreas ->
+                        val (routesResult, poleGpsOrders) = routesAndPoleGpsOrders
                         val uploading =
                             queuedSessions.map { session ->
                                 UploadingSurveySession(
@@ -165,13 +169,14 @@ class SurveyHubViewModel
                         val rejected = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_REJECTED_SWEEPS else emptyList()
                         val pending = if (SHOW_UNCONFIRMED_HUB_CARDS) FAKE_PENDING_AI_CONFIRMATION else emptyList()
                         val hasNothing =
-                            routesResult.routes.isEmpty() && uploading.isEmpty() &&
+                            routesResult.routes.isEmpty() && poleGpsOrders.isEmpty() && uploading.isEmpty() &&
                                 rejected.isEmpty() && pending.isEmpty() && importAreas.isEmpty()
                         if (hasNothing) {
                             SurveyHubUiState.Empty
                         } else {
                             SurveyHubUiState.Success(
                                 assignedRoutes = routesResult.routes,
+                                assignedPoleGpsOrders = poleGpsOrders,
                                 assignedImportAreas = importAreas,
                                 uploadingSessions = uploading,
                                 rejectedSweeps = rejected,
