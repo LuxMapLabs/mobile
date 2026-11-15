@@ -605,6 +605,25 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
+    fun `canSubmit for pole_gps_update is false with a measured pole but no report note`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val measurement =
+                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            val vm = viewModel(detail = poleGpsDetail(poleIds = listOf("P-1")), poleGpsRepository = poleGpsRepository)
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as WorkOrderDetailUiState.Success
+                assertEquals("", success.reportNote)
+                assertFalse(success.canSubmit())
+            }
+        }
+
+    @Test
     fun `retryAttachment delegates to the pole GPS repository with this work order and attachment id`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)

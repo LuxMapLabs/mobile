@@ -1,5 +1,7 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
@@ -149,7 +152,9 @@ import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import java.util.Locale
@@ -758,6 +763,7 @@ private fun WorkOrderDetailContent(
             } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
                 PoleGpsOverviewSection(
                     state = state,
+                    canCapture = canComplete && !isFormLocked,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -880,7 +886,12 @@ private fun WorkOrderHeroSection(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Text(
-                    text = "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi")),
+                    text =
+                        if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
+                            detail.workOrderId.uppercase(Locale.forLanguageTag("vi"))
+                        } else {
+                            "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi"))
+                        },
                     style = HeroMetadataTextStyle,
                     color = Color(0xFF9FB6D6),
                     maxLines = 1,
@@ -1385,10 +1396,35 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
 @Composable
 private fun PoleGpsOverviewSection(
     state: WorkOrderDetailUiState.Success,
+    canCapture: Boolean,
     onOpenPdf: (String) -> Unit,
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var pendingDownload by remember {
+        mutableStateOf<com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment?>(null)
+    }
+    val saveLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+            val localPath = pendingDownload?.localPath
+            pendingDownload = null
+            if (uri != null && localPath != null) {
+                scope.launch {
+                    val saved =
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                context.contentResolver.openOutputStream(uri)?.use { output ->
+                                    File(localPath).inputStream().use { it.copyTo(output) }
+                                }
+                            }.isSuccess
+                        }
+                    val message = if (saved) "Đã lưu file vào thiết bị" else "Không lưu được file"
+                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         CompletionSectionHeader(
             icon = Icons.Filled.StickyNote2,
@@ -1402,6 +1438,10 @@ private fun PoleGpsOverviewSection(
                     attachment = attachment,
                     onOpen = { onOpenPdf(attachment.attachmentId) },
                     onRetry = { onRetryAttachment(attachment.attachmentId) },
+                    onDownload = {
+                        pendingDownload = attachment
+                        saveLauncher.launch(attachment.fileName)
+                    },
                 )
             }
         }
@@ -1418,6 +1458,7 @@ private fun PoleGpsOverviewSection(
                 PoleGpsRow(
                     reference = reference,
                     measurement = state.poleMeasurements.firstOrNull { it.poleId == reference.poleId },
+                    enabled = canCapture,
                     onClick = { onMeasurePole(reference.poleId) },
                 )
             }
@@ -1430,14 +1471,14 @@ private fun PdfAttachmentRow(
     attachment: com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
+    onDownload: () -> Unit,
 ) {
-    val (label, canTap, onTap) =
+    val (canTap, onTap) =
         when (attachment.status) {
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> Triple("Sẵn sàng", true, onOpen)
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED ->
-                Triple("Lỗi · Nhấn để thử lại", true, onRetry)
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> Triple("Đang tải", false) {}
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> Triple("Chờ tải", false) {}
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> true to onOpen
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED -> true to onRetry
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> false to {}
+            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> false to {}
         }
     Row(
         modifier =
@@ -1457,7 +1498,15 @@ private fun PdfAttachmentRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(text = attachment.fileName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (attachment.status == com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY) {
+            IconButton(onClick = onDownload) {
+                Icon(
+                    imageVector = Icons.Filled.Download,
+                    contentDescription = "Tải file ${attachment.fileName} về máy",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -1465,6 +1514,7 @@ private fun PdfAttachmentRow(
 private fun PoleGpsRow(
     reference: com.luxmap.feature.workorder.polegps.data.PoleReference,
     measurement: com.luxmap.feature.workorder.polegps.data.PoleMeasurement?,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val oldPosition =
@@ -1480,7 +1530,7 @@ private fun PoleGpsRow(
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
                 .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .clickable(onClick = onClick)
+                .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -1493,13 +1543,14 @@ private fun PoleGpsRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (measurement != null) {
-            StatusBadge(
-                text = "±${"%.1f".format(measurement.accuracyM)} m",
-                colors = WorkOrderStatus.VERIFIED.badgeColors(),
-            )
-        } else {
-            StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
+        // No minimum-accuracy warning here: WorkOrderService.cs's Report() only validates
+        // lat in [-90, 90], lng in [-180, 180] and accuracy_m >= 0 and finite - there is no
+        // BE-enforced "good enough" threshold to warn against (the 8m figure removed from here
+        // belonged to the now-deleted continuous-video-survey flow, a different feature).
+        when {
+            measurement != null -> StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
+            !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
+            else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
         }
     }
 }

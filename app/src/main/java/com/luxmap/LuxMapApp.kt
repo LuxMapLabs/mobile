@@ -7,7 +7,6 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.luxmap.core.map.initMapLibre
 import com.luxmap.core.sync.SyncScheduler
-import com.luxmap.feature.survey.capture.SurveySessionRecoveryUseCase
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,8 +16,6 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class LuxMapApp : Application(), Configuration.Provider, ImageLoaderFactory {
-    @Inject lateinit var surveySessionRecoveryUseCase: SurveySessionRecoveryUseCase
-
     @Inject lateinit var workerFactory: HiltWorkerFactory
 
     @Inject lateinit var syncScheduler: SyncScheduler
@@ -32,7 +29,6 @@ class LuxMapApp : Application(), Configuration.Provider, ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         initMapLibre(this)
-        CoroutineScope(Dispatchers.Default).launch { surveySessionRecoveryUseCase.recoverAny() }
         CoroutineScope(Dispatchers.Default).launch { syncScheduler.schedulePeriodicSync() }
     }
 

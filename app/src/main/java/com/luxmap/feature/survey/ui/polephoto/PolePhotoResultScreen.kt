@@ -187,7 +187,11 @@ fun PolePhotoResultScreen(
         }
         TopSlideToast(
             state = toastState,
-            modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         )
     }
 }
@@ -396,12 +400,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
                     )
                 }
                 Text(
-                    text =
-                        when (band) {
-                            ConfidenceBand.HIGH -> confidenceText
-                            ConfidenceBand.MEDIUM -> "$confidenceText · nên xem lại ảnh"
-                            ConfidenceBand.LOW -> "$confidenceText · cần bạn xác nhận lại"
-                        },
+                    text = confidenceText,
                     style = MaterialTheme.typography.labelLarge,
                     color = bandColors.text,
                 )
@@ -660,7 +659,7 @@ private fun PolePhotoPreview(
             AsyncImage(
                 model = File(state.filePath),
                 contentDescription = "Ảnh cột đèn đã chụp",
-                contentScale = ContentScale.Fit,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
         }

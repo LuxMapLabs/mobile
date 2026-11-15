@@ -71,8 +71,8 @@ class LuxSensorBleClient
         private var userInitiatedDisconnect = false
 
         // sample_no/module_epoch must be scoped to one RECORDING SESSION, not one BLE connection
-        // (review feedback, 2026-10-08): CaptureViewModel connects BLE as soon as the screen opens,
-        // well before a session starts, and an in-session reconnect (spec §11 - a BLE drop must not
+        // (review feedback, 2026-10-08): a caller connects BLE as soon as its screen opens, well
+        // before a session starts, and an in-session reconnect (spec §11 - a BLE drop must not
         // stop recording) must not restart the counters mid-file either. One long-lived codec
         // survives connect()/reconnect(); only resetSampleCounters() (called once at session start)
         // resets it.
@@ -88,10 +88,10 @@ class LuxSensorBleClient
             }
         }
 
-        // Called once by SurveyCaptureService at the start of a recording session - never by
-        // connect(), which would reset the counters on every BLE reconnect instead of once per
-        // session. Takes the same lock as the read loop's decode() call so a reset can never
-        // interleave with an in-flight decode and corrupt LuxPacketCodec's internal counters.
+        // Called once at the start of a recording session - never by connect(), which would reset
+        // the counters on every BLE reconnect instead of once per session. Takes the same lock as
+        // the read loop's decode() call so a reset can never interleave with an in-flight decode
+        // and corrupt LuxPacketCodec's internal counters.
         fun resetSampleCounters() {
             synchronized(lock) { codec.reset() }
         }

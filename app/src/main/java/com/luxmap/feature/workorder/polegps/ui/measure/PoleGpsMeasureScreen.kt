@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -173,7 +174,10 @@ private fun PhotoPreview(
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+    Column(
+        modifier = Modifier.fillMaxSize().statusBarsPadding().padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
         AsyncImage(
             model = file,
             contentDescription = "Ảnh cột đèn vừa chụp",

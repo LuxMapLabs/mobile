@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +23,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -60,7 +64,6 @@ import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
-import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -73,7 +76,6 @@ import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
@@ -87,8 +89,9 @@ import java.util.Locale
 @Composable
 fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -140,9 +143,10 @@ fun SurveyHubRoute(
                 modifier = modifier,
                 onRetry = viewModel::onRetry,
                 onStartRoute = viewModel::onStartRoute,
-                onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
+                onOpenPoleLocationList = onOpenPoleLocationList,
+                onOpenWorkOrderDetail = onOpenWorkOrderDetail,
             )
         }
     }
@@ -156,10 +160,10 @@ fun SurveyHubScreen(
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
     onStartRoute: (workOrderId: String) -> Unit = {},
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
-    onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
@@ -178,11 +182,11 @@ fun SurveyHubScreen(
                             state = state,
                             onCapturePolePhotos = onCapturePolePhotos,
                             onStartRoute = onStartRoute,
-                            onReviewAiConfirmation = onReviewAiConfirmation,
-                            onResurvey = onResurvey,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
+                            onOpenPoleLocationList = onOpenPoleLocationList,
+                            onOpenWorkOrderDetail = onOpenWorkOrderDetail,
                         )
 
                     is SurveyHubUiState.Empty ->
@@ -338,16 +342,12 @@ private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
     onStartRoute: (workOrderId: String) -> Unit,
-    onReviewAiConfirmation: (surveySweepId: String) -> Unit,
-    onResurvey: (surveySweepId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
-    val hasAttentionCards =
-        state.rejectedSweeps.isNotEmpty() ||
-            state.pendingAiConfirmation.isNotEmpty() ||
-            state.uploadingSessions.isNotEmpty()
     val listState = rememberLazyListState()
     val visibleRoutes = state.assignedRoutes.filterNot { it.workOrderId in state.locallyCompletedWorkOrderIds }
     val inProgressRoutes =
@@ -361,9 +361,7 @@ private fun SurveyHubContent(
         var index = 0
         if (state.isStale) index++
         if (state.startError != null) index++
-        if (hasAttentionCards) {
-            index += 1 + state.rejectedSweeps.size + state.pendingAiConfirmation.size + state.uploadingSessions.size
-        }
+        index++
         val inProgressHeaderOffset = if (inProgressRoutes.isNotEmpty()) 1 + inProgressRoutes.size else 0
         index +=
             if (highlighted in inProgressRoutes) {
@@ -390,24 +388,12 @@ private fun SurveyHubContent(
         if (state.startError != null) {
             item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
+        item { PoleLocationEntryCard(onClick = onOpenPoleLocationList) }
         items(state.assignedImportAreas) { area ->
             AssignedImportAreaCard(area, onStartTrip = { onStartImportTrip(area.areaCode) })
         }
-        if (hasAttentionCards) {
-            item {
-                Text(
-                    text = "CẦN BẠN XỬ LÝ",
-                    style = OverlineTextStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            items(state.rejectedSweeps) { rejected ->
-                RejectedSweepCard(rejected, onResurvey = { onResurvey(rejected.surveySweepId) })
-            }
-            items(state.pendingAiConfirmation) { pending ->
-                AiPendingCard(pending, onReview = { onReviewAiConfirmation(pending.surveySweepId) })
-            }
-            items(state.uploadingSessions) { session -> UploadingSessionRow(session) }
+        items(state.assignedPoleGpsOrders) { order ->
+            PoleGpsUpdateOrderCard(order, onClick = { onOpenWorkOrderDetail(order.workOrderId) })
         }
         listOf("Đang thực hiện" to inProgressRoutes, "Chưa bắt đầu" to todoRoutes).forEach { (title, routes) ->
             if (routes.isNotEmpty()) {
@@ -488,88 +474,69 @@ private val ImportAreaTileBackground = Color(0xFFF1EEFB)
 private val ImportAreaTileForeground = Color(0xFF5B3FB4)
 
 @Composable
-private fun RejectedSweepCard(
-    sweep: LocalRejectedSweep,
-    onResurvey: () -> Unit,
+private fun PoleGpsUpdateOrderCard(
+    order: AssignedSurveyRoute,
+    onClick: () -> Unit,
 ) {
-    val colors = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme())
-    Column(
+    val status = workOrderStatusFromWire(order.woStatus)
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, colors.background, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onClick)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(text = "BỊ TỪ CHỐI · ${sweep.surveySweepId}", style = OverlineTextStyle, color = colors.text)
-        Text(
-            text = sweep.rejectionReason,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "Bởi ${sweep.rejectedByName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        PrimaryButton(text = "Khảo sát lại", onClick = onResurvey, modifier = Modifier.fillMaxWidth())
-    }
-}
-
-@Composable
-private fun AiPendingCard(
-    pending: LocalPendingAiConfirmation,
-    onReview: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = "CHỜ XÁC NHẬN AI · ${pending.surveySweepId}",
-            style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StatusBadge(
-                text = "${AssetCondition.NORMAL.label()} ${pending.normalCount}",
-                colors = AssetCondition.NORMAL.badgeColors(isDark = isDark),
-            )
-            StatusBadge(
-                text = "${AssetCondition.DIM.label()} ${pending.dimCount}",
-                colors = AssetCondition.DIM.badgeColors(isDark = isDark),
-            )
-            StatusBadge(
-                text = "${AssetCondition.OUT.label()} ${pending.outCount}",
-                colors = AssetCondition.OUT.badgeColors(isDark = isDark),
-            )
+        Box(
+            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
         }
-        PrimaryButton(text = "Xem & xác nhận", onClick = onReview, modifier = Modifier.fillMaxWidth())
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = order.workOrderId,
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = order.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+        }
+        StatusBadge(text = status.label(), colors = status.badgeColors())
     }
 }
 
 @Composable
-private fun UploadingSessionRow(session: UploadingSurveySession) {
+private fun PoleLocationEntryCard(onClick: () -> Unit) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.lg),
-        horizontalArrangement = Arrangement.SpaceBetween,
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onClick)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(
-            text = "Chờ tải lên · ${session.surveySweepId}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        StatusBadge(text = session.syncStatus.label(), colors = session.syncStatus.badgeColors())
+        Box(
+            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = "Cột thiếu GPS", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = "Đo và cập nhật GPS cho cột trong địa bàn của bạn",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null)
     }
 }
 

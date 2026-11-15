@@ -14,16 +14,12 @@ import com.luxmap.feature.notification.data.NotificationRepository
 import com.luxmap.feature.notification.data.RealNotificationRepository
 import com.luxmap.feature.profile.data.ProfileRepository
 import com.luxmap.feature.profile.data.RealProfileRepository
-import com.luxmap.feature.survey.data.AiClassificationRepository
-import com.luxmap.feature.survey.data.FakeAiClassificationRepository
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.RealPoleListRepository
 import com.luxmap.feature.survey.data.RealPolePhotoRepository
 import com.luxmap.feature.survey.data.RealSurveyRepository
-import com.luxmap.feature.survey.data.RealUploadRepository
 import com.luxmap.feature.survey.data.SurveyRepository
-import com.luxmap.feature.survey.data.UploadRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderDetailRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
@@ -55,18 +51,12 @@ abstract class RepositoryModule {
     abstract fun bindSurveyRepository(impl: RealSurveyRepository): SurveyRepository
 
     @Binds
-    abstract fun bindUploadRepository(impl: RealUploadRepository): UploadRepository
-
-    @Binds
     abstract fun bindWorkOrderDetailRepository(impl: RealWorkOrderDetailRepository): WorkOrderDetailRepository
 
     @Binds
     abstract fun bindWorkOrderCompletionRepository(
         impl: RealWorkOrderCompletionRepository,
     ): WorkOrderCompletionRepository
-
-    @Binds
-    abstract fun bindAiClassificationRepository(impl: FakeAiClassificationRepository): AiClassificationRepository
 
     @Binds
     abstract fun bindPolePhotoRepository(impl: RealPolePhotoRepository): PolePhotoRepository

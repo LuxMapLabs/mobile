@@ -39,6 +39,8 @@ Xem `docs/contract-drift.md` để biết chính xác tên nào đã chốt, tê
 
 ### Quyết định nghiệp vụ mới đã chốt (2026-09-25) — chưa cập nhật vào đặc tả chi tiết / api-contract v1.1
 
+**Cập nhật 2026-11-15 — CODE CỦA LUỒNG QUAY VIDEO LIÊN TỤC (F03 Lập kế hoạch + F04 Capture Mode + F05 Kiểm tra độ phủ + F06 Nộp đợt khảo sát, bước 2 ở mô tả dưới đây) ĐÃ BỊ XOÁ HẲN khỏi mobile, theo quyết định trực tiếp của người dùng.** Lý do: luồng này đã mất lối vào UI từ lâu (nút "Bắt đầu" ở Hub Khảo sát/F09 chỉ còn dẫn vào luồng chụp ảnh/video từng cột — xem mục "chụp ảnh/video ngắn theo từng cột đèn" phía dưới), nhưng mã nguồn vẫn còn, khiến người dùng thấy lệch khi hỏi lại. Đã xoá: `feature/survey/ui/{plan,capture,coverage,submit,aiconfirm}/`, `feature/survey/capture/` (toàn bộ, gồm `VideoCaptureSession.kt`), `feature/survey/domain/` (`GpsAccuracyGate.kt`, `CheckSurveyReadinessUseCase.kt`, `SurveyReadinessInputProvider.kt`), các entity/DAO/sync-handler/repository riêng cho sweep (`LocalSurveyPlanEntity`/`LocalSurveySessionEntity`/`LocalSurveyVideoSegmentEntity`/`LocalRoadSegmentEntity`, `SurveyPlanDao`/`SurveySessionDao`, `UploadRepository`, `AiClassificationRepository`, 4 sync handler sweep), và các lớp `core/camera`/`core/location`/`core/common` chỉ phục vụ riêng luồng này (`CameraSelector`, `ExposureLockController`, `FrameTimestampLogger`, `SegmentedVideoRecorder`, `SegmentRotationPolicy`, `StorageMonitor`, `SurveyTrackRecorder`). `AppDatabase` bump v19→v20 (4 entity + 2 DAO bị bỏ, `fallbackToDestructiveMigration()` đã có từ trước nên không cần migration DROP TABLE). Tác dụng phụ đã sửa luôn: badge "GPS yếu · nên đo lại" ở `PoleGpsRow` (luồng `pole_gps_update`, mục "chụp ảnh/video ngắn theo từng cột đèn") từng mượn tạm ngưỡng 8m của `GpsAccuracyGate` — nay bỏ hẳn cảnh báo đó, vì BE (`WorkOrderService.cs` `Report()`) không có ngưỡng độ chính xác tối thiểu nào, chỉ kiểm tra `lat∈[-90,90]`, `lng∈[-180,180]`, `accuracy_m≥0` và là số hữu hạn. **Bước 1 (video khảo sát toàn tuyến + track GPS/heading/timestamp liên tục) và các mục C6/C7 của đặc tả mô tả nghiệp vụ này vẫn giữ nguyên dưới đây — chỉ phần triển khai trên mobile là đã xoá, không phải nghiệp vụ bị huỷ.** Nếu làm lại luồng này sau, coi mục này là điểm bắt đầu, không phải code cũ đã xoá.
+
 Đã xác nhận với chủ dự án, thay đổi lớn so với F08–F10 hiện mô tả trong `LuxMap_Mobile_DacTaChiTiet_v2.2.docx` (1 `WorkOrder` liền mạch) và chưa có mục nào tương ứng trong `api-contract-v1.1.md.docx`. **Không code theo enum/model cũ của F08–F10 cho tới khi đặc tả và API contract được cập nhật chính thức** — phần dưới đây là quyết định nghiệp vụ đã chốt, chưa phải tên bảng/field/endpoint thật.
 
 **Cập nhật 2026-10-13 — phần F08–F10/`WorkOrder` (điểm 2 dưới đây) ĐÃ CÓ tên bảng/field/endpoint thật, không còn là "chưa phải tên thật" nữa.** Xác nhận trực tiếp bằng cách đọc source code repo `luxmap_backend` (nhánh `dev`, commit `00725dd`, 2026-10-12) và `docs/contract-drift.md` + `docs/api-contract-v1.1.md` của repo đó — không phải suy đoán từ `docs/Backend_API_Requirements_For_Mobile.docx` (file đó đã cũ, ghi "MỚI - CẦN CHỐT" cho các endpoint này nhưng BE đã chốt và code xong từ 28–29/09/2026 qua các ticket BE-23/FR-2/FR-2a/FR-3/BE-24). Xem chi tiết đã sửa ở điểm 2. **Điểm 1 (`ai_classified`/`final_classified`, survey AI) vẫn CHƯA xác nhận** — không đụng tới, giữ nguyên nguyên tắc audit trail ở dưới.
@@ -204,11 +206,12 @@ app/src/main/java/com/luxmap/
       SyncWorker.kt            # CoroutineWorker xử lý sync_queue theo priority/dependency/backoff
       SyncQueueManager.kt      # điều phối queue, không tự ghi đè khi conflict (409)
     camera/
-      ExposureLockController.kt  # Camera2Interop: khoá AE/ISO/shutter
-      CaptureMetadataWriter.kt   # ExifInterface: ghi GPS/heading/exposure vào ảnh
+      PhotoGpsExif.kt          # ExifInterface: ghi/đọc GPS vào ảnh chụp cột (pole-gps-update)
+      # ExposureLockController/CameraSelector/FrameTimestampLogger/SegmentedVideoRecorder/
+      # SegmentRotationPolicy đã bị xoá cùng luồng quay video liên tục (xem mục 2026-11-15)
     location/
       LocationTracker.kt       # Fused Location
-      HeadingSensor.kt          # SensorManager
+      # SurveyTrackRecorder (track GPS+heading liên tục) đã bị xoá cùng luồng trên
     map/
       MapLibreConfig.kt
       OfflineRegionManager.kt
@@ -246,22 +249,15 @@ app/src/main/java/com/luxmap/
         HomeViewModel.kt
         HomeUiState.kt
 
-    survey/                   # F03–F06, feature lớn nhất — khảo sát đêm, đường găng dự án
+    survey/                   # Hub Khảo sát: giao tuyến (task_kind=survey) + chụp ảnh/video từng cột
+                               # + hiển thị pole_gps_update - KHÔNG còn F03-F06 (xem mục 2026-11-15, đã xoá)
       data/
         SurveyRepository.kt
         FakeSurveyRepository.kt
         RealSurveyRepository.kt
-        dto/SurveySweepDto.kt
-        dto/SurveyFrameDto.kt
-      domain/
-        usecase/
-          CheckSurveyReadinessUseCase.kt   # F03 — checklist exposure/GPS/storage/pin, logic đủ phức tạp
-          CalculateCoverageUseCase.kt       # F05 — tính % độ phủ so với ngưỡng tối thiểu
       ui/
-        plan/                 # F03 Lập kế hoạch tuyến khảo sát
-        capture/              # F04 Chế độ chụp khảo sát (Capture Mode, dark bắt buộc)
-        coverage/              # F05 Kiểm tra độ phủ & chất lượng
-        submit/                 # F06 Nộp đợt khảo sát (upload chunk/resume)
+        hub/                  # Hub Khảo sát (danh sách tuyến + pole_gps_update + chuyến nhập tài sản)
+        polephoto/             # Chụp ảnh/video ngắn từng cột đèn (quyết định 2026-10-15, còn giữ)
 
     workorder/                 # F08–F10 — lệnh sửa chữa
       data/
@@ -376,8 +372,7 @@ Typography: nội dung tối thiểu 16sp, H1 20sp/700 (tiêu đề màn hình),
 
 | Màn hình/ngữ cảnh | Chế độ mặc định |
 |---|---|
-| F03 Lập kế hoạch khảo sát đêm | Dark |
-| F04 Capture Mode | Dark bắt buộc, ẩn Bottom Navigation |
+| F03 Lập kế hoạch khảo sát đêm / F04 Capture Mode | Đã xoá khỏi mobile (mục 2026-11-15) — hàng này chỉ còn giá trị lịch sử |
 | F09 khi vào chế độ điều hướng ban đêm | Chuyển Dark |
 | F10 Nghiệm thu | Theo hệ thống, không ép Dark |
 | Các màn còn lại | Theo hệ thống, mặc định Light |

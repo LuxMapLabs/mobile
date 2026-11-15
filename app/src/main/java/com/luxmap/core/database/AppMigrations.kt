@@ -44,3 +44,15 @@ val MIGRATION_17_18: Migration =
             db.execSQL("ALTER TABLE local_work_order_evidence ADD COLUMN poleId TEXT")
         }
     }
+
+val MIGRATION_18_19: Migration =
+    object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_pole_location_update (poleId TEXT NOT NULL, " +
+                    "photoFilePath TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, " +
+                    "capturedAt INTEGER NOT NULL, status TEXT NOT NULL, clientOpId TEXT NOT NULL, " +
+                    "PRIMARY KEY(poleId))",
+            )
+        }
+    }

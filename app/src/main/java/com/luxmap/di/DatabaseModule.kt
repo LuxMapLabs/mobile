@@ -5,12 +5,13 @@ import androidx.room.Room
 import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.database.MIGRATION_16_17
 import com.luxmap.core.database.MIGRATION_17_18
+import com.luxmap.core.database.MIGRATION_18_19
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.assetimport.data.dao.AssetImportDao
+import com.luxmap.feature.polelocation.data.PoleLocationUpdateDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
-import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 import dagger.Module
@@ -34,16 +35,9 @@ object DatabaseModule {
             // task in this plan (this task adds v1's tables, Task 13 bumps to v2) — destructive
             // migration is acceptable pre-release. Revisit before the app ships to a real device
             // with data worth preserving across an update.
-            .addMigrations(MIGRATION_16_17, MIGRATION_17_18)
+            .addMigrations(MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19)
             .fallbackToDestructiveMigration()
             .build()
-
-    // Needed so Hilt can build SurveySessionRecoveryUseCase (Task 16), which is the first class
-    // injected directly by LuxMapApp that needs this DAO. Only this one DAO is added here because
-    // it is the only one a real Hilt injection site currently needs - not general DAO wiring.
-    @Provides
-    @Singleton
-    fun provideSurveySessionDao(db: AppDatabase): SurveySessionDao = db.surveySessionDao()
 
     @Provides
     @Singleton
@@ -72,4 +66,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePoleGpsDao(db: AppDatabase): PoleGpsDao = db.poleGpsDao()
+
+    @Provides
+    @Singleton
+    fun providePoleLocationUpdateDao(db: AppDatabase): PoleLocationUpdateDao = db.poleLocationUpdateDao()
 }
