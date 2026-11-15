@@ -6,9 +6,9 @@ import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Singleton so every caller (the background SyncWorker and RealUploadRepository's foreground
-// retry) shares the same Mutex - an unscoped instance per injection site would give each caller
-// its own lock, which would not stop two callers from draining sync_queue at the same time.
+// Singleton so every caller shares the same Mutex - an unscoped instance per injection site would
+// give each caller its own lock, which would not stop two callers from draining sync_queue at
+// the same time.
 @Singleton
 class SyncQueueProcessor
     @Inject

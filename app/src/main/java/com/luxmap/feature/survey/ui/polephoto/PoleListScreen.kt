@@ -414,7 +414,7 @@ private fun ReportMethodOption(
 // Fixed Navy-gradient hero, same BrandHeroGradient as SurveyHubScreen - this screen is a
 // drill-down from the Survey Hub's "Chụp ảnh cột đèn" button, not a tab root, but the design doc
 // (mã 4b) still gives it the same hero treatment rather than the flat AppTopBar other drill-down
-// screens (e.g. AiConfirmationScreen) use.
+// screens use.
 @Composable
 private fun PoleListHeader(
     workOrderId: String,

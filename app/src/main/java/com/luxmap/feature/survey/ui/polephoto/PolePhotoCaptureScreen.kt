@@ -192,8 +192,7 @@ fun PolePhotoCaptureRoute(
         }
     }
 
-    // Design doc (mã 4d) is an all-dark review card, same forceDark convention CaptureScreen
-    // (F04) uses for its own night-survey screens - night-readability here matters more than
+    // Design doc (mã 4d) is an all-dark review card - night-readability here matters more than
     // following the system theme, and this screen is reached straight from the camera intent.
     LuxMapTheme(forceDark = true) {
         val fileToPreview = previewFile

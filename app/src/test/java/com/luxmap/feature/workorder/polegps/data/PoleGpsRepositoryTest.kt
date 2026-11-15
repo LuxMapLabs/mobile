@@ -27,7 +27,7 @@ import java.time.Instant
 class PoleGpsRepositoryTest {
     // enqueuePendingPhotoUploads runs its insert+enqueue+status-flip through
     // AppDatabase.withTransaction, a top-level Room extension function - mockkStatic is the only
-    // way to stub it on a plain mockk<AppDatabase>(), same precedent as RealUploadRepositoryTest.
+    // way to stub it on a plain mockk<AppDatabase>().
     @Before
     fun setUp() {
         mockkStatic("androidx.room.RoomDatabaseKt")
