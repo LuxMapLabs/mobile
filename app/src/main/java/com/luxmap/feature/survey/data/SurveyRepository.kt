@@ -15,11 +15,6 @@ data class AssignedSurveyRoute(
     val scheduledDate: String?,
 )
 
-data class QueuedUploadSession(
-    val sessionId: String,
-    val surveySweepId: String,
-)
-
 data class AssignedRoutesResult(
     val routes: List<AssignedSurveyRoute>,
     // True when this came from the local cache after a failed fetch, not the live backend.
@@ -39,16 +34,6 @@ interface SurveyRepository {
     // straight to the generic WorkOrderDetailScreen (F09), which already has everything this
     // task kind needs (pole list, PDF attachments, complete/verify).
     fun observeAssignedPoleGpsOrders(): Flow<List<AssignedSurveyRoute>>
-
-    fun observeUploadingSessions(): Flow<List<QueuedUploadSession>>
-
-    // Pure local data - no network involved, so Fake and Real do the same thing here (see
-    // the design spec §3 for why this still lives on the one repository interface).
-    suspend fun segmentFilePathsFor(sessionId: String): List<String>
-
-    // Deletes the session's local video/log files and its Room rows, returning the
-    // surveySweepId so the caller can start a fresh recording for the same route.
-    suspend fun discardSession(sessionId: String): String
 
     // Same generic POST /work-orders/{id}/start WorkOrderDetailScreen (F09) already uses - the
     // Hub needs its own way to call it, since Home deliberately hides survey work orders (see

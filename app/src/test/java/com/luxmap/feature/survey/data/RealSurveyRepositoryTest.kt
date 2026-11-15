@@ -1,12 +1,10 @@
 package com.luxmap.feature.survey.data
 
-import android.content.Context
 import com.luxmap.core.network.UserApi
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.network.dto.PagedResultDto
 import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
-import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalAssignedSurveyRouteEntity
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
 import io.mockk.coEvery
@@ -68,13 +66,11 @@ class RealSurveyRepositoryTest {
         runTest {
             val userApi = mockk<UserApi>()
             val workOrdersApi = mockk<WorkOrdersApi>()
-            val sessionDao = mockk<SurveySessionDao>()
             val routeCacheDao = mockk<SurveyRouteCacheDao>(relaxed = true)
-            val context = mockk<Context>()
             coEvery { userApi.me() } returns currentUser()
             coEvery { workOrdersApi.list("U-1", "survey") } returns
                 PagedResultDto(page = 1, pageSize = 200, total = 1, items = listOf(workOrderItemDto("WO-1")))
-            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+            val repository = RealSurveyRepository(userApi, workOrdersApi, routeCacheDao)
 
             val result = repository.observeAssignedRoutes().first()
 
@@ -87,12 +83,10 @@ class RealSurveyRepositoryTest {
         runTest {
             val userApi = mockk<UserApi>()
             val workOrdersApi = mockk<WorkOrdersApi>()
-            val sessionDao = mockk<SurveySessionDao>()
             val routeCacheDao = mockk<SurveyRouteCacheDao>()
-            val context = mockk<Context>()
             coEvery { userApi.me() } throws IllegalStateException("network down")
             coEvery { routeCacheDao.all() } returns listOf(routeEntity())
-            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+            val repository = RealSurveyRepository(userApi, workOrdersApi, routeCacheDao)
 
             val result = repository.observeAssignedRoutes().first()
 
@@ -104,12 +98,10 @@ class RealSurveyRepositoryTest {
         runTest {
             val userApi = mockk<UserApi>()
             val workOrdersApi = mockk<WorkOrdersApi>()
-            val sessionDao = mockk<SurveySessionDao>()
             val routeCacheDao = mockk<SurveyRouteCacheDao>()
-            val context = mockk<Context>()
             coEvery { userApi.me() } throws IllegalStateException("network down")
             coEvery { routeCacheDao.all() } returns emptyList()
-            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+            val repository = RealSurveyRepository(userApi, workOrdersApi, routeCacheDao)
 
             try {
                 repository.observeAssignedRoutes().first()
@@ -124,13 +116,11 @@ class RealSurveyRepositoryTest {
         runTest {
             val userApi = mockk<UserApi>()
             val workOrdersApi = mockk<WorkOrdersApi>()
-            val sessionDao = mockk<SurveySessionDao>()
             val routeCacheDao = mockk<SurveyRouteCacheDao>(relaxed = true)
-            val context = mockk<Context>()
             coEvery { userApi.me() } returns currentUser()
             coEvery { workOrdersApi.list("U-1", "pole_gps_update") } returns
                 PagedResultDto(page = 1, pageSize = 200, total = 1, items = listOf(workOrderItemDto("WO-1")))
-            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+            val repository = RealSurveyRepository(userApi, workOrdersApi, routeCacheDao)
 
             val result = repository.observeAssignedPoleGpsOrders().first()
 
@@ -142,11 +132,9 @@ class RealSurveyRepositoryTest {
         runTest {
             val userApi = mockk<UserApi>()
             val workOrdersApi = mockk<WorkOrdersApi>()
-            val sessionDao = mockk<SurveySessionDao>()
             val routeCacheDao = mockk<SurveyRouteCacheDao>()
-            val context = mockk<Context>()
             coEvery { userApi.me() } throws IllegalStateException("network down")
-            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+            val repository = RealSurveyRepository(userApi, workOrdersApi, routeCacheDao)
 
             val result = repository.observeAssignedPoleGpsOrders().first()
 
