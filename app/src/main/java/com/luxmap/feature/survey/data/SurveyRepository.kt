@@ -33,6 +33,13 @@ data class AssignedRoutesResult(
 interface SurveyRepository {
     fun observeAssignedRoutes(): Flow<AssignedRoutesResult>
 
+    // A pole_gps_update order (QR sticker + GPS collection) is also a field-survey task, so the
+    // Hub lists it too - but it is read-only here, not cached, and never blocks the rest of the
+    // Hub: a failed fetch is an empty list, not an Error for the whole screen. Opening one goes
+    // straight to the generic WorkOrderDetailScreen (F09), which already has everything this
+    // task kind needs (pole list, PDF attachments, complete/verify).
+    fun observeAssignedPoleGpsOrders(): Flow<List<AssignedSurveyRoute>>
+
     fun observeUploadingSessions(): Flow<List<QueuedUploadSession>>
 
     // Pure local data - no network involved, so Fake and Real do the same thing here (see

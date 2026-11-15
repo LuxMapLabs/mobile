@@ -20,6 +20,7 @@ import javax.inject.Singleton
 private const val TAG = "RealSurveyRepository"
 private const val UPLOADING_SYNC_STATE = "queued"
 private const val SURVEY_TASK_KIND = "survey"
+private const val POLE_GPS_UPDATE_TASK_KIND = "pole_gps_update"
 
 // Calls the real GET /auth/me + GET /work-orders?task_kind=survey (see UserApi/WorkOrdersApi),
 // same endpoint Home already uses - there is no separate survey-sweeps endpoint, confirmed
@@ -60,6 +61,30 @@ class RealSurveyRepository
                     val cached = routeCacheDao.all().map { it.toDomain() }
                     if (cached.isEmpty()) throw e
                     emit(AssignedRoutesResult(cached, isStale = true))
+                }
+            }
+
+        override fun observeAssignedPoleGpsOrders(): Flow<List<AssignedSurveyRoute>> =
+            flow {
+                try {
+                    val userId = userApi.me().userId
+                    val items = workOrdersApi.list(assignedTo = userId, taskKind = POLE_GPS_UPDATE_TASK_KIND).items
+                    emit(
+                        items.map { item ->
+                            AssignedSurveyRoute(
+                                workOrderId = item.workOrderId,
+                                title = item.title,
+                                communeId = item.communeId,
+                                woStatus = item.woStatus,
+                                dueDate = item.dueDate,
+                                scheduledDate = item.scheduledDate,
+                            )
+                        },
+                    )
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    emit(emptyList())
                 }
             }
 

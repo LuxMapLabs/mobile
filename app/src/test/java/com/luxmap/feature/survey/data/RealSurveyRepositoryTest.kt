@@ -118,4 +118,38 @@ class RealSurveyRepositoryTest {
                 assertEquals("network down", e.message)
             }
         }
+
+    @Test
+    fun `observeAssignedPoleGpsOrders fetches pole_gps_update orders assigned to me`() =
+        runTest {
+            val userApi = mockk<UserApi>()
+            val workOrdersApi = mockk<WorkOrdersApi>()
+            val sessionDao = mockk<SurveySessionDao>()
+            val routeCacheDao = mockk<SurveyRouteCacheDao>(relaxed = true)
+            val context = mockk<Context>()
+            coEvery { userApi.me() } returns currentUser()
+            coEvery { workOrdersApi.list("U-1", "pole_gps_update") } returns
+                PagedResultDto(page = 1, pageSize = 200, total = 1, items = listOf(workOrderItemDto("WO-1")))
+            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+
+            val result = repository.observeAssignedPoleGpsOrders().first()
+
+            assertEquals(listOf(route()), result)
+        }
+
+    @Test
+    fun `observeAssignedPoleGpsOrders swallows a failure as an empty list, not an error`() =
+        runTest {
+            val userApi = mockk<UserApi>()
+            val workOrdersApi = mockk<WorkOrdersApi>()
+            val sessionDao = mockk<SurveySessionDao>()
+            val routeCacheDao = mockk<SurveyRouteCacheDao>()
+            val context = mockk<Context>()
+            coEvery { userApi.me() } throws IllegalStateException("network down")
+            val repository = RealSurveyRepository(userApi, workOrdersApi, sessionDao, routeCacheDao, context)
+
+            val result = repository.observeAssignedPoleGpsOrders().first()
+
+            assertEquals(emptyList<AssignedSurveyRoute>(), result)
+        }
 }

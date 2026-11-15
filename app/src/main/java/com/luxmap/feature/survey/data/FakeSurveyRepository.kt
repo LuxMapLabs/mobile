@@ -41,6 +41,22 @@ class FakeSurveyRepository
                 )
             }
 
+        override fun observeAssignedPoleGpsOrders(): Flow<List<AssignedSurveyRoute>> =
+            flow {
+                emit(
+                    listOf(
+                        AssignedSurveyRoute(
+                            workOrderId = "WO-2040",
+                            title = "Cập nhật GPS cột đường liên thôn 5",
+                            communeId = "COM-001",
+                            woStatus = "assigned",
+                            dueDate = null,
+                            scheduledDate = "2026-11-10",
+                        ),
+                    ),
+                )
+            }
+
         override fun observeUploadingSessions(): Flow<List<QueuedUploadSession>> =
             sessionDao.observeSessionsBySyncState(UPLOADING_SYNC_STATE).map { sessions ->
                 sessions.map { QueuedUploadSession(sessionId = it.sessionId, surveySweepId = it.surveySweepId) }
