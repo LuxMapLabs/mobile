@@ -149,7 +149,6 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.core.ui.components.dueDateLabel
-import com.luxmap.feature.survey.domain.GpsAccuracyGate
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
@@ -1544,9 +1543,11 @@ private fun PoleGpsRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        // No minimum-accuracy warning here: WorkOrderService.cs's Report() only validates
+        // lat in [-90, 90], lng in [-180, 180] and accuracy_m >= 0 and finite - there is no
+        // BE-enforced "good enough" threshold to warn against (the 8m figure removed from here
+        // belonged to the now-deleted continuous-video-survey flow, a different feature).
         when {
-            measurement != null && measurement.accuracyM > GpsAccuracyGate.PROPOSED_THRESHOLD_METERS ->
-                StatusBadge(text = "GPS yếu · nên đo lại", colors = WorkOrderStatus.ASSIGNED.badgeColors())
             measurement != null -> StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
             !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
             else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
