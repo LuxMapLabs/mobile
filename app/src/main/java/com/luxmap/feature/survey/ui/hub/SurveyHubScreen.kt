@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +23,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddLocationAlt
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -89,6 +92,7 @@ fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -143,6 +147,7 @@ fun SurveyHubRoute(
                 onReviewAiConfirmation = onReviewAiConfirmation,
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
+                onOpenPoleLocationList = onOpenPoleLocationList,
             )
         }
     }
@@ -160,6 +165,7 @@ fun SurveyHubScreen(
     onResurvey: (surveySweepId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
 ) {
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
@@ -183,6 +189,7 @@ fun SurveyHubScreen(
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
+                            onOpenPoleLocationList = onOpenPoleLocationList,
                         )
 
                     is SurveyHubUiState.Empty ->
@@ -343,6 +350,7 @@ private fun SurveyHubContent(
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
+    onOpenPoleLocationList: () -> Unit = {},
 ) {
     val hasAttentionCards =
         state.rejectedSweeps.isNotEmpty() ||
@@ -361,6 +369,7 @@ private fun SurveyHubContent(
         var index = 0
         if (state.isStale) index++
         if (state.startError != null) index++
+        index++
         if (hasAttentionCards) {
             index += 1 + state.rejectedSweeps.size + state.pendingAiConfirmation.size + state.uploadingSessions.size
         }
@@ -390,6 +399,7 @@ private fun SurveyHubContent(
         if (state.startError != null) {
             item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
+        item { PoleLocationEntryCard(onClick = onOpenPoleLocationList) }
         items(state.assignedImportAreas) { area ->
             AssignedImportAreaCard(area, onStartTrip = { onStartImportTrip(area.areaCode) })
         }
@@ -486,6 +496,37 @@ private fun AssignedImportAreaCard(
 
 private val ImportAreaTileBackground = Color(0xFFF1EEFB)
 private val ImportAreaTileForeground = Color(0xFF5B3FB4)
+
+@Composable
+private fun PoleLocationEntryCard(onClick: () -> Unit) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onClick)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(text = "Cột thiếu GPS", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = "Đo và cập nhật GPS cho cột trong địa bàn của bạn",
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null)
+    }
+}
 
 @Composable
 private fun RejectedSweepCard(

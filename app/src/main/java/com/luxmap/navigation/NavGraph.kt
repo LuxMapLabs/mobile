@@ -48,6 +48,8 @@ import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.notification.ui.NotificationBadgeViewModel
 import com.luxmap.feature.notification.ui.NotificationListRoute
+import com.luxmap.feature.polelocation.ui.capture.PoleLocationCaptureRoute
+import com.luxmap.feature.polelocation.ui.list.PoleLocationListRoute
 import com.luxmap.feature.profile.ui.ProfileRoute
 import com.luxmap.feature.survey.ui.aiconfirm.AiConfirmationRoute
 import com.luxmap.feature.survey.ui.capture.CaptureScreen
@@ -251,6 +253,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenImportCapture = { tripId ->
                         navController.navigate(Routes.AssetImportCapture.createRoute(tripId))
                     },
+                    onOpenPoleLocationList = { navController.navigate(Routes.PoleLocationList.route) },
                 )
             }
             composable(
@@ -401,6 +404,23 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             popUpTo(Routes.Survey.route) { inclusive = true }
                         }
                     },
+                )
+            }
+            composable(Routes.PoleLocationList.route) {
+                PoleLocationListRoute(
+                    onCapturePole = { poleId ->
+                        navController.navigate(Routes.PoleLocationCapture.createRoute(poleId))
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(
+                route = Routes.PoleLocationCapture.route,
+                arguments = listOf(navArgument("poleId") { type = NavType.StringType }),
+            ) {
+                PoleLocationCaptureRoute(
+                    onDone = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(
