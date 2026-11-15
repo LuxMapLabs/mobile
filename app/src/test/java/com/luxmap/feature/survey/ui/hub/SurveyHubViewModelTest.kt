@@ -1,12 +1,9 @@
 package com.luxmap.feature.survey.ui.hub
 
 import app.cash.turbine.test
-import com.luxmap.core.network.ConnectivityObserver
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.assetimport.data.AssetImportRepository
 import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
-import com.luxmap.feature.survey.data.QueuedUploadSession
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.coEvery
@@ -38,13 +35,10 @@ class SurveyHubViewModelTest {
             dueDate = null,
             scheduledDate = "2026-10-01",
         )
-    private val queuedSession = QueuedUploadSession(sessionId = "SESSION-1", surveySweepId = "SWEEP-2")
 
     private fun viewModel(
         routes: List<AssignedSurveyRoute> = emptyList(),
         isStale: Boolean = false,
-        queuedSessions: List<QueuedUploadSession> = emptyList(),
-        isOnline: Boolean = true,
         repositoryFlowThrows: Boolean = false,
         locallyCompletedWorkOrderIds: Set<String> = emptySet(),
         poleGpsOrders: List<AssignedSurveyRoute> = emptyList(),
@@ -56,15 +50,12 @@ class SurveyHubViewModelTest {
             } else {
                 flowOf(AssignedRoutesResult(routes, isStale))
             }
-        every { repository.observeUploadingSessions() } returns flowOf(queuedSessions)
         every { repository.observeAssignedPoleGpsOrders() } returns flowOf(poleGpsOrders)
-        val connectivity = mockk<ConnectivityObserver>()
-        every { connectivity.isOnline } returns flowOf(isOnline)
         val completionRepository = mockk<WorkOrderCompletionRepository>()
         every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
         val assetImportRepository = mockk<AssetImportRepository>()
         every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-        return SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+        return SurveyHubViewModel(repository, completionRepository, assetImportRepository)
     }
 
     @Before
@@ -78,7 +69,7 @@ class SurveyHubViewModelTest {
     }
 
     @Test
-    fun `emits Empty when there are no routes and nothing uploading`() =
+    fun `emits Empty when there are no routes`() =
         runTest {
             viewModel().uiState.test {
                 assertEquals(SurveyHubUiState.Loading, awaitItem())
@@ -111,39 +102,6 @@ class SurveyHubViewModelTest {
         }
 
     @Test
-    fun `emits Success with an uploading session even when there are no assigned routes`() =
-        runTest {
-            viewModel(queuedSessions = listOf(queuedSession)).uiState.test {
-                awaitItem()
-                val success = awaitItem() as SurveyHubUiState.Success
-                assertTrue(success.assignedRoutes.isEmpty())
-                assertEquals(1, success.uploadingSessions.size)
-                assertEquals(SyncStatus.QUEUED_ONLINE, success.uploadingSessions.first().syncStatus)
-            }
-        }
-
-    @Test
-    fun `an uploading session is marked QUEUED_OFFLINE when the device is offline`() =
-        runTest {
-            viewModel(queuedSessions = listOf(queuedSession), isOnline = false).uiState.test {
-                awaitItem()
-                val success = awaitItem() as SurveyHubUiState.Success
-                assertEquals(SyncStatus.QUEUED_OFFLINE, success.uploadingSessions.first().syncStatus)
-            }
-        }
-
-    @Test
-    fun `the unconfirmed cards are always empty while SHOW_UNCONFIRMED_HUB_CARDS is false`() =
-        runTest {
-            viewModel(routes = listOf(route)).uiState.test {
-                awaitItem()
-                val success = awaitItem() as SurveyHubUiState.Success
-                assertTrue(success.rejectedSweeps.isEmpty())
-                assertTrue(success.pendingAiConfirmation.isEmpty())
-            }
-        }
-
-    @Test
     fun `emits Success with isStale when the repository falls back to its cache`() =
         runTest {
             viewModel(routes = listOf(route), isStale = true).uiState.test {
@@ -172,15 +130,12 @@ class SurveyHubViewModelTest {
                     flow { throw IllegalStateException("offline") },
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                 )
-            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
-            val connectivity = mockk<ConnectivityObserver>()
-            every { connectivity.isOnline } returns flowOf(true)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             val assetImportRepository = mockk<AssetImportRepository>()
             every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -202,15 +157,12 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
-            val connectivity = mockk<ConnectivityObserver>()
-            every { connectivity.isOnline } returns flowOf(true)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             val assetImportRepository = mockk<AssetImportRepository>()
             every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -231,16 +183,13 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
-            val connectivity = mockk<ConnectivityObserver>()
-            every { connectivity.isOnline } returns flowOf(true)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             val assetImportRepository = mockk<AssetImportRepository>()
             every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -264,16 +213,13 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
-            val connectivity = mockk<ConnectivityObserver>()
-            every { connectivity.isOnline } returns flowOf(true)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             val assetImportRepository = mockk<AssetImportRepository>()
             every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
             // Let init's load() reach Success first - otherwise onStartRoute's own
             // "current !is Success" guard returns early and never calls the repository, same
             // as why the uiState-based tests above drain Loading/Success via awaitItem() first.
@@ -290,16 +236,13 @@ class SurveyHubViewModelTest {
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(AssignedRoutesResult(listOf(route), false))
-            every { repository.observeUploadingSessions() } returns flowOf(emptyList())
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
-            val connectivity = mockk<ConnectivityObserver>()
-            every { connectivity.isOnline } returns flowOf(true)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             val assetImportRepository = mockk<AssetImportRepository>()
             every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, connectivity, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading

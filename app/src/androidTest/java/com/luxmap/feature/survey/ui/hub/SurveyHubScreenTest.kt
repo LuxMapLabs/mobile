@@ -6,7 +6,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -23,13 +22,6 @@ class SurveyHubScreenTest {
             woStatus = woStatus,
             dueDate = null,
             scheduledDate = "2026-10-02",
-        )
-
-    private fun uploadingSession() =
-        UploadingSurveySession(
-            sessionId = "SESSION-1",
-            surveySweepId = "SWEEP-2",
-            syncStatus = SyncStatus.QUEUED_ONLINE,
         )
 
     @Test
@@ -159,14 +151,14 @@ class SurveyHubScreenTest {
                     state =
                         SurveyHubUiState.Success(
                             assignedRoutes = emptyList(),
-                            uploadingSessions = listOf(uploadingSession()),
+                            assignedPoleGpsOrders = listOf(route().copy(workOrderId = "WO-9")),
                         ),
                 )
             }
         }
         composeRule.onNodeWithText("Chưa bắt đầu").assertDoesNotExist()
         composeRule.onNodeWithText("Đang thực hiện").assertDoesNotExist()
-        composeRule.onNodeWithText("Chờ tải lên · SWEEP-2").assertExists()
+        composeRule.onNodeWithText("WO-9").assertExists()
     }
 
     @Test
@@ -186,33 +178,6 @@ class SurveyHubScreenTest {
         }
         composeRule.onNodeWithText("Không tải được Khảo sát").assertExists()
         composeRule.onNodeWithText("Thử lại").assertExists()
-    }
-
-    @Test
-    fun tapping_Xem_va_xac_nhan_on_a_pending_ai_card_invokes_onReviewAiConfirmation() {
-        var reviewed: String? = null
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyHubScreen(
-                    state =
-                        SurveyHubUiState.Success(
-                            assignedRoutes = emptyList(),
-                            pendingAiConfirmation =
-                                listOf(
-                                    LocalPendingAiConfirmation(
-                                        surveySweepId = "SWEEP-2029",
-                                        normalCount = 11,
-                                        dimCount = 2,
-                                        outCount = 1,
-                                    ),
-                                ),
-                        ),
-                    onReviewAiConfirmation = { reviewed = it },
-                )
-            }
-        }
-        composeRule.onNodeWithText("Xem & xác nhận").performClick()
-        assertEquals("SWEEP-2029", reviewed)
     }
 
     // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): button only shows while still
