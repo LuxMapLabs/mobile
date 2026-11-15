@@ -30,22 +30,24 @@ class PoleLocationRepository
         // duplicate capture. DONE never needs filtering here: the server's own list stops naming
         // that pole as missing a location on the very next fetch. CONFLICT/FAILED stay so the
         // engineer can retry.
-        suspend fun polesMissingLocation(): List<PoleMissingLocationItem> =
-            api.listPoles(missingLocation = true).items
-                .map { item ->
-                    val local = dao.byPoleId(item.poleId)
-                    PoleMissingLocationItem(
-                        poleId = item.poleId,
-                        externalRef = item.externalRef,
-                        note = item.note,
-                        communeName = item.communeName,
-                        localStatus = local?.status,
-                    )
-                }
-                .filterNot {
-                    it.localStatus == PoleLocationUpdateStatus.PENDING ||
-                        it.localStatus == PoleLocationUpdateStatus.QUEUED
-                }
+        suspend fun polesMissingLocation(): Result<List<PoleMissingLocationItem>> =
+            runCatching {
+                api.listPoles(missingLocation = true).items
+                    .map { item ->
+                        val local = dao.byPoleId(item.poleId)
+                        PoleMissingLocationItem(
+                            poleId = item.poleId,
+                            externalRef = item.externalRef,
+                            note = item.note,
+                            communeName = item.communeName,
+                            localStatus = local?.status,
+                        )
+                    }
+                    .filterNot {
+                        it.localStatus == PoleLocationUpdateStatus.PENDING ||
+                            it.localStatus == PoleLocationUpdateStatus.QUEUED
+                    }
+            }
 
         suspend fun submit(
             poleId: String,

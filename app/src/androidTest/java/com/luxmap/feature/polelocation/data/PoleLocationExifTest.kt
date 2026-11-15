@@ -14,6 +14,7 @@ import java.io.FileOutputStream
 @RunWith(AndroidJUnit4::class)
 class PoleLocationExifTest {
     @get:Rule val tmp = TemporaryFolder()
+    private val exif = FileExifPoleLocation()
 
     private fun blankJpeg(): File {
         val file = tmp.newFile("pole.jpg")
@@ -26,8 +27,8 @@ class PoleLocationExifTest {
     fun write_then_read_round_trips_the_coordinates() {
         val file = blankJpeg()
 
-        PoleLocationExif.write(file, 10.123456, 106.654321)
-        val result = PoleLocationExif.read(file)
+        exif.write(file, 10.123456, 106.654321)
+        val result = exif.read(file)
 
         assertEquals(10.123456, result!!.first, 0.0001)
         assertEquals(106.654321, result.second, 0.0001)
@@ -37,6 +38,6 @@ class PoleLocationExifTest {
     fun read_without_a_prior_write_is_null() {
         val file = blankJpeg()
 
-        assertNull(PoleLocationExif.read(file))
+        assertNull(exif.read(file))
     }
 }

@@ -29,7 +29,7 @@ class PoleLocationRepositoryTest {
             coEvery { dao.byPoleId(any()) } returns null
             val repository = PoleLocationRepository(api, dao, mockk(relaxed = true))
 
-            val result = repository.polesMissingLocation()
+            val result = repository.polesMissingLocation().getOrThrow()
 
             assertEquals(listOf("POLE-1", "POLE-2"), result.map { it.poleId })
             assertEquals(listOf(null, null), result.map { it.localStatus })
@@ -49,7 +49,7 @@ class PoleLocationRepositoryTest {
             coEvery { dao.byPoleId("POLE-2") } returns null
             val repository = PoleLocationRepository(api, dao, mockk(relaxed = true))
 
-            val result = repository.polesMissingLocation()
+            val result = repository.polesMissingLocation().getOrThrow()
 
             assertEquals(listOf("POLE-2"), result.map { it.poleId })
         }
@@ -67,7 +67,7 @@ class PoleLocationRepositoryTest {
                 )
             val repository = PoleLocationRepository(api, dao, mockk(relaxed = true))
 
-            val result = repository.polesMissingLocation()
+            val result = repository.polesMissingLocation().getOrThrow()
 
             assertEquals(listOf("POLE-1"), result.map { it.poleId })
             assertEquals(PoleLocationUpdateStatus.CONFLICT, result.single().localStatus)
