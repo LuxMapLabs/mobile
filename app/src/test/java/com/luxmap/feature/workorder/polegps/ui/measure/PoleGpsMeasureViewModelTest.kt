@@ -1,13 +1,16 @@
 package com.luxmap.feature.workorder.polegps.ui.measure
 
 import androidx.lifecycle.SavedStateHandle
+import com.luxmap.core.camera.PhotoGpsExif
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -30,6 +33,7 @@ import java.time.Instant
 @OptIn(ExperimentalCoroutinesApi::class)
 class PoleGpsMeasureViewModelTest {
     private val repository = mockk<PoleGpsRepository>(relaxed = true)
+    private val exif = mockk<PhotoGpsExif>(relaxed = true)
     private var fixesFlow: Flow<GpsFix> = flowOf(GpsFix(10.1, 106.1, 4.0, Instant.ofEpochSecond(1)))
     private val source =
         object : GpsFixSource {
@@ -40,13 +44,19 @@ class PoleGpsMeasureViewModelTest {
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", 3, 10.0, 106.0)
+        every { exif.read(any()) } returns null
     }
 
     @After
     fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel() =
-        PoleGpsMeasureViewModel(SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")), repository, source)
+        PoleGpsMeasureViewModel(
+            SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
+            repository,
+            source,
+            exif,
+        )
 
     @Test
     fun `starts in Loading then shows the pole label and previous position once permission is granted`() =
@@ -148,6 +158,7 @@ class PoleGpsMeasureViewModelTest {
                     SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
                     repository,
                     trackedSource,
+                    exif,
                 )
             vm.startWatchingLocation()
             assertEquals(GpsFix(12.0, 108.0, 6.0, Instant.ofEpochSecond(7)), vm.currentFix.value)
@@ -169,5 +180,40 @@ class PoleGpsMeasureViewModelTest {
                 )
             }
             assertTrue(done)
+        }
+
+    @Test
+    fun `onPhotoCaptured writes the fix into EXIF then saves the value read back from EXIF`() =
+        runTest {
+            fixesFlow = flowOf(GpsFix(10.5, 106.5, 7.0, Instant.ofEpochSecond(42)))
+            val vm = viewModel()
+            val file = File("p1.jpg")
+            every { exif.read(file) } returns (11.1 to 107.1)
+
+            vm.onPhotoCaptured(file, hasLocationPermission = true) {}
+
+            verify { exif.write(file, 10.5, 106.5) }
+            coVerify {
+                repository.saveCapturedPhoto(
+                    "WO-1",
+                    "P-1",
+                    file.absolutePath,
+                    11.1,
+                    107.1,
+                    7.0,
+                    Instant.ofEpochSecond(42),
+                )
+            }
+        }
+
+    @Test
+    fun `without a gps fix, EXIF is never touched`() =
+        runTest {
+            val vm = viewModel()
+            val file = File("p1.jpg")
+
+            vm.onPhotoCaptured(file, hasLocationPermission = false) {}
+
+            verify(exactly = 0) { exif.write(any(), any(), any()) }
         }
 }

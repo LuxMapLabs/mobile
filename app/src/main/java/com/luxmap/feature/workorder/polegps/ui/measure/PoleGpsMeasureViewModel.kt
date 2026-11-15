@@ -3,6 +3,7 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.camera.PhotoGpsExif
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
@@ -26,6 +27,7 @@ class PoleGpsMeasureViewModel
         savedStateHandle: SavedStateHandle,
         private val repository: PoleGpsRepository,
         private val fixSource: GpsFixSource,
+        private val exif: PhotoGpsExif,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle["workOrderId"])
         private val poleId: String = checkNotNull(savedStateHandle["poleId"])
@@ -80,12 +82,19 @@ class PoleGpsMeasureViewModel
                     } else {
                         null
                     }
+                val (lat, lng) =
+                    if (fix != null) {
+                        exif.write(file, fix.lat, fix.lng)
+                        exif.read(file) ?: (fix.lat to fix.lng)
+                    } else {
+                        0.0 to 0.0
+                    }
                 repository.saveCapturedPhoto(
                     workOrderId = workOrderId,
                     poleId = poleId,
                     filePath = file.absolutePath,
-                    lat = fix?.lat ?: 0.0,
-                    lng = fix?.lng ?: 0.0,
+                    lat = lat,
+                    lng = lng,
                     accuracyM = fix?.accuracyM ?: 0.0,
                     capturedAt = fix?.capturedAt ?: Instant.now(),
                 )
