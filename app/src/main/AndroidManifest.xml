@@ -35,11 +35,6 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".feature.survey.capture.SurveyCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="camera|location|connectedDevice" />
-
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

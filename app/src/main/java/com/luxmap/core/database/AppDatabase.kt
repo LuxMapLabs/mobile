@@ -12,16 +12,10 @@ import com.luxmap.feature.polelocation.data.LocalPoleLocationUpdateEntity
 import com.luxmap.feature.polelocation.data.PoleLocationUpdateDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
-import com.luxmap.feature.survey.data.dao.SurveyPlanDao
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
-import com.luxmap.feature.survey.data.dao.SurveySessionDao
 import com.luxmap.feature.survey.data.entity.LocalAssignedSurveyRouteEntity
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
-import com.luxmap.feature.survey.data.entity.LocalRoadSegmentEntity
-import com.luxmap.feature.survey.data.entity.LocalSurveyPlanEntity
-import com.luxmap.feature.survey.data.entity.LocalSurveySessionEntity
-import com.luxmap.feature.survey.data.entity.LocalSurveyVideoSegmentEntity
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
@@ -34,10 +28,6 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 // keeping the list here is the single place that shows the whole local schema.
 @Database(
     entities = [
-        LocalSurveyPlanEntity::class,
-        LocalRoadSegmentEntity::class,
-        LocalSurveySessionEntity::class,
-        LocalSurveyVideoSegmentEntity::class,
         SyncQueueEntity::class,
         LocalWorkOrderEvidenceEntity::class,
         LocalWorkOrderCompletionEntity::class,
@@ -51,15 +41,11 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalPoleGpsMeasurementEntity::class,
         LocalPoleLocationUpdateEntity::class,
     ],
-    version = 19,
+    version = 20,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
 abstract class AppDatabase : RoomDatabase() {
-    abstract fun surveyPlanDao(): SurveyPlanDao
-
-    abstract fun surveySessionDao(): SurveySessionDao
-
     abstract fun syncQueueDao(): SyncQueueDao
 
     abstract fun workOrderCompletionDao(): WorkOrderCompletionDao
