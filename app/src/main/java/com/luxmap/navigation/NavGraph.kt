@@ -254,6 +254,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.AssetImportCapture.createRoute(tripId))
                     },
                     onOpenPoleLocationList = { navController.navigate(Routes.PoleLocationList.route) },
+                    onOpenWorkOrderDetail = { workOrderId ->
+                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
+                    },
                 )
             }
             composable(

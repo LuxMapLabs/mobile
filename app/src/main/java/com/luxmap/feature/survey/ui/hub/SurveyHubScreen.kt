@@ -46,6 +46,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -93,6 +94,7 @@ fun SurveyHubRoute(
     onReviewAiConfirmation: (surveySweepId: String) -> Unit = {},
     onOpenImportCapture: (tripId: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -148,6 +150,7 @@ fun SurveyHubRoute(
                 onRequestCancellation = viewModel::onRequestCancellation,
                 onStartImportTrip = viewModel::onStartImportTrip,
                 onOpenPoleLocationList = onOpenPoleLocationList,
+                onOpenWorkOrderDetail = onOpenWorkOrderDetail,
             )
         }
     }
@@ -166,6 +169,7 @@ fun SurveyHubScreen(
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
     onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
@@ -190,6 +194,7 @@ fun SurveyHubScreen(
                             highlightWorkOrderId = highlightWorkOrderId,
                             onStartImportTrip = onStartImportTrip,
                             onOpenPoleLocationList = onOpenPoleLocationList,
+                            onOpenWorkOrderDetail = onOpenWorkOrderDetail,
                         )
 
                     is SurveyHubUiState.Empty ->
@@ -351,6 +356,7 @@ private fun SurveyHubContent(
     highlightWorkOrderId: String? = null,
     onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
+    onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
     val hasAttentionCards =
         state.rejectedSweeps.isNotEmpty() ||
@@ -402,6 +408,9 @@ private fun SurveyHubContent(
         item { PoleLocationEntryCard(onClick = onOpenPoleLocationList) }
         items(state.assignedImportAreas) { area ->
             AssignedImportAreaCard(area, onStartTrip = { onStartImportTrip(area.areaCode) })
+        }
+        items(state.assignedPoleGpsOrders) { order ->
+            PoleGpsUpdateOrderCard(order, onClick = { onOpenWorkOrderDetail(order.workOrderId) })
         }
         if (hasAttentionCards) {
             item {
@@ -496,6 +505,42 @@ private fun AssignedImportAreaCard(
 
 private val ImportAreaTileBackground = Color(0xFFF1EEFB)
 private val ImportAreaTileForeground = Color(0xFF5B3FB4)
+
+@Composable
+private fun PoleGpsUpdateOrderCard(
+    order: AssignedSurveyRoute,
+    onClick: () -> Unit,
+) {
+    val status = workOrderStatusFromWire(order.woStatus)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.card))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .clickable(onClick = onClick)
+                .padding(Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = order.workOrderId,
+                style = LabelTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(text = order.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
+        }
+        StatusBadge(text = status.label(), colors = status.badgeColors())
+    }
+}
 
 @Composable
 private fun PoleLocationEntryCard(onClick: () -> Unit) {
