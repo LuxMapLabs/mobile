@@ -55,6 +55,24 @@ class ExtendedColorsTest {
     }
 
     @Test
+    fun `card text reaches AAA on the card container in both themes`() {
+        assertContrast("light card", LuxMapLightColorScheme.onSurface, LightExtendedColors.cardContainer, 7.0)
+        assertContrast("night card", LuxMapDarkColorScheme.onSurface, NightFieldExtendedColors.cardContainer, 7.0)
+        assertContrast(
+            "light card secondary",
+            LuxMapLightColorScheme.onSurfaceVariant,
+            LightExtendedColors.cardContainer,
+            4.5,
+        )
+        assertContrast(
+            "night card secondary",
+            LuxMapDarkColorScheme.onSurfaceVariant,
+            NightFieldExtendedColors.cardContainer,
+            4.5,
+        )
+    }
+
+    @Test
     fun `due today is readable in night field, unlike the old fixed amber`() {
         assertContrast("night dueToday", NightFieldExtendedColors.dueToday, LuxMapDarkColorScheme.surface, 7.0)
     }
