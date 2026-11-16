@@ -179,7 +179,7 @@ internal fun workOrderCtaState(
                 icon = Icons.Filled.HourglassTop,
                 enabled = false,
                 onClick = {},
-                hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
+                hint = "Chờ Kỹ sư bảo trì duyệt",
                 hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         else -> null

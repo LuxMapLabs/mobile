@@ -1,6 +1,5 @@
 package com.luxmap.feature.workorder.ui.detail
 
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -21,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 private fun repairDetail(
     woStatus: String = "in_progress",
@@ -121,30 +121,62 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun a_repair_in_progress_shows_the_app_top_bar_title_and_every_lifecycle_step_label() {
+    fun the_summary_shows_the_current_stage_without_a_multi_step_tracker() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
-        composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").assertExists()
         listOf("Khảo sát", "Duyệt #1", "Kiểm tra", "Duyệt #2").forEach { label ->
-            composeRule.onNodeWithText(label).assertExists()
+            composeRule.onNodeWithText(label).assertDoesNotExist()
         }
-        // "Sửa chữa" appears twice for a repair order - the kind badge and the current
-        // lifecycle step both use the same real label.
-        composeRule.onAllNodesWithText("Sửa chữa").assertCountEquals(2)
     }
 
     @Test
-    fun a_cancelled_work_order_hides_the_lifecycle_tracker() {
+    fun a_cancelled_work_order_shows_its_status_but_no_current_stage() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail(woStatus = "cancelled")))
         composeRule.onNodeWithText("Đã huỷ").assertExists()
-        composeRule.onNodeWithText("Đã nghiệm thu").assertDoesNotExist()
-        composeRule.onNodeWithText("Sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại", substring = true).assertDoesNotExist()
     }
 
     @Test
-    fun a_review_note_shows_the_managers_request() {
+    fun a_review_note_shows_the_maintenance_engineers_request() {
         val detail = repairDetail().copy(reviewNote = "Chụp thêm ảnh góc rộng")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Manager yêu cầu bổ sung: Chụp thêm ảnh góc rộng").assertExists()
+        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Chụp thêm ảnh góc rộng").assertExists()
+    }
+
+    @Test
+    fun only_the_most_urgent_message_is_a_banner_and_the_rest_go_to_the_notes_card() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete"))
+                .copy(scheduledDate = yesterday, reviewNote = "Bổ sung ảnh", note = "Ưu tiên trước mưa")
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Ghi chú & lịch sử").assertExists()
+        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Ghi chú giao việc").assertExists()
+        composeRule.onNodeWithText("Ưu tiên trước mưa").assertExists()
+    }
+
+    @Test
+    fun the_offline_banner_shows_alongside_the_business_banner() {
+        val detail = repairDetail(woStatus = "assigned").copy(cancellationRequestStatus = "pending")
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, isOnline = false))
+        composeRule.onNodeWithText("Đang ngoại tuyến").assertExists()
+        composeRule.onNodeWithText("Đã gửi yêu cầu hủy").assertExists()
+    }
+
+    @Test
+    fun no_text_on_the_screen_mentions_manager_or_an_internal_review_gate() {
+        val detail =
+            repairDetail(woStatus = "done").copy(
+                allowedActions = emptyList(),
+                reviewNote = "Đạt",
+                note = "Giao việc",
+            )
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Manager", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("cổng", substring = true).assertDoesNotExist()
     }
 
     // Client-only lock (not enforced server-side - allowed_actions still has "start" while
@@ -158,7 +190,7 @@ class WorkOrderDetailScreenTest {
             repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
                 .copy(cancellationRequestStatus = "pending")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt").assertExists()
+        composeRule.onNodeWithText("Đã gửi yêu cầu hủy").assertExists()
         composeRule.onNodeWithText("Đang chờ duyệt yêu cầu hủy").assertExists()
         composeRule.onNodeWithText("Bắt đầu").assertIsNotEnabled()
     }
@@ -167,8 +199,8 @@ class WorkOrderDetailScreenTest {
     fun a_done_work_order_with_no_allowed_actions_shows_the_disabled_submitted_hint() {
         val detail = repairDetail(woStatus = "done").copy(allowedActions = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Đã nộp báo cáo").assertExists()
-        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt (cổng #2)").assertExists()
+        composeRule.onAllNodesWithText("Đã nộp báo cáo").onFirst().assertExists()
+        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt").assertExists()
     }
 
     @Test

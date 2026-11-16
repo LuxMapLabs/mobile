@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.StickyNote2
@@ -106,6 +107,7 @@ import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.core.theme.WorkOrderStatus
@@ -122,7 +124,9 @@ import com.luxmap.core.ui.components.CancelRequestSheet
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
-import com.luxmap.core.ui.components.LifecycleTracker
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
@@ -584,11 +588,35 @@ private fun WorkOrderDetailContent(
                     .padding(start = Spacing.lg, top = Spacing.md, end = Spacing.lg, bottom = Spacing.xxl),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            WorkOrderStatusRow(status = status, showSubmittedBadge = hasActiveLocalCompletion)
-            WorkOrderSummaryCard(detail)
-            WorkOrderHeaderSection(detail)
-            state.syncStatus()?.let { status ->
-                StatusBadge(text = status.label(), colors = status.badgeColors())
+            val messages =
+                workOrderMessages(
+                    detail = detail,
+                    hasActiveLocalCompletion = hasActiveLocalCompletion,
+                    syncStatus = state.syncStatus(),
+                    isOnline = state.isOnline,
+                    today = LocalDate.now(),
+                )
+            WorkOrderSummaryCard(
+                detail = detail,
+                showSubmittedBadge = hasActiveLocalCompletion,
+                syncStatus = state.syncStatus(),
+            )
+            if (messages.showOffline) {
+                LuxBanner(
+                    title = "Đang ngoại tuyến",
+                    message = "Thao tác sẽ được lưu trên thiết bị và đồng bộ khi có mạng.",
+                    tone = LuxBannerTone.NEUTRAL,
+                )
+            }
+            messages.prominent?.let { message ->
+                LuxBanner(
+                    title = message.title,
+                    message = message.body.orEmpty(),
+                    tone = message.tone.toBannerTone(),
+                )
+            }
+            if (messages.notes.isNotEmpty()) {
+                WorkOrderNotesCard(notes = messages.notes)
             }
             if (kind == WorkOrderTaskKind.SURVEY) {
                 Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
@@ -654,26 +682,26 @@ private fun WorkOrderDetailContent(
     }
 }
 
-@Composable
-private fun WorkOrderStatusRow(
-    status: WorkOrderStatus,
-    showSubmittedBadge: Boolean,
-) {
-    when {
-        showSubmittedBadge -> StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-        status != WorkOrderStatus.ASSIGNED ->
-            StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+private fun WorkOrderMessageTone.toBannerTone(): LuxBannerTone =
+    when (this) {
+        WorkOrderMessageTone.ERROR -> LuxBannerTone.ERROR
+        WorkOrderMessageTone.WARNING -> LuxBannerTone.WARNING
+        WorkOrderMessageTone.NEUTRAL -> LuxBannerTone.NEUTRAL
+        WorkOrderMessageTone.INFO -> LuxBannerTone.INFO
     }
-}
 
 @Composable
-private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
+private fun WorkOrderSummaryCard(
+    detail: WorkOrderDetail,
+    showSubmittedBadge: Boolean,
+    syncStatus: SyncStatus?,
+) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val due = dueDateLabel(detail.dueDate)
     val dueColor =
         when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isOverdue -> LuxTheme.colors.dueOverdue
             due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurface
         }
@@ -681,169 +709,144 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
         when (kind) {
             WorkOrderTaskKind.REPAIR -> "Lịch sửa chữa"
             WorkOrderTaskKind.POLE_GPS_UPDATE -> "Lịch đo GPS"
-            else -> "Lịch kiểm tra"
+            WorkOrderTaskKind.SURVEY -> "Lịch khảo sát"
+            WorkOrderTaskKind.INSPECTION -> "Lịch kiểm tra"
         }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SummaryMetricCell(
+    LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary")) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (showSubmittedBadge) {
+                StatusBadge(
+                    text = "Đã nộp",
+                    colors = WorkOrderStatus.DONE.badgeColors(),
+                    icon = WorkOrderStatus.DONE.icon(),
+                )
+            } else {
+                StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+            }
+            syncStatus?.let { sync ->
+                StatusBadge(text = sync.label(), colors = sync.badgeColors(), icon = sync.icon())
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            SummaryMetric(
                 label = "Hạn xử lý",
                 value = due.text,
                 valueColor = dueColor,
+                showAlert = due.isOverdue || due.isToday,
                 modifier = Modifier.weight(1f),
             )
-            SummaryMetricCell(
+            SummaryMetric(
                 label = scheduleLabel,
                 value = scheduleValue,
                 valueColor = MaterialTheme.colorScheme.onSurface,
+                showAlert = false,
                 modifier = Modifier.weight(1f),
             )
         }
         if (status != WorkOrderStatus.CANCELLED) {
-            val lifecycleSteps = workOrderLifecycleSteps(status, kind)
-            if (lifecycleSteps.isNotEmpty()) {
-                LifecycleTracker(steps = lifecycleSteps)
-            }
+            Spacer(Modifier.height(Spacing.md))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = "Giai đoạn hiện tại: ${kind.label()}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun SummaryMetricCell(
+private fun SummaryMetric(
     label: String,
     value: String,
     valueColor: Color,
+    showAlert: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
-                .padding(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(
-            text = value,
-            style = BodyStrongTextStyle,
-            color = valueColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
-    val hasCancellationBanner = detail.cancellationRequestStatus != "none"
-    val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
-    val status = workOrderStatusFromWire(detail.woStatus)
-    val isOverdueToStart = isPastSchedule && status == WorkOrderStatus.ASSIGNED
-    val isOverdueToComplete = isPastSchedule && status == WorkOrderStatus.IN_PROGRESS
-    val hasAnyBanner =
-        !detail.note.isNullOrBlank() ||
-            !detail.reviewNote.isNullOrBlank() ||
-            hasCancellationBanner ||
-            isOverdueToStart ||
-            isOverdueToComplete
-    if (!hasAnyBanner) return
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        if (isOverdueToStart) {
-            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
-            InlineBanner(
-                message =
-                    "Quá hạn bắt đầu (dự kiến $dueText) · Không thể bắt đầu, liên hệ Kỹ sư bảo trì để được giao lại",
-                tone = InlineBannerTone.ERROR,
-            )
-        }
-        if (isOverdueToComplete) {
-            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
-            InlineBanner(
-                message = "Quá hạn nộp báo cáo (dự kiến $dueText) · Form đã khoá, liên hệ Kỹ sư bảo trì để xử lý",
-                tone = InlineBannerTone.ERROR,
-            )
-        }
-        if (!detail.reviewNote.isNullOrBlank()) {
-            if (status == WorkOrderStatus.IN_PROGRESS) {
-                InlineBanner(
-                    message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
-                    tone = InlineBannerTone.ERROR,
-                )
-            } else {
-                InlineBanner(
-                    message = "Ghi chú của Manager: ${detail.reviewNote}",
-                    tone = InlineBannerTone.OFFLINE,
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (showAlert) {
+                Icon(
+                    imageVector = Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = valueColor,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-        }
-        when (detail.cancellationRequestStatus) {
-            "pending" ->
-                InlineBanner(
-                    message = "Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt",
-                    tone = InlineBannerTone.PENDING,
-                )
-            "rejected" ->
-                InlineBanner(
-                    message = "Yêu cầu hủy bị từ chối: ${detail.cancellationRejectNote}",
-                    tone = InlineBannerTone.ERROR,
-                )
-        }
-        if (!detail.note.isNullOrBlank()) {
-            ManagerNoteCard(note = detail.note)
-        }
-    }
-}
-
-private const val MANAGER_NOTE_CLAMP_THRESHOLD = 110
-
-@Composable
-private fun ManagerNoteCard(note: String) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val canToggle = note.length > MANAGER_NOTE_CLAMP_THRESHOLD
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.StickyNote2,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = "Ghi chú từ Manager",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = note,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (canToggle && !expanded) MANAGER_NOTE_CLAMP_LINES else Int.MAX_VALUE,
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (canToggle) {
-                TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (expanded) "Thu gọn" else "Xem thêm")
-                }
-            }
         }
     }
 }
 
-private const val MANAGER_NOTE_CLAMP_LINES = 3
+private const val NOTE_CLAMP_THRESHOLD = 110
+private const val NOTE_CLAMP_LINES = 3
+
+@Composable
+private fun WorkOrderNotesCard(notes: List<WorkOrderNote>) {
+    LuxCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Ghi chú & lịch sử",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        notes.forEachIndexed { index, note ->
+            if (index > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = Spacing.md),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            } else {
+                Spacer(Modifier.height(Spacing.md))
+            }
+            WorkOrderNoteRow(note = note)
+        }
+    }
+}
+
+@Composable
+private fun WorkOrderNoteRow(note: WorkOrderNote) {
+    var expanded by rememberSaveable(note.label) { mutableStateOf(false) }
+    val canToggle = note.text.length > NOTE_CLAMP_THRESHOLD
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            text = note.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (note.text.isNotBlank()) {
+            Text(
+                text = note.text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (canToggle && !expanded) NOTE_CLAMP_LINES else Int.MAX_VALUE,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (canToggle) {
+            TextButton(
+                onClick = { expanded = !expanded },
+                modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Text(if (expanded) "Thu gọn" else "Xem thêm")
+            }
+        }
+    }
+}
 
 @Composable
 private fun FaultListSection(
@@ -1111,7 +1114,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Theo cấu hình của Manager · nhập sau khi bắt đầu",
+                text = "Theo cấu hình của Kỹ sư bảo trì · nhập sau khi bắt đầu",
                 style = LabelTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
