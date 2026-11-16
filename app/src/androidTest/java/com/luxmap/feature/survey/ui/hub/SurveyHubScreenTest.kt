@@ -3,6 +3,7 @@ package com.luxmap.feature.survey.ui.hub
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
@@ -10,6 +11,7 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 class SurveyHubScreenTest {
     @get:Rule val composeRule = createComposeRule()
@@ -21,15 +23,32 @@ class SurveyHubScreenTest {
             communeId = "COM-001",
             woStatus = woStatus,
             dueDate = null,
-            scheduledDate = "2026-10-02",
+            scheduledDate = LocalDate.now().toString(),
         )
 
     @Test
-    fun loading_state_shows_hero_header() {
+    fun the_top_bar_has_the_title_and_a_bell_that_opens_notifications() {
+        var opened = 0
         composeRule.setContent {
-            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Loading) }
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Loading,
+                    unreadNotificationCount = 2,
+                    onOpenNotifications = { opened++ },
+                )
+            }
         }
         composeRule.onNodeWithText("Khảo sát").assertExists()
+        composeRule.onNodeWithContentDescription("Thông báo, 2 chưa đọc").performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun the_missing_gps_entry_is_gone() {
+        composeRule.setContent {
+            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Success(assignedRoutes = listOf(route()))) }
+        }
+        composeRule.onNodeWithText("Cột thiếu GPS").assertDoesNotExist()
     }
 
     @Test

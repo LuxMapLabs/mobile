@@ -5,7 +5,9 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.workorder.data.CompletionSyncState
 import com.luxmap.feature.workorder.ui.detail.workOrderScheduleWindow
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import java.util.Locale
 
 enum class HubSection(val title: String) {
     IN_PROGRESS("Đang làm"),
@@ -92,3 +94,8 @@ fun scheduleValue(
     val text = DateFormatUtils.formatPlainDate(scheduledDate)
     return if (parsed == today) "$text · Hôm nay" else text
 }
+
+private val VI = Locale.forLanguageTag("vi")
+
+internal fun surveyHubDate(today: LocalDate): String =
+    today.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", VI)).replaceFirstChar { it.titlecase(VI) }

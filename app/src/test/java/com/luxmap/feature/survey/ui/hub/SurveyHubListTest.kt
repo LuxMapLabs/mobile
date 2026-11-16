@@ -88,4 +88,9 @@ class SurveyHubListTest {
         assertEquals("Chưa có lịch", scheduleValue(null, TODAY))
         assertEquals("Chưa có lịch", scheduleValue("bad", TODAY))
     }
+
+    @Test
+    fun `top bar date has the capitalized vietnamese weekday`() {
+        assertEquals("Thứ Ba, 17/11/2026", surveyHubDate(TODAY))
+    }
 }

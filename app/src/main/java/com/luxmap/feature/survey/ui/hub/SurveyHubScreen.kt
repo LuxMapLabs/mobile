@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,12 +58,9 @@ import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
-import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
-import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -73,6 +71,7 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.ui.components.CancelRequestSheet
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
@@ -80,14 +79,13 @@ import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
-    onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
+    unreadNotificationCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
     highlightWorkOrderId: String? = null,
     modifier: Modifier = Modifier,
     viewModel: SurveyHubViewModel = hiltViewModel(),
@@ -117,31 +115,18 @@ fun SurveyHubRoute(
         viewModel.startedRoute.collect { workOrderId -> onCapturePolePhotos(workOrderId) }
     }
 
-    // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
-    // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
-    // instead of blending into an all-dark one.
-    LuxMapTheme {
-        // Dark mode's accent token (colorScheme.primary) is Green400, not Navy700 - this screen
-        // wants the same navy accent F02 Việc hôm nay uses, so override just primary/onPrimary
-        // for this subtree instead of changing the app-wide dark palette. Harmless in Light mode
-        // (primary is already Navy700 there), only matters if the device itself is in dark mode.
-        MaterialTheme(
-            colorScheme = MaterialTheme.colorScheme.copy(primary = Navy700, onPrimary = Color.White),
-            typography = MaterialTheme.typography,
-        ) {
-            SurveyHubScreen(
-                state = uiState,
-                onCapturePolePhotos = onCapturePolePhotos,
-                highlightWorkOrderId = highlightWorkOrderId,
-                modifier = modifier,
-                onRetry = viewModel::onRetry,
-                onStartRoute = viewModel::onStartRoute,
-                onRequestCancellation = viewModel::onRequestCancellation,
-                onOpenPoleLocationList = onOpenPoleLocationList,
-                onOpenWorkOrderDetail = onOpenWorkOrderDetail,
-            )
-        }
-    }
+    SurveyHubScreen(
+        state = uiState,
+        onCapturePolePhotos = onCapturePolePhotos,
+        highlightWorkOrderId = highlightWorkOrderId,
+        modifier = modifier,
+        onRetry = viewModel::onRetry,
+        onStartRoute = viewModel::onStartRoute,
+        onRequestCancellation = viewModel::onRequestCancellation,
+        onOpenWorkOrderDetail = onOpenWorkOrderDetail,
+        unreadNotificationCount = unreadNotificationCount,
+        onOpenNotifications = onOpenNotifications,
+    )
 }
 
 @Composable
@@ -153,8 +138,9 @@ fun SurveyHubScreen(
     onRetry: () -> Unit = {},
     onStartRoute: (workOrderId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
-    onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
+    unreadNotificationCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
 ) {
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
@@ -162,9 +148,20 @@ fun SurveyHubScreen(
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            SurveyHubHeader()
-            Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            topBar = {
+                LuxTabTopBar(
+                    title = "Khảo sát",
+                    subtitle = surveyHubDate(remember { LocalDate.now() }),
+                    unreadNotificationCount = unreadNotificationCount,
+                    onNotificationsClick = onOpenNotifications,
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (state) {
                     is SurveyHubUiState.Loading -> HubLoadingSkeleton()
 
@@ -175,7 +172,6 @@ fun SurveyHubScreen(
                             onStartRoute = onStartRoute,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
-                            onOpenPoleLocationList = onOpenPoleLocationList,
                             onOpenWorkOrderDetail = onOpenWorkOrderDetail,
                         )
 
@@ -302,39 +298,12 @@ private fun SkeletonBar(
 // a metric block). The notification bell+badge seen in the mockup is not drawn here - the real
 // app already renders one globally in NavGraph's Scaffold across all 4 tabs, not per-screen.
 @Composable
-private fun SurveyHubHeader() {
-    val today =
-        remember {
-            LocalDate.now().format(
-                DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi")),
-            )
-        }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(Navy900)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(text = "Khảo sát", style = HeadlineTextStyle, color = Color.White)
-        Text(
-            text = today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) },
-            style = LabelTextStyle,
-            color = Color.White.copy(alpha = 0.75f),
-        )
-    }
-}
-
-@Composable
 private fun SurveyHubContent(
     state: SurveyHubUiState.Success,
     onCapturePolePhotos: (workOrderId: String) -> Unit,
     onStartRoute: (workOrderId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
-    onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
@@ -377,7 +346,6 @@ private fun SurveyHubContent(
         if (state.startError != null) {
             item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
-        item { PoleLocationEntryCard(onClick = onOpenPoleLocationList) }
         items(state.assignedPoleGpsOrders) { order ->
             PoleGpsUpdateOrderCard(order, onClick = { onOpenWorkOrderDetail(order.workOrderId) })
         }
@@ -436,40 +404,6 @@ private fun PoleGpsUpdateOrderCard(
             Text(text = order.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
         }
         StatusBadge(text = status.label(), colors = status.badgeColors())
-    }
-}
-
-@Composable
-private fun PoleLocationEntryCard(onClick: () -> Unit) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .clickable(onClick = onClick)
-                .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(40.dp)
-                    .background(LuxTheme.status.kind.background, RoundedCornerShape(Radius.chip)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = LuxTheme.status.kind.text)
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(text = "Cột thiếu GPS", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            Text(
-                text = "Đo và cập nhật GPS cho cột trong địa bàn của bạn",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(imageVector = Icons.Filled.ChevronRight, contentDescription = null)
     }
 }
 
