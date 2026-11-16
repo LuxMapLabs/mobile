@@ -308,7 +308,7 @@ Theo CLAUDE.md (mục WorkOrder, xác nhận từ source backend 2026-10-13), ba
 
 ## 12. Vòng 2: làm lại bố cục (2026-11-16)
 
-> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT.** Hướng đã thống nhất trong trao đổi 2026-11-16 (V1–V3 ở cuối mục). Chưa có code nào thay đổi.
+> **Trạng thái:** **ĐÃ DUYỆT VÀ ĐÃ CODE XONG 2026-11-17** trên nhánh `style/workorder-detail-layout-v2`. Còn nợ: kiểm tra tay trên máy đã đăng nhập (Light/Night Field, cỡ chữ 200%).
 > **Căn cứ:** ảnh chụp màn hiện tại (lệnh sửa chữa đang làm, quá hạn, 360dp) và phản hồi của chủ dự án.
 
 ### 12.1 Vấn đề thấy trên màn sau vòng 1
