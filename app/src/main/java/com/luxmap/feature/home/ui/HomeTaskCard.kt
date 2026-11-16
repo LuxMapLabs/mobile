@@ -24,7 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -139,7 +139,13 @@ fun HomeTaskCard(
         }
     LuxCard(
         onClick = onClick,
-        modifier = Modifier.semantics { contentDescription = "Mở lệnh ${item.workOrderId}" },
+        modifier =
+            Modifier.semantics {
+                onClick(label = "Mở lệnh ${item.workOrderId}") {
+                    onClick()
+                    true
+                }
+            },
         contentPadding = PaddingValues(0.dp),
     ) {
         Column(modifier = Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {

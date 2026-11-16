@@ -6,8 +6,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
@@ -19,6 +20,7 @@ import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.WorkOrderCluster
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
 import com.luxmap.feature.workorder.data.CompletionSyncState
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -70,7 +72,28 @@ class HomeLargeFontTest {
     fun selector_and_card_keep_48dp_targets_at_large_font_on_a_narrow_screen() {
         show()
         composeRule.onNodeWithText("Sửa chữa · 1").assertTouchTargetIsAtLeast(48.dp)
-        composeRule.onNodeWithContentDescription("Mở lệnh WO-1042").assertTouchTargetIsAtLeast(48.dp)
+        composeRule.onNode(hasClickAction() and hasText("WO-1042", substring = true)).assertTouchTargetIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun the_top_bar_greeting_is_not_clipped_or_overlapping_the_content_at_large_font() {
+        show()
+        val greeting =
+            composeRule.onNodeWithText(
+                "Xin chào, kysu1",
+                substring = true,
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+        val stats = composeRule.onNodeWithText("Tổng nhiệm vụ", useUnmergedTree = true).fetchSemanticsNode()
+        val greetingBottom = greeting.positionInRoot.y + greeting.size.height
+        assertTrue(
+            "greeting clipped: visible ${greeting.boundsInRoot.height}px of ${greeting.size.height}px",
+            greeting.boundsInRoot.height >= greeting.size.height - 1f,
+        )
+        assertTrue(
+            "greeting bottom $greetingBottom overlaps content top ${stats.boundsInRoot.top}",
+            greetingBottom <= stats.boundsInRoot.top + 1f,
+        )
     }
 
     @Test

@@ -1,11 +1,15 @@
 package com.luxmap.feature.home.ui
 
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -120,8 +124,23 @@ class HomeScreenTest {
         composeTestRule.onNodeWithText("3 sự cố · COM-001", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Làm: 17/11/2026", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Hạn 01/01/2030", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithContentDescription("Mở lệnh WO-7").performClick()
+        composeTestRule.onNode(hasClickAction() and hasText("WO-7", substring = true)).performClick()
         assertEquals("WO-7", opened)
+    }
+
+    @Test
+    fun talkback_reads_the_card_text_and_gets_the_open_action_label() {
+        setContent(uiState = successWith(item("WO-7", title = "Sửa đèn chợ", due = "2030-01-01")))
+        composeTestRule
+            .onNode(hasClickAction() and hasText("WO-7", substring = true))
+            .assert(hasText("Sửa đèn chợ", substring = true))
+            .assert(hasText("Hạn 01/01/2030", substring = true))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+            .assert(
+                SemanticsMatcher("open action label") {
+                    it.config.getOrNull(SemanticsActions.OnClick)?.label == "Mở lệnh WO-7"
+                },
+            )
     }
 
     @Test
