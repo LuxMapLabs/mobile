@@ -366,7 +366,7 @@ private fun FixtureInfoSection(detail: PoleDetail) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
                 .padding(Spacing.lg),
     ) {
         Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
@@ -491,7 +491,7 @@ private fun FaultCard(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
                 .clickable(onClick = onClick)
                 .padding(Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,

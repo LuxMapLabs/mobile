@@ -341,7 +341,7 @@ private fun AccountSection(profile: CurrentUserProfile) {
                     Text(text = profile.email, style = MaterialTheme.typography.bodyLarge)
                 }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -415,9 +415,9 @@ private fun ReadinessSection(
         }
         Column(modifier = Modifier.fillMaxWidth().cardOutline()) {
             NetworkRow(isOnline = isOnline)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             SyncRow(pendingSyncCount = pendingSyncCount, errorSyncCount = errorSyncCount, lastSyncedAt = lastSyncedAt)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             BleRow(state = bleConnectionState)
         }
     }
@@ -608,7 +608,7 @@ private fun FooterInfo(
 private fun Modifier.cardOutline(): Modifier =
     this
         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
 
 // "NB" from "Nguyễn Văn Bình" - first letter of the first word + first letter of the last word.
 // Falls back to the single token's own first letter (e.g. a bare username while loading/erroring).

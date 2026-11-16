@@ -358,7 +358,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -514,7 +514,7 @@ private fun ReviewFooter(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md)
                 .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -903,7 +903,7 @@ private fun RetakeButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = Dimens.minTouchTarget),
         shape = RoundedCornerShape(Radius.control),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
     ) {
         Icon(imageVector = Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(20.dp))

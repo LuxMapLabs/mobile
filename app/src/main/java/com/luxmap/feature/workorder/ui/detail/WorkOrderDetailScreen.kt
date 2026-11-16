@@ -370,7 +370,7 @@ private fun SideBySideBottomBar(
     onCancelClick: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Column(
             modifier =
                 Modifier
@@ -662,7 +662,7 @@ private fun SubmitConfirmationSheet(
                         .padding(horizontal = Spacing.md),
             ) {
                 rows.forEachIndexed { index, row ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
@@ -701,7 +701,7 @@ private fun SubmitConfirmationSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
                     contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text("Kiểm tra lại", maxLines = 1)
@@ -937,7 +937,7 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
                 .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -1061,7 +1061,7 @@ private fun ManagerNoteCard(note: String) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -1151,7 +1151,7 @@ private fun FaultRow(
 ) {
     val priority = severityFromWire(fault.severity)
     val (typeIcon, typeColors) = faultTypeVisual(fault.faultType)
-    val borderColor = if (isAnswered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val borderColor = if (isAnswered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     Row(
         modifier =
             Modifier
@@ -1255,7 +1255,7 @@ private fun WorkflowStepRow(
                         .background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                         .border(
                             width = if (done) 0.dp else 2.dp,
-                            color = MaterialTheme.colorScheme.outline,
+                            color = MaterialTheme.colorScheme.outlineVariant,
                             shape = CircleShape,
                         ),
                 contentAlignment = Alignment.Center,
@@ -1279,7 +1279,11 @@ private fun WorkflowStepRow(
                             .width(StepConnectorWidth)
                             .padding(vertical = Spacing.xs)
                             .background(
-                                if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                if (done) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
                             ),
                 )
             }
@@ -1346,7 +1350,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block)),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block)),
     ) {
         Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -1362,7 +1366,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
         }
         val isDark = isSystemInDarkTheme()
         items.forEach { item ->
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1486,7 +1490,7 @@ private fun PdfAttachmentRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(onClick = onTap, enabled = canTap)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -1529,7 +1533,7 @@ private fun PoleGpsRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -1576,7 +1580,7 @@ private fun PoleGpsReportSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(
@@ -1636,7 +1640,7 @@ private fun RepairCompletionSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(
@@ -1838,7 +1842,7 @@ private fun InspectionCompletionSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(

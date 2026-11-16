@@ -382,7 +382,7 @@ private fun ReportMethodOption(
                 .clickable(enabled = enabled, onClick = onClick)
                 .border(
                     1.dp,
-                    if (enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.surfaceVariant,
+                    if (enabled) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.surfaceVariant,
                     RoundedCornerShape(Radius.control),
                 )
                 .padding(Spacing.md),
@@ -459,7 +459,7 @@ private fun PoleListBottomBar(
     onTapComplete: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(
             modifier =
                 Modifier
@@ -535,7 +535,7 @@ private fun CompleteSurveyConfirmSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
                     contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text("Kiểm tra lại", maxLines = 1)
@@ -556,7 +556,7 @@ private fun CompleteSurveyConfirmSheet(
 private fun Modifier.cardOutline(): Modifier =
     this
         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
 
 @Composable
 private fun PoleListSectionHeader(count: Int) {
@@ -651,7 +651,7 @@ private fun PoleRow(
                 modifier =
                     Modifier
                         .size(Dimens.minTouchTarget)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.control)),
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.control)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -729,7 +729,7 @@ private fun PoleRowSkeleton() {
                     .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SkeletonBar(widthFraction = 0.5f, height = 12.dp, color = MaterialTheme.colorScheme.outline)
+            SkeletonBar(widthFraction = 0.5f, height = 12.dp, color = MaterialTheme.colorScheme.outlineVariant)
             SkeletonBar(widthFraction = 0.3f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
         }
     }

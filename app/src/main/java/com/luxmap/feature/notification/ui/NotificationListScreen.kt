@@ -245,13 +245,13 @@ private fun NotificationSuccessContent(
                                             RoundedCornerShape(Radius.block),
                                         ).border(
                                             1.dp,
-                                            MaterialTheme.colorScheme.outline,
+                                            MaterialTheme.colorScheme.outlineVariant,
                                             RoundedCornerShape(Radius.block),
                                         ),
                             ) {
                                 rows.forEachIndexed { index, row ->
                                     if (index > 0) {
-                                        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                                     }
                                     NotificationRow(
                                         row = row,
@@ -299,7 +299,7 @@ private fun NotificationSkeletonList() {
                     Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
                         .padding(Spacing.md),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
@@ -308,7 +308,7 @@ private fun NotificationSkeletonList() {
                         Modifier
                             .size(NotificationTileSize)
                             .background(
-                                MaterialTheme.colorScheme.outline,
+                                MaterialTheme.colorScheme.outlineVariant,
                                 RoundedCornerShape(NotificationSkeletonTileCorner),
                             ),
                 )
@@ -318,21 +318,21 @@ private fun NotificationSkeletonList() {
                             Modifier
                                 .fillMaxWidth(0.4f)
                                 .height(10.dp)
-                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(5.dp)),
+                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(5.dp)),
                     )
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(0.9f)
                                 .height(12.dp)
-                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
+                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
                     )
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxWidth(0.7f)
                                 .height(12.dp)
-                                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(6.dp)),
+                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
                     )
                 }
             }
@@ -430,7 +430,7 @@ private fun NotificationFilterChip(
 ) {
     val containerColor = if (selected) Navy700 else MaterialTheme.colorScheme.surface
     val contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    val borderColor = if (selected) Navy700 else MaterialTheme.colorScheme.outline
+    val borderColor = if (selected) Navy700 else MaterialTheme.colorScheme.outlineVariant
     val badgeBg = if (selected) Color.White.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant
     Row(
         modifier =
@@ -496,7 +496,7 @@ private fun NotificationRow(
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(text = type.label(), style = LabelTextStyle, color = tileColors.text)
-                Text(text = "·", style = LabelTextStyle, color = MaterialTheme.colorScheme.outline)
+                Text(text = "·", style = LabelTextStyle, color = MaterialTheme.colorScheme.outlineVariant)
                 Text(text = timeLabel, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
@@ -529,7 +529,7 @@ private fun NotificationRow(
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.outline,
+                    tint = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
         }

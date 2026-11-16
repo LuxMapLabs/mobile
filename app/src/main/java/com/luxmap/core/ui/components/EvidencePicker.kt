@@ -111,7 +111,7 @@ private fun AddTile(
     onClick: () -> Unit,
     enabled: Boolean,
 ) {
-    val outlineColor = MaterialTheme.colorScheme.outline
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
     val contentAlpha = if (enabled) 1f else 0.4f
     Column(
         modifier =
