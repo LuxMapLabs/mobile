@@ -106,6 +106,46 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(uiState) {
+        if (uiState is LoginUiState.Success) onLoginSuccess()
+    }
+
+    LoginContent(
+        uiState = uiState,
+        isOnline = isOnline,
+        identifier = viewModel.identifier,
+        password = viewModel.password,
+        isPasswordVisible = viewModel.isPasswordVisible,
+        rememberMe = viewModel.rememberMe,
+        onIdentifierChange = viewModel::onIdentifierChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onTogglePasswordVisibility = viewModel::onTogglePasswordVisibility,
+        onRememberMeChange = viewModel::onRememberMeChange,
+        onLogin = viewModel::onLoginClick,
+        onGoogleSignIn = { viewModel.onGoogleSignInClick(context) },
+        modifier = modifier,
+    )
+}
+
+// State and callbacks keep rendering independent of Hilt, authentication and navigation.
+// Keep this in the same file during the extraction to avoid a large move-only diff.
+@Composable
+internal fun LoginContent(
+    uiState: LoginUiState,
+    isOnline: Boolean,
+    identifier: String,
+    password: String,
+    isPasswordVisible: Boolean,
+    rememberMe: Boolean,
+    onIdentifierChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onTogglePasswordVisibility: () -> Unit,
+    onRememberMeChange: (Boolean) -> Unit,
+    onLogin: () -> Unit,
+    onGoogleSignIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val identifierFocusRequester = remember { FocusRequester() }
@@ -113,9 +153,6 @@ fun LoginScreen(
     val errorPlacement = (uiState as? LoginUiState.Error)?.let { errorPlacementFor(it) }
 
     LaunchedEffect(uiState) {
-        if (uiState is LoginUiState.Success) {
-            onLoginSuccess()
-        }
         // Put the cursor in the field that needs fixing, so the user can type again right away.
         // Errors shown in the banner do not move the focus.
         when ((uiState as? LoginUiState.Error)?.reason) {
@@ -231,8 +268,8 @@ fun LoginScreen(
 
             FieldLabel("Mã nhân viên hoặc số điện thoại")
             OutlinedTextField(
-                value = viewModel.identifier,
-                onValueChange = viewModel::onIdentifierChange,
+                value = identifier,
+                onValueChange = onIdentifierChange,
                 placeholder = { Text("Ví dụ: NV-0125") },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
@@ -266,8 +303,8 @@ fun LoginScreen(
 
             FieldLabel("Mật khẩu")
             OutlinedTextField(
-                value = viewModel.password,
-                onValueChange = viewModel::onPasswordChange,
+                value = password,
+                onValueChange = onPasswordChange,
                 placeholder = { Text("Nhập mật khẩu") },
                 leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                 singleLine = true,
@@ -287,20 +324,20 @@ fun LoginScreen(
                         onDone = {
                             keyboardController?.hide()
                             focusManager.clearFocus()
-                            if (!isSubmitting) viewModel.onLoginClick()
+                            if (!isSubmitting) onLogin()
                         },
                     ),
                 isError = errorPlacement?.passwordInvalid == true,
                 visualTransformation =
-                    if (viewModel.isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    IconButton(onClick = viewModel::onTogglePasswordVisibility) {
+                    IconButton(onClick = onTogglePasswordVisibility) {
                         val icon =
-                            if (viewModel.isPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                            if (isPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
                         Icon(
                             imageVector = icon,
                             contentDescription =
-                                if (viewModel.isPasswordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
+                                if (isPasswordVisible) "Ẩn mật khẩu" else "Hiện mật khẩu",
                         )
                     }
                 },
@@ -317,8 +354,8 @@ fun LoginScreen(
             Spacer(Modifier.height(Spacing.sm))
 
             RememberMeRow(
-                checked = viewModel.rememberMe,
-                onCheckedChange = viewModel::onRememberMeChange,
+                checked = rememberMe,
+                onCheckedChange = onRememberMeChange,
                 enabled = !isSubmitting,
             )
             Spacer(Modifier.height(Spacing.md))
@@ -348,7 +385,7 @@ fun LoginScreen(
                 }
             PrimaryButton(
                 text = loginButtonText,
-                onClick = viewModel::onLoginClick,
+                onClick = onLogin,
                 enabled = !isSubmitting,
                 isLoading = uiState is LoginUiState.LoggingIn,
                 trailingIcon = if (isSubmitting) null else Icons.AutoMirrored.Filled.ArrowForward,
@@ -381,7 +418,7 @@ fun LoginScreen(
             OrDivider()
             Spacer(Modifier.height(Spacing.lg))
             OutlinedButton(
-                onClick = { viewModel.onGoogleSignInClick(context) },
+                onClick = onGoogleSignIn,
                 enabled = !isSubmitting,
                 shape = RoundedCornerShape(Radius.control),
                 modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
