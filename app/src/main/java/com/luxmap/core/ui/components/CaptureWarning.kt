@@ -21,9 +21,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.NightFieldStatusColors
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.badgeColors
 
 // §3 CaptureWarning: GPS-lost / lux-sensor-gap banner for F04. Reuses AssetCondition.DIM's dark
 // pair (#4A3310/#F7C66D, same hex the spec's own component row gives) instead of a new token.
@@ -32,7 +32,7 @@ fun CaptureWarning(
     message: String,
     modifier: Modifier = Modifier,
 ) {
-    val colors = AssetCondition.DIM.badgeColors(isDark = true)
+    val colors = NightFieldStatusColors.asset.getValue(AssetCondition.DIM)
     Row(
         modifier =
             modifier

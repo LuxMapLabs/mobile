@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -88,44 +90,31 @@ val BrandHeroGradient =
         1f to Blue600,
     )
 
-// Semantic — theo theme (mục 2.2), dùng trong LuxMapColorScheme ở Theme.kt
-data class LuxMapSemanticColors(
-    val background: Color,
-    val surface: Color,
-    val surfaceSubtle: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val border: Color,
-    val focus: Color,
-    val navigationActive: Color,
-    val navigationInactive: Color,
-)
+val White = Color(0xFFFFFFFF)
+val Gray150 = Color(0xFFE8EDF3)
+val Slate800 = Color(0xFF1E293B)
+val Navy200 = Color(0xFFA9BCDD)
+val Blue50 = Color(0xFFE4EEF6)
+val Blue900 = Color(0xFF173B57)
+val Red700 = Color(0xFFB91C1C)
+val Red50 = Color(0xFFFEE2E2)
+val Red900 = Color(0xFF7F1D1D)
 
-val LightSemanticColors =
-    LuxMapSemanticColors(
-        background = Gray25,
-        surface = Color(0xFFFFFFFF),
-        surfaceSubtle = Gray50,
-        textPrimary = Gray900,
-        textSecondary = Slate600,
-        border = Gray200,
-        focus = Blue500,
-        navigationActive = Navy700,
-        navigationInactive = Slate600,
-    )
-
-val DarkSemanticColors =
-    LuxMapSemanticColors(
-        background = Dark950,
-        surface = Dark800,
-        surfaceSubtle = Dark900,
-        textPrimary = DarkText,
-        textSecondary = DarkSecondary,
-        border = Dark700,
-        focus = Green400,
-        navigationActive = Green400,
-        navigationInactive = DarkMuted,
-    )
+val Navy300 = Color(0xFF9DB7E0)
+val Navy750 = Color(0xFF21375C)
+val Navy950 = Color(0xFF0E1E38)
+val Blue100 = Color(0xFFD2E4F2)
+val Blue300 = Color(0xFF8FB8DA)
+val Blue800 = Color(0xFF1B3A52)
+val Blue950 = Color(0xFF0B2235)
+val Night100 = Color(0xFFE6E6E6)
+val Night500 = Color(0xFF8C8C8C)
+val Night750 = Color(0xFF2E2E2E)
+val Night800 = Color(0xFF262626)
+val Night850 = Color(0xFF1C1C1C)
+val NightError700 = Color(0xFF4A1717)
+val NightOnError = Color(0xFF3B0A0A)
+val NightOnErrorContainer = Color(0xFFFFD5D5)
 
 // Component — badge tình trạng tài sản (mục 2.3), cặp bg/text theo theme, không đổi
 enum class AssetCondition { NORMAL, DIM, OUT, UNKNOWN }
@@ -142,59 +131,17 @@ fun AssetCondition.label(): String =
 
 data class BadgeColors(val background: Color, val text: Color)
 
-fun AssetCondition.badgeColors(isDark: Boolean): BadgeColors =
-    when (this) {
-        AssetCondition.NORMAL ->
-            if (isDark) {
-                BadgeColors(
-                    Color(0xFF123D34),
-                    Color(0xFF8CE3D1),
-                )
-            } else {
-                BadgeColors(Color(0xFFD1FAE5), Color(0xFF065F46))
-            }
-        AssetCondition.DIM ->
-            if (isDark) {
-                BadgeColors(
-                    Color(0xFF4A3310),
-                    Color(0xFFF7C66D),
-                )
-            } else {
-                BadgeColors(Color(0xFFFEF3C7), Color(0xFF92400E))
-            }
-        AssetCondition.OUT ->
-            if (isDark) {
-                BadgeColors(
-                    Color(0xFF4A1717),
-                    Color(0xFFFF9A9A),
-                )
-            } else {
-                BadgeColors(Color(0xFFFEE2E2), Color(0xFF991B1B))
-            }
-        AssetCondition.UNKNOWN ->
-            if (isDark) {
-                BadgeColors(
-                    Color(0xFF303030),
-                    Color(0xFFD0D0D0),
-                )
-            } else {
-                BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555))
-            }
-    }
+@Composable
+@ReadOnlyComposable
+fun AssetCondition.badgeColors(): BadgeColors = LuxTheme.status.asset.getValue(this)
 
 // Component — badge trạng thái đồng bộ (mục 2.4). queued tách offline/online ở tầng gọi,
 // không gộp failed/conflict (xem CLAUDE.md "Nguyên tắc nghiệp vụ cốt lõi")
 enum class SyncStatus { QUEUED_OFFLINE, QUEUED_ONLINE, SYNCING, FAILED, CONFLICT, DONE }
 
-fun SyncStatus.badgeColors(): BadgeColors =
-    when (this) {
-        SyncStatus.QUEUED_OFFLINE -> BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555))
-        SyncStatus.QUEUED_ONLINE -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
-        SyncStatus.SYNCING -> BadgeColors(Color(0xFFFFF3DC), Color(0xFF8A5A00))
-        SyncStatus.FAILED -> BadgeColors(Color(0xFFFBE4E4), Color(0xFF9B2C2C))
-        SyncStatus.CONFLICT -> BadgeColors(Color(0xFFFDE8D0), Color(0xFF8A3B00))
-        SyncStatus.DONE -> BadgeColors(Color(0xFFE3F6F1), Color(0xFF1E6B5C))
-    }
+@Composable
+@ReadOnlyComposable
+fun SyncStatus.badgeColors(): BadgeColors = LuxTheme.status.sync.getValue(this)
 
 fun SyncStatus.label(): String =
     when (this) {
@@ -226,13 +173,9 @@ fun WorkOrderPriority.label(): String =
         WorkOrderPriority.URGENT -> "Khẩn"
     }
 
-fun WorkOrderPriority.badgeColors(): BadgeColors =
-    when (this) {
-        WorkOrderPriority.LOW -> BadgeColors(Color(0xFFF1F5F9), Color(0xFF475569))
-        WorkOrderPriority.NORMAL -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
-        WorkOrderPriority.HIGH -> BadgeColors(Color(0xFFFEF3C7), Color(0xFF92400E))
-        WorkOrderPriority.URGENT -> BadgeColors(Color(0xFFFEE2E2), Color(0xFF991B1B))
-    }
+@Composable
+@ReadOnlyComposable
+fun WorkOrderPriority.badgeColors(): BadgeColors = LuxTheme.status.priority.getValue(this)
 
 fun severityFromWire(value: String): WorkOrderPriority =
     when (value) {
@@ -268,15 +211,9 @@ fun WorkOrderStatus.icon(): ImageVector =
         WorkOrderStatus.CANCELLED -> Icons.Filled.Cancel
     }
 
-fun WorkOrderStatus.badgeColors(): BadgeColors =
-    when (this) {
-        WorkOrderStatus.OPEN -> BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555))
-        WorkOrderStatus.ASSIGNED -> BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864))
-        WorkOrderStatus.IN_PROGRESS -> BadgeColors(Color(0xFFFFF3DC), Color(0xFF8A5A00))
-        WorkOrderStatus.DONE -> BadgeColors(Color(0xFFE3F6F1), Color(0xFF1E6B5C))
-        WorkOrderStatus.VERIFIED -> BadgeColors(Color(0xFFD1FAE5), Color(0xFF065F46))
-        WorkOrderStatus.CANCELLED -> BadgeColors(Color(0xFFFBE4E4), Color(0xFF9B2C2C))
-    }
+@Composable
+@ReadOnlyComposable
+fun WorkOrderStatus.badgeColors(): BadgeColors = LuxTheme.status.workOrder.getValue(this)
 
 // wo_status arrives from the backend as a snake_case wire string (WireEnum, e.g. "in_progress")
 // - never guess a mapping at the call site, always go through this one function. An unknown
@@ -293,9 +230,6 @@ fun workOrderStatusFromWire(value: String): WorkOrderStatus =
         else -> WorkOrderStatus.OPEN
     }
 
-// Component - task_kind badge (F02 cluster list), distinguishes an inspection ticket from a
-// repair ticket on the same work_order entity. Colors reuse the existing ASSIGNED/IN_PROGRESS
-// pairs above rather than adding new ones.
 enum class WorkOrderTaskKind { INSPECTION, REPAIR, SURVEY, POLE_GPS_UPDATE }
 
 fun WorkOrderTaskKind.label(): String =
@@ -314,13 +248,9 @@ fun WorkOrderTaskKind.icon(): ImageVector =
         WorkOrderTaskKind.POLE_GPS_UPDATE -> Icons.Filled.LocationOn
     }
 
-fun WorkOrderTaskKind.badgeColors(): BadgeColors =
-    when (this) {
-        WorkOrderTaskKind.INSPECTION -> WorkOrderStatus.ASSIGNED.badgeColors()
-        WorkOrderTaskKind.REPAIR -> WorkOrderStatus.IN_PROGRESS.badgeColors()
-        WorkOrderTaskKind.SURVEY -> WorkOrderStatus.DONE.badgeColors()
-        WorkOrderTaskKind.POLE_GPS_UPDATE -> WorkOrderStatus.VERIFIED.badgeColors()
-    }
+@Composable
+@ReadOnlyComposable
+fun WorkOrderTaskKind.badgeColors(): BadgeColors = LuxTheme.status.kind
 
 // task_kind arrives from the backend as a snake_case wire string ("inspection"/"repair"/
 // "survey") - an unknown value falls back to Inspection (the non-destructive one) rather than

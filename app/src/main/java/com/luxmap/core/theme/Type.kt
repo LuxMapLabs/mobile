@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
 import com.luxmap.R
 
@@ -19,72 +20,36 @@ val BeVietnamPro =
         Font(R.font.be_vietnam_pro_bold, FontWeight.Bold),
     )
 
-// Thang chữ theo mục 3 Design System v2.0. Nội dung đọc/hành động không nhỏ hơn 16sp;
-// Caption (14sp) chỉ dùng cho metadata phụ, không dùng cho cảnh báo/hướng dẫn.
+private fun luxStyle(
+    size: Int,
+    lineHeight: Int,
+    weight: FontWeight,
+) = TextStyle(
+    fontFamily = BeVietnamPro,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = lineHeight.sp,
+    letterSpacing = 0.sp,
+    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+)
+
 val Typography =
     Typography(
-        // Display Number 28sp/34sp/700 — số lớn: lux, số lượng, quãng đường
-        displayLarge =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
-                lineHeight = 34.sp,
-            ),
-        // H1 20sp/26sp/700 — tiêu đề màn hình
-        titleLarge =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp,
-                lineHeight = 26.sp,
-            ),
-        // H2 17sp/24sp/600 — tiêu đề section/card
-        titleMedium =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 17.sp,
-                lineHeight = 24.sp,
-            ),
-        // Body 16sp/24sp/400 — nội dung chính
-        bodyLarge =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Normal,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-            ),
-        bodyMedium =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Normal,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-            ),
-        // Body Strong 16sp/24sp/600 — label quan trọng, chữ trên nút (Button mặc định dùng labelLarge)
-        labelLarge =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
-                lineHeight = 24.sp,
-            ),
-        // Caption 14sp/20sp/500 — timestamp, metadata phụ
-        bodySmall =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            ),
-        labelSmall =
-            TextStyle(
-                fontFamily = BeVietnamPro,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            ),
+        displayLarge = luxStyle(34, 42, FontWeight.Bold),
+        displayMedium = luxStyle(30, 38, FontWeight.Bold),
+        displaySmall = luxStyle(28, 36, FontWeight.Bold),
+        headlineLarge = luxStyle(26, 36, FontWeight.Bold),
+        headlineMedium = luxStyle(24, 33, FontWeight.Bold),
+        headlineSmall = luxStyle(22, 30, FontWeight.SemiBold),
+        titleLarge = luxStyle(20, 28, FontWeight.Bold),
+        titleMedium = luxStyle(17, 24, FontWeight.SemiBold),
+        titleSmall = luxStyle(16, 24, FontWeight.SemiBold),
+        bodyLarge = luxStyle(16, 24, FontWeight.Normal),
+        bodyMedium = luxStyle(16, 22, FontWeight.Normal),
+        bodySmall = luxStyle(14, 20, FontWeight.Medium),
+        labelLarge = luxStyle(16, 24, FontWeight.SemiBold),
+        labelMedium = luxStyle(14, 20, FontWeight.SemiBold),
+        labelSmall = luxStyle(14, 20, FontWeight.Medium),
     )
 
 // v2.1 redesign typography scale — additive TextStyle vals, deliberately NOT remapped onto
@@ -109,7 +74,5 @@ val BodyTextStyle =
     TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
 val LabelTextStyle =
     TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
-val OverlineTextStyle =
-    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp)
-val BadgeTextStyle =
-    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
+val OverlineTextStyle = Typography.labelMedium
+val BadgeTextStyle = Typography.labelMedium

@@ -680,7 +680,7 @@ fun MapScreen(
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(vertical = Spacing.sm),
-                            color = MaterialTheme.colorScheme.outline,
+                            color = MaterialTheme.colorScheme.outlineVariant,
                         )
                         Text(text = "Hiển thị trạng thái cột", style = MaterialTheme.typography.labelLarge)
                         MapStatusFilterRow(

@@ -2,7 +2,6 @@ package com.luxmap.feature.map.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -44,7 +43,6 @@ fun MapStatusFilterRow(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val isDark = isSystemInDarkTheme()
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -54,7 +52,7 @@ fun MapStatusFilterRow(
             StatusFilterChip(
                 label = condition.label(),
                 selected = condition in selectedStatuses,
-                selectedColors = condition.badgeColors(isDark),
+                selectedColors = condition.badgeColors(),
                 enabled = enabled,
                 onClick = { onToggle(condition) },
             )

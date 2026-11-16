@@ -53,7 +53,7 @@ fun LuminanceTrendCard(
             modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusMedium))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
                 .padding(Spacing.lg),
     ) {
         Text(text = "Xu hướng độ sáng", style = MaterialTheme.typography.titleMedium)

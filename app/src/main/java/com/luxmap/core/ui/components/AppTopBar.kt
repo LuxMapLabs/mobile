@@ -7,20 +7,14 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.TitleTextStyle
-
-private val SubtitleTextStyle =
-    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 16.sp)
 
 // onBack is nullable for a screen that intentionally has no way back (e.g. F05 Coverage, which
 // blocks the system back gesture too so a packaged session always gets an explicit decision) -
@@ -40,7 +34,7 @@ fun AppTopBar(
             Column {
                 Text(text = title, style = TitleTextStyle)
                 if (subtitle != null) {
-                    Text(text = subtitle, style = SubtitleTextStyle)
+                    Text(text = subtitle, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

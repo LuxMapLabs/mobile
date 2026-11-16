@@ -3,7 +3,6 @@ package com.luxmap.feature.survey.ui.hub
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +60,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.Radius
@@ -71,7 +71,6 @@ import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
@@ -248,7 +247,7 @@ private fun HubLoadingSkeleton() {
         modifier = Modifier.fillMaxSize().padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        SkeletonBar(width = 120.dp, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+        SkeletonBar(width = 120.dp, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
         repeat(3) { RouteCardSkeleton() }
     }
 }
@@ -275,7 +274,7 @@ private fun RouteCardSkeleton() {
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 SkeletonBar(widthFraction = 0.4f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-                SkeletonBar(widthFraction = 0.6f, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+                SkeletonBar(widthFraction = 0.6f, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
         SkeletonBar(
@@ -416,7 +415,7 @@ private fun PoleGpsUpdateOrderCard(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -447,7 +446,7 @@ private fun PoleLocationEntryCard(onClick: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -517,8 +516,8 @@ private fun AssignedRouteCard(
     // of guessing a different one.
     val canRequestCancellation = status == WorkOrderStatus.ASSIGNED && !isCancelled
     val dateColor =
-        if (scheduledDateIsToday(route.scheduledDate)) DueTodayColor else MaterialTheme.colorScheme.onSurface
-    val borderColor = if (isHighlighted) Navy700 else MaterialTheme.colorScheme.outline
+        if (scheduledDateIsToday(route.scheduledDate)) LuxTheme.colors.dueToday else MaterialTheme.colorScheme.onSurface
+    val borderColor = if (isHighlighted) Navy700 else MaterialTheme.colorScheme.outlineVariant
     val borderWidth = if (isHighlighted) 2.dp else 1.dp
     Column(
         modifier =
@@ -573,7 +572,7 @@ private fun AssignedRouteCard(
                         .fillMaxWidth()
                         .heightIn(min = Dimens.minTouchTarget)
                         .background(
-                            AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).background,
+                            AssetCondition.OUT.badgeColors().background,
                             RoundedCornerShape(Radius.control),
                         ),
                 horizontalArrangement = Arrangement.Center,
@@ -581,7 +580,7 @@ private fun AssignedRouteCard(
             ) {
                 Text(
                     text = "Đã gửi yêu cầu hủy · chờ duyệt",
-                    color = AssetCondition.OUT.badgeColors(isDark = isSystemInDarkTheme()).text,
+                    color = AssetCondition.OUT.badgeColors().text,
                 )
             }
         } else {

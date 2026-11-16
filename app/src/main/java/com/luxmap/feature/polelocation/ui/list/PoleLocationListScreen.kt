@@ -123,7 +123,7 @@ private fun PoleLocationRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,

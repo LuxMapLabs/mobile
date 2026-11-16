@@ -1,6 +1,5 @@
 package com.luxmap.core.ui.components
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -28,7 +27,7 @@ fun InlineErrorText(
     message: String,
     modifier: Modifier = Modifier,
 ) {
-    val color = AssetCondition.OUT.badgeColors(isSystemInDarkTheme()).text
+    val color = AssetCondition.OUT.badgeColors().text
     Row(
         modifier = modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         verticalAlignment = Alignment.CenterVertically,

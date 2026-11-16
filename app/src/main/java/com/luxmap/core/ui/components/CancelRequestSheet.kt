@@ -120,7 +120,7 @@ fun CancelRequestSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text("Quay lại")
@@ -152,7 +152,7 @@ private fun CancelReasonRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val outColors = AssetCondition.OUT.badgeColors(isDark = false)
+    val outColors = AssetCondition.OUT.badgeColors()
     Row(
         modifier =
             Modifier

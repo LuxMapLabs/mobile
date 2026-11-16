@@ -10,12 +10,12 @@ class LuxMapColorSchemeTest {
 
     @Test
     fun `light primaryContainer is the navy token, not the Material default`() {
-        assertEquals(Navy50, LuxMapLightColorScheme.primaryContainer)
+        assertEquals(Navy100, LuxMapLightColorScheme.primaryContainer)
     }
 
     @Test
     fun `light onPrimaryContainer is the navy token`() {
-        assertEquals(Navy700, LuxMapLightColorScheme.onPrimaryContainer)
+        assertEquals(Navy800, LuxMapLightColorScheme.onPrimaryContainer)
     }
 
     @Test
@@ -25,7 +25,24 @@ class LuxMapColorSchemeTest {
 
     @Test
     fun `dark primaryContainer is the navy token`() {
-        assertEquals(Navy800, LuxMapDarkColorScheme.primaryContainer)
+        assertEquals(Navy750, LuxMapDarkColorScheme.primaryContainer)
+    }
+
+    @Test
+    fun `light primary stays the approved brand navy`() {
+        assertEquals(Navy700, LuxMapLightColorScheme.primary)
+    }
+
+    @Test
+    fun `night field primary is the lightened brand navy, not the asset normal teal`() {
+        assertEquals(Navy300, LuxMapDarkColorScheme.primary)
+        assertTrue(LuxMapDarkColorScheme.primary != Green400)
+    }
+
+    @Test
+    fun `both themes disable tonal surface tint`() {
+        assertEquals(Color.Transparent, LuxMapLightColorScheme.surfaceTint)
+        assertEquals(Color.Transparent, LuxMapDarkColorScheme.surfaceTint)
     }
 
     @Test

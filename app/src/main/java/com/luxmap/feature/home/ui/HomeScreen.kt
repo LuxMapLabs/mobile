@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -70,6 +69,7 @@ import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -81,7 +81,6 @@ import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
@@ -366,7 +365,7 @@ private fun SummaryStatCell(
 
 @Composable
 private fun SummaryStatDivider() {
-    Box(modifier = Modifier.width(1.dp).height(16.dp).background(MaterialTheme.colorScheme.outline))
+    Box(modifier = Modifier.width(1.dp).height(16.dp).background(MaterialTheme.colorScheme.outlineVariant))
 }
 
 @Composable
@@ -451,7 +450,7 @@ private fun TabEmptyState(tab: TaskFilterTab) {
                 Modifier
                     .size(56.dp)
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card)),
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
@@ -489,12 +488,11 @@ private fun TaskRow(
     val status = workOrderStatusFromWire(item.woStatus)
     val due = dueDateLabel(item.dueDate)
     val kindColors = kind.badgeColors()
-    val isDark = isSystemInDarkTheme()
     // Same 3-tier due-date color convention used across the work-order screens.
     val dueColor =
         when {
             due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
+            due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val dueIcon =
@@ -504,7 +502,11 @@ private fun TaskRow(
             else -> Icons.Filled.EventAvailable
         }
     val borderColor =
-        if (due.isOverdue) MaterialTheme.colorScheme.error.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outline
+        if (due.isOverdue) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        }
     Column(
         modifier =
             Modifier
@@ -544,13 +546,12 @@ private fun TaskRow(
                         status = status,
                         isOverdue = due.isOverdue,
                         isLocallyCompleted = isLocallyCompleted,
-                        isDark = isDark,
                     )
                 }
                 Text(text = clusterLabel, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget).padding(horizontal = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
@@ -561,7 +562,7 @@ private fun TaskRow(
             Icon(
                 imageVector = Icons.Filled.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
+                tint = MaterialTheme.colorScheme.outlineVariant,
             )
         }
     }
@@ -575,7 +576,6 @@ private fun TaskStatusBadge(
     status: WorkOrderStatus,
     isOverdue: Boolean,
     isLocallyCompleted: Boolean,
-    isDark: Boolean,
 ) {
     when {
         isLocallyCompleted ->
@@ -583,7 +583,7 @@ private fun TaskStatusBadge(
         isOverdue ->
             StatusBadge(
                 text = "Quá hạn",
-                colors = AssetCondition.OUT.badgeColors(isDark),
+                colors = AssetCondition.OUT.badgeColors(),
                 icon = Icons.Filled.ErrorOutline,
             )
         else -> StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
@@ -616,7 +616,7 @@ private fun TaskRowSkeleton() {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -628,7 +628,7 @@ private fun TaskRowSkeleton() {
                         .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SkeletonBar(widthFraction = 0.45f, height = 14.dp, color = MaterialTheme.colorScheme.outline)
+                SkeletonBar(widthFraction = 0.45f, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
                 SkeletonBar(widthFraction = 0.7f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
@@ -673,7 +673,7 @@ private fun BoxScope.ErrorState(
             onClick = onRetry,
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
             Spacer(Modifier.width(Spacing.sm))

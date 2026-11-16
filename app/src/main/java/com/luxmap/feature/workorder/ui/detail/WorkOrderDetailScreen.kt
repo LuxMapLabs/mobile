@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -93,15 +92,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -110,12 +106,11 @@ import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
-import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
@@ -136,7 +131,6 @@ import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
@@ -370,7 +364,7 @@ private fun SideBySideBottomBar(
     onCancelClick: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Column(
             modifier =
                 Modifier
@@ -427,6 +421,7 @@ private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean 
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
 // redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
 // the old layout's separate inline buttons for each case.
+@Composable
 private fun workOrderCtaState(
     state: WorkOrderDetailUiState.Success,
     onStart: () -> Unit,
@@ -467,7 +462,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
-                hintColor = Danger600,
+                hintColor = MaterialTheme.colorScheme.error,
             )
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
@@ -476,7 +471,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
-                hintColor = Gray500,
+                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
             WorkOrderCtaState(
@@ -497,7 +492,12 @@ private fun workOrderCtaState(
                     } else {
                         missingRequirementsHint(repairRequirements(state))
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 requiresConfirmation = true,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
@@ -514,7 +514,12 @@ private fun workOrderCtaState(
                         missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
                         else -> null
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
                 progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
                 requiresConfirmation = true,
@@ -534,7 +539,12 @@ private fun workOrderCtaState(
                         missing > 0 -> "Còn $missing cột chưa chụp"
                         else -> null
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 requiresConfirmation = true,
             )
         }
@@ -545,7 +555,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
-                hintColor = Gray500,
+                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         else -> null
     }
@@ -567,6 +577,7 @@ private fun missingRequirementsHint(requirements: List<Requirement>): String? {
 
 private data class SubmitSummaryRow(val icon: ImageVector, val iconColor: Color, val label: String, val value: String)
 
+@Composable
 private fun submitSummaryRows(
     kind: WorkOrderTaskKind,
     state: WorkOrderDetailUiState.Success,
@@ -576,19 +587,19 @@ private fun submitSummaryRows(
         listOf(
             SubmitSummaryRow(
                 Icons.Filled.Error,
-                AssetCondition.OUT.badgeColors(isDark = false).text,
+                AssetCondition.OUT.badgeColors().text,
                 "Có sự cố",
                 outcomes.count { it == "fault_present" }.toString(),
             ),
             SubmitSummaryRow(
                 Icons.Filled.CheckCircle,
-                AssetCondition.NORMAL.badgeColors(isDark = false).text,
+                AssetCondition.NORMAL.badgeColors().text,
                 "Không có sự cố",
                 outcomes.count { it == "fault_absent" }.toString(),
             ),
             SubmitSummaryRow(
                 Icons.Filled.Help,
-                AssetCondition.DIM.badgeColors(isDark = false).text,
+                AssetCondition.DIM.badgeColors().text,
                 "Chưa xác định",
                 outcomes.count { it == "inconclusive" }.toString(),
             ),
@@ -662,7 +673,7 @@ private fun SubmitConfirmationSheet(
                         .padding(horizontal = Spacing.md),
             ) {
                 rows.forEachIndexed { index, row ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(
                         modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
@@ -701,7 +712,7 @@ private fun SubmitConfirmationSheet(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
                     contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text("Kiểm tra lại", maxLines = 1)
@@ -828,15 +839,6 @@ private val HeroMinHeight = 136.dp
 private val HeroBackChipColor = Color(0xFF1E3D6B)
 private val HeroBackChipRing = Color(0xFF93B2E0)
 
-private val HeroMetadataTextStyle =
-    TextStyle(
-        fontFamily = BeVietnamPro,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.04.em,
-    )
-
 @Composable
 private fun WorkOrderHeroSection(
     detail: WorkOrderDetail,
@@ -892,7 +894,7 @@ private fun WorkOrderHeroSection(
                         } else {
                             "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi"))
                         },
-                    style = HeroMetadataTextStyle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF9FB6D6),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -922,7 +924,7 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val dueColor =
         when {
             due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
+            due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurface
         }
     val scheduleLabel =
@@ -937,7 +939,7 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
                 .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -1061,7 +1063,7 @@ private fun ManagerNoteCard(note: String) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -1132,14 +1134,15 @@ private val FaultSectionAvatarSize = 32.dp
 private val FaultTypeIconSize = 44.dp
 private val FaultNavigateButtonSize = 48.dp
 
+@Composable
 private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
     when (faultType) {
-        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors(isDark = false)
-        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors(isDark = false)
-        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors(isDark = false)
-        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors(isDark = false)
-        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors(isDark = false)
-        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors()
+        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors()
+        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors()
+        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors()
+        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors()
+        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors()
     }
 
 @Composable
@@ -1151,7 +1154,7 @@ private fun FaultRow(
 ) {
     val priority = severityFromWire(fault.severity)
     val (typeIcon, typeColors) = faultTypeVisual(fault.faultType)
-    val borderColor = if (isAnswered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+    val borderColor = if (isAnswered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     Row(
         modifier =
             Modifier
@@ -1235,12 +1238,11 @@ private fun WorkflowStepRow(
     isLast: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
-    val isDark = isSystemInDarkTheme()
     val tagColors =
         when {
             !required -> WorkOrderStatus.OPEN.badgeColors()
             done -> WorkOrderStatus.VERIFIED.badgeColors()
-            else -> AssetCondition.OUT.badgeColors(isDark)
+            else -> AssetCondition.OUT.badgeColors()
         }
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Column(
@@ -1255,7 +1257,7 @@ private fun WorkflowStepRow(
                         .background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
                         .border(
                             width = if (done) 0.dp else 2.dp,
-                            color = MaterialTheme.colorScheme.outline,
+                            color = MaterialTheme.colorScheme.outlineVariant,
                             shape = CircleShape,
                         ),
                 contentAlignment = Alignment.Center,
@@ -1279,7 +1281,11 @@ private fun WorkflowStepRow(
                             .width(StepConnectorWidth)
                             .padding(vertical = Spacing.xs)
                             .background(
-                                if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                if (done) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
                             ),
                 )
             }
@@ -1346,7 +1352,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.block)),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block)),
     ) {
         Column(modifier = Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -1360,9 +1366,8 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        val isDark = isSystemInDarkTheme()
         items.forEach { item ->
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1381,9 +1386,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                     text = if (item.required) "Bắt buộc" else "Không bắt buộc",
                     colors =
                         if (item.required) {
-                            AssetCondition.OUT.badgeColors(
-                                isDark,
-                            )
+                            AssetCondition.OUT.badgeColors()
                         } else {
                             WorkOrderStatus.OPEN.badgeColors()
                         },
@@ -1486,7 +1489,7 @@ private fun PdfAttachmentRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(onClick = onTap, enabled = canTap)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -1529,7 +1532,7 @@ private fun PoleGpsRow(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.card))
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -1576,7 +1579,7 @@ private fun PoleGpsReportSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(
@@ -1636,7 +1639,7 @@ private fun RepairCompletionSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(
@@ -1838,7 +1841,7 @@ private fun InspectionCompletionSection(
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                     .padding(Spacing.md),
         ) {
             WorkflowStepRow(

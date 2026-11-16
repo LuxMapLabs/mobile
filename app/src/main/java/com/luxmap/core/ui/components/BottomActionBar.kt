@@ -55,7 +55,7 @@ fun BottomActionBar(
 ) {
     Column(modifier = modifier.fillMaxWidth().let { if (pinned) it.navigationBarsPadding() else it }) {
         if (pinned) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         }
         Column(
             modifier =
@@ -75,7 +75,7 @@ fun BottomActionBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     progressSegments.forEach { done ->
-                        val color = if (done) Navy700 else MaterialTheme.colorScheme.outline
+                        val color = if (done) Navy700 else MaterialTheme.colorScheme.outlineVariant
                         Box(
                             modifier =
                                 Modifier

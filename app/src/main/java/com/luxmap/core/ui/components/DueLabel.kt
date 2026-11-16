@@ -1,6 +1,5 @@
 package com.luxmap.core.ui.components
 
-import androidx.compose.ui.graphics.Color
 import com.luxmap.core.common.DateFormatUtils
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
@@ -29,5 +28,3 @@ fun dueDateLabel(
         else -> DueLabel("Hạn $formattedDate", isToday = false, isOverdue = false)
     }
 }
-
-val DueTodayColor = Color(0xFFB45309)

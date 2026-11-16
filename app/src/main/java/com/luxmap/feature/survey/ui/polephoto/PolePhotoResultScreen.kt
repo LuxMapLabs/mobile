@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -334,7 +333,7 @@ private fun cvStateColors(cvState: String?): BadgeColors {
             "off" -> AssetCondition.OUT
             else -> AssetCondition.UNKNOWN
         }
-    return condition.badgeColors(isSystemInDarkTheme())
+    return condition.badgeColors()
 }
 
 @Composable
@@ -350,7 +349,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
             ConfidenceBand.MEDIUM -> AssetCondition.DIM
             ConfidenceBand.LOW -> AssetCondition.OUT
         }
-    val bandColors = bandCondition.badgeColors(isSystemInDarkTheme())
+    val bandColors = bandCondition.badgeColors()
     val confidenceText = confidenceLabel(state.confidence)
 
     Column(
@@ -358,7 +357,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
                 .padding(Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
@@ -514,7 +513,7 @@ private fun ReviewFooter(
             Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md)
                 .navigationBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -903,7 +902,7 @@ private fun RetakeButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = Dimens.minTouchTarget),
         shape = RoundedCornerShape(Radius.control),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
     ) {
         Icon(imageVector = Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(20.dp))

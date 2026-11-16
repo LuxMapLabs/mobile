@@ -33,7 +33,7 @@ fun LifecycleTracker(
 ) {
     val doneColor = if (onDarkHero) Color.White else Navy700
     val currentColor = if (onDarkHero) Color.White.copy(alpha = 0.7f) else Blue500
-    val futureColor = if (onDarkHero) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outline
+    val futureColor = if (onDarkHero) Color.White.copy(alpha = 0.25f) else MaterialTheme.colorScheme.outlineVariant
     val eyebrowColor = if (onDarkHero) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
     val activeTextColor = if (onDarkHero) Color.White else MaterialTheme.colorScheme.primary
     val currentIndex = steps.indexOfLast { it.state != LifecycleStepState.FUTURE }.coerceAtLeast(0)
