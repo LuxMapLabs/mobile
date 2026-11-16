@@ -303,3 +303,99 @@ Theo CLAUDE.md (mục WorkOrder, xác nhận từ source backend 2026-10-13), ba
 - Xác nhận cách thể hiện các bước "duyệt" (lệnh `verified`) với backend.
 
 Đây là một hạng mục riêng, cần duyệt riêng; không thuộc đợt redesign này.
+
+---
+
+## 12. Vòng 2: làm lại bố cục (2026-11-16)
+
+> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT.** Hướng đã thống nhất trong trao đổi 2026-11-16 (V1–V3 ở cuối mục). Chưa có code nào thay đổi.
+> **Căn cứ:** ảnh chụp màn hiện tại (lệnh sửa chữa đang làm, quá hạn, 360dp) và phản hồi của chủ dự án.
+
+### 12.1 Vấn đề thấy trên màn sau vòng 1
+
+| # | Vấn đề | Hậu quả |
+|---|---|---|
+| 1 | Header: tiêu đề lệnh 2 dòng + dòng phụ "Sửa chữa · mã lệnh" trong thanh cao cố định 64dp | Dòng phụ bị che mất |
+| 2 | "Hạn xử lý" nằm trong lưới 2 cột | Bị cắt thành "Quá hạn 1 ngà…" |
+| 3 | "Quá hạn" lặp 3 lần: chữ đỏ ở ô hạn, banner 3 dòng, ghi chú đỏ 2 dòng trên nút | Dài, nặng nề |
+| 4 | Dòng sự cố có badge mức độ ("Cao") | Nhiễu, không phục vụ thao tác sửa |
+| 5 | Mỗi trường form có chữ "Bắt buộc"/"Không bắt buộc" bên phải | Rối mắt |
+
+### 12.2 Bố cục mới (một cột gọn)
+
+```
+← Lệnh sửa chữa                                ← 1 dòng, không mã lệnh
+┌──────────────────────────────────────┐
+│ Sửa đèn tuyến liên xã Phước Hiệp      │  tiêu đề lệnh, titleMedium, xuống dòng tự do
+│ đoạn qua chợ                          │
+│ [⟳ Đang thực hiện]                    │
+│ Hạn xử lý          15/11/2026         │  dòng nhãn – giá trị
+│                    ⓘ Quá hạn 1 ngày   │  xuống dòng khi thiếu chỗ, không cắt
+│ Lịch sửa chữa      15/11/2026         │
+│ Giai đoạn hiện tại Sửa chữa           │
+│ Mã lệnh            a3f9c2e1-7b4d-…    │  mã đầy đủ, bodySmall, được xuống dòng
+└──────────────────────────────────────┘
+[! Quá hạn nộp báo cáo                  ]  banner 2 dòng
+[  Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.]
+Ghi chú & lịch sử …                         (giữ nguyên)
+Sự cố cần sửa                      2 sự cố
+  💡 Đèn tắt · POLE-0047 · F1        ➤      không badge mức độ
+Nghiệm thu                     0/2 bắt buộc  (giữ nguyên)
+  Ảnh sau sửa chữa *
+  Kết quả sửa chữa *
+  Vật tư đã thay
+────────────────────────────────────────
+Đã khoá do quá hạn                          1 dòng, căn trái
+[        Hoàn thành lệnh 🔒        ]
+```
+
+**Header**
+- `LuxChildTopBar` chỉ có tiêu đề loại lệnh, 1 dòng, không dòng phụ: "Lệnh sửa chữa" / "Lệnh kiểm tra" / "Lệnh khảo sát" / "Lệnh đo GPS cột".
+- Đang tải / Rỗng / Lỗi: "Chi tiết lệnh" (chưa biết loại lệnh). Vẫn cùng một kiểu bar cho 4 trạng thái.
+
+**Thẻ tóm tắt**
+- Tiêu đề lệnh ở đầu thẻ (`titleMedium`), không giới hạn số dòng.
+- Badge trạng thái lệnh.
+- Các dòng nhãn – giá trị (nhãn `bodyMedium` `onSurfaceVariant` bên trái, giá trị `bodyLarge` bên phải). Khi không đủ chỗ, giá trị xuống dòng dưới nhãn; không cắt chữ, không ellipsis.
+  - **Hạn xử lý:** ngày `due_date`. Nếu quá hạn, thêm dòng "Quá hạn N ngày" màu `dueOverdue` kèm icon (cùng phép tính hiện có).
+  - **Lịch {sửa chữa / kiểm tra / khảo sát / đo GPS}:** ngày `scheduled_date`, hoặc "Chưa có lịch".
+  - **Giai đoạn hiện tại:** giữ (không bỏ, theo V3).
+  - **Mã lệnh:** mã đầy đủ, `bodySmall`, được xuống dòng.
+
+**Thông điệp quá hạn: mỗi chỗ một câu ngắn**
+
+| Chỗ | Hiện tại | Mới |
+|---|---|---|
+| Banner quá hạn nộp | "Hạn dự kiến {ngày}. Form đã khoá. Liên hệ Kỹ sư bảo trì để được xử lý." | Tiêu đề "Quá hạn nộp báo cáo" + "Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì." |
+| Banner quá hạn bắt đầu | "Hạn dự kiến {ngày}. Liên hệ Kỹ sư bảo trì để được giao lại." | Tiêu đề "Quá hạn bắt đầu" + "Liên hệ Kỹ sư bảo trì để được giao lại." |
+| Ghi chú trên nút, quá hạn nộp | "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý" | "Đã khoá do quá hạn" |
+| Ghi chú trên nút, quá hạn bắt đầu | "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại" | "Đã khoá do quá hạn" |
+| Ghi chú trên nút, chưa tới lịch | "Mở vào {ngày}" | giữ |
+| Ghi chú trên nút, chờ duyệt hủy | "Đang chờ duyệt yêu cầu hủy" | giữ |
+
+Ngày hạn không lặp trong banner vì đã có ở thẻ tóm tắt. Ghi chú trên nút căn trái, 1 dòng ở cỡ chữ thường.
+
+**Sự cố cần sửa / cần kiểm tra:** bỏ badge mức độ (`severity`). Dòng còn: icon loại sự cố, tên loại sự cố, "mã cột · mã sự cố", nút chỉ đường 48dp. Áp dụng cho cả lệnh sửa chữa và lệnh kiểm tra.
+
+**Form nghiệm thu / báo cáo kiểm tra / đo GPS cột**
+- Trường bắt buộc: nhãn + **dấu `*` màu `colorScheme.error`** ngay sau nhãn. Semantics của nhãn đọc "{nhãn}, bắt buộc" (TalkBack không đọc "sao").
+- Trường không bắt buộc: chỉ nhãn.
+- Bỏ chữ "Bắt buộc" / "Không bắt buộc" ở bên phải mỗi trường.
+- Bộ đếm "x/y bắt buộc" cạnh tiêu đề nhóm: giữ (V3).
+
+### 12.3 Giữ nguyên
+Nghiệp vụ, `allowed_actions`, cửa sổ lịch, khoá "chờ duyệt hủy", điều kiện nộp, sheet xác nhận nộp, sheet xin hủy, ghi chú & lịch sử, luồng ảnh bằng chứng, đo GPS cột, PDF, lối tắt "Mở tab Khảo sát". Không đổi API, Room, sync.
+
+### 12.4 Test
+- `WorkOrderDetailScreenTest`: cập nhật chữ mới; thêm "header 1 dòng = loại lệnh, không có mã", "thẻ tóm tắt có mã lệnh đầy đủ", "dòng sự cố không có badge mức độ", "trường bắt buộc có * và đọc 'bắt buộc'; trường không bắt buộc không có chữ Bắt buộc/Không bắt buộc", "ghi chú quá hạn trên nút là 'Đã khoá do quá hạn'".
+- `WorkOrderDetailLargeFontTest` (1.5×, 360dp): header không bị cắt; dòng "Hạn xử lý" và "Quá hạn N ngày" hiển thị đủ.
+- `WorkOrderMessagesTest`: cập nhật nội dung banner.
+- Chạy trên SM-A075F.
+
+### 12.5 Quyết định (2026-11-16)
+
+| # | Câu hỏi | Quyết định |
+|---|---|---|
+| V1 | Hướng bố cục: một cột gọn / chia tab / chỉ sửa lỗi | **Một cột gọn** |
+| V2 | Mã lệnh: không trên header / rút gọn trên header / đầy đủ trên header | **Không trên header**, mã đầy đủ ở cuối thẻ tóm tắt |
+| V3 | Bỏ thêm "Giai đoạn hiện tại" / bộ đếm "x/y bắt buộc" / mã sự cố? | **Không bỏ thêm gì** |
