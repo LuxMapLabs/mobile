@@ -181,14 +181,34 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun a_schedule_overdue_order_without_a_due_date_shows_the_banner_and_no_overdue_line() {
+    fun a_passed_schedule_is_flagged_on_the_schedule_row_even_when_the_due_date_is_later() {
         val yesterday = LocalDate.now().minusDays(1).toString()
+        val later = LocalDate.now().plusDays(4).toString()
         val detail =
-            repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday, dueDate = null)
+            repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday, dueDate = later)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
-        composeRule.onNodeWithText("Chưa có hạn").assertExists()
-        composeRule.onNodeWithText("Quá hạn 1 ngày").assertDoesNotExist()
+        composeRule.onNodeWithText("Đã qua lịch").assertExists()
+        composeRule.onNodeWithText("Quá hạn", substring = true).assertExists()
+    }
+
+    @Test
+    fun an_open_form_does_not_flag_the_schedule_row() {
+        val today = LocalDate.now().toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete"))
+                .copy(scheduledDate = today, dueDate = LocalDate.now().minusDays(3).toString())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn 3 ngày").assertExists()
+        composeRule.onNodeWithText("Đã qua lịch").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_title_comes_before_the_status_badge_in_the_summary() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        val title = composeRule.onNodeWithText("Sửa đèn tuyến A").fetchSemanticsNode()
+        val badge = composeRule.onNodeWithText("Đang thực hiện").fetchSemanticsNode()
+        assertTrue(title.boundsInRoot.top < badge.boundsInRoot.top)
     }
 
     @Test

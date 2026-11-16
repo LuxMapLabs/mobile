@@ -49,3 +49,15 @@ fun dueSummary(
         else -> DueSummary(dateText, null, isOverdue = false, isToday = false)
     }
 }
+
+enum class DueTone { ALERT, WARNING, NEUTRAL }
+
+fun dueTone(
+    due: DueSummary,
+    isScheduleOverdue: Boolean,
+): DueTone =
+    when {
+        due.isOverdue && isScheduleOverdue -> DueTone.ALERT
+        due.isToday -> DueTone.WARNING
+        else -> DueTone.NEUTRAL
+    }

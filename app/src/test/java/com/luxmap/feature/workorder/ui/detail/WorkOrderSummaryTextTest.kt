@@ -54,4 +54,17 @@ class WorkOrderSummaryTextTest {
         assertEquals(missing, dueSummary(null, TODAY))
         assertEquals(missing, dueSummary("2026-13-40", TODAY))
     }
+
+    @Test
+    fun `an overdue due date is an alert only while the schedule has passed and the form is locked`() {
+        val overdue = dueSummary("2026-11-13", TODAY)
+        assertEquals(DueTone.ALERT, dueTone(overdue, isScheduleOverdue = true))
+        assertEquals(DueTone.NEUTRAL, dueTone(overdue, isScheduleOverdue = false))
+    }
+
+    @Test
+    fun `due today is a warning and a future due date is neutral`() {
+        assertEquals(DueTone.WARNING, dueTone(dueSummary("2026-11-16", TODAY), isScheduleOverdue = false))
+        assertEquals(DueTone.NEUTRAL, dueTone(dueSummary("2026-11-20", TODAY), isScheduleOverdue = true))
+    }
 }

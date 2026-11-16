@@ -569,15 +569,23 @@ private fun WorkOrderSummaryCard(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val due = remember(detail.dueDate) { dueSummary(detail.dueDate, LocalDate.now()) }
+    val today = LocalDate.now()
+    val due = dueSummary(detail.dueDate, today)
+    val isScheduleOverdue = workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
     val dueColor =
-        when {
-            due.isOverdue -> LuxTheme.colors.dueOverdue
-            due.isToday -> LuxTheme.colors.dueToday
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        when (dueTone(due, isScheduleOverdue)) {
+            DueTone.ALERT -> LuxTheme.colors.dueOverdue
+            DueTone.WARNING -> LuxTheme.colors.dueToday
+            DueTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary")) {
+        Text(
+            text = detail.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(Spacing.sm))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             if (showSubmittedBadge) {
                 StatusBadge(
@@ -593,31 +601,17 @@ private fun WorkOrderSummaryCard(
             }
         }
         Spacer(Modifier.height(Spacing.md))
-        Text(
-            text = detail.title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.height(Spacing.md))
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             SummaryRow(label = "Hạn xử lý") {
                 SummaryValue(text = due.dateText)
-                due.statusText?.let { statusText ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Schedule,
-                            contentDescription = null,
-                            tint = dueColor,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = dueColor)
-                    }
+                due.statusText?.let { SummaryAlertLine(text = it, color = dueColor) }
+            }
+            SummaryRow(label = workOrderScheduleLabel(kind)) {
+                SummaryValue(text = scheduleValue)
+                if (isScheduleOverdue) {
+                    SummaryAlertLine(text = "Đã qua lịch", color = LuxTheme.colors.dueOverdue)
                 }
             }
-            SummaryRow(label = workOrderScheduleLabel(kind)) { SummaryValue(text = scheduleValue) }
             if (status != WorkOrderStatus.CANCELLED) {
                 SummaryRow(label = "Giai đoạn hiện tại") { SummaryValue(text = kind.label()) }
             }
@@ -650,6 +644,22 @@ private fun SummaryRow(
             modifier = Modifier.padding(end = Spacing.md),
         )
         Column(horizontalAlignment = Alignment.End, content = value)
+    }
+}
+
+@Composable
+private fun SummaryAlertLine(
+    text: String,
+    color: Color,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Icon(
+            imageVector = Icons.Filled.Schedule,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(text = text, style = MaterialTheme.typography.bodyMedium, color = color)
     }
 }
 

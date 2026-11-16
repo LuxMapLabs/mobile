@@ -373,7 +373,7 @@ Nghiệm thu                     0/2 bắt buộc  (giữ nguyên)
 | Ghi chú trên nút, chưa tới lịch | "Mở vào {ngày}" | giữ |
 | Ghi chú trên nút, chờ duyệt hủy | "Đang chờ duyệt yêu cầu hủy" | giữ |
 
-Ngày hạn không lặp trong banner vì đã có ở thẻ tóm tắt. Ghi chú trên nút căn trái, 1 dòng ở cỡ chữ thường.
+Banner và khoá form tính theo `scheduled_date`; dòng "Quá hạn N ngày" trong thẻ tính theo `due_date`. Vì vậy khi lịch đã qua (form bị khoá), dòng "Lịch …" có thêm dòng đỏ **"Đã qua lịch"** — đây là chỗ giải thích vì sao bị khoá, banner không lặp ngày. Dòng "Quá hạn N ngày" của Hạn xử lý chỉ đỏ khi form đang bị khoá; khi form vẫn mở thì dùng màu chữ phụ (có icon), để màu đỏ luôn đi cùng việc bị khoá (quyết định V4, 2026-11-17). Ghi chú trên nút căn trái, 1 dòng ở cỡ chữ thường.
 
 **Sự cố cần sửa / cần kiểm tra:** bỏ badge mức độ (`severity`). Dòng còn: icon loại sự cố, tên loại sự cố, "mã cột · mã sự cố", nút chỉ đường 48dp. Áp dụng cho cả lệnh sửa chữa và lệnh kiểm tra.
 
@@ -399,3 +399,4 @@ Nghiệp vụ, `allowed_actions`, cửa sổ lịch, khoá "chờ duyệt hủy"
 | V1 | Hướng bố cục: một cột gọn / chia tab / chỉ sửa lỗi | **Một cột gọn** |
 | V2 | Mã lệnh: không trên header / rút gọn trên header / đầy đủ trên header | **Không trên header**, mã đầy đủ ở cuối thẻ tóm tắt |
 | V3 | Bỏ thêm "Giai đoạn hiện tại" / bộ đếm "x/y bắt buộc" / mã sự cố? | **Không bỏ thêm gì** |
+| V4 | Khoá theo lịch nhưng thẻ cảnh báo theo hạn — xử lý? (phát hiện ở review toàn nhánh) | **Đánh dấu dòng Lịch "Đã qua lịch"**; dòng quá hạn của Hạn xử lý chỉ đỏ khi form bị khoá |
