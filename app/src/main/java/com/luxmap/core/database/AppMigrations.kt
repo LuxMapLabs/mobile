@@ -56,3 +56,11 @@ val MIGRATION_18_19: Migration =
             )
         }
     }
+
+val MIGRATION_21_22: Migration =
+    object : Migration(21, 22) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS local_pole_location_update")
+            db.execSQL("DELETE FROM sync_queue WHERE opType = 'update_pole_location'")
+        }
+    }
