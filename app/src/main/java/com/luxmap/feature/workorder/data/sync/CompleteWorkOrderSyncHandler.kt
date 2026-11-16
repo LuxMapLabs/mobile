@@ -31,6 +31,22 @@ class CompleteWorkOrderSyncHandler
             val completion =
                 dao.completionByWorkOrderId(payload.workOrderId)
                     ?: return SyncOpResult.Failed("Local completion row missing")
+            if (completion.submitStatus == "synced") return SyncOpResult.Done
+            val evidenceStates =
+                payload.evidenceClientOpIds.orEmpty().associateWith {
+                    dao.completionEvidenceStatus(payload.workOrderId, it)
+                }
+            val conflict = evidenceStates.entries.firstOrNull { it.value == "conflict" }
+            if (conflict != null) {
+                dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
+                return SyncOpResult.Conflict("Evidence upload conflict: ${conflict.key}")
+            }
+            val failed = evidenceStates.entries.firstOrNull { it.value == null || it.value == "failed" }
+            if (failed != null) {
+                dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                return SyncOpResult.Failed("Evidence upload failed: ${failed.key}")
+            }
+            if (evidenceStates.values.any { it != "done" }) return SyncOpResult.WaitingForDependency
             val outcomes = completion.faultOutcomesJson?.let { Json.decodeFromString<List<FaultOutcome>>(it) }
 
             return try {
@@ -49,8 +65,14 @@ class CompleteWorkOrderSyncHandler
             } catch (e: HttpException) {
                 when {
                     e.code() == 409 && e.errorCodeOrNull() == "AFTER_EVIDENCE_REQUIRED" -> SyncOpResult.RetryLater
-                    e.code() == 409 -> SyncOpResult.Conflict(e.errorCodeOrNull() ?: "conflict")
-                    e.code() == 400 || e.code() == 404 -> SyncOpResult.Failed(e.errorCodeOrNull() ?: "HTTP ${e.code()}")
+                    e.code() == 409 -> {
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
+                        SyncOpResult.Conflict(e.errorCodeOrNull() ?: "conflict")
+                    }
+                    e.code() == 400 || e.code() == 404 -> {
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                        SyncOpResult.Failed(e.errorCodeOrNull() ?: "HTTP ${e.code()}")
+                    }
                     else -> SyncOpResult.RetryLater
                 }
             } catch (e: IOException) {

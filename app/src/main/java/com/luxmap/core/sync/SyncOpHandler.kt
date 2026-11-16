@@ -1,5 +1,7 @@
 package com.luxmap.core.sync
 
+internal const val SYNC_ATTEMPTS_EXHAUSTED = "Exceeded retry attempts"
+
 interface SyncOpHandler {
     val opType: String
 
@@ -15,6 +17,8 @@ sealed interface SyncOpResult {
     data object Done : SyncOpResult
 
     data object RetryLater : SyncOpResult
+
+    data object WaitingForDependency : SyncOpResult
 
     data class Failed(val message: String) : SyncOpResult
 

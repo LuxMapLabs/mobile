@@ -11,7 +11,11 @@ interface SyncQueueDao {
     @Insert
     suspend fun insert(row: SyncQueueEntity): Long
 
-    @Query("SELECT * FROM sync_queue WHERE status = 'queued' ORDER BY createdAt ASC")
+    // Evidence uploads can resume after a worker interruption because the API deduplicates their client operation IDs.
+    @Query(
+        "SELECT * FROM sync_queue WHERE status = 'queued' OR " +
+            "(status = 'syncing' AND opType = 'upload_work_order_evidence') ORDER BY createdAt ASC, id ASC",
+    )
     suspend fun queuedRows(): List<SyncQueueEntity>
 
     @Query("SELECT COUNT(*) FROM sync_queue WHERE status IN ('queued', 'syncing')")

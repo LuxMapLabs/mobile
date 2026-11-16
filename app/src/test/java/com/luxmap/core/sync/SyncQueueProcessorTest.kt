@@ -46,6 +46,18 @@ private fun handler(
 
 class SyncQueueProcessorTest {
     @Test
+    fun `waiting for an attachment leaves the completion retry count unchanged`() =
+        runTest {
+            val dao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { dao.queuedRows() } returns listOf(row(2, "COMP-1", "complete_work_order", attemptCount = 3))
+            val processor =
+                SyncQueueProcessor(dao, setOf(handler("complete_work_order", SyncOpResult.WaitingForDependency)))
+
+            assertTrue(processor.processQueuedOps())
+            coVerify { dao.updateStatus(2, "queued", 3, null, any()) }
+        }
+
+    @Test
     fun `a Done result marks the row done and does not ask for a retry`() =
         runTest {
             val dao = mockk<SyncQueueDao>(relaxed = true)

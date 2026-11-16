@@ -41,7 +41,7 @@ class SyncQueueProcessor
                     }
 
                     if (row.attemptCount >= MAX_ATTEMPTS) {
-                        dao.updateStatus(row.id, "failed", row.attemptCount, "Exceeded retry attempts", Instant.now())
+                        dao.updateStatus(row.id, "failed", row.attemptCount, SYNC_ATTEMPTS_EXHAUSTED, Instant.now())
                         continue
                     }
 
@@ -67,6 +67,10 @@ class SyncQueueProcessor
                         is SyncOpResult.Done -> dao.updateStatus(row.id, "done", row.attemptCount, null, Instant.now())
                         is SyncOpResult.RetryLater -> {
                             dao.updateStatus(row.id, "queued", row.attemptCount + 1, null, Instant.now())
+                            stillPending = true
+                        }
+                        is SyncOpResult.WaitingForDependency -> {
+                            dao.updateStatus(row.id, "queued", row.attemptCount, null, Instant.now())
                             stillPending = true
                         }
                         is SyncOpResult.Failed ->
