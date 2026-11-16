@@ -19,8 +19,10 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 private const val LARGE_FONT_SCALE = 1.5f
 
@@ -99,11 +101,24 @@ class WorkOrderDetailLargeFontTest {
     }
 
     @Test
-    fun the_summary_card_stays_readable_at_large_font_on_a_narrow_screen() {
-        screen(detail(taskKind = "repair", woStatus = "in_progress", allowedActions = emptyList()))
+    fun header_stays_one_line_and_due_rows_are_fully_visible_at_large_font() {
+        screen(
+            detail(taskKind = "repair", woStatus = "in_progress", allowedActions = emptyList()).copy(
+                dueDate = LocalDate.now().minusDays(3).toString(),
+                workOrderId = "a3f9c2e1-7b4d-4c1e-9f2a-1234567890ab",
+            ),
+        )
+        val header = composeRule.onNodeWithText("Lệnh sửa chữa", useUnmergedTree = true).fetchSemanticsNode()
+        assertTrue("header clipped", header.boundsInRoot.height >= header.size.height - 1f)
         composeRule.onNodeWithTag("work_order_summary").assertIsDisplayed()
-        composeRule.onNodeWithText("Hạn xử lý").assertIsDisplayed()
-        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Hạn xử lý").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Quá hạn 3 ngày").performScrollTo().assertIsDisplayed()
+        val code =
+            composeRule
+                .onNodeWithText("a3f9c2e1-7b4d-4c1e-9f2a-1234567890ab")
+                .performScrollTo()
+                .fetchSemanticsNode()
+        assertTrue("code clipped", code.boundsInRoot.width >= code.size.width - 1f)
     }
 
     @Test

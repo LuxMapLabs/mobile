@@ -129,12 +129,20 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun the_summary_shows_the_current_stage_without_a_multi_step_tracker() {
+    fun the_summary_shows_the_current_stage_as_a_row_without_a_multi_step_tracker() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
-        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại").assertExists()
+        composeRule.onAllNodesWithText("Sửa chữa").onFirst().assertExists()
         listOf("Khảo sát", "Duyệt #1", "Kiểm tra", "Duyệt #2").forEach { label ->
             composeRule.onNodeWithText(label).assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun an_overdue_due_date_shows_the_date_and_a_separate_overdue_line() {
+        val detail = repairDetail().copy(dueDate = LocalDate.now().minusDays(2).toString())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn 2 ngày").assertExists()
     }
 
     @Test
@@ -164,6 +172,47 @@ class WorkOrderDetailScreenTest {
         composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
         composeRule.onNodeWithText("Ghi chú giao việc").assertExists()
         composeRule.onNodeWithText("Ưu tiên trước mưa").assertExists()
+    }
+
+    @Test
+    fun an_overdue_report_shows_one_short_hint_above_the_locked_button() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail = repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Đã khoá do quá hạn").assertExists()
+        composeRule.onNodeWithText("liên hệ Kỹ sư bảo trì để xử lý", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.").assertExists()
+    }
+
+    @Test
+    fun a_passed_schedule_is_flagged_on_the_schedule_row_even_when_the_due_date_is_later() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val later = LocalDate.now().plusDays(4).toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday, dueDate = later)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Đã qua lịch").assertExists()
+        composeRule.onNodeWithText("Quá hạn", substring = true).assertExists()
+    }
+
+    @Test
+    fun an_open_form_does_not_flag_the_schedule_row() {
+        val today = LocalDate.now().toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete"))
+                .copy(scheduledDate = today, dueDate = LocalDate.now().minusDays(3).toString())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn 3 ngày").assertExists()
+        composeRule.onNodeWithText("Đã qua lịch").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_title_comes_before_the_status_badge_in_the_summary() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        val title = composeRule.onNodeWithText("Sửa đèn tuyến A").fetchSemanticsNode()
+        val badge = composeRule.onNodeWithText("Đang thực hiện").fetchSemanticsNode()
+        assertTrue(title.boundsInRoot.top < badge.boundsInRoot.top)
     }
 
     @Test
@@ -280,6 +329,21 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun fault_rows_have_no_severity_badge() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("POLE-0047", substring = true).assertExists()
+        composeRule.onNodeWithText("Cao").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_fault_without_coordinates_says_so_and_has_no_severity_badge() {
+        val noLocation = repairDetail().faults.single().copy(lat = 0.0, lng = 0.0)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail().copy(faults = listOf(noLocation))))
+        composeRule.onNodeWithText("Chưa có toạ độ").assertExists()
+        composeRule.onNodeWithText("Cao").assertDoesNotExist()
+    }
+
+    @Test
     fun empty_state_shows_the_no_work_order_message_and_a_way_back() {
         var backed = false
         setContent(uiState = WorkOrderDetailUiState.Empty, onBack = { backed = true })
@@ -316,10 +380,13 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun a_loaded_work_order_shows_its_title_and_kind_with_code_in_the_top_bar() {
+    fun the_top_bar_shows_only_the_kind_and_the_card_holds_title_and_full_code() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
+        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertDoesNotExist()
         composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
-        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertExists()
+        composeRule.onNodeWithText("Mã lệnh").assertExists()
+        composeRule.onNodeWithText("WO-1042").assertExists()
         composeRule.onNodeWithContentDescription("Quay lại").assertExists()
     }
 
@@ -328,7 +395,7 @@ class WorkOrderDetailScreenTest {
         var captured = 0
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
-        composeRule.onNodeWithText("Ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithContentDescription("Ảnh sau sửa chữa, bắt buộc").assertExists()
         composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
         composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
         assertEquals(1, captured)
@@ -350,10 +417,14 @@ class WorkOrderDetailScreenTest {
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("0/2 bắt buộc").assertExists()
-        composeRule.onNodeWithText("Kết quả sửa chữa").assertExists()
-        composeRule.onNodeWithText("Vật tư đã thay").assertExists()
-        composeRule.onAllNodesWithText("Bắt buộc").assertCountEquals(2)
-        composeRule.onNodeWithText("Không bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Kết quả sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay").assertExists()
+        composeRule.onNodeWithText("Bắt buộc").assertDoesNotExist()
+        composeRule.onNodeWithText("Không bắt buộc").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Kết quả sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Ảnh sau sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay, bắt buộc").assertDoesNotExist()
         composeRule.onNodeWithText("Bắt đầu thực hiện").assertDoesNotExist()
         composeRule.onNodeWithText("Xác nhận sự cố").assertDoesNotExist()
     }

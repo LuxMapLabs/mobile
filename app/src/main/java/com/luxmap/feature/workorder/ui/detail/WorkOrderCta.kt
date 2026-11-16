@@ -87,7 +87,7 @@ internal fun workOrderCtaState(
                 icon = Icons.Filled.Lock,
                 enabled = false,
                 onClick = {},
-                hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
+                hint = "Đã khoá do quá hạn",
                 hintColor = MaterialTheme.colorScheme.error,
             )
         "start" in detail.allowedActions ->
@@ -114,7 +114,7 @@ internal fun workOrderCtaState(
                 onClick = onSubmit,
                 hint =
                     if (scheduleWindow.isOverdueToComplete) {
-                        "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                        "Đã khoá do quá hạn"
                     } else {
                         missingRequirementsHint(repairRequirements(state))
                     },
@@ -136,7 +136,7 @@ internal fun workOrderCtaState(
                 onClick = onSubmit,
                 hint =
                     when {
-                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                        scheduleWindow.isOverdueToComplete -> "Đã khoá do quá hạn"
                         missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
                         else -> null
                     },
@@ -161,7 +161,7 @@ internal fun workOrderCtaState(
                 onClick = onSubmit,
                 hint =
                     when {
-                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
+                        scheduleWindow.isOverdueToComplete -> "Đã khoá do quá hạn"
                         missing > 0 -> "Còn $missing cột chưa chụp"
                         else -> null
                     },

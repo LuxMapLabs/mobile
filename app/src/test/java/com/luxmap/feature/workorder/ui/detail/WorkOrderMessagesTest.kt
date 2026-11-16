@@ -54,6 +54,7 @@ class WorkOrderMessagesTest {
         val result = messages(detail(woStatus = "in_progress", scheduledDate = "2026-11-15"))
         assertEquals("Quá hạn nộp báo cáo", result.prominent?.title)
         assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
+        assertEquals("Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.", result.prominent?.body)
     }
 
     @Test
@@ -61,6 +62,7 @@ class WorkOrderMessagesTest {
         val result = messages(detail(woStatus = "assigned", scheduledDate = "2026-11-15"))
         assertEquals("Quá hạn bắt đầu", result.prominent?.title)
         assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
+        assertEquals("Liên hệ Kỹ sư bảo trì để được giao lại.", result.prominent?.body)
     }
 
     @Test
