@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,6 +18,7 @@ import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -87,12 +89,15 @@ class WorkOrderDetailScreenTest {
         onOpenPdf: (String) -> Unit = {},
         onMeasurePole: (String) -> Unit = {},
         onRetryAttachment: (String) -> Unit = {},
+        onRetry: () -> Unit = {},
+        onBack: () -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
                 WorkOrderDetailScreen(
                     uiState = uiState,
-                    onBack = {},
+                    onBack = onBack,
+                    onRetry = onRetry,
                     onStart = onStart,
                     onNavigateFault = onNavigateFault,
                     onReportNoteChanged = onReportNoteChanged,
@@ -178,15 +183,47 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun empty_state_shows_the_no_work_order_message() {
-        setContent(uiState = WorkOrderDetailUiState.Empty)
-        composeRule.onNodeWithText("Không tìm thấy lệnh này").assertExists()
+    fun empty_state_shows_the_no_work_order_message_and_a_way_back() {
+        var backed = false
+        setContent(uiState = WorkOrderDetailUiState.Empty, onBack = { backed = true })
+        composeRule.onNodeWithText("Không tìm thấy lệnh này", substring = true).assertExists()
+        composeRule.onAllNodesWithText("Quay lại").onFirst().performClick()
+        assertTrue(backed)
     }
 
     @Test
-    fun error_state_shows_the_message() {
-        setContent(uiState = WorkOrderDetailUiState.Error("Không tải được dữ liệu lệnh"))
-        composeRule.onNodeWithText("Không tải được dữ liệu lệnh").assertExists()
+    fun error_state_offers_retry_and_hides_the_raw_exception_message() {
+        var retries = 0
+        setContent(
+            uiState = WorkOrderDetailUiState.Error("java.net.SocketTimeoutException: timeout"),
+            onRetry = { retries++ },
+        )
+        composeRule.onNodeWithText("Không tải được dữ liệu", substring = true).assertExists()
+        composeRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun a_network_error_says_saved_data_is_safe() {
+        setContent(uiState = WorkOrderDetailUiState.Error("timeout", isNetworkError = true))
+        composeRule.onNodeWithText("Không có kết nối mạng", substring = true).assertExists()
+        composeRule.onNodeWithText("vẫn an toàn", substring = true).assertExists()
+    }
+
+    @Test
+    fun the_top_bar_keeps_the_same_back_button_while_loading_and_when_loaded() {
+        setContent(uiState = WorkOrderDetailUiState.Loading)
+        composeRule.onNodeWithText("Chi tiết lệnh").assertExists()
+        composeRule.onNodeWithContentDescription("Quay lại").assertExists()
+    }
+
+    @Test
+    fun a_loaded_work_order_shows_its_title_and_kind_with_code_in_the_top_bar() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
+        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertExists()
+        composeRule.onNodeWithContentDescription("Quay lại").assertExists()
     }
 
     @Test

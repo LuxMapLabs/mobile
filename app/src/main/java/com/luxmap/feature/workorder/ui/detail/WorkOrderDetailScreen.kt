@@ -8,7 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,12 +31,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
@@ -58,7 +54,6 @@ import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.WbTwilight
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -89,7 +84,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -109,11 +103,9 @@ import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
-import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.core.theme.WorkOrderStatus
@@ -124,7 +116,6 @@ import com.luxmap.core.theme.label
 import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
-import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
@@ -132,7 +123,12 @@ import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LifecycleTracker
-import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.OutcomeSegment
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -147,7 +143,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
-import java.util.Locale
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -181,6 +176,7 @@ fun WorkOrderDetailRoute(
         onOpenPdf = onOpenPdf,
         onMeasurePole = onMeasurePole,
         onRetryAttachment = viewModel::retryAttachment,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -201,6 +197,7 @@ fun WorkOrderDetailScreen(
     onOpenPdf: (String) -> Unit = {},
     onMeasurePole: (String) -> Unit = {},
     onRetryAttachment: (String) -> Unit = {},
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
@@ -211,12 +208,16 @@ fun WorkOrderDetailScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = modifier,
-            // Success renders its own navy hero with an embedded back button (see
-            // WorkOrderHeroSection) instead of this plain top bar - the other 3 states have no
-            // detail to put in a hero, so they keep the plain bar with a generic title.
             topBar = {
-                if (uiState !is WorkOrderDetailUiState.Success) {
-                    AppTopBar(title = "Chi tiết lệnh", onBack = onBack)
+                if (uiState is WorkOrderDetailUiState.Success) {
+                    val kind = workOrderTaskKindFromWire(uiState.detail.taskKind)
+                    LuxChildTopBar(
+                        title = uiState.detail.title,
+                        subtitle = "${kind.label()} · ${uiState.detail.workOrderId}",
+                        onBack = onBack,
+                    )
+                } else {
+                    LuxChildTopBar(title = "Chi tiết lệnh", onBack = onBack)
                 }
             },
             bottomBar = {
@@ -259,11 +260,10 @@ fun WorkOrderDetailScreen(
         ) { contentPadding ->
             Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
                 when (uiState) {
-                    is WorkOrderDetailUiState.Loading -> LoadingState()
+                    is WorkOrderDetailUiState.Loading -> WorkOrderDetailLoading()
                     is WorkOrderDetailUiState.Success ->
                         WorkOrderDetailContent(
                             state = uiState,
-                            onBack = onBack,
                             onNavigateFault = onNavigateFault,
                             onReportNoteChanged = onReportNoteChanged,
                             onMaterialsUsedChanged = onMaterialsUsedChanged,
@@ -275,20 +275,20 @@ fun WorkOrderDetailScreen(
                             onRetryAttachment = onRetryAttachment,
                         )
                     is WorkOrderDetailUiState.Empty ->
-                        MessageState(
-                            icon = Icons.Filled.Assignment,
-                            iconColors = SyncStatus.DONE.badgeColors(),
+                        LuxEmptyState(
                             title = "Không tìm thấy lệnh này",
-                            subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
-                            action = {},
+                            message = "Lệnh có thể đã bị huỷ hoặc không còn thuộc địa bàn của bạn.",
+                            actionLabel = "Quay lại",
+                            onAction = onBack,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                     is WorkOrderDetailUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.CloudOff,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
-                            title = uiState.message,
-                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                            action = {},
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (uiState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            secondaryActionLabel = "Quay lại",
+                            onSecondaryAction = onBack,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                 }
             }
@@ -557,7 +557,6 @@ private fun SubmitConfirmationSheet(
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
-    onBack: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
@@ -577,15 +576,15 @@ private fun WorkOrderDetailContent(
     // backend), so this already means "started but overdue to submit", not "overdue to start".
     val isFormLocked = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(start = Spacing.md, top = Spacing.md, end = Spacing.md, bottom = Spacing.xxl),
+                    .padding(start = Spacing.lg, top = Spacing.md, end = Spacing.lg, bottom = Spacing.xxl),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
+            WorkOrderStatusRow(status = status, showSubmittedBadge = hasActiveLocalCompletion)
             WorkOrderSummaryCard(detail)
             WorkOrderHeaderSection(detail)
             state.syncStatus()?.let { status ->
@@ -655,86 +654,15 @@ private fun WorkOrderDetailContent(
     }
 }
 
-private val HeroBackButtonTouchSize = 48.dp
-private val HeroBackButtonChipSize = 40.dp
-private val HeroMinHeight = 136.dp
-private val HeroBackChipColor = Color(0xFF1E3D6B)
-private val HeroBackChipRing = Color(0xFF93B2E0)
-
 @Composable
-private fun WorkOrderHeroSection(
-    detail: WorkOrderDetail,
+private fun WorkOrderStatusRow(
+    status: WorkOrderStatus,
     showSubmittedBadge: Boolean,
-    onBack: () -> Unit,
 ) {
-    val status = workOrderStatusFromWire(detail.woStatus)
-    val kind = workOrderTaskKindFromWire(detail.taskKind)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(Navy900)
-                .statusBarsPadding()
-                .heightIn(min = HeroMinHeight)
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.size(HeroBackButtonTouchSize),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(HeroBackButtonChipSize)
-                        .clip(RoundedCornerShape(Radius.chip))
-                        .background(HeroBackChipColor)
-                        .border(1.dp, HeroBackChipRing.copy(alpha = 0.22f), RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Quay lại",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text =
-                        if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
-                            detail.workOrderId.uppercase(Locale.forLanguageTag("vi"))
-                        } else {
-                            "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi"))
-                        },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF9FB6D6),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (showSubmittedBadge) {
-                    StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-                } else if (status != WorkOrderStatus.ASSIGNED) {
-                    StatusBadge(text = status.label(), colors = status.badgeColors())
-                }
-            }
-            Text(
-                text = detail.title,
-                style = TitleTextStyle.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+    when {
+        showSubmittedBadge -> StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
+        status != WorkOrderStatus.ASSIGNED ->
+            StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
     }
 }
 
@@ -1722,8 +1650,17 @@ private fun InspectionCompletionSection(
 }
 
 @Composable
-private fun BoxScope.LoadingState() {
-    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).testTag("work_order_detail_loading"))
+private fun WorkOrderDetailLoading() {
+    LuxLoadingRegion(
+        description = "Đang tải chi tiết lệnh",
+        modifier = Modifier.fillMaxWidth().padding(Spacing.lg).testTag("work_order_detail_loading"),
+    ) {
+        LuxSkeleton(modifier = Modifier.fillMaxWidth().height(140.dp), shape = MaterialTheme.shapes.medium)
+        LuxSkeleton(modifier = Modifier.width(160.dp).height(20.dp))
+        repeat(3) {
+            LuxSkeleton(modifier = Modifier.fillMaxWidth().height(72.dp), shape = MaterialTheme.shapes.medium)
+        }
+    }
 }
 
 private fun sampleRepairWithFaults() =
