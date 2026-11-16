@@ -9,9 +9,35 @@ import java.time.Instant
 interface WorkOrderCompletionRepository {
     fun observeEvidence(workOrderId: String): Flow<LocalWorkOrderEvidenceEntity?>
 
+    fun observeEvidenceList(workOrderId: String): Flow<List<LocalWorkOrderEvidenceEntity>>
+
     fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?>
 
     fun observeCompletedWorkOrderIds(): Flow<Set<String>>
+
+    suspend fun captureEvidence(
+        workOrderId: String,
+        kind: EvidenceKind,
+        clientOpId: String,
+        filePath: String,
+        lat: Double,
+        lng: Double,
+        capturedAt: Instant,
+    )
+
+    suspend fun removeDraftEvidence(
+        workOrderId: String,
+        clientOpId: String,
+    )
+
+    suspend fun prepareEvidenceRework(
+        workOrderId: String,
+        previousClientOpId: String,
+    )
+
+    suspend fun retryEvidenceSubmission(workOrderId: String): Boolean
+
+    suspend fun reopenEvidenceSubmission(workOrderId: String): Boolean
 
     fun observeCompletionSyncStates(): Flow<Map<String, CompletionSyncState>>
 

@@ -16,6 +16,10 @@ class SyncQueueManager
         val errorCount: Flow<Int> = dao.observeErrorCount()
         val lastSyncedAt: Flow<Instant?> = dao.observeLastSyncedAt()
 
+        suspend fun triggerSync() {
+            syncTrigger.triggerNow()
+        }
+
         suspend fun enqueue(
             opType: String,
             payloadJson: String,
@@ -36,6 +40,6 @@ class SyncQueueManager
                     updatedAt = now,
                 ),
             )
-            syncTrigger.triggerNow()
+            triggerSync()
         }
     }

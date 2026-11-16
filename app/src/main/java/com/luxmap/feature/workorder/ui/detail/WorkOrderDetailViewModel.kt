@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import java.io.IOException
 import javax.inject.Inject
 
@@ -99,7 +100,7 @@ class WorkOrderDetailViewModel
                 }
                 combine(
                     detailState,
-                    completionRepository.observeEvidence(workOrderId),
+                    completionRepository.observeEvidenceList(workOrderId),
                     completionRepository.observeCompletion(workOrderId),
                     connectivityObserver.isOnline,
                 ) { latestDetail, evidence, completion, isOnline -> Quad(latestDetail, evidence, completion, isOnline) }
@@ -121,7 +122,7 @@ class WorkOrderDetailViewModel
                     .collect { (latestDetail, evidence, completion, isOnline, poleGpsData) ->
                         if (latestDetail != null) {
                             val current = _uiState.value as? WorkOrderDetailUiState.Success
-                            _uiState.value =
+                            val next =
                                 current?.copy(
                                     detail = latestDetail,
                                     localEvidence = evidence,
@@ -139,6 +140,25 @@ class WorkOrderDetailViewModel
                                     poleAttachments = poleGpsData.attachments,
                                     poleReferences = poleGpsData.references,
                                 )
+                            val restoredDraft =
+                                completion?.takeIf {
+                                    it.submitStatus == "draft" && current?.localCompletion?.submitStatus != "draft"
+                                }
+                            _uiState.value =
+                                if (restoredDraft == null) {
+                                    next
+                                } else {
+                                    val outcomes =
+                                        restoredDraft.faultOutcomesJson?.let {
+                                            Json.decodeFromString<List<FaultOutcome>>(it)
+                                        }.orEmpty()
+                                    next.copy(
+                                        reportNote = restoredDraft.reportNote,
+                                        materialsUsed = restoredDraft.materialsUsed.orEmpty(),
+                                        faultOutcomes = outcomes.associate { it.faultId to it.outcome },
+                                        justSubmitted = false,
+                                    )
+                                }
                         }
                     }
             }
@@ -187,6 +207,7 @@ class WorkOrderDetailViewModel
             if (current !is WorkOrderDetailUiState.Success || !current.canSubmit() || current.isSubmitting) return
             _uiState.value = current.copy(isSubmitting = true, submitError = null, justSubmitted = true)
             viewModelScope.launch {
+                prepareReworkIfNeeded(current)
                 if (current.detail.taskKind == "pole_gps_update") {
                     poleGpsRepository.enqueuePendingPhotoUploads(workOrderId)
                 }
@@ -234,10 +255,51 @@ class WorkOrderDetailViewModel
             }
         }
 
-        fun retakeEvidence(onReady: () -> Unit) {
+        fun removeEvidence(clientOpId: String) {
             viewModelScope.launch {
-                completionRepository.retakeEvidence(workOrderId)
+                completionRepository.removeDraftEvidence(workOrderId, clientOpId)
+            }
+        }
+
+        fun recoverEvidenceSubmission(replace: Boolean) {
+            val current = _uiState.value as? WorkOrderDetailUiState.Success ?: return
+            if (current.isSubmitting || current.localCompletion?.submitStatus != "failed") return
+            updateSuccess { it.copy(isSubmitting = true, submitError = null) }
+            viewModelScope.launch {
+                val changed =
+                    try {
+                        if (replace) {
+                            completionRepository.reopenEvidenceSubmission(workOrderId)
+                        } else {
+                            completionRepository.retryEvidenceSubmission(workOrderId)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        false
+                    }
+                updateSuccess {
+                    it.copy(
+                        isSubmitting = false,
+                        submitError = if (changed) null else "Không cập nhật được bản nộp. Vui lòng thử lại.",
+                    )
+                }
+            }
+        }
+
+        fun prepareEvidenceCapture(onReady: () -> Unit) {
+            val current = _uiState.value as? WorkOrderDetailUiState.Success ?: return
+            viewModelScope.launch {
+                prepareReworkIfNeeded(current)
                 onReady()
+            }
+        }
+
+        private suspend fun prepareReworkIfNeeded(state: WorkOrderDetailUiState.Success) {
+            val previous = state.localCompletion ?: return
+            if (state.detail.taskKind !in listOf("repair", "inspection")) return
+            if (previous.submitStatus == "synced" && isReturnedForRework(state)) {
+                completionRepository.prepareEvidenceRework(workOrderId, previous.clientOpId)
             }
         }
 

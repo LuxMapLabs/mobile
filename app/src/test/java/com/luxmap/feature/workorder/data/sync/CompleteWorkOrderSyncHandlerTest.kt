@@ -60,6 +60,42 @@ private fun detailDto(workOrderId: String = "WO-1") =
 
 class CompleteWorkOrderSyncHandlerTest {
     @Test
+    fun `completion waits for the older photo when the newer photo has already synced`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val handler = CompleteWorkOrderSyncHandler(api, dao, mockk(relaxed = true))
+            coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
+            coEvery { dao.completionEvidenceStatus("WO-1", "older") } returns "queued"
+            coEvery { dao.completionEvidenceStatus("WO-1", "newer") } returns "done"
+            coEvery { api.complete("WO-1", any()) } returns detailDto()
+            val payload = Json.encodeToString(CompletionSyncPayload("WO-1", listOf("older", "newer")))
+
+            assertEquals(SyncOpResult.WaitingForDependency, handler.handle(payload))
+            coVerify(exactly = 0) { api.complete(any(), any()) }
+
+            coEvery { dao.completionEvidenceStatus("WO-1", "older") } returns "done"
+            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            coVerify(exactly = 1) { api.complete("WO-1", any()) }
+        }
+
+    @Test
+    fun `a failed photo blocks completion and records failure on the report`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val handler = CompleteWorkOrderSyncHandler(api, dao, mockk(relaxed = true))
+            coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
+            coEvery { dao.completionEvidenceStatus("WO-1", "waiting") } returns "queued"
+            coEvery { dao.completionEvidenceStatus("WO-1", "broken") } returns "failed"
+            val payload = Json.encodeToString(CompletionSyncPayload("WO-1", listOf("waiting", "broken")))
+
+            assertTrue(handler.handle(payload) is SyncOpResult.Failed)
+            coVerify { dao.updateCompletionSubmitStatus("WO-1", "failed") }
+            coVerify(exactly = 0) { api.complete(any(), any()) }
+        }
+
+    @Test
     fun `a successful complete marks the local completion row synced and returns Done`() =
         runTest {
             val api = mockk<WorkOrdersApi>()

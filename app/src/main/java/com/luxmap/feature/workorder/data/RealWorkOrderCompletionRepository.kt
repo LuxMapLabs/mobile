@@ -32,11 +32,66 @@ class RealWorkOrderCompletionRepository
         override fun observeEvidence(workOrderId: String): Flow<LocalWorkOrderEvidenceEntity?> =
             dao.observeLatestEvidence(workOrderId)
 
+        override fun observeEvidenceList(workOrderId: String): Flow<List<LocalWorkOrderEvidenceEntity>> =
+            dao.observeEvidenceList(workOrderId)
+
         override fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?> =
             dao.observeCompletion(workOrderId)
 
         override fun observeCompletedWorkOrderIds(): Flow<Set<String>> =
             dao.observeAllCompletions().map { completions -> completions.map { it.workOrderId }.toSet() }
+
+        override suspend fun captureEvidence(
+            workOrderId: String,
+            kind: EvidenceKind,
+            clientOpId: String,
+            filePath: String,
+            lat: Double,
+            lng: Double,
+            capturedAt: Instant,
+        ) {
+            dao.insertDraftEvidence(
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = clientOpId,
+                    workOrderId = workOrderId,
+                    kind = kind.wireValue,
+                    filePath = filePath,
+                    capturedAt = capturedAt,
+                    lat = lat,
+                    lng = lng,
+                    uploadStatus = "draft",
+                ),
+            )
+        }
+
+        override suspend fun removeDraftEvidence(
+            workOrderId: String,
+            clientOpId: String,
+        ) {
+            val evidence = dao.evidenceByClientOpId(clientOpId) ?: return
+            if (dao.deleteDraftEvidence(workOrderId, clientOpId) == 1) {
+                File(evidence.filePath).delete()
+            }
+        }
+
+        override suspend fun prepareEvidenceRework(
+            workOrderId: String,
+            previousClientOpId: String,
+        ) {
+            dao.deleteSyncedCompletion(workOrderId, previousClientOpId)
+        }
+
+        override suspend fun retryEvidenceSubmission(workOrderId: String): Boolean {
+            if (!dao.retryEvidenceSubmission(workOrderId)) return false
+            syncQueueManager.triggerSync()
+            return true
+        }
+
+        override suspend fun reopenEvidenceSubmission(workOrderId: String): Boolean {
+            val discardedFiles = dao.reopenEvidenceSubmission(workOrderId) ?: return false
+            discardedFiles.forEach { File(it).delete() }
+            return true
+        }
 
         @OptIn(ExperimentalCoroutinesApi::class)
         override fun observeCompletionSyncStates(): Flow<Map<String, CompletionSyncState>> =
@@ -94,8 +149,7 @@ class RealWorkOrderCompletionRepository
             faultOutcomes: List<FaultOutcome>?,
         ) {
             val clientOpId = UUID.randomUUID().toString()
-            val dependsOn = if (taskKind == "repair") dao.latestEvidenceClientOpId(workOrderId) else null
-            dao.insertOrReplaceCompletion(
+            val completion =
                 LocalWorkOrderCompletionEntity(
                     workOrderId = workOrderId,
                     reportNote = reportNote,
@@ -103,13 +157,24 @@ class RealWorkOrderCompletionRepository
                     faultOutcomesJson = faultOutcomes?.let { json.encodeToString(it) },
                     clientOpId = clientOpId,
                     submitStatus = "pending",
-                ),
-            )
+                )
+            val evidenceKind =
+                when (taskKind) {
+                    "repair" -> EvidenceKind.AFTER
+                    "inspection" -> EvidenceKind.OBSERVATION
+                    else -> null
+                }
+            if (evidenceKind != null) {
+                if (dao.stageEvidenceCompletion(completion, evidenceKind.wireValue)) {
+                    syncQueueManager.triggerSync()
+                }
+                return
+            }
+            dao.insertOrReplaceCompletion(completion)
             syncQueueManager.enqueue(
                 opType = "complete_work_order",
                 payloadJson = json.encodeToString(CompletionSyncPayload(workOrderId)),
                 clientOpId = clientOpId,
-                dependsOnClientOpId = dependsOn,
             )
         }
 

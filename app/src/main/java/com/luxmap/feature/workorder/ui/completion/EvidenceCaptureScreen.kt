@@ -1,25 +1,39 @@
 package com.luxmap.feature.workorder.ui.completion
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxChildTopBar
 import java.io.File
 
 @Composable
@@ -28,56 +42,145 @@ fun EvidenceCaptureRoute(
     viewModel: EvidenceCaptureViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
-    var pendingFile by remember { mutableStateOf<File?>(null) }
-    var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+    val state by viewModel.state.collectAsState()
+    var pendingPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var launchError by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val takePictureLauncher =
+    val takePicture =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
-            val file = pendingFile
+            val file = pendingPath?.let(::File)
+            pendingPath = null
             if (success && file != null) {
                 viewModel.onPhotoCaptured(file, onDone)
             } else {
-                onDone()
+                file?.delete()
             }
         }
 
     fun launchCamera() {
         val file = viewModel.outputFile(context.filesDir)
-        pendingFile = file
+        pendingPath = file.absolutePath
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        takePictureLauncher.launch(uri)
+        try {
+            takePicture.launch(uri)
+        } catch (_: ActivityNotFoundException) {
+            pendingPath = null
+            launchError = "Không mở được camera."
+        } catch (_: SecurityException) {
+            pendingPath = null
+            launchError = "Không có quyền dùng camera."
+        }
     }
 
-    // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
-    // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
-    // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
-    // stays best-effort like before (missing GPS is not fatal, just means lat/lng 0,0).
-    val permissionsLauncher =
+    val cameraPermissions =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-            if (result[Manifest.permission.CAMERA] == true) {
-                launchCamera()
-            } else {
-                onDone()
-            }
+            if (result[Manifest.permission.CAMERA] == true) launchCamera() else launchError = "Cần quyền dùng camera."
+        }
+    val locationPermission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            viewModel.useCurrentLocation()
+        }
+    val picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+            viewModel.onGallerySelected(context.filesDir, context.contentResolver, uris)
         }
 
-    LaunchedEffect(Unit) {
-        val cameraGranted =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        when {
-            cameraGranted -> launchCamera()
-            hasRequestedPermissions -> onDone()
-            else -> {
-                hasRequestedPermissions = true
-                permissionsLauncher.launch(
-                    arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
-                )
+    fun close() {
+        if (state.busy) return
+        viewModel.skipPhotosWithoutLocation()
+        onDone()
+    }
+
+    BackHandler(enabled = true) { close() }
+    Scaffold(topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) }) { padding ->
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            val available = !state.busy && state.awaitingLocation == 0 && pendingPath == null
+            OutlinedButton(
+                onClick = {
+                    launchError = null
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        launchCamera()
+                    } else {
+                        cameraPermissions.launch(
+                            arrayOf(
+                                Manifest.permission.CAMERA,
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ),
+                        )
+                    }
+                },
+                enabled = available,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Chụp ảnh") }
+            OutlinedButton(
+                onClick = {
+                    launchError = null
+                    try {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    } catch (_: ActivityNotFoundException) {
+                        launchError = "Không mở được thư viện ảnh."
+                    }
+                },
+                enabled = available,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Chọn từ thư viện") }
+            if (state.busy) {
+                CircularProgressIndicator()
+                Text("Đang chuẩn bị ảnh…")
             }
+            launchError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (state.added > 0) Text("Đã thêm ${state.added} ảnh.")
+            if (state.failed > 0) Text("Không thêm được ${state.failed} ảnh.", color = MaterialTheme.colorScheme.error)
+            if (state.usedImportTime > 0) Text("${state.usedImportTime} ảnh thiếu giờ chụp. Đã lưu giờ nhập ảnh.")
+            Button(onClick = { close() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Xong") }
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+    if (state.awaitingLocation > 0 && !state.busy) {
+        AlertDialog(
+            onDismissRequest = viewModel::skipPhotosWithoutLocation,
+            title = { Text("Ảnh thiếu vị trí") },
+            text = {
+                Text(
+                    if (state.locationUnavailable) {
+                        "Chưa lấy được vị trí hiện tại. Bật định vị hoặc bỏ qua các ảnh này."
+                    } else {
+                        "Không đọc được GPS của ${state.awaitingLocation} ảnh. Dùng vị trí hiện tại để đính kèm?"
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val granted =
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                        if (granted == PackageManager.PERMISSION_GRANTED) {
+                            viewModel.useCurrentLocation()
+                        } else {
+                            locationPermission.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                ),
+                            )
+                        }
+                    },
+                ) { Text("Dùng vị trí hiện tại") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::skipPhotosWithoutLocation) { Text("Bỏ qua ảnh này") }
+            },
+        )
     }
 }
