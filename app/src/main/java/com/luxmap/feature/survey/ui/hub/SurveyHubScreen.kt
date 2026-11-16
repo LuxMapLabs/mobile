@@ -3,9 +3,7 @@ package com.luxmap.feature.survey.ui.hub
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,20 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -38,25 +30,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.WorkOrderStatus
-import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.CancelRequestSheet
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxTabTopBar
-import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
@@ -145,7 +134,19 @@ fun SurveyHubScreen(
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
                 when (state) {
-                    is SurveyHubUiState.Loading -> HubLoadingSkeleton()
+                    is SurveyHubUiState.Loading ->
+                        LuxLoadingRegion(
+                            description = "Đang tải việc khảo sát",
+                            modifier = Modifier.padding(Spacing.lg),
+                        ) {
+                            LuxSkeleton(modifier = Modifier.fillMaxWidth(0.4f).height(20.dp))
+                            repeat(3) {
+                                LuxSkeleton(
+                                    modifier = Modifier.fillMaxWidth().height(140.dp),
+                                    shape = MaterialTheme.shapes.medium,
+                                )
+                            }
+                        }
 
                     is SurveyHubUiState.Success ->
                         SurveyHubContent(
@@ -158,31 +159,26 @@ fun SurveyHubScreen(
                         )
 
                     is SurveyHubUiState.Empty ->
-                        MessageState(
+                        LuxEmptyState(
+                            title = "Chưa có việc khảo sát được giao",
+                            message = "Khi Kỹ sư bảo trì giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
                             icon = Icons.Filled.EventAvailable,
-                            iconColors = SyncStatus.DONE.badgeColors(),
-                            title = "Chưa có tuyến nào được phân công — liên hệ Kỹ sư bảo trì",
-                            subtitle = "Khi có tuyến mới được giao, danh sách sẽ hiển thị tại đây.",
-                            action = {},
+                            actionLabel = "Làm mới",
+                            onAction = onRetry,
                         )
 
                     is SurveyHubUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.CloudOff,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
-                            title = state.message,
-                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                        ) {
-                            OutlinedButton(
-                                onClick = onRetry,
-                                colors =
-                                    ButtonDefaults.outlinedButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                    ),
-                            ) {
-                                Text("Thử lại")
-                            }
-                        }
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            title = "Không tải được việc khảo sát",
+                            message =
+                                if (state.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
+                        )
                 }
             }
         }
@@ -214,66 +210,6 @@ fun SurveyHubScreen(
             cancelSheetWorkOrderId = null
         }
     }
-}
-
-// Shaped like the real content below it (a thin section-label bar + 3 route-card-shaped rows)
-// instead of a spinner, so the loading state doesn't jump/resize once real data replaces it -
-// same pattern as HomeScreen's LoadingSkeletonState.
-@Composable
-private fun HubLoadingSkeleton() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        SkeletonBar(width = 120.dp, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
-        repeat(3) { RouteCardSkeleton() }
-    }
-}
-
-@Composable
-private fun RouteCardSkeleton() {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(40.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
-            )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SkeletonBar(widthFraction = 0.4f, height = 12.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-                SkeletonBar(widthFraction = 0.6f, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            }
-        }
-        SkeletonBar(
-            widthFraction = 1f,
-            height = Dimens.minTouchTarget,
-            color = WorkOrderStatus.ASSIGNED.badgeColors().background,
-            shape = RoundedCornerShape(Radius.control),
-        )
-    }
-}
-
-@Composable
-private fun SkeletonBar(
-    height: Dp,
-    color: Color,
-    width: Dp? = null,
-    widthFraction: Float? = null,
-    shape: RoundedCornerShape = RoundedCornerShape(Dimens.radiusSmall),
-) {
-    val widthModifier = if (width != null) Modifier.width(width) else Modifier.fillMaxWidth(widthFraction ?: 1f)
-    Box(modifier = widthModifier.height(height).background(color, shape))
 }
 
 @Composable

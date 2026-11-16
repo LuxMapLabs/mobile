@@ -173,22 +173,43 @@ class SurveyHubScreenTest {
     }
 
     @Test
-    fun empty_state_shows_the_no_routes_message() {
+    fun empty_offers_refresh() {
+        var retries = 0
         composeRule.setContent {
-            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Empty) }
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Empty,
+                    onRetry = { retries++ },
+                )
+            }
         }
-        composeRule.onNodeWithText("Chưa có tuyến nào được phân công", substring = true).assertExists()
+        composeRule.onNodeWithText("Chưa có việc khảo sát được giao").assertExists()
+        composeRule.onNodeWithText("Làm mới").performClick()
+        assertEquals(1, retries)
     }
 
     @Test
-    fun error_state_shows_the_message_and_a_retry_action() {
+    fun a_network_error_uses_hub_copy_and_hides_the_raw_message() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
-                SurveyHubScreen(state = SurveyHubUiState.Error("Không tải được Khảo sát"), onRetry = {})
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Error("java.net.UnknownHostException", isNetworkError = true),
+                    onRetry = { retries++ },
+                )
             }
         }
-        composeRule.onNodeWithText("Không tải được Khảo sát").assertExists()
-        composeRule.onNodeWithText("Thử lại").assertExists()
+        composeRule.onNodeWithText("Không tải được việc khảo sát").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun loading_is_one_announced_region() {
+        composeRule.setContent { LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Loading) } }
+        composeRule.onNodeWithContentDescription("Đang tải việc khảo sát").assertExists()
     }
 
     // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): button only shows while still
