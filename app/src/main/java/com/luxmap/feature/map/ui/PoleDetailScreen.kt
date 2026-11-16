@@ -208,7 +208,7 @@ private fun PoleHeaderSection(detail: PoleDetail) {
     Column {
         // Design System v3.0.1: pole code is the biggest, boldest text on the screen — field
         // crew must recognize which pole this is in under 2 seconds.
-        Text(text = detail.poleId, style = MaterialTheme.typography.displayLarge)
+        Text(text = detail.poleId, style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(Spacing.xs))
         Text(
             text = detail.segmentName ?: "Chưa gắn tuyến đường",
