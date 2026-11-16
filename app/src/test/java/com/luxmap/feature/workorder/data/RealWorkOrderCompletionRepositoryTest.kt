@@ -5,6 +5,7 @@ import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
@@ -16,6 +17,38 @@ import org.junit.Test
 import java.time.Instant
 
 class RealWorkOrderCompletionRepositoryTest {
+    @Test
+    fun `captureEvidence saves one draft per image without starting an upload`() =
+        runTest {
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            val syncQueue = mockk<SyncQueueManager>(relaxed = true)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueue)
+            val capturedAt = Instant.parse("2026-11-16T08:00:00Z")
+
+            repository.captureEvidence("WO-1", EvidenceKind.AFTER, "photo-a", "/tmp/a.jpg", 10.0, 106.0, capturedAt)
+            repository.captureEvidence(
+                workOrderId = "WO-2",
+                kind = EvidenceKind.OBSERVATION,
+                clientOpId = "photo-b",
+                filePath = "/tmp/b.jpg",
+                lat = 10.0,
+                lng = 106.0,
+                capturedAt = capturedAt,
+            )
+
+            coVerify(exactly = 1) {
+                dao.insertDraftEvidence(
+                    match { it.clientOpId == "photo-a" && it.kind == "after" && it.uploadStatus == "draft" },
+                )
+            }
+            coVerify(exactly = 1) {
+                dao.insertDraftEvidence(
+                    match { it.clientOpId == "photo-b" && it.kind == "observation" && it.uploadStatus == "draft" },
+                )
+            }
+            coVerify(exactly = 0) { syncQueue.enqueue(any(), any(), any(), any()) }
+        }
+
     @Test
     fun `captureAfterEvidence writes the local row then enqueues an upload op with no dependency`() =
         runTest {
@@ -46,11 +79,11 @@ class RealWorkOrderCompletionRepositoryTest {
         }
 
     @Test
-    fun `submitCompletion for a repair depends on the latest evidence clientOpId`() =
+    fun `submitCompletion for a repair stages all after photos before triggering sync`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
-            io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
+            coEvery { dao.stageEvidenceCompletion(any(), "after") } returns true
             val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
 
             repository.submitCompletion(
@@ -62,20 +95,17 @@ class RealWorkOrderCompletionRepositoryTest {
             )
 
             coVerify {
-                syncQueueManager.enqueue(
-                    opType = "complete_work_order",
-                    payloadJson = any(),
-                    clientOpId = any(),
-                    dependsOnClientOpId = "OP-1",
-                )
+                dao.stageEvidenceCompletion(match { it.workOrderId == "WO-1" }, "after")
+                syncQueueManager.triggerSync()
             }
         }
 
     @Test
-    fun `submitCompletion for an inspection does not depend on any evidence op`() =
+    fun `submitCompletion for an inspection stages observation photos and keeps fault outcomes`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            coEvery { dao.stageEvidenceCompletion(any(), "observation") } returns true
             val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
 
             repository.submitCompletion(
@@ -87,12 +117,11 @@ class RealWorkOrderCompletionRepositoryTest {
             )
 
             coVerify {
-                syncQueueManager.enqueue(
-                    opType = "complete_work_order",
-                    payloadJson = any(),
-                    clientOpId = any(),
-                    dependsOnClientOpId = null,
+                dao.stageEvidenceCompletion(
+                    match { it.workOrderId == "WO-2" && it.faultOutcomesJson?.contains("FAULT-1") == true },
+                    "observation",
                 )
+                syncQueueManager.triggerSync()
             }
         }
 
