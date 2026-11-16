@@ -1,6 +1,6 @@
 # Đề xuất redesign: Hub Khảo sát
 
-> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT.** Hướng đã thống nhất 2026-11-17 (H1–H4, mục 9). Chưa có code nào thay đổi.
+> **Trạng thái:** **ĐÃ DUYỆT VÀ ĐÃ CODE XONG 2026-11-17** trên nhánh `style/redesign-survey-hub-vnext`. Còn nợ: kiểm tra tay trên máy đã đăng nhập (Light/Night Field, cỡ chữ 200%).
 > **Màn:** `feature/survey/ui/hub/SurveyHubScreen.kt` (650 dòng), route `survey?highlightWorkOrderId=…`, tab 2 của bottom nav.
 > **Căn cứ:** `docs/design-system/AUDIT_REPORT.md` (mục 6.3, P-11, P-12), `docs/design-system/vNext/`, code hiện tại (đọc 2026-11-17), cách đã làm ở F02 (`F02_HOME.md`) và F09 (`F09_WORK_ORDER_DETAIL.md`).
 
