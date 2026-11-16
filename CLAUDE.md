@@ -9,7 +9,8 @@ Bốn vai trò còn lại theo đúng tên trong hồ sơ đăng ký: **Superior
 ## Tài liệu tham chiếu bắt buộc đọc trước khi code
 
 - `docs/LuxMap_Mobile_DacTaChiTiet_v2.2.docx` — đặc tả từng màn hình (mã F01–F15), bảng ánh xạ Màn hình → API → Bảng dữ liệu (mục C2–C3), enum trạng thái dùng chung (mục C4), quy tắc nghiệp vụ bắt buộc (mục C5), ma trận truy vết UI/trạng thái (mục P9)
-- `docs/LuxMap_Mobile_Design_System_v2.0.md` — design tokens 3 lớp (primitive/semantic/component), typography, spacing, master components, quy tắc Dark Mode theo ngữ cảnh
+- `docs/design-system/vNext/` (2026-11-16) — **Design System hiện hành** "Civic Utility": token màu Light/Night Field, 15 slot typography, shape, component spec, quy chuẩn bản đồ GIS, accessibility, ánh xạ Compose. Đọc `README.md` trước (quyết định đã duyệt + điểm còn chờ). Đi kèm `docs/design-system/AUDIT_REPORT.md` (audit hiện trạng UI) và `DESIGN_DIRECTION_RESEARCH.md` (so sánh hướng thiết kế). Thay thế v2.0 ở phần token; v2.0 vẫn là nguồn cho nguyên tắc nền tảng/thuật ngữ khi vNext chưa nói tới
+- `docs/LuxMap_Mobile_Design_System_v2.0.md` — design tokens 3 lớp (primitive/semantic/component), typography, spacing, master components, quy tắc Dark Mode theo ngữ cảnh. **Phần token đã được vNext thay thế (2026-11-16)**
 - `docs/LuxMap_Mobile_Technology_Stack.docx` — ngăn xếp công nghệ chốt, kiến trúc 5 lớp (Presentation/Domain/Data/Sync/Device), bảng local DB, quy tắc offline-first chi tiết
 - `docs/LuxMap_Rural_Road_Lighting_GIS_phuonglhk.md` — hồ sơ đề tài: bối cảnh, kiến trúc tổng thể, vai trò hệ thống, câu hỏi nghiên cứu (RQ1/RQ2)
 - `docs/FA26SE222 v1.2.docx` — hồ sơ đăng ký đề tài Capstone (bản chính thức nộp GVHD): bối cảnh, 8 module giải pháp, danh sách vai trò hệ thống (Superior/Manager/Field Engineer/System Admin/Citizen) và nghiệp vụ từng vai trò, yêu cầu phi chức năng, deliverables, phân công thành viên, câu hỏi nghiên cứu. Đây là nguồn xác định **tên và phạm vi vai trò hệ thống** — khi có khác biệt với các tài liệu đặc tả chi tiết khác về vai trò/phạm vi, ưu tiên đối chiếu lại với file này trước khi kết luận. **Đã xác nhận với chủ dự án (2026-09-25) và đã sửa lại mục A2 của `LuxMap_Mobile_DacTaChiTiet_v2.2.docx`** cho khớp: hệ thống có 5 vai trò (thêm Citizen), không còn ghi "đúng 4 vai trò, Citizen không tồn tại" như bản cũ
@@ -293,65 +294,40 @@ app/src/main/java/com/luxmap/
 
 Mỗi feature nhỏ hơn (`auth`, `home`, `map`, `notification`, `profile`...) chỉ cần `data/` + `ui/`, không bắt buộc có `domain/` — chỉ thêm `domain/` khi thực sự có logic nghiệp vụ tách riêng được (xem mục Kiến trúc & Design Pattern).
 
-## Design tokens — 3 lớp
+## Design tokens — Design System vNext "Civic Utility" (hiện hành từ 2026-11-16)
 
-Token tổ chức theo 3 lớp: **Primitive** (giá trị gốc) → **Semantic** (ý nghĩa sử dụng, khác nhau theo Light/Dark) → **Component** (giá trị theo component cụ thể).
+**Nguồn đúng khi code UI:** `docs/design-system/vNext/` (README, `COLOR_SYSTEM.md`, `TYPOGRAPHY.md`, `SHAPE_SURFACE.md`, `COMPONENT_SPECIFICATIONS.md`, `GIS_MAP_GUIDELINES.md`, `DARK_NIGHT_FIELD.md`, `ACCESSIBILITY.md`, `COMPOSE_IMPLEMENTATION.md`) + code thật trong `core/theme/`. Hướng đã duyệt: **Light-first + "Night Field" (theme tối có token riêng) + Material 3 tiết chế** — Navy700 `#1F3864` là màu thương hiệu, Be Vietnam Pro, WCAG AA tối thiểu/AAA cho nội dung chính và CTA, **không gradient**, **không M3 Expressive**, **không dynamic color**. Duyệt bổ sung 2026-11-16: T-01 (primary Night Field = Navy300), T-02 (disabled theo code), T-03 (badge ưu tiên dùng cặp nền/chữ), T-06 (radius). Các điểm còn chờ (T-04, T-05, T-07…T-16) liệt kê ở `docs/design-system/vNext/README.md` mục 5 — không tự quyết.
 
-**Cập nhật 2026-10-11:** lớp brand/semantic (background/surface/text/border/focus/navigation) từng được chủ dự án duyệt chuyển từ Design System v2.0 sang v2.1 ("Night Ledger" redesign, `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` mục 2, roadmap `docs/superpowers/plans/2026-10-11-luxmap-redesign-roadmap.md` quyết định #1, đã lên code ở Phase 0).
+**Lịch sử (chỉ để tham khảo):** v2.0 → thử "Night Ledger" v2.1 (2026-10-11) → rollback về v2.0 (2026-10-14, PR #65–67) → vNext (2026-11-16, nhánh `style/design-system-vnext-tokens`). `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` và `docs/LuxMap_Mobile_Design_System_v2.1.md` **không còn là nguồn token**. 25 primitive v2.1 (`Paper/Ink/Lumen/Night`, `NightSurf*`…) vẫn còn khai báo trong `Color.kt` nhưng không dùng — chờ dọn ở giai đoạn dọn dẹp. `BrandHeroGradient` cũng còn trong code (các hero hiện tại) nhưng bị loại khỏi vNext; sẽ gỡ dần khi redesign từng màn. Đích sau đăng nhập là `Routes.Home` (đảo lại 2026-11-14), không liên quan token.
 
-**Cập nhật 2026-10-14 — ĐÃ ROLLBACK, mục trên đã lỗi thời.** Quyết định sản phẩm đổi ý: "Claude Design project turn 3 (Đồng bộ toàn bộ giao diện theo Design System v2.0)" yêu cầu bỏ bảng màu Night Ledger, trả lớp brand/semantic về đúng Design System v2.0 — đã code xong (PR #66 `style/redesign-rollback-tokens-v2.0`, theo sau là PR #65 `style/redesign-phase11-login` và PR #67 `style/redesign-phase2-home-v2.0` chỉnh 2 màn còn dính token v2.1), merge vào `dev` ngày 2026-10-14. `LightSemanticColors`/`DarkSemanticColors` và M3 color scheme (`Theme.kt`) hiện trỏ lại `Navy700`/`Blue500`/`Gray*`/`Dark*` — **không còn dùng** `Paper`/`Ink`/`Lumen`/`Night*`. Theo đó: màn Đăng nhập (F01) dùng hero `navy-700`/`BrandHeroGradient` (không phải hero `inverseSurface`/Ink như spec v2.1), và đích sau đăng nhập là `Routes.Map` (không phải `Routes.Home`) — 2 điểm roadmap từng đánh dấu "cần quyết định sản phẩm" nay đã chốt theo hướng này. **Cập nhật 2026-11-14 — đích sau đăng nhập đã ĐẢO LẠI lần nữa, theo yêu cầu trực tiếp của chủ dự án:** vào thẳng `Routes.Home` (Việc hôm nay), không còn là `Routes.Map` như quyết định 2026-10-14 ở trên. `NavGraph.kt`'s `onLoginSuccess` và anchor `popUpTo(...)` của bottom nav đã đổi theo (từ `Routes.Map.route` sang `Routes.Home.route`) để tab vẫn giữ đúng state khi chuyển qua lại. Phần hero/token màn Đăng nhập (`navy-700`/`BrandHeroGradient`) không đổi, chỉ đích điều hướng sau khi đăng nhập thành công là đổi. Token v2.1 (Paper/Ink/Lumen/Night*...) **vẫn còn khai báo trong `Color.kt`** (không dùng ở đâu khác trong code, xác nhận bằng grep toàn bộ `app/src/main/java/com/luxmap` ngày 2026-10-18) — giữ lại để tham khảo lịch sử, không phải nguồn token khi code mới, có thể dọn sau nếu muốn. **Lớp status (asset condition/sync/work-order status/priority/task-kind) không bị ảnh hưởng, vẫn là v2.0 như trước giờ** — các bảng badge ở dưới vẫn là nguồn đúng. Khi code token brand/semantic mới, lấy đúng từ mục 2.1 Design System v2.0 + code thật trong `core/theme/Color.kt`/`Theme.kt` — **không dùng** `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` hay `docs/LuxMap_Mobile_Design_System_v2.1.md` cho lớp này nữa (2 file đó vẫn còn trong `docs/`, không xoá, nhưng đã bị quyết định 2026-10-14 vượt qua).
+### Quy tắc dùng token trong code
 
-### Primitive colors — brand/semantic (v2.0, hiện hành trong `Color.kt`)
+- `feature/` **chỉ** đọc `MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*`, `MaterialTheme.shapes.*`, `LuxTheme.colors.*` (success/warning/info/disabled/focus/due/overlay) và `LuxTheme.status.*` / các hàm `@Composable` `*.badgeColors()` — **không** import primitive (`Navy700`, `Gray500`, `Danger600`…) hay viết `Color(0x…)` trong màn hình. Code cũ còn vi phạm sẽ được sửa dần theo từng màn khi redesign.
+- `colorScheme.outline` (≥3:1) **chỉ** cho ranh giới control (text field, nút viền, checkbox); viền card/divider trang trí dùng `colorScheme.outlineVariant`.
+- Mỗi miền trạng thái có bộ token riêng (`LuxTheme.status.asset/workOrder/priority/sync/iot/kind`), kể cả khi trùng giá trị hex — không mượn màu chéo. Badge luôn có **icon + nhãn**, không chỉ màu.
+- `badgeColors()` là hàm `@Composable` tự theo theme (Light/Night Field) — **không** truyền `isDark` và không dùng `isSystemInDarkTheme()` để chọn màu (sai trong màn `forceDark`).
 
-```kotlin
-val Navy700 = Color(0xFF1F3864)  // Thương hiệu, điều hướng active Light
-val Blue500 = Color(0xFF3E86C9)  // Focus Light
-val Gray25  = Color(0xFFF8FAFC)  // Nền Light
-val Gray50  = Color(0xFFF1F5F9)  // Surface phụ Light
-val Gray200 = Color(0xFFE2E8F0)  // Viền/outline Light
-val Gray500 = Color(0xFF64748B)  // Chữ phụ Light, điều hướng inactive
-val Gray900 = Color(0xFF0F172A)  // Chữ chính Light
-val Dark950 = Color(0xFF0D0D0D)  // Nền Dark
-val Dark900 = Color(0xFF121212)  // Surface phụ Dark
-val Dark800 = Color(0xFF1A1A1A)  // Surface Dark
-val Dark700 = Color(0xFF2A2A2A)  // Viền/outline Dark
-val DarkText  = Color(0xFFF5F5F5) // Chữ chính Dark
-val DarkMuted = Color(0xFFA0A0A0) // Chữ phụ Dark, điều hướng inactive Dark
-```
+### Màu semantic (M3 `ColorScheme`, `core/theme/Theme.kt`)
 
-Bảng đầy đủ xem mục 2.1 Design System v2.0 và code thật trong `core/theme/Color.kt`. `Navy900`/`Blue600` (thêm từ Global Design System v1.0 mục 3.1) chỉ dùng cho `BrandHeroGradient` ở hero F01, không phải token semantic chung.
-
-### Primitive colors — status (v2.0, không đổi)
-
-```kotlin
-val Green400 = Color(0xFF5FC4B0)   // Đèn bình thường, điểm nhấn Dark Mode
-val Amber500 = Color(0xFFE9A23B)   // Cảnh báo trung bình
-val Rose600 = Color(0xFFD64545)    // Hỏng/tắt, SLA khẩn
-val Success600 = Color(0xFF059669) // Hoàn tất thành công
-val Danger600 = Color(0xFFDC2626)  // Hành động nguy hiểm
-```
-
-Bảng đầy đủ (gray-50/200/500/700, dark-900/700, dark-muted...) xem mục 2.1 Design System v2.0.
-
-### Semantic colors (Light / Dark) — v2.0, hiện hành trong `LuxMapSemanticColors`/`Theme.kt`
-
-| Semantic token | Light | Dark |
+| Role | Light | Night Field |
 |---|---:|---:|
-| `color.background` | `#F8FAFC` (Gray25) | `#0D0D0D` (Dark950) |
-| `color.surface` | `#FFFFFF` | `#1A1A1A` (Dark800) |
-| `color.surface.subtle` | `#F1F5F9` (Gray50) | `#121212` (Dark900) |
-| `color.text.primary` | `#0F172A` (Gray900) | `#F5F5F5` (DarkText) |
-| `color.text.secondary` | `#64748B` (Gray500) | `#A0A0A0` (DarkMuted) |
-| `color.border` / `outline` | `#E2E8F0` (Gray200) | `#2A2A2A` (Dark700) |
-| `color.focus` | `#3E86C9` (Blue500) | `#5FC4B0` (Green400) |
-| `color.navigation.active` | `#1F3864` (Navy700) | `#5FC4B0` (Green400) |
-| `color.navigation.inactive` | `#64748B` (Gray500) | `#A0A0A0` (DarkMuted) |
+| `primary` / `onPrimary` | `#1F3864` / `#FFFFFF` | `#9DB7E0` / `#0E1E38` |
+| `primaryContainer` / `onPrimaryContainer` | `#D9E2EF` / `#172B4D` | `#21375C` / `#D9E2EF` |
+| `secondary` | `#475569` | `#B3B3B3` |
+| `tertiary` | `#2D6388` | `#8FB8DA` |
+| `background` | `#F8FAFC` | `#0D0D0D` |
+| `surface` | `#FFFFFF` | `#121212` |
+| `surfaceContainer` (Low → Highest) | `#F8FAFC` · `#F1F5F9` · `#E8EDF3` · `#E2E8F0` | `#121212` · `#1C1C1C` · `#262626` · `#2E2E2E` |
+| `onSurface` / `onSurfaceVariant` | `#0F172A` / `#475569` | `#E6E6E6` / `#B3B3B3` |
+| `outline` / `outlineVariant` | `#64748B` / `#E2E8F0` | `#8C8C8C` / `#2A2A2A` |
+| `error` / `errorContainer` | `#B91C1C` / `#FEE2E2` | `#FF9A9A` / `#4A1717` |
+| `surfaceTint` | Transparent | Transparent |
 
-Bảng đầy đủ xem mục 2.1 Design System v2.0 và code thật trong `core/theme/Theme.kt`. M3 `ColorScheme` ở đây chỉ dùng các role cơ bản (`primary/onPrimary/secondary/.../outline/error`) — các role từng thêm cho redesign v2.1 (`primaryContainer`, `inverseSurface`, `surfaceContainerHigh`, `outlineVariant`) đã bị bỏ cùng đợt rollback 2026-10-14, không phải chỉ đổi giá trị như ghi chú `contract-drift.md` cũ (mục đó giờ chỉ còn giá trị lịch sử).
+Mở rộng (`LuxTheme.colors`, `core/theme/ExtendedColors.kt`): success `#047857`/`#6FD3A8`, warning `#B45309`/`#F7C66D`, info `#0369A1`/`#7CC4F0`, disabled `#E2E8F0`+`#475569` / `#2A2A2A`+`#A0A0A0`, focusRing `#3E86C9`/`#9DB7E0`, `dueOverdue`/`dueToday`/`dueFuture`. Bảng đầy đủ + tỉ lệ tương phản: `docs/design-system/vNext/COLOR_SYSTEM.md`. Mọi cặp được test khoá ở `ColorSchemeContrastTest`/`ExtendedColorsTest`.
 
-### Badge trạng thái tài sản (Light / Dark) — dùng đúng cặp, không đổi
+### Badge trạng thái tài sản (Light / Night Field) — giữ nguyên giá trị v2.0
 
-| Trạng thái | Nền Light | Chữ Light | Nền Dark | Chữ Dark |
+| Trạng thái | Nền Light | Chữ Light | Nền Night Field | Chữ Night Field |
 |---|---:|---:|---:|---:|
 | Bình thường (`normal`) | `#D1FAE5` | `#065F46` | `#123D34` | `#8CE3D1` |
 | Đèn mờ (`dim`) | `#FEF3C7` | `#92400E` | `#4A3310` | `#F7C66D` |
@@ -360,27 +336,33 @@ Bảng đầy đủ xem mục 2.1 Design System v2.0 và code thật trong `core
 
 ### Badge trạng thái đồng bộ (sync_queue.status) — không gộp `failed` và `conflict`
 
-| Enum | Nhãn UI | Nền | Chữ |
-|---|---|---:|---:|
-| `queued` + offline | Chờ mạng | `#EFEFEF` | `#555555` |
-| `queued` + online | Chờ đồng bộ | `#E8EEF7` | `#1F3864` |
-| `syncing` | Đang đồng bộ | `#FFF3DC` | `#8A5A00` |
-| `failed` | Đồng bộ lỗi | `#FBE4E4` | `#9B2C2C` |
-| `conflict` | Xung đột | `#FDE8D0` | `#8A3B00` |
-| `done` | Đã đồng bộ | `#E3F6F1` | `#1E6B5C` |
+| Enum | Nhãn UI | Light (nền / chữ) | Night Field (nền / chữ) |
+|---|---|---|---|
+| `queued` + offline | Chờ mạng | `#EFEFEF` / `#555555` | `#2E2E2E` / `#CFCFCF` |
+| `queued` + online | Chờ đồng bộ | `#E8EEF7` / `#1F3864` | `#1C2A44` / `#C3D3EE` |
+| `syncing` | Đang đồng bộ | `#FFF3DC` / `#8A5A00` | `#3D2C0B` / `#F3C978` |
+| `failed` | Đồng bộ lỗi | `#FBE4E4` / `#9B2C2C` | `#451818` / `#F8A5A5` |
+| `conflict` | Xung đột | `#FDE8D0` / `#8A3B00` | `#45250B` / `#F6B27A` |
+| `done` | Đã đồng bộ | `#E3F6F1` / `#1E6B5C` | `#12352E` / `#93DCCB` |
 
 "Đã lưu trên thiết bị" (ghi Room thành công) khác với "Đã đồng bộ" (`done`, server đã xác nhận) — không dùng lẫn hai cụm này trong UI.
 
-### Badge ưu tiên Work Order
+### Badge ưu tiên Work Order — cặp nền/chữ (T-03, thay bảng màu đơn của v2.0)
 
-| Priority | Nhãn | Màu |
-|---|---|---:|
-| `low` | Thấp | `#64748B` |
-| `normal` | Bình thường | `#3E86C9` |
-| `high` | Cao | `#E9A23B` |
-| `urgent` | Khẩn | `#D64545` |
+| Priority | Nhãn | Light (nền / chữ) | Night Field (nền / chữ) |
+|---|---|---|---|
+| `low` | Thấp | `#F1F5F9` / `#475569` | `#262626` / `#BDBDBD` |
+| `normal` | Bình thường | `#E8EEF7` / `#1F3864` | `#1C2A44` / `#C3D3EE` |
+| `high` | Cao | `#FEF3C7` / `#92400E` | `#4A3310` / `#F7C66D` |
+| `urgent` | Khẩn | `#FEE2E2` / `#991B1B` | `#4A1717` / `#FF9A9A` |
 
-Typography: nội dung tối thiểu 16sp, H1 20sp/700 (tiêu đề màn hình), H2 17sp/600 (tiêu đề section/card), Caption 14sp chỉ dùng cho metadata phụ (không dùng cho cảnh báo/hướng dẫn). Nút bấm và mọi vùng chạm tối thiểu **48×48dp** (không phải 44dp — phù hợp thao tác một tay hoặc đeo găng tay khi khảo sát).
+Icon cho badge ưu tiên (T-03) chưa thêm vì chưa màn nào hiển thị badge này — khi thêm, tránh icon "vạch" kiểu `SignalCellularAlt*` (dễ đọc nhầm là sóng mạng). Trạng thái lệnh (`wo_status`), IoT (`online/offline/none`) và **loại lệnh (trung tính `#F1F5F9`/`#334155`, phân biệt bằng icon + nhãn)** — xem `COLOR_SYSTEM.md` mục 6.
+
+### Typography, shape, kích thước
+
+- **Typography:** đủ 15 slot M3 trong `core/theme/Type.kt`, tất cả Be Vietnam Pro, không slot nào < 14sp; nội dung và chữ hành động ≥ 16sp; line height ≥ 1.35× cho slot chữ; `LineHeightStyle.Trim.None` (không cắt dấu tiếng Việt). Vai trò: tiêu đề tab gốc `headlineMedium`, tiêu đề bar màn con `titleLarge` (H1 v2.0), tiêu đề section/card `titleMedium` (H2 v2.0), nội dung `bodyLarge`/`bodyMedium`, caption `bodySmall`, chữ nút `labelLarge`, badge/chip `labelMedium`, nhãn bottom nav `labelSmall`. **Không tạo `TextStyle` mới ngoài 15 slot** — 10 `*TextStyle` rời cũ (`BadgeTextStyle` 13sp…) sẽ được thay dần khi redesign từng màn. Be Vietnam Pro **không có `tnum`** (chữ số tỉ lệ) — số động đặt trong ô độ rộng cố định.
+- **Shapes** (`core/theme/Shape.kt`, T-06): extraSmall 6 (badge) · small 8 (chip) · medium 12 (card, nút, text field) · large 16 (dialog) · extraLarge 24 (bottom sheet).
+- Nút bấm và mọi vùng chạm tối thiểu **48×48dp** (không phải 44dp — phù hợp thao tác một tay hoặc đeo găng tay khi khảo sát). Lề màn hình 16dp.
 
 ### Dark Mode theo ngữ cảnh — không phải theo màn hình cố định
 
