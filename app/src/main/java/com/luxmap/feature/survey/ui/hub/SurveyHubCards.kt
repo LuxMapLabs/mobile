@@ -150,6 +150,7 @@ fun SurveyRouteCard(
                         onClick = onCapture,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                item.order.woStatus != "assigned" -> Unit
                 isCancelled ->
                     Text(
                         text = "Đã gửi yêu cầu hủy · chờ duyệt",

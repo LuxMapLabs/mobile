@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -241,9 +242,13 @@ private fun SurveyHubContent(
             }
         }
     val listState = rememberLazyListState()
+    var scrolledForHighlight by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(keys, highlightWorkOrderId) {
         val index = keys.indexOf(highlightWorkOrderId)
-        if (highlightWorkOrderId != null && index >= 0) listState.animateScrollToItem(index)
+        if (highlightWorkOrderId != null && index >= 0 && scrolledForHighlight != highlightWorkOrderId) {
+            scrolledForHighlight = highlightWorkOrderId
+            listState.animateScrollToItem(index)
+        }
     }
     LazyColumn(
         state = listState,

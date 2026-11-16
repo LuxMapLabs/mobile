@@ -69,6 +69,9 @@ class SurveyHubViewModel
             viewModelScope.launch {
                 repository.startRoute(workOrderId).fold(
                     onSuccess = {
+                        (_uiState.value as? SurveyHubUiState.Success)?.let { latest ->
+                            _uiState.value = latest.copy(startingWorkOrderId = null)
+                        }
                         load()
                         _startedRoute.tryEmit(workOrderId)
                     },
@@ -144,7 +147,18 @@ class SurveyHubViewModel
                                 isNetworkError = e is IOException,
                             )
                     }.collect { state ->
-                        _uiState.value = state
+                        val previous = _uiState.value as? SurveyHubUiState.Success
+                        _uiState.value =
+                            if (state is SurveyHubUiState.Success && previous != null) {
+                                state.copy(
+                                    startingWorkOrderId = previous.startingWorkOrderId,
+                                    startError = previous.startError,
+                                    requestingCancellationFor = previous.requestingCancellationFor,
+                                    cancellationError = previous.cancellationError,
+                                )
+                            } else {
+                                state
+                            }
                     }
                 }
         }

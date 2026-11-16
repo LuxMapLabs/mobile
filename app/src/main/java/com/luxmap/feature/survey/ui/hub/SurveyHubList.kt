@@ -43,7 +43,8 @@ fun surveyHubGroups(
                 sync != null -> HubSection.PENDING_SYNC
                 order.workOrderId in completedIds -> null
                 order.woStatus == "in_progress" -> HubSection.IN_PROGRESS
-                else -> HubSection.TODO
+                order.woStatus in NOT_STARTED_STATUSES -> HubSection.TODO
+                else -> null
             } ?: continue
         bySection.getValue(section) += HubItem(order, kind, sync)
     }
@@ -51,6 +52,8 @@ fun surveyHubGroups(
         bySection.getValue(section).takeIf { it.isNotEmpty() }?.let { HubGroup(section, it) }
     }
 }
+
+private val NOT_STARTED_STATUSES = setOf("assigned", "open")
 
 sealed interface StartGate {
     data object Open : StartGate

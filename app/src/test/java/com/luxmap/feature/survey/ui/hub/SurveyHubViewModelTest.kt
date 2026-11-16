@@ -9,8 +9,10 @@ import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -201,6 +203,7 @@ class SurveyHubViewModelTest {
                 viewModel.onStartRoute("WO-1")
                 val starting = awaitItem() as SurveyHubUiState.Success
                 assertEquals("WO-1", starting.startingWorkOrderId)
+                assertEquals(null, (awaitItem() as SurveyHubUiState.Success).startingWorkOrderId)
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(listOf(startedRoute), success.assignedRoutes)
                 assertEquals(null, success.startingWorkOrderId)
@@ -334,5 +337,47 @@ class SurveyHubViewModelTest {
                 assertEquals(SurveyHubUiState.Loading, awaitItem())
                 assertEquals(SurveyHubUiState.Empty, awaitItem())
             }
+        }
+
+    @Test
+    fun `a background sync update keeps the in-flight start state`() =
+        runTest {
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns flowOf(AssignedRoutesResult(listOf(route), false))
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            val started = CompletableDeferred<Result<Unit>>()
+            coEvery { repository.startRoute("WO-1") } coAnswers { started.await() }
+            val syncStates = MutableStateFlow<Map<String, CompletionSyncState>>(emptyMap())
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns syncStates
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
+
+            viewModel.uiState.test {
+                awaitItem()
+                awaitItem()
+                viewModel.onStartRoute("WO-1")
+                assertEquals("WO-1", (awaitItem() as SurveyHubUiState.Success).startingWorkOrderId)
+                syncStates.value = mapOf("WO-OTHER" to CompletionSyncState.PENDING)
+                assertEquals("WO-1", (awaitItem() as SurveyHubUiState.Success).startingWorkOrderId)
+                started.complete(Result.success(Unit))
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `only finished work orders left means Empty`() =
+        runTest {
+            viewModel(
+                routes =
+                    listOf(
+                        route.copy(woStatus = "done"),
+                        route.copy(workOrderId = "WO-2", woStatus = "cancelled"),
+                    ),
+            )
+                .uiState.test {
+                    assertEquals(SurveyHubUiState.Loading, awaitItem())
+                    assertEquals(SurveyHubUiState.Empty, awaitItem())
+                }
         }
 }

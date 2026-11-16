@@ -93,4 +93,16 @@ class SurveyHubListTest {
     fun `top bar date has the capitalized vietnamese weekday`() {
         assertEquals("Thứ Ba, 17/11/2026", surveyHubDate(TODAY))
     }
+
+    @Test
+    fun `done, verified and cancelled orders are not listed`() {
+        val groups =
+            surveyHubGroups(
+                routes = listOf(order("D", "done"), order("V", "verified"), order("C", "cancelled"), order("A")),
+                poleGpsOrders = listOf(order("GD", "done")),
+                syncStates = emptyMap(),
+                completedIds = emptySet(),
+            )
+        assertEquals(listOf("A"), groups.flatMap { g -> g.items.map { it.order.workOrderId } })
+    }
 }

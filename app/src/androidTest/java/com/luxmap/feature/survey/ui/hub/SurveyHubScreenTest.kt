@@ -1,13 +1,19 @@
 package com.luxmap.feature.survey.ui.hub
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.workorder.data.CompletionSyncState
@@ -352,5 +358,40 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Bắt đầu").assertExists()
+    }
+
+    @Test
+    fun a_done_route_is_not_listed() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes =
+                                listOf(
+                                    route(),
+                                    route(woStatus = "done").copy(workOrderId = "WO-D", title = "Tuyến đã xong"),
+                                ),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Tuyến đã xong").assertDoesNotExist()
+        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+    }
+
+    @Test
+    fun the_highlight_scrolls_once_and_does_not_yank_the_list_back_on_later_updates() {
+        val routes = (1..8).map { route().copy(workOrderId = "WO-$it", title = "Tuyến số $it") }
+        var state by mutableStateOf<SurveyHubUiState>(SurveyHubUiState.Success(assignedRoutes = routes))
+        composeRule.setContent {
+            LuxMapTheme { SurveyHubScreen(state = state, highlightWorkOrderId = "WO-8") }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        val extended = routes + route().copy(workOrderId = "WO-9", title = "Tuyến số 9")
+        state = SurveyHubUiState.Success(assignedRoutes = extended)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Tuyến số 1").assertIsDisplayed()
     }
 }
