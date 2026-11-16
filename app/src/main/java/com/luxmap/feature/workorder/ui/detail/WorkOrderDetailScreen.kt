@@ -1,6 +1,5 @@
 package com.luxmap.feature.workorder.ui.detail
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -9,12 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -28,7 +25,6 @@ import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -36,18 +32,12 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -63,7 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -73,15 +63,12 @@ import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
@@ -90,18 +77,17 @@ import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.BottomActionBar
-import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxBottomSheet
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
 import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -209,29 +195,20 @@ fun WorkOrderDetailScreen(
                                 scheduleWindow.canActOnSchedule &&
                                 (uiState.localCompletion == null || isReturnedForRework(uiState))
                         val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
-                        if (showCancelRequest) {
-                            SideBySideBottomBar(
-                                hint = cta.hint,
-                                hintColor = cta.hintColor,
-                                primaryText = cta.text,
-                                primaryIcon = cta.icon,
-                                primaryEnabled = cta.enabled,
-                                onPrimaryClick = onCtaClick,
-                                onCancelClick = { showCancelSheet = true },
-                            )
-                        } else {
-                            BottomActionBar(
-                                ctaText = cta.text,
-                                ctaIcon = cta.icon,
-                                onCtaClick = onCtaClick,
-                                ctaEnabled = cta.enabled,
-                                hint = cta.hint,
-                                hintColor = cta.hintColor,
-                                showHintIcon = cta.hint != null,
-                                progressText = cta.progressText,
-                                progressSegments = cta.progressSegments,
-                            )
-                        }
+                        val actionError = uiState.startError ?: uiState.submitError
+                        BottomActionBar(
+                            ctaText = cta.text,
+                            ctaIcon = cta.icon,
+                            onCtaClick = onCtaClick,
+                            ctaEnabled = cta.enabled,
+                            hint = actionError ?: cta.hint,
+                            hintColor = if (actionError != null) MaterialTheme.colorScheme.error else cta.hintColor,
+                            showHintIcon = actionError != null || cta.hint != null,
+                            progressText = cta.progressText,
+                            progressSegments = cta.progressSegments,
+                            secondaryText = if (showCancelRequest) "Yêu cầu hủy" else null,
+                            onSecondaryClick = if (showCancelRequest) ({ showCancelSheet = true }) else null,
+                        )
                     }
                 }
             },
@@ -316,74 +293,15 @@ fun WorkOrderDetailScreen(
     }
 }
 
-@Composable
-private fun SideBySideBottomBar(
-    hint: String?,
-    hintColor: Color?,
-    primaryText: String,
-    primaryIcon: ImageVector,
-    primaryEnabled: Boolean,
-    onPrimaryClick: () -> Unit,
-    onCancelClick: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.md, start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (hint != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    modifier = Modifier.padding(bottom = Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null,
-                        tint = hintColor ?: MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = hint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = hintColor ?: MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().height(PrimaryButtonHeight),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                CancelRequestButton(
-                    onClick = onCancelClick,
-                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
-                    contentPadding = PaddingValues(horizontal = Spacing.sm),
-                )
-                PrimaryButton(
-                    text = primaryText,
-                    onClick = onPrimaryClick,
-                    enabled = primaryEnabled,
-                    trailingIcon = primaryIcon,
-                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
-                )
-            }
-        }
-    }
-}
-
 private data class SubmitSummaryRow(val icon: ImageVector, val iconColor: Color, val label: String, val value: String)
 
 @Composable
 private fun submitSummaryRows(
     kind: WorkOrderTaskKind,
     state: WorkOrderDetailUiState.Success,
-): List<SubmitSummaryRow> =
-    if (kind == WorkOrderTaskKind.INSPECTION) {
+): List<SubmitSummaryRow> {
+    val primary = MaterialTheme.colorScheme.primary
+    return if (kind == WorkOrderTaskKind.INSPECTION) {
         val outcomes = state.faultOutcomes.values
         listOf(
             SubmitSummaryRow(
@@ -408,24 +326,29 @@ private fun submitSummaryRows(
     } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
         listOf(
-            SubmitSummaryRow(Icons.Filled.Navigation, Navy700, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
-            SubmitSummaryRow(Icons.Filled.StickyNote2, Navy700, "Tệp PDF", state.poleAttachments.size.toString()),
-            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Filled.Navigation, primary, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
+            SubmitSummaryRow(Icons.Filled.StickyNote2, primary, "Tệp PDF", state.poleAttachments.size.toString()),
+            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
     } else {
         listOf(
-            SubmitSummaryRow(Icons.Filled.ReportProblem, Gray500, "Sự cố đã sửa", state.detail.faults.size.toString()),
+            SubmitSummaryRow(
+                Icons.Filled.ReportProblem,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                "Sự cố đã sửa",
+                state.detail.faults.size.toString(),
+            ),
             SubmitSummaryRow(
                 Icons.Filled.PhotoCamera,
-                Navy700,
+                primary,
                 "Ảnh nghiệm thu",
                 if (state.localEvidence != null) "1 ảnh" else "0 ảnh",
             ),
-            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
         )
     }
+}
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SubmitConfirmationSheet(
     state: WorkOrderDetailUiState.Success,
@@ -435,100 +358,72 @@ private fun SubmitConfirmationSheet(
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val rows = submitSummaryRows(kind, state)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+    LuxBottomSheet(title = "Nộp báo cáo?", onDismiss = onDismiss) {
+        Text(
+            text = "${kind.label()} · ${detail.workOrderId}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
+                    .padding(horizontal = Spacing.md),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Box(
+            rows.forEachIndexed { index, row ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
                     modifier =
                         Modifier
-                            .size(52.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-                    contentAlignment = Alignment.Center,
+                            .fillMaxWidth()
+                            .heightIn(min = Dimens.minTouchTarget)
+                            .padding(vertical = Spacing.xs)
+                            .semantics(mergeDescendants = true) {},
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Send,
+                        imageVector = row.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = row.iconColor,
+                        modifier = Modifier.size(20.dp),
                     )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(text = "Nộp báo cáo?", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
                     Text(
-                        text = detail.workOrderId,
-                        style = LabelTextStyle,
+                        text = row.label,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = row.value,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
-                        .padding(horizontal = Spacing.md),
-            ) {
-                rows.forEachIndexed { index, row ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Icon(
-                            imageVector = row.icon,
-                            contentDescription = null,
-                            tint = row.iconColor,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = row.value,
-                            style = BodyStrongTextStyle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            Text(
-                text =
-                    "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
-                        "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+        Text(
+            text =
+                "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
+                    "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            LuxSecondaryButton(
+                text = "Kiểm tra lại",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f).height(PrimaryButtonHeight),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text("Kiểm tra lại", maxLines = 1)
-                }
-                Button(
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-                ) {
-                    Text("Nộp báo cáo")
-                    Spacer(Modifier.width(Spacing.sm))
-                    Icon(imageVector = Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-            }
+            PrimaryButton(
+                text = "Nộp báo cáo",
+                onClick = onConfirm,
+                trailingIcon = Icons.Filled.Send,
+                modifier = Modifier.weight(1.5f),
+            )
         }
     }
 }
@@ -654,16 +549,6 @@ private fun WorkOrderDetailContent(
                         onRetakeEvidence = onRetakeEvidence,
                     )
                 }
-            }
-            if (state.startError != null) {
-                Text(
-                    text = state.startError,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            if (state.submitError != null) {
-                InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
             }
         }
     }

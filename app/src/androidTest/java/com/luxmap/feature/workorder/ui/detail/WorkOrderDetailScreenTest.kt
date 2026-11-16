@@ -200,6 +200,63 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun cancel_request_sits_next_to_start_in_one_bottom_bar_and_opens_the_reason_sheet() {
+        val detail = repairDetail(woStatus = "assigned", allowedActions = listOf("start", "request_cancellation"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Bắt đầu").assertIsEnabled()
+        composeRule.onNodeWithText("Yêu cầu hủy").performClick()
+        composeRule.onNodeWithText("Yêu cầu hủy lệnh").assertExists()
+    }
+
+    @Test
+    fun a_start_error_is_shown_once_right_above_the_button() {
+        val detail = repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(detail = detail, startError = "Mất kết nối. Vui lòng thử lại."),
+        )
+        composeRule.onAllNodesWithText("Mất kết nối. Vui lòng thử lại.").assertCountEquals(1)
+    }
+
+    @Test
+    fun confirming_the_submit_sheet_submits_the_report() {
+        var submitted = 0
+        val faults = listOf(fault("FAULT-1", "POLE-0047"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = inspectionDetail(faults),
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                    reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                ),
+            onSubmit = { submitted++ },
+        )
+        composeRule.onNodeWithText("Nộp báo cáo kiểm tra").performClick()
+        composeRule.onNodeWithText("Nộp báo cáo?").assertExists()
+        composeRule.onNodeWithText("Nộp báo cáo").performClick()
+        assertEquals(1, submitted)
+    }
+
+    @Test
+    fun dismissing_the_submit_sheet_does_not_submit() {
+        var submitted = 0
+        val faults = listOf(fault("FAULT-1", "POLE-0047"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = inspectionDetail(faults),
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                    reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                ),
+            onSubmit = { submitted++ },
+        )
+        composeRule.onNodeWithText("Nộp báo cáo kiểm tra").performClick()
+        composeRule.onNodeWithText("Kiểm tra lại").performClick()
+        composeRule.onNodeWithText("Nộp báo cáo?").assertDoesNotExist()
+        assertEquals(0, submitted)
+    }
+
+    @Test
     fun a_done_work_order_with_no_allowed_actions_shows_the_disabled_submitted_hint() {
         val detail = repairDetail(woStatus = "done").copy(allowedActions = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
