@@ -125,12 +125,20 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun the_summary_shows_the_current_stage_without_a_multi_step_tracker() {
+    fun the_summary_shows_the_current_stage_as_a_row_without_a_multi_step_tracker() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
-        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại").assertExists()
+        composeRule.onAllNodesWithText("Sửa chữa").onFirst().assertExists()
         listOf("Khảo sát", "Duyệt #1", "Kiểm tra", "Duyệt #2").forEach { label ->
             composeRule.onNodeWithText(label).assertDoesNotExist()
         }
+    }
+
+    @Test
+    fun an_overdue_due_date_shows_the_date_and_a_separate_overdue_line() {
+        val detail = repairDetail().copy(dueDate = LocalDate.now().minusDays(2).toString())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn 2 ngày").assertExists()
     }
 
     @Test
@@ -312,10 +320,13 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun a_loaded_work_order_shows_its_title_and_kind_with_code_in_the_top_bar() {
+    fun the_top_bar_shows_only_the_kind_and_the_card_holds_title_and_full_code() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
+        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertDoesNotExist()
         composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
-        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertExists()
+        composeRule.onNodeWithText("Mã lệnh").assertExists()
+        composeRule.onNodeWithText("WO-1042").assertExists()
         composeRule.onNodeWithContentDescription("Quay lại").assertExists()
     }
 

@@ -5,6 +5,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,7 +96,6 @@ import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
-import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
@@ -173,16 +175,13 @@ fun WorkOrderDetailScreen(
         Scaffold(
             modifier = modifier,
             topBar = {
-                if (uiState is WorkOrderDetailUiState.Success) {
-                    val kind = workOrderTaskKindFromWire(uiState.detail.taskKind)
-                    LuxChildTopBar(
-                        title = uiState.detail.title,
-                        subtitle = "${kind.label()} · ${uiState.detail.workOrderId}",
-                        onBack = onBack,
-                    )
-                } else {
-                    LuxChildTopBar(title = "Chi tiết lệnh", onBack = onBack)
-                }
+                val title =
+                    if (uiState is WorkOrderDetailUiState.Success) {
+                        workOrderHeaderTitle(workOrderTaskKindFromWire(uiState.detail.taskKind))
+                    } else {
+                        "Chi tiết lệnh"
+                    }
+                LuxChildTopBar(title = title, onBack = onBack)
             },
             bottomBar = {
                 if (uiState is WorkOrderDetailUiState.Success) {
@@ -570,19 +569,12 @@ private fun WorkOrderSummaryCard(
 ) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val due = dueDateLabel(detail.dueDate)
+    val due = remember(detail.dueDate) { dueSummary(detail.dueDate, LocalDate.now()) }
     val dueColor =
         when {
             due.isOverdue -> LuxTheme.colors.dueOverdue
             due.isToday -> LuxTheme.colors.dueToday
-            else -> MaterialTheme.colorScheme.onSurface
-        }
-    val scheduleLabel =
-        when (kind) {
-            WorkOrderTaskKind.REPAIR -> "Lịch sửa chữa"
-            WorkOrderTaskKind.POLE_GPS_UPDATE -> "Lịch đo GPS"
-            WorkOrderTaskKind.SURVEY -> "Lịch khảo sát"
-            WorkOrderTaskKind.INSPECTION -> "Lịch kiểm tra"
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
     LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary")) {
@@ -601,67 +593,69 @@ private fun WorkOrderSummaryCard(
             }
         }
         Spacer(Modifier.height(Spacing.md))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            SummaryMetric(
-                label = "Hạn xử lý",
-                value = due.text,
-                valueColor = dueColor,
-                showAlert = due.isOverdue || due.isToday,
-                modifier = Modifier.weight(1f),
-            )
-            SummaryMetric(
-                label = scheduleLabel,
-                value = scheduleValue,
-                valueColor = MaterialTheme.colorScheme.onSurface,
-                showAlert = false,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (status != WorkOrderStatus.CANCELLED) {
-            Spacer(Modifier.height(Spacing.md))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = "Giai đoạn hiện tại: ${kind.label()}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Text(
+            text = detail.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            SummaryRow(label = "Hạn xử lý") {
+                SummaryValue(text = due.dateText)
+                due.statusText?.let { statusText ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Schedule,
+                            contentDescription = null,
+                            tint = dueColor,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(text = statusText, style = MaterialTheme.typography.bodyMedium, color = dueColor)
+                    }
+                }
+            }
+            SummaryRow(label = workOrderScheduleLabel(kind)) { SummaryValue(text = scheduleValue) }
+            if (status != WorkOrderStatus.CANCELLED) {
+                SummaryRow(label = "Giai đoạn hiện tại") { SummaryValue(text = kind.label()) }
+            }
+            SummaryRow(label = "Mã lệnh") {
+                Text(
+                    text = detail.workOrderId,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SummaryMetric(
+private fun SummaryRow(
     label: String,
-    value: String,
-    valueColor: Color,
-    showAlert: Boolean,
-    modifier: Modifier = Modifier,
+    value: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+    ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = Spacing.md),
         )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            if (showAlert) {
-                Icon(
-                    imageVector = Icons.Filled.Schedule,
-                    contentDescription = null,
-                    tint = valueColor,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Column(horizontalAlignment = Alignment.End, content = value)
     }
+}
+
+@Composable
+private fun SummaryValue(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
 }
 
 private const val NOTE_CLAMP_THRESHOLD = 110

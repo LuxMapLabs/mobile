@@ -103,7 +103,7 @@ class WorkOrderDetailLargeFontTest {
         screen(detail(taskKind = "repair", woStatus = "in_progress", allowedActions = emptyList()))
         composeRule.onNodeWithTag("work_order_summary").assertIsDisplayed()
         composeRule.onNodeWithText("Hạn xử lý").assertIsDisplayed()
-        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Giai đoạn hiện tại").performScrollTo().assertIsDisplayed()
     }
 
     @Test
