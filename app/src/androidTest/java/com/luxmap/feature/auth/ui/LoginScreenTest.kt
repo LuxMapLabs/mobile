@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
@@ -151,7 +153,8 @@ class LoginScreenTest {
     }
 
     private fun assertSubmissionDisabled(loginLabel: String) {
-        val fields = composeRule.onAllNodes(hasSetTextAction())
+        val fields = composeRule.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.EditableText))
+        fields.assertCountEquals(2)
         fields[0].assertIsNotEnabled()
         fields[1].assertIsNotEnabled()
         composeRule.onNodeWithText("Duy trì đăng nhập trên thiết bị này").assertIsNotEnabled()
