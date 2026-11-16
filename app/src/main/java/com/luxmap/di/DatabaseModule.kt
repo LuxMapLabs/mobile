@@ -7,7 +7,6 @@ import com.luxmap.core.database.MIGRATION_16_17
 import com.luxmap.core.database.MIGRATION_17_18
 import com.luxmap.core.database.MIGRATION_18_19
 import com.luxmap.core.sync.SyncQueueDao
-import com.luxmap.feature.assetimport.data.dao.AssetImportDao
 import com.luxmap.feature.polelocation.data.PoleLocationUpdateDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
@@ -58,10 +57,6 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideSurveyRouteCacheDao(db: AppDatabase): SurveyRouteCacheDao = db.surveyRouteCacheDao()
-
-    @Provides
-    @Singleton
-    fun provideAssetImportDao(db: AppDatabase): AssetImportDao = db.assetImportDao()
 
     @Provides
     @Singleton

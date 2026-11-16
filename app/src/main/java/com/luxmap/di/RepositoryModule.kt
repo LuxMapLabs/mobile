@@ -1,7 +1,5 @@
 package com.luxmap.di
 
-import com.luxmap.feature.assetimport.data.AssetImportRepository
-import com.luxmap.feature.assetimport.data.FakeAssetImportRepository
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.auth.data.RealAuthRepository
 import com.luxmap.feature.home.data.HomeRepository
@@ -69,7 +67,4 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindProfileRepository(impl: RealProfileRepository): ProfileRepository
-
-    @Binds
-    abstract fun bindAssetImportRepository(impl: FakeAssetImportRepository): AssetImportRepository
 }
