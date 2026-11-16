@@ -36,7 +36,6 @@ import com.luxmap.core.theme.label
 import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxListItem
-import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
@@ -52,14 +51,7 @@ internal fun FaultListCard(
     footer: @Composable (WorkOrderFaultDetail) -> Unit = {},
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LuxSectionHeader(title = title, modifier = Modifier.weight(1f))
-            Text(
-                text = "${faults.size} sự cố",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        CountedSectionHeader(title = title, count = "${faults.size} sự cố")
         if (faults.isEmpty()) {
             LuxCard(modifier = Modifier.fillMaxWidth()) {
                 Text(

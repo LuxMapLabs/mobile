@@ -17,8 +17,24 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxSectionHeader
 
 internal const val MIN_REPORT_NOTE_LENGTH = 10
+
+@Composable
+internal fun CountedSectionHeader(
+    title: String,
+    count: String,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        LuxSectionHeader(title = title, modifier = Modifier.weight(1f))
+        Text(
+            text = count,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 @Composable
 internal fun CompletionFieldHeader(

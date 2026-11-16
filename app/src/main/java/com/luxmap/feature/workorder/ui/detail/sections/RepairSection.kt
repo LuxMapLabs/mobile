@@ -31,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -45,7 +44,6 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.LuxCard
-import com.luxmap.core.ui.components.LuxSectionHeader
 import java.io.File
 
 @Composable
@@ -66,14 +64,7 @@ internal fun RepairCompletionSection(
     var showEvidencePreview by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LuxSectionHeader(title = "Nghiệm thu", modifier = Modifier.weight(1f))
-            Text(
-                text = "$requiredDone/2 bắt buộc",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        CountedSectionHeader(title = "Nghiệm thu", count = "$requiredDone/2 bắt buộc")
         LuxCard(modifier = Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 CompletionFieldHeader(title = "Ảnh sau sửa chữa", required = true)
