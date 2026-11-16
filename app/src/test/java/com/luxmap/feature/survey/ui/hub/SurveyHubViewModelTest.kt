@@ -1,7 +1,6 @@
 package com.luxmap.feature.survey.ui.hub
 
 import app.cash.turbine.test
-import com.luxmap.feature.assetimport.data.AssetImportRepository
 import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
@@ -53,9 +52,7 @@ class SurveyHubViewModelTest {
         every { repository.observeAssignedPoleGpsOrders() } returns flowOf(poleGpsOrders)
         val completionRepository = mockk<WorkOrderCompletionRepository>()
         every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
-        val assetImportRepository = mockk<AssetImportRepository>()
-        every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-        return SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+        return SurveyHubViewModel(repository, completionRepository)
     }
 
     @Before
@@ -133,9 +130,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
-            val assetImportRepository = mockk<AssetImportRepository>()
-            every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -160,9 +155,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
-            val assetImportRepository = mockk<AssetImportRepository>()
-            every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -187,9 +180,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
-            val assetImportRepository = mockk<AssetImportRepository>()
-            every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading
@@ -217,9 +208,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
-            val assetImportRepository = mockk<AssetImportRepository>()
-            every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
             // Let init's load() reach Success first - otherwise onStartRoute's own
             // "current !is Success" guard returns early and never calls the repository, same
             // as why the uiState-based tests above drain Loading/Success via awaitItem() first.
@@ -240,9 +229,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
-            val assetImportRepository = mockk<AssetImportRepository>()
-            every { assetImportRepository.observeAssignedAreas() } returns flowOf(emptyList())
-            val viewModel = SurveyHubViewModel(repository, completionRepository, assetImportRepository)
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
                 awaitItem() // Loading

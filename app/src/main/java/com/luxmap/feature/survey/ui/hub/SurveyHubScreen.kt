@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddLocationAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Event
@@ -79,7 +78,6 @@ import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
-import com.luxmap.feature.assetimport.data.AssignedImportArea
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -89,7 +87,6 @@ import java.util.Locale
 @Composable
 fun SurveyHubRoute(
     onCapturePolePhotos: (workOrderId: String) -> Unit = {},
-    onOpenImportCapture: (tripId: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
     highlightWorkOrderId: String? = null,
@@ -120,9 +117,6 @@ fun SurveyHubRoute(
     LaunchedEffect(Unit) {
         viewModel.startedRoute.collect { workOrderId -> onCapturePolePhotos(workOrderId) }
     }
-    LaunchedEffect(Unit) {
-        viewModel.startedImportTrip.collect { tripId -> onOpenImportCapture(tripId) }
-    }
 
     // Not in CLAUDE.md's forced-dark table (only F03/F04 are) - this hub screen follows the
     // system theme, same as F02 Việc hôm nay, so its Navy700 cards pop against a light page
@@ -144,7 +138,6 @@ fun SurveyHubRoute(
                 onRetry = viewModel::onRetry,
                 onStartRoute = viewModel::onStartRoute,
                 onRequestCancellation = viewModel::onRequestCancellation,
-                onStartImportTrip = viewModel::onStartImportTrip,
                 onOpenPoleLocationList = onOpenPoleLocationList,
                 onOpenWorkOrderDetail = onOpenWorkOrderDetail,
             )
@@ -161,7 +154,6 @@ fun SurveyHubScreen(
     onRetry: () -> Unit = {},
     onStartRoute: (workOrderId: String) -> Unit = {},
     onRequestCancellation: (workOrderId: String, reason: String) -> Unit = { _, _ -> },
-    onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
@@ -184,7 +176,6 @@ fun SurveyHubScreen(
                             onStartRoute = onStartRoute,
                             onOpenCancelSheet = { cancelSheetWorkOrderId = it },
                             highlightWorkOrderId = highlightWorkOrderId,
-                            onStartImportTrip = onStartImportTrip,
                             onOpenPoleLocationList = onOpenPoleLocationList,
                             onOpenWorkOrderDetail = onOpenWorkOrderDetail,
                         )
@@ -344,7 +335,6 @@ private fun SurveyHubContent(
     onStartRoute: (workOrderId: String) -> Unit,
     onOpenCancelSheet: (workOrderId: String) -> Unit,
     highlightWorkOrderId: String? = null,
-    onStartImportTrip: (areaCode: String) -> Unit = {},
     onOpenPoleLocationList: () -> Unit = {},
     onOpenWorkOrderDetail: (workOrderId: String) -> Unit = {},
 ) {
@@ -389,9 +379,6 @@ private fun SurveyHubContent(
             item { InlineBanner(message = state.startError, tone = InlineBannerTone.ERROR) }
         }
         item { PoleLocationEntryCard(onClick = onOpenPoleLocationList) }
-        items(state.assignedImportAreas) { area ->
-            AssignedImportAreaCard(area, onStartTrip = { onStartImportTrip(area.areaCode) })
-        }
         items(state.assignedPoleGpsOrders) { order ->
             PoleGpsUpdateOrderCard(order, onClick = { onOpenWorkOrderDetail(order.workOrderId) })
         }
@@ -410,62 +397,6 @@ private fun SurveyHubContent(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AssignedImportAreaCard(
-    area: AssignedImportArea,
-    onStartTrip: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Box(
-                modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AddLocationAlt,
-                    contentDescription = null,
-                    tint = ImportAreaTileForeground,
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        text = "${area.areaCode} · Khu vực mới",
-                        style = LabelTextStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatusBadge(text = "Đã giao", colors = WorkOrderStatus.ASSIGNED.badgeColors())
-                }
-                Text(text = area.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            StatusBadge(text = "Chưa có bản đồ số", colors = SyncStatus.QUEUED_OFFLINE.badgeColors())
-            StatusBadge(text = "Hạn ${area.dueDateLabel}", colors = SyncStatus.QUEUED_ONLINE.badgeColors())
-        }
-        Button(
-            onClick = onStartTrip,
-            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-            colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-        ) {
-            Text(text = "Bắt đầu chuyến")
         }
     }
 }
