@@ -93,6 +93,7 @@ class WorkOrderDetailScreenTest {
         onRetryAttachment: (String) -> Unit = {},
         onRetry: () -> Unit = {},
         onBack: () -> Unit = {},
+        onOpenSurvey: (String) -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
@@ -100,6 +101,7 @@ class WorkOrderDetailScreenTest {
                     uiState = uiState,
                     onBack = onBack,
                     onRetry = onRetry,
+                    onOpenSurvey = onOpenSurvey,
                     onStart = onStart,
                     onNavigateFault = onNavigateFault,
                     onReportNoteChanged = onReportNoteChanged,
@@ -399,6 +401,25 @@ class WorkOrderDetailScreenTest {
         )
         composeRule.onNodeWithText("Tải lỗi · chạm để thử lại", substring = true).performClick()
         assertEquals("A-1", retriedId)
+    }
+
+    @Test
+    fun a_started_survey_offers_a_shortcut_to_the_survey_tab() {
+        var opened: String? = null
+        val detail = repairDetail(woStatus = "in_progress").copy(taskKind = "survey", faults = emptyList())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onOpenSurvey = { opened = it })
+        composeRule.onNodeWithText("Mở tab Khảo sát").performClick()
+        assertEquals("WO-1042", opened)
+    }
+
+    @Test
+    fun a_survey_not_yet_started_explains_how_to_start_without_a_shortcut() {
+        val detail =
+            repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
+                .copy(taskKind = "survey", faults = emptyList())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Bấm Bắt đầu", substring = true).assertExists()
+        composeRule.onNodeWithText("Mở tab Khảo sát").assertDoesNotExist()
     }
 
     @Test

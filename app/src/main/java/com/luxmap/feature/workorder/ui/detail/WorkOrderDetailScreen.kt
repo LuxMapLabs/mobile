@@ -116,6 +116,7 @@ import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionSection
 import com.luxmap.feature.workorder.ui.detail.sections.PoleGpsSection
 import com.luxmap.feature.workorder.ui.detail.sections.RepairCompletionSection
+import com.luxmap.feature.workorder.ui.detail.sections.SurveySection
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -152,6 +153,7 @@ fun WorkOrderDetailRoute(
         onMeasurePole = onMeasurePole,
         onRetryAttachment = viewModel::retryAttachment,
         onRetry = viewModel::retry,
+        onOpenSurvey = onStartSurvey,
         modifier = modifier,
     )
 }
@@ -173,6 +175,7 @@ fun WorkOrderDetailScreen(
     onMeasurePole: (String) -> Unit = {},
     onRetryAttachment: (String) -> Unit = {},
     onRetry: () -> Unit = {},
+    onOpenSurvey: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
@@ -239,6 +242,7 @@ fun WorkOrderDetailScreen(
                     is WorkOrderDetailUiState.Success ->
                         WorkOrderDetailContent(
                             state = uiState,
+                            onOpenSurvey = onOpenSurvey,
                             onNavigateFault = onNavigateFault,
                             onReportNoteChanged = onReportNoteChanged,
                             onMaterialsUsedChanged = onMaterialsUsedChanged,
@@ -532,6 +536,7 @@ private fun SubmitConfirmationSheet(
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
+    onOpenSurvey: (String) -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
@@ -590,7 +595,11 @@ private fun WorkOrderDetailContent(
                 WorkOrderNotesCard(notes = messages.notes)
             }
             if (kind == WorkOrderTaskKind.SURVEY) {
-                Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
+                SurveySection(
+                    started = status == WorkOrderStatus.IN_PROGRESS,
+                    canStart = "start" in detail.allowedActions,
+                    onOpenSurvey = { onOpenSurvey(detail.workOrderId) },
+                )
             } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
                 PoleGpsSection(
                     attachments = state.poleAttachments,
