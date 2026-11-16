@@ -61,6 +61,7 @@ fun LuxMapTheme(
     MaterialTheme(
         colorScheme = if (useDarkTheme) LuxMapDarkColorScheme else LuxMapLightColorScheme,
         typography = Typography,
+        shapes = LuxShapes,
         content = content,
     )
 }
