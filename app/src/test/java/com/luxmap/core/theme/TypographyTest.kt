@@ -56,6 +56,12 @@ class TypographyTest {
     }
 
     @Test
+    fun `legacy badge and overline styles follow labelMedium instead of 13sp`() {
+        assertEquals(Typography.labelMedium, BadgeTextStyle)
+        assertEquals(Typography.labelMedium, OverlineTextStyle)
+    }
+
+    @Test
     fun `no slot trims the line box or tightens letter spacing`() {
         slots.forEach { (name, style) ->
             assertEquals(name, LineHeightStyle.Trim.None, style.lineHeightStyle?.trim)

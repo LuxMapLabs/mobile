@@ -74,7 +74,5 @@ val BodyTextStyle =
     TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp)
 val LabelTextStyle =
     TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 20.sp)
-val OverlineTextStyle =
-    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 16.sp)
-val BadgeTextStyle =
-    TextStyle(fontFamily = BeVietnamPro, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, lineHeight = 18.sp)
+val OverlineTextStyle = Typography.labelMedium
+val BadgeTextStyle = Typography.labelMedium
