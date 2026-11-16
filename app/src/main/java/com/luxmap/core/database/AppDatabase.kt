@@ -5,9 +5,6 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueEntity
-import com.luxmap.feature.assetimport.data.dao.AssetImportDao
-import com.luxmap.feature.assetimport.data.entity.LocalAssetImportPoleEntity
-import com.luxmap.feature.assetimport.data.entity.LocalAssetImportTripEntity
 import com.luxmap.feature.polelocation.data.LocalPoleLocationUpdateEntity
 import com.luxmap.feature.polelocation.data.PoleLocationUpdateDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
@@ -34,14 +31,12 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalPolePhotoEntity::class,
         LocalPoleListItemEntity::class,
         LocalAssignedSurveyRouteEntity::class,
-        LocalAssetImportTripEntity::class,
-        LocalAssetImportPoleEntity::class,
         LocalPoleGpsOrderEntity::class,
         LocalWorkOrderAttachmentEntity::class,
         LocalPoleGpsMeasurementEntity::class,
         LocalPoleLocationUpdateEntity::class,
     ],
-    version = 20,
+    version = 21,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
@@ -55,8 +50,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun poleListCacheDao(): PoleListCacheDao
 
     abstract fun surveyRouteCacheDao(): SurveyRouteCacheDao
-
-    abstract fun assetImportDao(): AssetImportDao
 
     abstract fun poleGpsDao(): PoleGpsDao
 

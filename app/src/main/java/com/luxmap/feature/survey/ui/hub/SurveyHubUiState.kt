@@ -1,6 +1,5 @@
 package com.luxmap.feature.survey.ui.hub
 
-import com.luxmap.feature.assetimport.data.AssignedImportArea
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 
 sealed interface SurveyHubUiState {
@@ -9,7 +8,6 @@ sealed interface SurveyHubUiState {
     data class Success(
         val assignedRoutes: List<AssignedSurveyRoute>,
         val assignedPoleGpsOrders: List<AssignedSurveyRoute> = emptyList(),
-        val assignedImportAreas: List<AssignedImportArea> = emptyList(),
         // True when assignedRoutes came from the local cache after a failed fetch.
         val isStale: Boolean = false,
         // The route currently calling POST /work-orders/{id}/start - disables its "Bat dau

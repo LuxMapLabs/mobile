@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luxmap.feature.assetimport.data.AssetImportRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,7 +23,6 @@ class SurveyHubViewModel
     constructor(
         private val repository: SurveyRepository,
         private val completionRepository: WorkOrderCompletionRepository,
-        private val assetImportRepository: AssetImportRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<SurveyHubUiState>(SurveyHubUiState.Loading)
         val uiState: StateFlow<SurveyHubUiState> = _uiState.asStateFlow()
@@ -35,9 +33,6 @@ class SurveyHubViewModel
         // Route collects this once to navigate right after a successful start.
         private val _startedRoute = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val startedRoute: SharedFlow<String> = _startedRoute.asSharedFlow()
-
-        private val _startedImportTrip = MutableSharedFlow<String>(extraBufferCapacity = 1)
-        val startedImportTrip: SharedFlow<String> = _startedImportTrip.asSharedFlow()
 
         // Not part of the combine() below on purpose - that flow rebuilds Success from scratch
         // on every emission, which would otherwise wipe this session-only marker on an unrelated
@@ -117,13 +112,6 @@ class SurveyHubViewModel
             }
         }
 
-        fun onStartImportTrip(areaCode: String) {
-            viewModelScope.launch {
-                val trip = assetImportRepository.startOrResumeTrip(areaCode)
-                _startedImportTrip.tryEmit(trip.tripId)
-            }
-        }
-
         private fun load() {
             loadJob?.cancel()
             loadJob =
@@ -134,18 +122,15 @@ class SurveyHubViewModel
                                 routes to poleGpsOrders
                             },
                         completionRepository.observeCompletedWorkOrderIds(),
-                        assetImportRepository.observeAssignedAreas(),
-                    ) { routesAndPoleGpsOrders, locallyCompletedWorkOrderIds, importAreas ->
+                    ) { routesAndPoleGpsOrders, locallyCompletedWorkOrderIds ->
                         val (routesResult, poleGpsOrders) = routesAndPoleGpsOrders
-                        val hasNothing =
-                            routesResult.routes.isEmpty() && poleGpsOrders.isEmpty() && importAreas.isEmpty()
+                        val hasNothing = routesResult.routes.isEmpty() && poleGpsOrders.isEmpty()
                         if (hasNothing) {
                             SurveyHubUiState.Empty
                         } else {
                             SurveyHubUiState.Success(
                                 assignedRoutes = routesResult.routes,
                                 assignedPoleGpsOrders = poleGpsOrders,
-                                assignedImportAreas = importAreas,
                                 isStale = routesResult.isStale,
                                 cancelledWorkOrderIds = cancelledWorkOrderIds,
                                 locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
