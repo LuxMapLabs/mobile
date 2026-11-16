@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
+import com.luxmap.feature.workorder.data.CompletionSyncState
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.coEvery
 import io.mockk.every
@@ -21,6 +22,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SurveyHubViewModelTest {
@@ -41,17 +43,22 @@ class SurveyHubViewModelTest {
         repositoryFlowThrows: Boolean = false,
         locallyCompletedWorkOrderIds: Set<String> = emptySet(),
         poleGpsOrders: List<AssignedSurveyRoute> = emptyList(),
+        syncStates: Map<String, CompletionSyncState> = emptyMap(),
+        poleGpsThrows: Boolean = false,
+        routesThrowable: Throwable = IllegalStateException("offline"),
     ): SurveyHubViewModel {
         val repository = mockk<SurveyRepository>()
         every { repository.observeAssignedRoutes() } returns
             if (repositoryFlowThrows) {
-                flow { throw IllegalStateException("offline") }
+                flow { throw routesThrowable }
             } else {
                 flowOf(AssignedRoutesResult(routes, isStale))
             }
-        every { repository.observeAssignedPoleGpsOrders() } returns flowOf(poleGpsOrders)
+        every { repository.observeAssignedPoleGpsOrders() } returns
+            if (poleGpsThrows) flow { throw IllegalStateException("x") } else flowOf(poleGpsOrders)
         val completionRepository = mockk<WorkOrderCompletionRepository>()
         every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
+        every { completionRepository.observeCompletionSyncStates() } returns flowOf(syncStates)
         return SurveyHubViewModel(repository, completionRepository)
     }
 
@@ -91,7 +98,10 @@ class SurveyHubViewModelTest {
     @Test
     fun `emits Success with locallyCompletedWorkOrderIds from the completion repository`() =
         runTest {
-            viewModel(routes = listOf(route), locallyCompletedWorkOrderIds = setOf("WO-1")).uiState.test {
+            viewModel(
+                routes = listOf(route, route.copy(workOrderId = "WO-2")),
+                locallyCompletedWorkOrderIds = setOf("WO-1"),
+            ).uiState.test {
                 awaitItem()
                 val success = awaitItem() as SurveyHubUiState.Success
                 assertEquals(setOf("WO-1"), success.locallyCompletedWorkOrderIds)
@@ -130,6 +140,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
@@ -155,6 +166,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
@@ -180,6 +192,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
@@ -208,6 +221,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
             // Let init's load() reach Success first - otherwise onStartRoute's own
             // "current !is Success" guard returns early and never calls the repository, same
@@ -229,6 +243,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
 
             viewModel.uiState.test {
@@ -264,6 +279,60 @@ class SurveyHubViewModelTest {
             viewModel.uiState.test {
                 awaitItem() // Loading
                 assertTrue(awaitItem() is SurveyHubUiState.Success)
+            }
+        }
+
+    @Test
+    fun `carries completion sync states into Success`() =
+        runTest {
+            viewModel(
+                routes = listOf(route.copy(woStatus = "in_progress")),
+                syncStates = mapOf("WO-1" to CompletionSyncState.PENDING),
+                locallyCompletedWorkOrderIds = setOf("WO-1"),
+            ).uiState.test {
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(mapOf("WO-1" to CompletionSyncState.PENDING), success.completionSyncStates)
+            }
+        }
+
+    @Test
+    fun `only synced work orders left means Empty`() =
+        runTest {
+            viewModel(routes = listOf(route), locallyCompletedWorkOrderIds = setOf("WO-1")).uiState.test {
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                assertEquals(SurveyHubUiState.Empty, awaitItem())
+            }
+        }
+
+    @Test
+    fun `an IOException is a network error`() =
+        runTest {
+            viewModel(repositoryFlowThrows = true, routesThrowable = IOException("timeout")).uiState.test {
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as SurveyHubUiState.Error).isNetworkError)
+            }
+        }
+
+    @Test
+    fun `a pole gps flow failure shows Error, not a crash`() =
+        runTest {
+            viewModel(routes = listOf(route), poleGpsThrows = true).uiState.test {
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                assertEquals(false, (awaitItem() as SurveyHubUiState.Error).isNetworkError)
+            }
+        }
+
+    @Test
+    fun `onRetry reloads from Empty`() =
+        runTest {
+            val vm = viewModel()
+            vm.uiState.test {
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                assertEquals(SurveyHubUiState.Empty, awaitItem())
+                vm.onRetry()
+                assertEquals(SurveyHubUiState.Loading, awaitItem())
+                assertEquals(SurveyHubUiState.Empty, awaitItem())
             }
         }
 }

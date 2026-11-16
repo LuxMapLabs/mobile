@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.ui.hub
 
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.workorder.data.CompletionSyncState
 
 sealed interface SurveyHubUiState {
     data object Loading : SurveyHubUiState
@@ -25,9 +26,10 @@ sealed interface SurveyHubUiState {
         // completely unchanged after completing its survey at the pole list, same local-state
         // gap as WorkOrderDetailScreen's own localCompletion check for repair/inspection.
         val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
+        val completionSyncStates: Map<String, CompletionSyncState> = emptyMap(),
     ) : SurveyHubUiState
 
     data object Empty : SurveyHubUiState
 
-    data class Error(val message: String) : SurveyHubUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : SurveyHubUiState
 }

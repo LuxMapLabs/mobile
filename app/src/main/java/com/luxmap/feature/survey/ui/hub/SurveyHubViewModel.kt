@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -45,7 +46,8 @@ class SurveyHubViewModel
         }
 
         fun onRetry() {
-            if (_uiState.value !is SurveyHubUiState.Error) return
+            val current = _uiState.value
+            if (current !is SurveyHubUiState.Error && current !is SurveyHubUiState.Empty) return
             _uiState.value = SurveyHubUiState.Loading
             load()
         }
@@ -117,15 +119,13 @@ class SurveyHubViewModel
             loadJob =
                 viewModelScope.launch {
                     combine(
-                        repository.observeAssignedRoutes()
-                            .combine(repository.observeAssignedPoleGpsOrders()) { routes, poleGpsOrders ->
-                                routes to poleGpsOrders
-                            },
+                        repository.observeAssignedRoutes(),
+                        repository.observeAssignedPoleGpsOrders(),
                         completionRepository.observeCompletedWorkOrderIds(),
-                    ) { routesAndPoleGpsOrders, locallyCompletedWorkOrderIds ->
-                        val (routesResult, poleGpsOrders) = routesAndPoleGpsOrders
-                        val hasNothing = routesResult.routes.isEmpty() && poleGpsOrders.isEmpty()
-                        if (hasNothing) {
+                        completionRepository.observeCompletionSyncStates(),
+                    ) { routesResult, poleGpsOrders, completedIds, syncStates ->
+                        val groups = surveyHubGroups(routesResult.routes, poleGpsOrders, syncStates, completedIds)
+                        if (groups.isEmpty()) {
                             SurveyHubUiState.Empty
                         } else {
                             SurveyHubUiState.Success(
@@ -133,11 +133,16 @@ class SurveyHubViewModel
                                 assignedPoleGpsOrders = poleGpsOrders,
                                 isStale = routesResult.isStale,
                                 cancelledWorkOrderIds = cancelledWorkOrderIds,
-                                locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
+                                locallyCompletedWorkOrderIds = completedIds,
+                                completionSyncStates = syncStates,
                             )
                         }
                     }.catch { e ->
-                        _uiState.value = SurveyHubUiState.Error(e.message ?: "Không tải được Khảo sát")
+                        _uiState.value =
+                            SurveyHubUiState.Error(
+                                message = e.message ?: "Không tải được Khảo sát",
+                                isNetworkError = e is IOException,
+                            )
                     }.collect { state ->
                         _uiState.value = state
                     }
