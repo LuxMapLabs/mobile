@@ -1,37 +1,25 @@
 package com.luxmap.feature.home.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -47,32 +35,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.WorkOrderTaskKind
-import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxTabTopBar
-import com.luxmap.core.ui.components.MessageState
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.workorder.data.CompletionSyncState
 import java.time.Instant
@@ -163,7 +147,7 @@ fun HomeScreen(
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
-                is HomeUiState.Loading -> LoadingSkeletonState()
+                is HomeUiState.Loading -> HomeLoading()
                 is HomeUiState.Success ->
                     HomeContent(
                         data = uiState.data,
@@ -172,8 +156,8 @@ fun HomeScreen(
                         completionSyncStates = uiState.completionSyncStates,
                         onOpenWorkOrder = onOpenWorkOrder,
                     )
-                is HomeUiState.Empty -> EmptyState()
-                is HomeUiState.Error -> ErrorState(message = uiState.message, onRetry = onRetry)
+                is HomeUiState.Empty -> HomeEmpty(onRetry = onRetry)
+                is HomeUiState.Error -> HomeError(isNetworkError = uiState.isNetworkError, onRetry = onRetry)
             }
         }
     }
@@ -211,11 +195,11 @@ private fun HomeContent(
         ) {
             if (isStale) {
                 item {
-                    InlineBanner(
+                    LuxBanner(
                         message = "Đang xem dữ liệu đã lưu, cập nhật lúc ${DateFormatUtils.formatInstant(
                             lastSyncedAt,
                         )}",
-                        tone = InlineBannerTone.OFFLINE,
+                        tone = LuxBannerTone.INFO,
                     )
                 }
             }
@@ -295,158 +279,55 @@ private fun SummaryStatDivider() {
     )
 }
 
-// Per-kind empty copy matches the mockup's own TYPE[...].empty entries - distinct from the
-// screen's own 4-state Empty (that one means no data at all, not a filter with nothing in it).
 @Composable
 private fun TabEmptyState(tab: HomeTaskTab) {
-    val (icon, iconTint, title, body) =
-        when (tab) {
-            HomeTaskTab.INSPECTION ->
-                EmptyContent(
-                    WorkOrderTaskKind.INSPECTION.icon(),
-                    WorkOrderTaskKind.INSPECTION.badgeColors().text,
-                    "Không có nhiệm vụ kiểm tra",
-                    "Lệnh kiểm tra cột đèn và thiết bị được giao sẽ hiện ở đây.",
-                )
-            HomeTaskTab.REPAIR ->
-                EmptyContent(
-                    WorkOrderTaskKind.REPAIR.icon(),
-                    WorkOrderTaskKind.REPAIR.badgeColors().text,
-                    "Không có nhiệm vụ sửa chữa",
-                    "Lệnh sửa chữa và bảo trì được giao sẽ hiện ở đây.",
-                )
-        }
-    Column(
-        modifier =
-            Modifier.fillMaxWidth().padding(
-                top = Spacing.xxl,
-                bottom = Spacing.lg,
-                start = Spacing.xl,
-                end = Spacing.xl,
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(56.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(28.dp))
-        }
-        Text(
-            text = title,
-            style = TitleTextStyle,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = body,
-            style = LabelTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-private data class EmptyContent(
-    val icon: ImageVector,
-    val iconTint: Color,
-    val title: String,
-    val body: String,
-)
-
-// Shaped like the real content below it (stats/tabs placeholder + 4 TaskRowSkeleton) instead
-// of generic rows, so the loading state does not jump/resize once real data replaces it.
-@Composable
-private fun LoadingSkeletonState() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        SkeletonBar(widthFraction = 1f, height = 24.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-        SkeletonBar(
-            widthFraction = 1f,
-            height = 44.dp,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = RoundedCornerShape(Radius.card),
-        )
-        repeat(4) { TaskRowSkeleton() }
-    }
-}
-
-@Composable
-private fun TaskRowSkeleton() {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
+    when (tab) {
+        HomeTaskTab.INSPECTION ->
+            LuxEmptyState(
+                title = "Không có nhiệm vụ kiểm tra",
+                message = "Lệnh kiểm tra cột đèn và thiết bị được giao sẽ hiện ở đây.",
+                icon = WorkOrderTaskKind.INSPECTION.icon(),
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SkeletonBar(widthFraction = 0.45f, height = 14.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                SkeletonBar(widthFraction = 0.7f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-            }
+        HomeTaskTab.REPAIR ->
+            LuxEmptyState(
+                title = "Không có nhiệm vụ sửa chữa",
+                message = "Lệnh sửa chữa và bảo trì được giao sẽ hiện ở đây.",
+                icon = WorkOrderTaskKind.REPAIR.icon(),
+            )
+    }
+}
+
+@Composable
+private fun HomeLoading() {
+    LuxLoadingRegion(description = "Đang tải việc được giao", modifier = Modifier.padding(Spacing.lg)) {
+        LuxSkeleton(modifier = Modifier.fillMaxWidth().height(24.dp))
+        LuxSkeleton(modifier = Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.small)
+        repeat(3) {
+            LuxSkeleton(modifier = Modifier.fillMaxWidth().height(120.dp), shape = MaterialTheme.shapes.medium)
         }
     }
 }
 
 @Composable
-private fun SkeletonBar(
-    height: Dp,
-    color: Color,
-    width: Dp? = null,
-    widthFraction: Float? = null,
-    shape: RoundedCornerShape = RoundedCornerShape(Dimens.radiusSmall),
-) {
-    val widthModifier = if (width != null) Modifier.width(width) else Modifier.fillMaxWidth(widthFraction ?: 1f)
-    Box(modifier = widthModifier.height(height).background(color, shape))
-}
-
-@Composable
-private fun BoxScope.EmptyState() {
-    MessageState(
+private fun HomeEmpty(onRetry: () -> Unit) {
+    LuxEmptyState(
+        title = "Chưa có việc được giao",
+        message = "Khi Kỹ sư bảo trì giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.",
         icon = Icons.Filled.EventAvailable,
-        iconColors = SyncStatus.DONE.badgeColors(),
-        title = "Không có việc nào cho hôm nay",
-        subtitle = "Khi có lệnh sửa chữa mới được giao, danh sách sẽ hiển thị tại đây.",
-        action = {},
+        actionLabel = "Làm mới",
+        onAction = onRetry,
     )
 }
 
 @Composable
-private fun BoxScope.ErrorState(
-    message: String,
+private fun HomeError(
+    isNetworkError: Boolean,
     onRetry: () -> Unit,
 ) {
-    MessageState(
-        icon = Icons.Filled.CloudOff,
-        iconColors = SyncStatus.FAILED.badgeColors(),
-        title = message,
-        subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-    ) {
-        OutlinedButton(
-            onClick = onRetry,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Icon(imageVector = Icons.Filled.Refresh, contentDescription = null)
-            Spacer(Modifier.width(Spacing.sm))
-            Text("Thử lại")
-        }
-    }
+    LuxErrorState(
+        onRetry = onRetry,
+        kind = if (isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+        title = "Không tải được danh sách lệnh",
+        message = if (isNetworkError) "Kiểm tra kết nối rồi thử lại." else "Vui lòng thử lại sau ít phút.",
+    )
 }

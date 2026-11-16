@@ -165,14 +165,46 @@ class HomeScreenTest {
     }
 
     @Test
-    fun emptyState_showsEmptyMessage() {
-        setContent(uiState = HomeUiState.Empty)
-        composeTestRule.onNodeWithText("Không có việc nào cho hôm nay").assertExists()
+    fun empty_offers_refresh() {
+        var retries = 0
+        setContent(uiState = HomeUiState.Empty, onRetry = { retries++ })
+        composeTestRule.onNodeWithText("Chưa có việc được giao").assertExists()
+        composeTestRule.onNodeWithText("Làm mới").performClick()
+        assertEquals(1, retries)
     }
 
     @Test
-    fun errorState_showsErrorMessage() {
-        setContent(uiState = HomeUiState.Error(message = "Không tải được dữ liệu"))
-        composeTestRule.onNodeWithText("Không tải được dữ liệu").assertExists()
+    fun a_network_error_uses_the_home_copy_and_retries() {
+        var retries = 0
+        setContent(
+            uiState = HomeUiState.Error("java.net.SocketTimeoutException: timeout", isNetworkError = true),
+            onRetry = { retries++ },
+        )
+        composeTestRule.onNodeWithText("Không tải được danh sách lệnh").assertExists()
+        composeTestRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeTestRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("đã lưu", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun a_generic_error_uses_the_home_copy() {
+        setContent(uiState = HomeUiState.Error("boom"))
+        composeTestRule.onNodeWithText("Vui lòng thử lại sau ít phút.").assertExists()
+        composeTestRule.onNodeWithText("Thử lại").assertExists()
+    }
+
+    @Test
+    fun loading_is_announced_as_one_region() {
+        setContent(uiState = HomeUiState.Loading)
+        composeTestRule.onNodeWithContentDescription("Đang tải việc được giao").assertExists()
+    }
+
+    @Test
+    fun an_empty_tab_shows_its_own_message() {
+        setContent(uiState = successWith(item("R1")))
+        composeTestRule.onNodeWithText("Kiểm tra · 0").performClick()
+        composeTestRule.onNodeWithText("Không có nhiệm vụ kiểm tra").assertExists()
     }
 }
