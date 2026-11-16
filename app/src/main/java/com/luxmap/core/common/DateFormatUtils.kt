@@ -37,13 +37,6 @@ object DateFormatUtils {
         return instant.atZone(ZoneId.systemDefault()).format(isoDisplayFormatter)
     }
 
-    // Time only, no date - for compact spots like the home header's SyncPill where the
-    // surrounding screen already shows today's date.
-    fun formatTimeOnly(instant: Instant?): String {
-        if (instant == null) return "Chưa cập nhật"
-        return instant.atZone(ZoneId.systemDefault()).format(timeOnlyFormatter)
-    }
-
     // Same safety as formatIsoInstant, date only — for compact labels like a photo overlay.
     fun formatIsoDateOnly(iso: String?): String {
         if (iso.isNullOrBlank()) return "Chưa cập nhật"
