@@ -12,12 +12,14 @@ import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.profile.data.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.time.Instant
 import javax.inject.Inject
 
@@ -44,14 +46,28 @@ class ProfileViewModel
             loadProfile()
         }
 
+        private var loadJob: Job? = null
+
+        fun retry() {
+            _profileState.value = ProfileUiState.Loading
+            loadProfile()
+        }
+
         private fun loadProfile() {
-            viewModelScope.launch {
-                _profileState.value =
-                    profileRepository.fetchCurrentUser().fold(
-                        onSuccess = { ProfileUiState.Success(it) },
-                        onFailure = { ProfileUiState.Error(it.message ?: "Không tải được thông tin cá nhân") },
-                    )
-            }
+            loadJob?.cancel()
+            loadJob =
+                viewModelScope.launch {
+                    _profileState.value =
+                        profileRepository.fetchCurrentUser().fold(
+                            onSuccess = { ProfileUiState.Success(it) },
+                            onFailure = {
+                                ProfileUiState.Error(
+                                    message = it.message ?: "Không tải được thông tin cá nhân",
+                                    isNetworkError = it is IOException,
+                                )
+                            },
+                        )
+                }
         }
 
         val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"

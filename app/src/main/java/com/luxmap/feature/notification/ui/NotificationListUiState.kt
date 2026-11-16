@@ -32,5 +32,5 @@ sealed interface NotificationListUiState {
 
     data object Empty : NotificationListUiState
 
-    data class Error(val message: String) : NotificationListUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : NotificationListUiState
 }
