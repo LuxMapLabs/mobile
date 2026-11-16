@@ -1,5 +1,6 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -9,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
@@ -304,7 +306,7 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun an_inspection_shows_an_outcome_segment_per_fault_and_the_progress_hint() {
+    fun an_inspection_lists_each_fault_once_with_its_own_outcome_choice() {
         val faults = listOf(fault("FAULT-1", "POLE-0047"), fault("FAULT-2", "POLE-0048"))
         val state =
             WorkOrderDetailUiState.Success(
@@ -312,9 +314,11 @@ class WorkOrderDetailScreenTest {
                 faultOutcomes = mapOf("FAULT-1" to "fault_present"),
             )
         setContent(uiState = state)
+        composeRule.onAllNodesWithText("POLE-0047", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("POLE-0048", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("Có sự cố").assertCountEquals(2)
         composeRule.onNodeWithText("1/2 sự cố đã có kết quả").assertExists()
-        composeRule.onNodeWithText("POLE-0047").assertExists()
-        composeRule.onNodeWithText("POLE-0048").assertExists()
+        composeRule.onNodeWithText("0/10 ký tự tối thiểu").assertExists()
     }
 
     @Test
@@ -325,8 +329,32 @@ class WorkOrderDetailScreenTest {
             uiState = WorkOrderDetailUiState.Success(detail = inspectionDetail(faults)),
             onFaultOutcomeSelected = { faultId, outcome -> picked = faultId to outcome },
         )
-        composeRule.onAllNodesWithText("Có sự cố")[0].performClick()
-        assertEquals("FAULT-1" to "fault_present", picked)
+        composeRule.onAllNodesWithText("Không có")[1].performScrollTo().performClick()
+        assertEquals("FAULT-2" to "fault_absent", picked)
+    }
+
+    @Test
+    fun an_inspection_not_yet_started_shows_the_faults_without_outcome_choices() {
+        val detail =
+            inspectionDetail(listOf(fault("FAULT-1", "POLE-0047")))
+                .copy(woStatus = "assigned", allowedActions = listOf("start"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("POLE-0047", substring = true).assertExists()
+        composeRule.onNodeWithText("Có sự cố").assertDoesNotExist()
+    }
+
+    @Test
+    fun an_inspection_past_its_schedule_keeps_outcome_choices_visible_but_locked() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail = inspectionDetail(listOf(fault("FAULT-1", "POLE-0047"))).copy(scheduledDate = yesterday)
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = detail,
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                ),
+        )
+        composeRule.onNodeWithText("Có sự cố").assertIsNotEnabled()
     }
 
     @Test
