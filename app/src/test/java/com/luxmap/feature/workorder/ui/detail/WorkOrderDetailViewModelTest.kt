@@ -26,9 +26,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -185,6 +187,94 @@ class WorkOrderDetailViewModelTest {
                 val error = awaitItem() as WorkOrderDetailUiState.Error
                 assertEquals("network down", error.message)
             }
+        }
+
+    @Test
+    fun `a network failure marks the error as a network error`() =
+        runTest {
+            val vm = viewModel(detailFlow = flow { throw IOException("timeout") })
+            advanceUntilIdle()
+
+            val error = vm.uiState.value as WorkOrderDetailUiState.Error
+            assertTrue(error.isNetworkError)
+        }
+
+    @Test
+    fun `a non network failure is not marked as a network error`() =
+        runTest {
+            val vm = viewModel(detailFlow = flow { throw IllegalStateException("bad data") })
+            advanceUntilIdle()
+
+            val error = vm.uiState.value as WorkOrderDetailUiState.Error
+            assertFalse(error.isNetworkError)
+        }
+
+    @Test
+    fun `retry after an error reloads the work order`() =
+        runTest {
+            var attempts = 0
+            val vm =
+                viewModel(
+                    detailFlow =
+                        flow {
+                            attempts++
+                            if (attempts == 1) throw IOException("offline")
+                            emit(repairDetail())
+                        },
+                )
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value is WorkOrderDetailUiState.Error)
+
+            vm.retry()
+            assertEquals(WorkOrderDetailUiState.Loading, vm.uiState.value)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value is WorkOrderDetailUiState.Success)
+            assertEquals(2, attempts)
+        }
+
+    @Test
+    fun `retrying several times keeps exactly one live data collection`() =
+        runTest {
+            var attempts = 0
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            val vm =
+                viewModel(
+                    detailFlow =
+                        flow {
+                            attempts++
+                            if (attempts == 1) throw IOException("offline")
+                            emit(repairDetail())
+                        },
+                    completionRepository = completionRepository,
+                )
+            val evidenceFlow = MutableSharedFlow<LocalWorkOrderEvidenceEntity?>(replay = 1)
+            evidenceFlow.tryEmit(null)
+            every { completionRepository.observeEvidence(WORK_ORDER_ID) } returns evidenceFlow
+            advanceUntilIdle()
+            assertEquals(1, evidenceFlow.subscriptionCount.value)
+
+            vm.retry()
+            vm.retry()
+            vm.retry()
+            advanceUntilIdle()
+
+            assertEquals(1, evidenceFlow.subscriptionCount.value)
+            assertTrue(vm.uiState.value is WorkOrderDetailUiState.Success)
+        }
+
+    @Test
+    fun `retry is ignored once the work order is loaded so typed input is kept`() =
+        runTest {
+            val vm = viewModel(detail = repairDetail(allowedActions = listOf("complete")))
+            advanceUntilIdle()
+            vm.onReportNoteChanged("Đã thay bóng LED")
+
+            vm.retry()
+            advanceUntilIdle()
+
+            val success = vm.uiState.value as WorkOrderDetailUiState.Success
+            assertEquals("Đã thay bóng LED", success.reportNote)
         }
 
     @Test
