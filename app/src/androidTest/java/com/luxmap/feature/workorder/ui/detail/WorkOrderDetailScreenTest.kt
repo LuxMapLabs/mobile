@@ -386,6 +386,22 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun a_pdf_that_failed_to_download_says_so_and_retries_on_tap() {
+        var retriedId: String? = null
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(),
+                    poleAttachments =
+                        listOf(PoleGpsAttachment("A-1", "qr.pdf", 10L, AttachmentStatus.FAILED, null)),
+                ),
+            onRetryAttachment = { retriedId = it },
+        )
+        composeRule.onNodeWithText("Tải lỗi · chạm để thử lại", substring = true).performClick()
+        assertEquals("A-1", retriedId)
+    }
+
+    @Test
     fun tapping_a_pdf_row_that_is_ready_opens_the_viewer() {
         var openedId: String? = null
         setContent(
