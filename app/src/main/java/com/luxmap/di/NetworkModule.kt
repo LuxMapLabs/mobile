@@ -1,7 +1,6 @@
 package com.luxmap.di
 
 import com.luxmap.core.network.ApiClient
-import com.luxmap.core.network.AssetsApi
 import com.luxmap.core.network.AuthApi
 import com.luxmap.core.network.AuthHeaderInterceptor
 import com.luxmap.core.network.MapApi
@@ -91,8 +90,4 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideMapApi(retrofit: Retrofit): MapApi = retrofit.create(MapApi::class.java)
-
-    @Provides
-    @Singleton
-    fun provideAssetsApi(retrofit: Retrofit): AssetsApi = retrofit.create(AssetsApi::class.java)
 }

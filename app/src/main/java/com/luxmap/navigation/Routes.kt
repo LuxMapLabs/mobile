@@ -98,16 +98,6 @@ sealed interface Routes {
         ) = "work-order/$workOrderId/pole-gps/pdf/$attachmentId"
     }
 
-    data object PoleLocationList : Routes {
-        override val route = "pole-location"
-    }
-
-    data object PoleLocationCapture : Routes {
-        override val route = "pole-location/{poleId}/capture"
-
-        fun createRoute(poleId: String) = "pole-location/$poleId/capture"
-    }
-
     data object Notification : Routes {
         override val route = "notification"
     }

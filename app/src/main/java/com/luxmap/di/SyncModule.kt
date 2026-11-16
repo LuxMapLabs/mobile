@@ -3,7 +3,6 @@ package com.luxmap.di
 import com.luxmap.core.sync.SyncOpHandler
 import com.luxmap.core.sync.SyncTrigger
 import com.luxmap.core.sync.WorkManagerSyncTrigger
-import com.luxmap.feature.polelocation.data.UpdatePoleLocationSyncHandler
 import com.luxmap.feature.survey.data.sync.SubmitPolePhotoReviewSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPolePhotoSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPoleVideoSyncHandler
@@ -44,8 +43,4 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindUploadPoleVideoSyncHandler(impl: UploadPoleVideoSyncHandler): SyncOpHandler
-
-    @Binds
-    @IntoSet
-    abstract fun bindUpdatePoleLocationSyncHandler(impl: UpdatePoleLocationSyncHandler): SyncOpHandler
 }
