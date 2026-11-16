@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.NightFieldStatusColors
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
@@ -72,8 +73,8 @@ fun SyncPill(
 // wants for done/syncing/failed, since both come from the same "light accent on dark" need.
 private fun SyncStatus.onDarkHeroIconColor(): Color =
     when (this) {
-        SyncStatus.DONE -> AssetCondition.NORMAL.badgeColors(isDark = true).text
-        SyncStatus.SYNCING -> AssetCondition.DIM.badgeColors(isDark = true).text
-        SyncStatus.FAILED, SyncStatus.CONFLICT -> AssetCondition.OUT.badgeColors(isDark = true).text
+        SyncStatus.DONE -> NightFieldStatusColors.asset.getValue(AssetCondition.NORMAL).text
+        SyncStatus.SYNCING -> NightFieldStatusColors.asset.getValue(AssetCondition.DIM).text
+        SyncStatus.FAILED, SyncStatus.CONFLICT -> NightFieldStatusColors.asset.getValue(AssetCondition.OUT).text
         SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE -> Color.White.copy(alpha = 0.75f)
     }

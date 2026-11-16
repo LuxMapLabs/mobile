@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -112,10 +111,10 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BeVietnamPro
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
@@ -136,7 +135,6 @@ import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
@@ -427,6 +425,7 @@ private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean 
 // Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
 // redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
 // the old layout's separate inline buttons for each case.
+@Composable
 private fun workOrderCtaState(
     state: WorkOrderDetailUiState.Success,
     onStart: () -> Unit,
@@ -467,7 +466,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
-                hintColor = Danger600,
+                hintColor = MaterialTheme.colorScheme.error,
             )
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
@@ -476,7 +475,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
-                hintColor = Gray500,
+                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
             WorkOrderCtaState(
@@ -497,7 +496,12 @@ private fun workOrderCtaState(
                     } else {
                         missingRequirementsHint(repairRequirements(state))
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 requiresConfirmation = true,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
@@ -514,7 +518,12 @@ private fun workOrderCtaState(
                         missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
                         else -> null
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
                 progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
                 requiresConfirmation = true,
@@ -534,7 +543,12 @@ private fun workOrderCtaState(
                         missing > 0 -> "Còn $missing cột chưa chụp"
                         else -> null
                     },
-                hintColor = if (scheduleWindow.isOverdueToComplete) Danger600 else DueTodayColor,
+                hintColor =
+                    if (scheduleWindow.isOverdueToComplete) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        LuxTheme.colors.dueToday
+                    },
                 requiresConfirmation = true,
             )
         }
@@ -545,7 +559,7 @@ private fun workOrderCtaState(
                 enabled = false,
                 onClick = {},
                 hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
-                hintColor = Gray500,
+                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         else -> null
     }
@@ -567,6 +581,7 @@ private fun missingRequirementsHint(requirements: List<Requirement>): String? {
 
 private data class SubmitSummaryRow(val icon: ImageVector, val iconColor: Color, val label: String, val value: String)
 
+@Composable
 private fun submitSummaryRows(
     kind: WorkOrderTaskKind,
     state: WorkOrderDetailUiState.Success,
@@ -576,19 +591,19 @@ private fun submitSummaryRows(
         listOf(
             SubmitSummaryRow(
                 Icons.Filled.Error,
-                AssetCondition.OUT.badgeColors(isDark = false).text,
+                AssetCondition.OUT.badgeColors().text,
                 "Có sự cố",
                 outcomes.count { it == "fault_present" }.toString(),
             ),
             SubmitSummaryRow(
                 Icons.Filled.CheckCircle,
-                AssetCondition.NORMAL.badgeColors(isDark = false).text,
+                AssetCondition.NORMAL.badgeColors().text,
                 "Không có sự cố",
                 outcomes.count { it == "fault_absent" }.toString(),
             ),
             SubmitSummaryRow(
                 Icons.Filled.Help,
-                AssetCondition.DIM.badgeColors(isDark = false).text,
+                AssetCondition.DIM.badgeColors().text,
                 "Chưa xác định",
                 outcomes.count { it == "inconclusive" }.toString(),
             ),
@@ -922,7 +937,7 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val dueColor =
         when {
             due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
+            due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurface
         }
     val scheduleLabel =
@@ -1132,14 +1147,15 @@ private val FaultSectionAvatarSize = 32.dp
 private val FaultTypeIconSize = 44.dp
 private val FaultNavigateButtonSize = 48.dp
 
+@Composable
 private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
     when (faultType) {
-        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors(isDark = false)
-        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors(isDark = false)
-        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors(isDark = false)
-        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors(isDark = false)
-        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors(isDark = false)
-        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors(isDark = false)
+        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors()
+        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors()
+        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors()
+        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors()
+        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors()
+        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors()
     }
 
 @Composable
@@ -1235,12 +1251,11 @@ private fun WorkflowStepRow(
     isLast: Boolean = false,
     content: @Composable () -> Unit = {},
 ) {
-    val isDark = isSystemInDarkTheme()
     val tagColors =
         when {
             !required -> WorkOrderStatus.OPEN.badgeColors()
             done -> WorkOrderStatus.VERIFIED.badgeColors()
-            else -> AssetCondition.OUT.badgeColors(isDark)
+            else -> AssetCondition.OUT.badgeColors()
         }
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Column(
@@ -1364,7 +1379,6 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        val isDark = isSystemInDarkTheme()
         items.forEach { item ->
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(
@@ -1385,9 +1399,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                     text = if (item.required) "Bắt buộc" else "Không bắt buộc",
                     colors =
                         if (item.required) {
-                            AssetCondition.OUT.badgeColors(
-                                isDark,
-                            )
+                            AssetCondition.OUT.badgeColors()
                         } else {
                             WorkOrderStatus.OPEN.badgeColors()
                         },

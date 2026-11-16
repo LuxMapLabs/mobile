@@ -64,12 +64,12 @@ import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.Blue600
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.Danger600
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisabledContent
 import com.luxmap.core.theme.Gray50
 import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.Radius
@@ -77,7 +77,6 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.notification.data.NotificationType
@@ -166,8 +165,8 @@ fun NotificationListScreen(
                             icon = Icons.Filled.ErrorOutline,
                             iconColors =
                                 BadgeColors(
-                                    AssetCondition.OUT.badgeColors(isDark = false).background,
-                                    Danger600,
+                                    AssetCondition.OUT.badgeColors().background,
+                                    MaterialTheme.colorScheme.error,
                                 ),
                             title = "Không tải được danh sách thông báo",
                             subtitle = state.message,
@@ -579,10 +578,11 @@ private fun NotificationType.label(): String =
     }
 
 // type -> tile background/icon color (mockup's KIND table). Every pair reuses an existing
-// core/theme color instead of a new hex: red = AssetCondition.OUT's background + Danger600,
+// core/theme color instead of a new hex: red = AssetCondition.OUT's background + colorScheme.error,
 // neutral = Gray50 + DisabledContent, teal = SyncStatus.DONE's pair, dusty blue =
 // WorkOrderStatus.ASSIGNED's background + Blue600 (the exact hex BrandHeroGradient's end stop
-// already uses), amber = AssetCondition.DIM's background + DueTodayColor.
+// already uses), amber = AssetCondition.DIM's background + LuxTheme.colors.dueToday.
+@Composable
 private fun NotificationType.tileColors(): BadgeColors =
     when (this) {
         NotificationType.WORK_ORDER_ASSIGNED, NotificationType.WORK_ORDER_RESCHEDULED ->
@@ -591,7 +591,7 @@ private fun NotificationType.tileColors(): BadgeColors =
         NotificationType.WORK_ORDER_RETURNED,
         NotificationType.SURVEY_RETURNED,
         NotificationType.SURVEY_PROCESSING_FAILED,
-        -> BadgeColors(AssetCondition.OUT.badgeColors(isDark = false).background, Danger600)
+        -> BadgeColors(AssetCondition.OUT.badgeColors().background, MaterialTheme.colorScheme.error)
         NotificationType.WORK_ORDER_UNASSIGNED, NotificationType.WORK_ORDER_CANCELLED ->
             BadgeColors(Gray50, DisabledContent)
         NotificationType.WORK_ORDER_COMPLETED, NotificationType.WORK_ORDER_VERIFIED ->
@@ -599,8 +599,8 @@ private fun NotificationType.tileColors(): BadgeColors =
         NotificationType.SURVEY_READY_FOR_REVIEW ->
             BadgeColors(WorkOrderStatus.ASSIGNED.badgeColors().background, Blue600)
         NotificationType.FAULT_REPORTED, NotificationType.CITIZEN_REPORT_RECEIVED ->
-            BadgeColors(AssetCondition.DIM.badgeColors(isDark = false).background, DueTodayColor)
-        NotificationType.UNKNOWN -> AssetCondition.UNKNOWN.badgeColors(isDark = false)
+            BadgeColors(AssetCondition.DIM.badgeColors().background, LuxTheme.colors.dueToday)
+        NotificationType.UNKNOWN -> AssetCondition.UNKNOWN.badgeColors()
     }
 
 private const val DAY_GROUP_TODAY = "Hôm nay"

@@ -9,7 +9,7 @@ class WorkOrderPriorityBadgeTest {
     @Test
     fun `every priority badge meets AA for text`() {
         WorkOrderPriority.entries.forEach { priority ->
-            val colors = priority.badgeColors()
+            val colors = LightStatusColors.priority.getValue(priority)
             val ratio = contrastRatio(colors.text, colors.background)
             assertTrue("${priority.name} contrast was $ratio", ratio >= 4.5)
         }
@@ -17,14 +17,14 @@ class WorkOrderPriorityBadgeTest {
 
     @Test
     fun `the high priority badge is no longer the unreadable amber`() {
-        val colors = WorkOrderPriority.HIGH.badgeColors()
+        val colors = LightStatusColors.priority.getValue(WorkOrderPriority.HIGH)
         val ratio = contrastRatio(colors.text, colors.background)
         assertTrue("HIGH contrast was $ratio", ratio >= 6.0)
     }
 
     @Test
     fun `each priority has a distinct background so the four stay tellable apart`() {
-        val backgrounds = WorkOrderPriority.entries.map { it.badgeColors().background }
+        val backgrounds = WorkOrderPriority.entries.map { LightStatusColors.priority.getValue(it).background }
         assertEquals(backgrounds.size, backgrounds.toSet().size)
     }
 
@@ -38,7 +38,7 @@ class WorkOrderPriorityBadgeTest {
 
     @Test
     fun `an unknown wire severity still resolves to a readable badge`() {
-        val colors = severityFromWire("something_the_backend_added_later").badgeColors()
+        val colors = LightStatusColors.priority.getValue(severityFromWire("something_the_backend_added_later"))
         val ratio = contrastRatio(colors.text, colors.background)
         assertTrue("fallback contrast was $ratio", ratio >= 4.5)
         assertTrue(colors.background != Color.Unspecified)

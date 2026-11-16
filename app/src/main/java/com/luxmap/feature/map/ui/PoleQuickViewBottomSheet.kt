@@ -1,7 +1,6 @@
 package com.luxmap.feature.map.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,7 +50,6 @@ fun PoleQuickViewBottomSheet(
     onOpenDetail: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
-    val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -64,7 +62,7 @@ fun PoleQuickViewBottomSheet(
                 Text(text = pole.poleId, style = MaterialTheme.typography.titleLarge)
                 StatusBadge(
                     text = pole.fixtureStatus.label(),
-                    colors = pole.fixtureStatus.badgeColors(isDark),
+                    colors = pole.fixtureStatus.badgeColors(),
                 )
             }
 

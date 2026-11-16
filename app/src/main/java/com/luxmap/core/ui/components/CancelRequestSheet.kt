@@ -152,7 +152,7 @@ private fun CancelReasonRow(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val outColors = AssetCondition.OUT.badgeColors(isDark = false)
+    val outColors = AssetCondition.OUT.badgeColors()
     Row(
         modifier =
             Modifier

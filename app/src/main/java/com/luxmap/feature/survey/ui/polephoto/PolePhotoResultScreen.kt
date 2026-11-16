@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -334,7 +333,7 @@ private fun cvStateColors(cvState: String?): BadgeColors {
             "off" -> AssetCondition.OUT
             else -> AssetCondition.UNKNOWN
         }
-    return condition.badgeColors(isSystemInDarkTheme())
+    return condition.badgeColors()
 }
 
 @Composable
@@ -350,7 +349,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
             ConfidenceBand.MEDIUM -> AssetCondition.DIM
             ConfidenceBand.LOW -> AssetCondition.OUT
         }
-    val bandColors = bandCondition.badgeColors(isSystemInDarkTheme())
+    val bandColors = bandCondition.badgeColors()
     val confidenceText = confidenceLabel(state.confidence)
 
     Column(

@@ -60,7 +60,7 @@ fun OutcomeSegment(
     ) {
         OUTCOME_OPTIONS.forEach { option ->
             val isSelected = selected == option.value
-            val colors = option.condition.badgeColors(isDark = false)
+            val colors = option.condition.badgeColors()
             OutcomeTile(
                 label = option.label,
                 icon = option.icon,

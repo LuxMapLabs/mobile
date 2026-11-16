@@ -193,7 +193,7 @@ fun ProfileScreen(
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
             icon = {
-                val tone = AssetCondition.OUT.badgeColors(isDark = false)
+                val tone = AssetCondition.OUT.badgeColors()
                 Box(
                     modifier = Modifier.size(48.dp).clip(CircleShape).background(tone.background),
                     contentAlignment = Alignment.Center,

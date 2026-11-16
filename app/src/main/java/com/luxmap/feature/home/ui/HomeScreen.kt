@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -70,6 +69,7 @@ import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LabelTextStyle
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -81,7 +81,6 @@ import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
-import com.luxmap.core.ui.components.DueTodayColor
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.MessageState
@@ -489,12 +488,11 @@ private fun TaskRow(
     val status = workOrderStatusFromWire(item.woStatus)
     val due = dueDateLabel(item.dueDate)
     val kindColors = kind.badgeColors()
-    val isDark = isSystemInDarkTheme()
     // Same 3-tier due-date color convention used across the work-order screens.
     val dueColor =
         when {
             due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> DueTodayColor
+            due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val dueIcon =
@@ -548,7 +546,6 @@ private fun TaskRow(
                         status = status,
                         isOverdue = due.isOverdue,
                         isLocallyCompleted = isLocallyCompleted,
-                        isDark = isDark,
                     )
                 }
                 Text(text = clusterLabel, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
@@ -579,7 +576,6 @@ private fun TaskStatusBadge(
     status: WorkOrderStatus,
     isOverdue: Boolean,
     isLocallyCompleted: Boolean,
-    isDark: Boolean,
 ) {
     when {
         isLocallyCompleted ->
@@ -587,7 +583,7 @@ private fun TaskStatusBadge(
         isOverdue ->
             StatusBadge(
                 text = "Quá hạn",
-                colors = AssetCondition.OUT.badgeColors(isDark),
+                colors = AssetCondition.OUT.badgeColors(),
                 icon = Icons.Filled.ErrorOutline,
             )
         else -> StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())

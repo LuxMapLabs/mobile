@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -206,7 +205,6 @@ private fun PoleDetailContent(
 
 @Composable
 private fun PoleHeaderSection(detail: PoleDetail) {
-    val isDark = isSystemInDarkTheme()
     Column {
         // Design System v3.0.1: pole code is the biggest, boldest text on the screen — field
         // crew must recognize which pole this is in under 2 seconds.
@@ -220,7 +218,7 @@ private fun PoleHeaderSection(detail: PoleDetail) {
         Spacer(Modifier.height(Spacing.sm))
         StatusBadge(
             text = detail.fixtureStatus.label().uppercase(),
-            colors = detail.fixtureStatus.badgeColors(isDark),
+            colors = detail.fixtureStatus.badgeColors(),
         )
         if (detail.determinedAt != null) {
             Spacer(Modifier.height(Spacing.sm))
@@ -247,7 +245,6 @@ private fun String.toSourceChannelLabel(): String =
 // one), which also means PoleDetailContent's spacedBy() adds no extra gap for it.
 @Composable
 private fun PriorityAlertCard(detail: PoleDetail) {
-    val isDark = isSystemInDarkTheme()
     val title: String
     val body: String
     when (detail.fixtureStatus) {
@@ -261,7 +258,7 @@ private fun PriorityAlertCard(detail: PoleDetail) {
         }
         AssetCondition.NORMAL, AssetCondition.UNKNOWN -> return
     }
-    val colors = detail.fixtureStatus.badgeColors(isDark)
+    val colors = detail.fixtureStatus.badgeColors()
     Column(
         modifier =
             Modifier
@@ -482,10 +479,9 @@ private fun FaultCard(
     fault: PoleDetailFault,
     onClick: () -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
     // Reuse OUT's badge colors for the icon circle — a fault card is always in the "something's
     // wrong" tone regardless of the pole's overall fixture_status.
-    val colors = AssetCondition.OUT.badgeColors(isDark)
+    val colors = AssetCondition.OUT.badgeColors()
     Row(
         modifier =
             Modifier

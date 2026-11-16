@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -578,7 +577,6 @@ private fun PoleRow(
     onClick: () -> Unit,
     onViewAiResult: () -> Unit,
 ) {
-    val isDark = isSystemInDarkTheme()
     val condition =
         when (pole.fixtureStatus) {
             "normal" -> AssetCondition.NORMAL
@@ -613,7 +611,7 @@ private fun PoleRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                StatusBadge(text = condition.label(), colors = condition.badgeColors(isDark))
+                StatusBadge(text = condition.label(), colors = condition.badgeColors())
                 if (pole.syncStatus != null) {
                     StatusBadge(
                         text = polePhotoSyncLabel(pole.syncStatus),

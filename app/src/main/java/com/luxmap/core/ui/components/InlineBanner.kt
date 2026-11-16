@@ -1,7 +1,6 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,12 +36,11 @@ fun InlineBanner(
     message: String,
     tone: InlineBannerTone,
     modifier: Modifier = Modifier,
-    isDark: Boolean = isSystemInDarkTheme(),
 ) {
     val colors =
         when (tone) {
             InlineBannerTone.OFFLINE -> SyncStatus.QUEUED_OFFLINE.badgeColors()
-            InlineBannerTone.ERROR -> AssetCondition.OUT.badgeColors(isDark)
+            InlineBannerTone.ERROR -> AssetCondition.OUT.badgeColors()
             InlineBannerTone.PENDING -> SyncStatus.QUEUED_ONLINE.badgeColors()
         }
     val icon =

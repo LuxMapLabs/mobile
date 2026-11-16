@@ -87,20 +87,67 @@ class ExtendedColorsTest {
     }
 
     @Test
-    fun `light palettes match the existing v2 badge colors so light screens do not shift`() {
-        AssetCondition.entries.forEach {
-            assertEquals(it.badgeColors(isDark = false), LightStatusColors.asset.getValue(it))
-        }
-        WorkOrderStatus.entries.forEach { assertEquals(it.badgeColors(), LightStatusColors.workOrder.getValue(it)) }
-        WorkOrderPriority.entries.forEach { assertEquals(it.badgeColors(), LightStatusColors.priority.getValue(it)) }
-        SyncStatus.entries.forEach { assertEquals(it.badgeColors(), LightStatusColors.sync.getValue(it)) }
+    fun `light asset and sync palettes keep the v2 hex pairs so light screens do not shift`() {
+        assertEquals(
+            BadgeColors(Color(0xFFD1FAE5), Color(0xFF065F46)),
+            LightStatusColors.asset.getValue(AssetCondition.NORMAL),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFFEF3C7), Color(0xFF92400E)),
+            LightStatusColors.asset.getValue(AssetCondition.DIM),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFFEE2E2), Color(0xFF991B1B)),
+            LightStatusColors.asset.getValue(AssetCondition.OUT),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555)),
+            LightStatusColors.asset.getValue(AssetCondition.UNKNOWN),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFEFEFEF), Color(0xFF555555)),
+            LightStatusColors.sync.getValue(SyncStatus.QUEUED_OFFLINE),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFE8EEF7), Color(0xFF1F3864)),
+            LightStatusColors.sync.getValue(SyncStatus.QUEUED_ONLINE),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFFFF3DC), Color(0xFF8A5A00)),
+            LightStatusColors.sync.getValue(SyncStatus.SYNCING),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFFBE4E4), Color(0xFF9B2C2C)),
+            LightStatusColors.sync.getValue(SyncStatus.FAILED),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFFDE8D0), Color(0xFF8A3B00)),
+            LightStatusColors.sync.getValue(SyncStatus.CONFLICT),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFFE3F6F1), Color(0xFF1E6B5C)),
+            LightStatusColors.sync.getValue(SyncStatus.DONE),
+        )
     }
 
     @Test
     fun `night field asset palette keeps the v2 dark pairs`() {
-        AssetCondition.entries.forEach {
-            assertEquals(it.badgeColors(isDark = true), NightFieldStatusColors.asset.getValue(it))
-        }
+        assertEquals(
+            BadgeColors(Color(0xFF123D34), Color(0xFF8CE3D1)),
+            NightFieldStatusColors.asset.getValue(AssetCondition.NORMAL),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFF4A3310), Color(0xFFF7C66D)),
+            NightFieldStatusColors.asset.getValue(AssetCondition.DIM),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFF4A1717), Color(0xFFFF9A9A)),
+            NightFieldStatusColors.asset.getValue(AssetCondition.OUT),
+        )
+        assertEquals(
+            BadgeColors(Color(0xFF303030), Color(0xFFD0D0D0)),
+            NightFieldStatusColors.asset.getValue(AssetCondition.UNKNOWN),
+        )
     }
 
     @Test
