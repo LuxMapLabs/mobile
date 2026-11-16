@@ -4,17 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -219,15 +219,13 @@ private fun HomeContent(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SummaryStatsRow(summary: HomeSummary) {
     val overdueColor =
         if (summary.overdue > 0) LuxTheme.colors.dueOverdue else MaterialTheme.colorScheme.onSurface
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.Top,
     ) {
         SummaryStatCell(
             label = "Tổng nhiệm vụ",
@@ -246,23 +244,21 @@ private fun SummaryStatsRow(summary: HomeSummary) {
 }
 
 @Composable
-private fun SummaryStatCell(
+private fun RowScope.SummaryStatCell(
     label: String,
     value: Int,
     valueColor: Color,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(
-            text = "$value",
-            style = MaterialTheme.typography.titleMedium,
-            color = valueColor,
-            modifier = Modifier.widthIn(min = 24.dp),
-            textAlign = TextAlign.End,
-        )
+    Column(
+        modifier = Modifier.weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(text = "$value", style = MaterialTheme.typography.titleMedium, color = valueColor)
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -274,7 +270,7 @@ private fun SummaryStatDivider() {
             Modifier
                 .padding(vertical = Spacing.xs)
                 .width(1.dp)
-                .height(20.dp)
+                .fillMaxHeight()
                 .background(MaterialTheme.colorScheme.outlineVariant),
     )
 }

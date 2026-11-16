@@ -184,6 +184,17 @@ class HomeScreenTest {
     }
 
     @Test
+    fun the_three_stats_stay_on_one_row_on_a_narrow_screen() {
+        setContent(uiState = successWith(item("R1", status = "in_progress"), item("R2")))
+        val total = composeTestRule.onNodeWithText("Tổng nhiệm vụ", useUnmergedTree = true).fetchSemanticsNode()
+        val inProgress = composeTestRule.onNodeWithText("Đang làm", useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals(total.boundsInRoot.top, inProgress.boundsInRoot.top, 1f)
+        val overdue = composeTestRule.onNodeWithText("Quá hạn", useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals(inProgress.size.height.toFloat(), total.size.height.toFloat(), 1f)
+        assertEquals(inProgress.size.height.toFloat(), overdue.size.height.toFloat(), 1f)
+    }
+
+    @Test
     fun empty_offers_refresh() {
         var retries = 0
         setContent(uiState = HomeUiState.Empty, onRetry = { retries++ })
