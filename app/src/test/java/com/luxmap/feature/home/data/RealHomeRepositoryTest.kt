@@ -42,19 +42,47 @@ class RealHomeRepositoryTest {
         woStatus: String = "assigned",
         dueDate: String? = null,
         priorityScore: Double? = null,
+        kind: String = "repair",
+        title: String = "Fix lamp",
+        scheduledDate: String? = null,
+        faultIds: List<String> = listOf("FAULT-1"),
     ) = WorkOrderItemDto(
         workOrderId = id,
-        title = "Fix lamp",
+        title = title,
         communeId = communeId,
-        taskKind = "repair",
+        taskKind = kind,
         caseId = id,
-        faultIds = listOf("FAULT-1"),
+        faultIds = faultIds,
         woStatus = woStatus,
         priorityScore = priorityScore,
         createdAt = "2026-09-01T00:00:00Z",
         updatedAt = "2026-09-01T00:00:00Z",
         dueDate = dueDate,
+        scheduledDate = scheduledDate,
     )
+
+    @Test
+    fun `maps title, scheduled_date, fault count and commune into the summary item`() =
+        runTest {
+            val items =
+                listOf(
+                    workOrder(
+                        "WO-1",
+                        communeId = "COM-009",
+                        title = "Sửa đèn chợ",
+                        scheduledDate = "2026-11-17",
+                        faultIds = listOf("F-1", "F-2", "F-3"),
+                    ),
+                )
+            repository(items).observeHomeData().test {
+                val item = awaitItem().clusters.single().items.single()
+                assertEquals("Sửa đèn chợ", item.title)
+                assertEquals("2026-11-17", item.scheduledDate)
+                assertEquals(3, item.faultCount)
+                assertEquals("COM-009", item.communeId)
+                awaitComplete()
+            }
+        }
 
     @Test
     fun `counts assigned and in-progress by wo_status`() =

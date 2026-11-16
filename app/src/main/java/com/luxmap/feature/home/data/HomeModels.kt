@@ -25,6 +25,10 @@ data class WorkOrderSummaryItem(
     val dueDate: String?,
     val priorityScore: Double?,
     val taskKind: String,
+    val communeId: String,
+    val title: String,
+    val scheduledDate: String?,
+    val faultCount: Int,
 )
 
 // One cluster - clusterLabel is the raw commune_id (e.g. "COM-001") for now, not a friendly

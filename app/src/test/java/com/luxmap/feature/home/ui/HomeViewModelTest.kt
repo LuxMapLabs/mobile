@@ -6,6 +6,7 @@ import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.home.data.WorkOrderCluster
+import com.luxmap.feature.home.data.WorkOrderSummaryItem
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -34,6 +35,33 @@ private fun fakeAuthRepository(username: String? = "kysu1"): AuthRepository {
     return repository
 }
 
+private fun summaryItem(
+    id: String,
+    kind: String,
+) = WorkOrderSummaryItem(
+    workOrderId = id,
+    woStatus = "assigned",
+    dueDate = null,
+    priorityScore = null,
+    taskKind = kind,
+    communeId = "COM-001",
+    title = "Lệnh $id",
+    scheduledDate = null,
+    faultCount = 0,
+)
+
+private fun homeData(vararg items: WorkOrderSummaryItem) =
+    HomeData(
+        metrics =
+            HomeMetrics(
+                assignedCount = items.size,
+                inProgressCount = 0,
+                overdueCount = 0,
+                plannedSweepCount = null,
+            ),
+        clusters = listOf(WorkOrderCluster(clusterLabel = "COM-001", items = items.toList())),
+    )
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
     private val dispatcher = StandardTestDispatcher()
@@ -49,22 +77,10 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `emits Empty when repository has no work orders and no planned sweeps`() =
+    fun `emits Empty when there are no work orders at all`() =
         runTest {
             val repository = mockk<HomeRepository>()
-            every { repository.observeHomeData() } returns
-                flowOf(
-                    HomeData(
-                        metrics =
-                            HomeMetrics(
-                                assignedCount = 0,
-                                inProgressCount = 0,
-                                overdueCount = 0,
-                                plannedSweepCount = 0,
-                            ),
-                        clusters = emptyList(),
-                    ),
-                )
+            every { repository.observeHomeData() } returns flowOf(homeData())
             val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
@@ -74,46 +90,38 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `emits Success with the repository data when there is at least one work order`() =
+    fun `emits Empty when the API only returns survey and pole gps work orders`() =
         runTest {
-            val data =
-                HomeData(
-                    metrics =
-                        HomeMetrics(
-                            assignedCount = 1,
-                            inProgressCount = 0,
-                            overdueCount = 0,
-                            plannedSweepCount = 0,
-                        ),
-                    clusters = listOf(WorkOrderCluster(clusterLabel = "Xã Đông Thịnh", items = emptyList())),
-                )
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returns
+                flowOf(homeData(summaryItem("S1", "survey"), summaryItem("G1", "pole_gps_update")))
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(HomeUiState.Empty, awaitItem())
+            }
+        }
+
+    @Test
+    fun `emits Success when only one tab has work orders`() =
+        runTest {
+            val data = homeData(summaryItem("R1", "repair"))
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(data)
             val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
-                val success = awaitItem() as HomeUiState.Success
-                assertEquals(data, success.data)
+                assertEquals(data, (awaitItem() as HomeUiState.Success).data)
             }
         }
 
     @Test
     fun `carries locally completed work order ids into the success state`() =
         runTest {
-            val data =
-                HomeData(
-                    metrics =
-                        HomeMetrics(
-                            assignedCount = 1,
-                            inProgressCount = 0,
-                            overdueCount = 0,
-                            plannedSweepCount = 0,
-                        ),
-                    clusters = listOf(WorkOrderCluster(clusterLabel = "Xã Đông Thịnh", items = emptyList())),
-                )
             val repository = mockk<HomeRepository>()
-            every { repository.observeHomeData() } returns flowOf(data)
+            every { repository.observeHomeData() } returns flowOf(homeData(summaryItem("WO-1", "repair")))
             val viewModel = HomeViewModel(repository, fakeCompletionRepository(setOf("WO-1")), fakeAuthRepository())
 
             viewModel.uiState.test {
@@ -140,17 +148,7 @@ class HomeViewModelTest {
     @Test
     fun `retry re-fetches and can recover from a previous error`() =
         runTest {
-            val data =
-                HomeData(
-                    metrics =
-                        HomeMetrics(
-                            assignedCount = 1,
-                            inProgressCount = 0,
-                            overdueCount = 0,
-                            plannedSweepCount = 0,
-                        ),
-                    clusters = emptyList(),
-                )
+            val data = homeData(summaryItem("WO-1", "repair"))
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returnsMany
                 listOf(

@@ -232,26 +232,27 @@ private fun HomeContent(
     locallyCompletedWorkOrderIds: Set<String>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    // No "Tất cả" tab anymore - defaults to Sửa chữa (repair is this screen's primary work kind)
-    // rather than Khảo sát, which would always open on an empty state since survey items never
-    // flow into this list (see allVisibleItems()).
-    var selectedTab by rememberSaveable { mutableStateOf(TaskFilterTab.REPAIR) }
-    val counts = data.taskFilterTabCounts()
+    var selectedTab by rememberSaveable { mutableStateOf(HomeTaskTab.REPAIR) }
+    val today = remember { LocalDate.now() }
+    val tasks = remember(data) { data.visibleTasks() }
+    val summary = remember(tasks, today) { tasks.homeSummary(today) }
     Column(modifier = Modifier.fillMaxSize()) {
-        // Fixed, does not scroll with the list below - matches the mockup's own
-        // flex-shrink:0 summary+filter block.
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             SummaryStatsRow(
-                total = data.allVisibleItems().size,
-                overdue = data.metrics.overdueCount,
-                inProgress = data.metrics.inProgressCount,
+                total = summary.total,
+                overdue = summary.overdue,
+                inProgress = summary.inProgress,
             )
-            TaskFilterTabs(selected = selectedTab, counts = counts, onSelect = { selectedTab = it })
+            TaskFilterTabs(
+                selected = selectedTab,
+                counts = HomeTaskTab.entries.associateWith { tasks.countFor(it) },
+                onSelect = { selectedTab = it },
+            )
         }
-        val visibleItems = data.filteredSortedItems(selectedTab)
+        val visibleItems = remember(tasks, selectedTab, today) { tasks.sortedFor(selectedTab, today) }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.lg, top = Spacing.xs, end = Spacing.lg, bottom = Spacing.lg),
@@ -273,7 +274,7 @@ private fun HomeContent(
                 items(visibleItems, key = { it.workOrderId }) { item ->
                     TaskRow(
                         item = item,
-                        clusterLabel = data.clusterLabelFor(item.workOrderId),
+                        clusterLabel = item.communeId,
                         isLocallyCompleted = item.workOrderId in locallyCompletedWorkOrderIds,
                         onClick = { onOpenWorkOrder(item.workOrderId) },
                     )
@@ -282,46 +283,6 @@ private fun HomeContent(
         }
     }
 }
-
-// No "Tất cả" tab - reuses WorkOrderTaskKind directly so the tab set never drifts from the
-// badge/icon mapping used elsewhere.
-private enum class TaskFilterTab(val label: String, val kind: WorkOrderTaskKind) {
-    INSPECTION("Kiểm tra", WorkOrderTaskKind.INSPECTION),
-    REPAIR("Sửa chữa", WorkOrderTaskKind.REPAIR),
-}
-
-// Survey and pole_gps_update work orders are deliberately left out of this screen's own data
-// (clusters never contain those items) - the dedicated Khảo sát tab (SurveyHubScreen) lists both
-// with richer, field-survey-specific actions (readiness check, rejected/AI-pending states, QR PDF)
-// that this plain task row can't offer. Neither has an entry in TaskFilterTab - it would always
-// show a count of 0 and its own empty state, so it is left out rather than shown disabled.
-internal val TASK_KIND_SECTION_ORDER: List<WorkOrderTaskKind> =
-    listOf(WorkOrderTaskKind.REPAIR, WorkOrderTaskKind.INSPECTION)
-
-private fun HomeData.allVisibleItems(): List<WorkOrderSummaryItem> =
-    clusters.flatMap { it.items }.filter { TASK_KIND_SECTION_ORDER.contains(workOrderTaskKindFromWire(it.taskKind)) }
-
-private fun HomeData.taskFilterTabCounts(): Map<TaskFilterTab, Int> {
-    val all = allVisibleItems()
-    return TaskFilterTab.entries.associateWith { tab ->
-        all.count { workOrderTaskKindFromWire(it.taskKind) == tab.kind }
-    }
-}
-
-// Sort order matches the mockup's rank (overdue first, then due today, then by priority score) -
-// the mockup's separate "high priority" tier is dropped, same reasoning as before: the backend
-// item shape has no severity/urgent flag, only a raw priorityScore.
-private fun HomeData.filteredSortedItems(tab: TaskFilterTab): List<WorkOrderSummaryItem> {
-    val filtered = allVisibleItems().filter { workOrderTaskKindFromWire(it.taskKind) == tab.kind }
-    return filtered.sortedWith(
-        compareByDescending<WorkOrderSummaryItem> { dueDateLabel(it.dueDate).isOverdue }
-            .thenByDescending { dueDateLabel(it.dueDate).isToday }
-            .thenByDescending { it.priorityScore ?: 0.0 },
-    )
-}
-
-private fun HomeData.clusterLabelFor(workOrderId: String): String =
-    clusters.first { cluster -> cluster.items.any { it.workOrderId == workOrderId } }.clusterLabel
 
 // Simple 3-number row (Tổng nhiệm vụ / Quá hạn / Đang thực hiện), replacing the old progress-bar
 // + legend - the new mockup's header has no stats at all, they moved into this plain row inside
@@ -370,9 +331,9 @@ private fun SummaryStatDivider() {
 
 @Composable
 private fun TaskFilterTabs(
-    selected: TaskFilterTab,
-    counts: Map<TaskFilterTab, Int>,
-    onSelect: (TaskFilterTab) -> Unit,
+    selected: HomeTaskTab,
+    counts: Map<HomeTaskTab, Int>,
+    onSelect: (HomeTaskTab) -> Unit,
 ) {
     Row(
         modifier =
@@ -382,7 +343,7 @@ private fun TaskFilterTabs(
                 .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        TaskFilterTab.entries.forEach { tab ->
+        HomeTaskTab.entries.forEach { tab ->
             val isSelected = tab == selected
             val contentColor =
                 if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
@@ -416,17 +377,17 @@ private fun TaskFilterTabs(
 // Per-kind empty copy matches the mockup's own TYPE[...].empty entries - distinct from the
 // screen's own 4-state Empty (that one means no data at all, not a filter with nothing in it).
 @Composable
-private fun TabEmptyState(tab: TaskFilterTab) {
+private fun TabEmptyState(tab: HomeTaskTab) {
     val (icon, iconTint, title, body) =
         when (tab) {
-            TaskFilterTab.INSPECTION ->
+            HomeTaskTab.INSPECTION ->
                 EmptyContent(
                     WorkOrderTaskKind.INSPECTION.icon(),
                     WorkOrderTaskKind.INSPECTION.badgeColors().text,
                     "Không có nhiệm vụ kiểm tra",
                     "Lệnh kiểm tra cột đèn và thiết bị được giao sẽ hiện ở đây.",
                 )
-            TaskFilterTab.REPAIR ->
+            HomeTaskTab.REPAIR ->
                 EmptyContent(
                     WorkOrderTaskKind.REPAIR.icon(),
                     WorkOrderTaskKind.REPAIR.badgeColors().text,

@@ -63,6 +63,10 @@ class RealHomeRepository
                 dueDate = dueDate,
                 priorityScore = priorityScore,
                 taskKind = taskKind,
+                communeId = communeId,
+                title = title,
+                scheduledDate = scheduledDate,
+                faultCount = faultIds.size,
             )
 
         private companion object {
