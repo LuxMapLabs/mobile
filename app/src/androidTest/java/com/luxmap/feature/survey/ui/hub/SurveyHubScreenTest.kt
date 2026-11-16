@@ -1,15 +1,26 @@
 package com.luxmap.feature.survey.ui.hub
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
+import com.luxmap.feature.workorder.data.CompletionSyncState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 class SurveyHubScreenTest {
     @get:Rule val composeRule = createComposeRule()
@@ -21,15 +32,32 @@ class SurveyHubScreenTest {
             communeId = "COM-001",
             woStatus = woStatus,
             dueDate = null,
-            scheduledDate = "2026-10-02",
+            scheduledDate = LocalDate.now().toString(),
         )
 
     @Test
-    fun loading_state_shows_hero_header() {
+    fun the_top_bar_has_the_title_and_a_bell_that_opens_notifications() {
+        var opened = 0
         composeRule.setContent {
-            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Loading) }
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Loading,
+                    unreadNotificationCount = 2,
+                    onOpenNotifications = { opened++ },
+                )
+            }
         }
         composeRule.onNodeWithText("Khảo sát").assertExists()
+        composeRule.onNodeWithContentDescription("Thông báo, 2 chưa đọc").performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun the_missing_gps_entry_is_gone() {
+        composeRule.setContent {
+            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Success(assignedRoutes = listOf(route()))) }
+        }
+        composeRule.onNodeWithText("Cột thiếu GPS").assertDoesNotExist()
     }
 
     @Test
@@ -40,7 +68,7 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
-        composeRule.onNodeWithText("Chưa bắt đầu").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
     }
 
     // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29) - "Bat dau tuyen" and the separately
@@ -118,16 +146,6 @@ class SurveyHubScreenTest {
     // Found 2026-10-29: a done/verified route used to keep showing "Chup anh cot den" on a
     // disabled button, which looked like a stuck action rather than a finished route.
     @Test
-    fun a_done_route_shows_da_hoan_tat_disabled_on_the_merged_cta() {
-        composeRule.setContent {
-            LuxMapTheme {
-                SurveyHubScreen(state = SurveyHubUiState.Success(assignedRoutes = listOf(route(woStatus = "done"))))
-            }
-        }
-        composeRule.onNodeWithText("Đã hoàn tất").assertIsNotEnabled()
-    }
-
-    @Test
     fun a_start_error_shows_an_inline_banner() {
         composeRule.setContent {
             LuxMapTheme {
@@ -144,7 +162,7 @@ class SurveyHubScreenTest {
     }
 
     @Test
-    fun success_state_with_no_assigned_routes_hides_the_section_headers() {
+    fun a_pole_gps_order_alone_is_listed_under_its_status_group() {
         composeRule.setContent {
             LuxMapTheme {
                 SurveyHubScreen(
@@ -156,28 +174,48 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chưa bắt đầu").assertDoesNotExist()
-        composeRule.onNodeWithText("Đang thực hiện").assertDoesNotExist()
-        composeRule.onNodeWithText("WO-9").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Đo GPS cột").assertExists()
     }
 
     @Test
-    fun empty_state_shows_the_no_routes_message() {
-        composeRule.setContent {
-            LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Empty) }
-        }
-        composeRule.onNodeWithText("Chưa có tuyến nào được phân công", substring = true).assertExists()
-    }
-
-    @Test
-    fun error_state_shows_the_message_and_a_retry_action() {
+    fun empty_offers_refresh() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
-                SurveyHubScreen(state = SurveyHubUiState.Error("Không tải được Khảo sát"), onRetry = {})
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Empty,
+                    onRetry = { retries++ },
+                )
             }
         }
-        composeRule.onNodeWithText("Không tải được Khảo sát").assertExists()
-        composeRule.onNodeWithText("Thử lại").assertExists()
+        composeRule.onNodeWithText("Chưa có việc khảo sát được giao").assertExists()
+        composeRule.onNodeWithText("Làm mới").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun a_network_error_uses_hub_copy_and_hides_the_raw_message() {
+        var retries = 0
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Error("java.net.UnknownHostException", isNetworkError = true),
+                    onRetry = { retries++ },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Không tải được việc khảo sát").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun loading_is_one_announced_region() {
+        composeRule.setContent { LuxMapTheme { SurveyHubScreen(state = SurveyHubUiState.Loading) } }
+        composeRule.onNodeWithContentDescription("Đang tải việc khảo sát").assertExists()
     }
 
     // WO-CANCEL-REQUEST on the Hub (CLAUDE.md 2026-10-29): button only shows while still
@@ -214,5 +252,146 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Yêu cầu hủy").assertDoesNotExist()
+    }
+
+    @Test
+    fun routes_and_pole_gps_orders_are_grouped_by_status() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route(woStatus = "in_progress")),
+                            assignedPoleGpsOrders =
+                                listOf(route(woStatus = "assigned").copy(workOrderId = "WO-G", title = "Đo GPS ấp 3")),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đang làm · 1").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Đo GPS ấp 3", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun a_route_scheduled_later_has_locked_buttons_and_an_opens_on_hint() {
+        val later = LocalDate.now().plusDays(3)
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route().copy(scheduledDate = later.toString())),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu").assertIsNotEnabled()
+        composeRule.onNodeWithText("Yêu cầu hủy").assertIsNotEnabled()
+        composeRule.onNodeWithText("Mở vào", substring = true).assertExists()
+    }
+
+    @Test
+    fun a_route_past_its_schedule_is_locked_and_flags_the_schedule_row() {
+        val yesterday = LocalDate.now().minusDays(1)
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route().copy(scheduledDate = yesterday.toString())),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu").assertIsNotEnabled()
+        composeRule.onNodeWithText("Đã khoá do quá hạn").assertExists()
+        composeRule.onNodeWithText("Đã qua lịch").assertExists()
+    }
+
+    @Test
+    fun a_pending_sync_route_has_a_sync_badge_and_no_buttons() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = listOf(route(woStatus = "in_progress")),
+                            locallyCompletedWorkOrderIds = setOf("WO-1"),
+                            completionSyncStates = mapOf("WO-1" to CompletionSyncState.FAILED),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Chờ đồng bộ · 1").assertExists()
+        composeRule.onNodeWithText("Đồng bộ lỗi").assertExists()
+        composeRule.onNodeWithText("Chụp ảnh/video từng cột").assertDoesNotExist()
+    }
+
+    @Test
+    fun tapping_a_pole_gps_card_opens_the_detail() {
+        var opened: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes = emptyList(),
+                            assignedPoleGpsOrders = listOf(route().copy(workOrderId = "WO-G")),
+                        ),
+                    onOpenWorkOrderDetail = { opened = it },
+                )
+            }
+        }
+        composeRule.onNode(hasClickAction() and hasText("Đo GPS cột", substring = true)).performClick()
+        assertEquals("WO-G", opened)
+    }
+
+    @Test
+    fun an_unknown_highlight_id_does_not_crash() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state = SurveyHubUiState.Success(assignedRoutes = listOf(route())),
+                    highlightWorkOrderId = "NOPE",
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bắt đầu").assertExists()
+    }
+
+    @Test
+    fun a_done_route_is_not_listed() {
+        composeRule.setContent {
+            LuxMapTheme {
+                SurveyHubScreen(
+                    state =
+                        SurveyHubUiState.Success(
+                            assignedRoutes =
+                                listOf(
+                                    route(),
+                                    route(woStatus = "done").copy(workOrderId = "WO-D", title = "Tuyến đã xong"),
+                                ),
+                        ),
+                )
+            }
+        }
+        composeRule.onNodeWithText("Tuyến đã xong").assertDoesNotExist()
+        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+    }
+
+    @Test
+    fun the_highlight_scrolls_once_and_does_not_yank_the_list_back_on_later_updates() {
+        val routes = (1..8).map { route().copy(workOrderId = "WO-$it", title = "Tuyến số $it") }
+        var state by mutableStateOf<SurveyHubUiState>(SurveyHubUiState.Success(assignedRoutes = routes))
+        composeRule.setContent {
+            LuxMapTheme { SurveyHubScreen(state = state, highlightWorkOrderId = "WO-8") }
+        }
+        composeRule.waitForIdle()
+        composeRule.onNode(hasScrollToIndexAction()).performScrollToIndex(0)
+        val extended = routes + route().copy(workOrderId = "WO-9", title = "Tuyến số 9")
+        state = SurveyHubUiState.Success(assignedRoutes = extended)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Tuyến số 1").assertIsDisplayed()
     }
 }
