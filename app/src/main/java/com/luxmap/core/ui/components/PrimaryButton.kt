@@ -1,10 +1,10 @@
 package com.luxmap.core.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -14,16 +14,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.PrimaryButtonHeight
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 
 private val LoadingIndicatorSize = 18.dp
 private val LoadingIndicatorStrokeWidth = 2.dp
 
-// Vùng chạm tối thiểu 48dp — một tay, có thể đeo găng tay (mục 1 Design System v2.0).
-// Màu lấy từ MaterialTheme.colorScheme để tự đổi đúng theo Light/Dark, không hard-code token màu.
 @Composable
 fun PrimaryButton(
     text: String,
@@ -34,17 +35,22 @@ fun PrimaryButton(
     trailingIcon: ImageVector? = null,
 ) {
     Button(
-        onClick = onClick,
+        onClick = { if (!isLoading) onClick() },
         enabled = enabled,
-        modifier = modifier.heightIn(min = PrimaryButtonHeight),
-        shape = RoundedCornerShape(Radius.control),
+        modifier =
+            modifier
+                .heightIn(min = PrimaryButtonHeight)
+                .semantics { if (isLoading) stateDescription = "Đang xử lý" },
+        shape = MaterialTheme.shapes.medium,
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContainerColor = LuxTheme.colors.disabledContainer,
+                disabledContentColor = LuxTheme.colors.disabledContent,
             ),
     ) {
-        Text(text = text)
+        Text(text = text, style = MaterialTheme.typography.labelLarge)
         if (isLoading) {
             Spacer(Modifier.width(Spacing.sm))
             CircularProgressIndicator(
@@ -55,6 +61,18 @@ fun PrimaryButton(
         } else if (trailingIcon != null) {
             Spacer(Modifier.width(Spacing.sm))
             Icon(imageVector = trailingIcon, contentDescription = null)
+        }
+    }
+}
+
+@LuxPreviews
+@Composable
+private fun PrimaryButtonPreview() {
+    LuxMapTheme {
+        Column {
+            PrimaryButton(text = "Bắt đầu", onClick = {})
+            PrimaryButton(text = "Đang nộp…", onClick = {}, isLoading = true)
+            PrimaryButton(text = "Hoàn thành lệnh", onClick = {}, enabled = false)
         }
     }
 }
