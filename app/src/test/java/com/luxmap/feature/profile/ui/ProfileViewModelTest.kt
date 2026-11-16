@@ -1,7 +1,5 @@
 package com.luxmap.feature.profile.ui
 
-import com.luxmap.core.ble.BleConnectionState
-import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
@@ -12,7 +10,6 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -41,7 +38,6 @@ class ProfileViewModelTest {
         errorCount: Int = 0,
         lastSyncedAt: Instant? = null,
         isOnline: Boolean = true,
-        bleState: BleConnectionState = BleConnectionState.Disconnected,
         profileResult: Result<CurrentUserProfile> = Result.success(SAMPLE_PROFILE),
     ): ProfileViewModel {
         val authRepository = mockk<AuthRepository>()
@@ -54,14 +50,11 @@ class ProfileViewModelTest {
         every { syncQueueManager.lastSyncedAt } returns flowOf(lastSyncedAt)
         val connectivityObserver = mockk<ConnectivityObserver>()
         every { connectivityObserver.isOnline } returns flowOf(isOnline)
-        val bleClient = mockk<LuxSensorBleClient>()
-        every { bleClient.connectionState } returns MutableStateFlow(bleState)
         return ProfileViewModel(
             authRepository,
             profileRepository,
             syncQueueManager,
             connectivityObserver,
-            bleClient,
         )
     }
 
@@ -102,14 +95,6 @@ class ProfileViewModelTest {
             advanceUntilIdle()
 
             assertEquals(false, vm.isOnline.value)
-        }
-
-    @Test
-    fun `bleConnectionState reflects the ble client`() =
-        runTest {
-            val vm = viewModel(bleState = BleConnectionState.Connected)
-
-            assertEquals(BleConnectionState.Connected, vm.bleConnectionState.value)
         }
 
     @Test
