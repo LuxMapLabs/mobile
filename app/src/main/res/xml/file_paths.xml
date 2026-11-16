@@ -4,5 +4,4 @@
     <files-path name="pole-photos" path="pole-photos/" />
     <files-path name="pole-videos" path="pole-videos/" />
     <files-path name="pole-gps" path="pole-gps/" />
-    <files-path name="pole-location" path="pole-location/" />
 </paths>
