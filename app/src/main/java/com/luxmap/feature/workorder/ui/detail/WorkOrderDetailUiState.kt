@@ -13,7 +13,7 @@ sealed interface WorkOrderDetailUiState {
 
     data class Success(
         val detail: WorkOrderDetail,
-        val localEvidence: LocalWorkOrderEvidenceEntity? = null,
+        val localEvidence: List<LocalWorkOrderEvidenceEntity> = emptyList(),
         val localCompletion: LocalWorkOrderCompletionEntity? = null,
         val isOnline: Boolean = true,
         val reportNote: String = detail.reportNote.orEmpty(),
@@ -39,12 +39,15 @@ sealed interface WorkOrderDetailUiState {
 fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
     val noteValid = reportNote.trim().length >= 10
     return when (detail.taskKind) {
-        "repair" -> noteValid && localEvidence != null
+        "repair" -> noteValid && localEvidence.any { it.kind == "after" }
         "inspection" -> noteValid && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
         "pole_gps_update" -> noteValid && poleMeasurements.isNotEmpty()
         else -> false
     }
 }
+
+internal fun WorkOrderDetailUiState.Success.hasActiveLocalCompletion(): Boolean =
+    localCompletion?.let { it.submitStatus != "draft" && !isReturnedForRework(this) } == true
 
 fun WorkOrderDetailUiState.Success.syncStatus(): SyncStatus? =
     when (localCompletion?.submitStatus) {

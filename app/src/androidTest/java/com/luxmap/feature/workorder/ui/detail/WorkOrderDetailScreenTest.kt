@@ -87,7 +87,8 @@ class WorkOrderDetailScreenTest {
         onFaultOutcomeSelected: (String, String) -> Unit = { _, _ -> },
         onSubmit: () -> Unit = {},
         onCaptureEvidence: () -> Unit = {},
-        onRetakeEvidence: () -> Unit = {},
+        onRemoveEvidence: (String) -> Unit = {},
+        onRecoverEvidence: (Boolean) -> Unit = {},
         onOpenPdf: (String) -> Unit = {},
         onMeasurePole: (String) -> Unit = {},
         onRetryAttachment: (String) -> Unit = {},
@@ -109,7 +110,8 @@ class WorkOrderDetailScreenTest {
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onSubmit = onSubmit,
                     onCaptureEvidence = onCaptureEvidence,
-                    onRetakeEvidence = onRetakeEvidence,
+                    onRemoveEvidence = onRemoveEvidence,
+                    onRecoverEvidence = onRecoverEvidence,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -326,8 +328,19 @@ class WorkOrderDetailScreenTest {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
         composeRule.onNodeWithText("Ảnh sau sửa chữa").assertExists()
         composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
-        composeRule.onNodeWithContentDescription("Chụp ảnh").performScrollTo().performClick()
+        composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
         assertEquals(1, captured)
+    }
+
+    @Test
+    fun an_inspection_can_open_the_shared_photo_picker() {
+        var opened = false
+        val detail = inspectionDetail(emptyList()).copy(allowedActions = listOf("complete"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { opened = true })
+
+        composeRule.onNodeWithText("Ảnh hiện trường").assertExists()
+        composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
+        assertEquals(true, opened)
     }
 
     @Test

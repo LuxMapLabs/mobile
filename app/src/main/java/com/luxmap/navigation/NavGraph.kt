@@ -398,8 +398,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
-                    onCaptureEvidence = {
-                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId))
+                    onCaptureEvidence = { kind ->
+                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId, kind.wireValue))
                     },
                     onStartSurvey = {
                         navController.navigate(Routes.Survey.createRoute(workOrderId))
@@ -414,7 +414,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
             composable(
                 route = Routes.WorkOrderEvidenceCapture.route,
-                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+                arguments =
+                    listOf(
+                        navArgument("workOrderId") { type = NavType.StringType },
+                        navArgument("kind") {
+                            type = NavType.StringType
+                            defaultValue = "after"
+                        },
+                    ),
             ) {
                 EvidenceCaptureRoute(onDone = { navController.popBackStack() })
             }

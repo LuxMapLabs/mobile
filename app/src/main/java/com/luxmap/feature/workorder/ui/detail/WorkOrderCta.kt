@@ -40,6 +40,7 @@ internal data class WorkOrderCtaState(
 
 internal fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean =
     !state.justSubmitted &&
+        (state.localCompletion == null || state.localCompletion.submitStatus == "synced") &&
         workOrderStatusFromWire(state.detail.woStatus) == WorkOrderStatus.IN_PROGRESS &&
         !state.detail.reviewNote.isNullOrBlank()
 
@@ -98,7 +99,7 @@ internal fun workOrderCtaState(
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
                 hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
+        "complete" in detail.allowedActions && state.hasActiveLocalCompletion() ->
             WorkOrderCtaState(
                 text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
                 icon = Icons.Filled.HourglassTop,
@@ -190,7 +191,7 @@ internal fun workOrderCtaState(
 // "Cần ..." lock hint instead of duplicating the wording in 2 places.
 internal fun repairRequirements(state: WorkOrderDetailUiState.Success): List<Requirement> =
     listOf(
-        Requirement("Có ít nhất 1 ảnh sau sửa chữa", met = state.localEvidence != null),
+        Requirement("Có ít nhất 1 ảnh sau sửa chữa", met = state.localEvidence.any { it.kind == "after" }),
         Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
     )
 

@@ -80,7 +80,7 @@ class WorkOrderDetailLargeFontTest {
                 onFaultOutcomeSelected = { _, _ -> },
                 onSubmit = {},
                 onCaptureEvidence = {},
-                onRetakeEvidence = {},
+                onRemoveEvidence = {},
             )
         }
     }

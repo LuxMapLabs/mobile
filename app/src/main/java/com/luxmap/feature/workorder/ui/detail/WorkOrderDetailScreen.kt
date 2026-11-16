@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -94,8 +95,10 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.core.ui.components.dueDateLabel
+import com.luxmap.feature.workorder.data.EvidenceKind
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
+import com.luxmap.feature.workorder.ui.detail.sections.CompletionEvidenceSection
 import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
@@ -109,7 +112,7 @@ import java.time.LocalDate
 @Composable
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
-    onCaptureEvidence: () -> Unit,
+    onCaptureEvidence: (EvidenceKind) -> Unit,
     onStartSurvey: (workOrderId: String) -> Unit,
     onOpenPdf: (attachmentId: String) -> Unit = {},
     onMeasurePole: (poleId: String) -> Unit = {},
@@ -133,8 +136,16 @@ fun WorkOrderDetailRoute(
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
         onRequestCancellation = viewModel::requestCancellation,
-        onCaptureEvidence = onCaptureEvidence,
-        onRetakeEvidence = { viewModel.retakeEvidence(onCaptureEvidence) },
+        onCaptureEvidence = {
+            val state = uiState as? WorkOrderDetailUiState.Success
+            when (state?.detail?.taskKind) {
+                "inspection" -> viewModel.prepareEvidenceCapture { onCaptureEvidence(EvidenceKind.OBSERVATION) }
+                "repair" -> viewModel.prepareEvidenceCapture { onCaptureEvidence(EvidenceKind.AFTER) }
+                else -> Unit
+            }
+        },
+        onRemoveEvidence = viewModel::removeEvidence,
+        onRecoverEvidence = viewModel::recoverEvidenceSubmission,
         onOpenPdf = onOpenPdf,
         onMeasurePole = onMeasurePole,
         onRetryAttachment = viewModel::retryAttachment,
@@ -156,7 +167,8 @@ fun WorkOrderDetailScreen(
     onSubmit: () -> Unit,
     onRequestCancellation: (reason: String) -> Unit = {},
     onCaptureEvidence: () -> Unit,
-    onRetakeEvidence: () -> Unit,
+    onRemoveEvidence: (String) -> Unit,
+    onRecoverEvidence: (Boolean) -> Unit = {},
     onOpenPdf: (String) -> Unit = {},
     onMeasurePole: (String) -> Unit = {},
     onRetryAttachment: (String) -> Unit = {},
@@ -193,7 +205,7 @@ fun WorkOrderDetailScreen(
                         val showCancelRequest =
                             "request_cancellation" in uiState.detail.allowedActions &&
                                 scheduleWindow.canActOnSchedule &&
-                                (uiState.localCompletion == null || isReturnedForRework(uiState))
+                                !uiState.hasActiveLocalCompletion()
                         val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
                         val actionError = uiState.startError ?: uiState.submitError
                         BottomActionBar(
@@ -225,7 +237,8 @@ fun WorkOrderDetailScreen(
                             onMaterialsUsedChanged = onMaterialsUsedChanged,
                             onFaultOutcomeSelected = onFaultOutcomeSelected,
                             onCaptureEvidence = onCaptureEvidence,
-                            onRetakeEvidence = onRetakeEvidence,
+                            onRemoveEvidence = onRemoveEvidence,
+                            onRecoverEvidence = onRecoverEvidence,
                             onOpenPdf = onOpenPdf,
                             onMeasurePole = onMeasurePole,
                             onRetryAttachment = onRetryAttachment,
@@ -322,6 +335,12 @@ private fun submitSummaryRows(
                 "Chưa xác định",
                 outcomes.count { it == "inconclusive" }.toString(),
             ),
+            SubmitSummaryRow(
+                Icons.Filled.PhotoCamera,
+                primary,
+                "Ảnh hiện trường",
+                "${state.localEvidence.count { it.kind == "observation" }} ảnh",
+            ),
         )
     } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
@@ -342,7 +361,7 @@ private fun submitSummaryRows(
                 Icons.Filled.PhotoCamera,
                 primary,
                 "Ảnh nghiệm thu",
-                if (state.localEvidence != null) "1 ảnh" else "0 ảnh",
+                "${state.localEvidence.count { it.kind == "after" }} ảnh",
             ),
             SubmitSummaryRow(Icons.Filled.EditNote, primary, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
         )
@@ -437,7 +456,8 @@ private fun WorkOrderDetailContent(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onCaptureEvidence: () -> Unit,
-    onRetakeEvidence: () -> Unit,
+    onRemoveEvidence: (String) -> Unit,
+    onRecoverEvidence: (Boolean) -> Unit,
     onOpenPdf: (String) -> Unit,
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
@@ -445,7 +465,7 @@ private fun WorkOrderDetailContent(
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val status = workOrderStatusFromWire(detail.woStatus)
-    val hasActiveLocalCompletion = state.localCompletion != null && !isReturnedForRework(state)
+    val hasActiveLocalCompletion = state.hasActiveLocalCompletion()
     val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
     // "complete" in allowedActions implies wo_status = in_progress (WorkOrderRules on the
     // backend), so this already means "started but overdue to submit", not "overdue to start".
@@ -520,6 +540,19 @@ private fun WorkOrderDetailContent(
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onReportNoteChanged = onReportNoteChanged,
                 )
+                val photos = state.localEvidence.filter { it.kind == "observation" }
+                if (canComplete || photos.isNotEmpty()) {
+                    LuxCard {
+                        CompletionEvidenceSection(
+                            title = "Ảnh hiện trường",
+                            required = false,
+                            photos = photos,
+                            editable = canComplete && !isFormLocked && !state.isSubmitting,
+                            onAdd = onCaptureEvidence,
+                            onRemove = onRemoveEvidence,
+                        )
+                    }
+                }
                 if (status == WorkOrderStatus.ASSIGNED) {
                     PreStartRequirementsPreview(kind = kind)
                 }
@@ -537,20 +570,68 @@ private fun WorkOrderDetailContent(
                 if (status == WorkOrderStatus.ASSIGNED) {
                     PreStartRequirementsPreview(kind = kind)
                 }
-                if (canComplete) {
+                val photos = state.localEvidence.filter { it.kind == "after" }
+                if (canComplete || photos.isNotEmpty()) {
                     RepairCompletionSection(
-                        evidenceFilePath = state.localEvidence?.filePath,
+                        photos = photos,
                         reportNote = state.reportNote,
                         materialsUsed = state.materialsUsed,
-                        locked = isFormLocked,
+                        locked = !canComplete || isFormLocked || state.isSubmitting,
                         onReportNoteChanged = onReportNoteChanged,
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
                         onCaptureEvidence = onCaptureEvidence,
-                        onRetakeEvidence = onRetakeEvidence,
+                        onRemoveEvidence = onRemoveEvidence,
                     )
                 }
             }
+            if ("complete" in detail.allowedActions && state.localCompletion?.submitStatus == "failed") {
+                EvidenceRecoveryActions(
+                    state = state,
+                    allowReplacement = !isFormLocked,
+                    onRecover = onRecoverEvidence,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun EvidenceRecoveryActions(
+    state: WorkOrderDetailUiState.Success,
+    allowReplacement: Boolean,
+    onRecover: (Boolean) -> Unit,
+) {
+    val replace = state.localEvidence.any { it.uploadStatus == "replaceable_error" }
+    val retry =
+        state.localEvidence.any { it.uploadStatus == "retryable_error" } &&
+            state.localEvidence.none { it.uploadStatus in setOf("replaceable_error", "failed", "conflict") }
+    var confirmReplacement by rememberSaveable { mutableStateOf(false) }
+    if (replace && allowReplacement) {
+        LuxSecondaryButton(
+            text = "Thay ảnh lỗi",
+            enabled = !state.isSubmitting,
+            onClick = { confirmReplacement = true },
+        )
+    } else if (retry) {
+        LuxSecondaryButton(text = "Thử lại ảnh lỗi", enabled = !state.isSubmitting, onClick = { onRecover(false) })
+    }
+    if (confirmReplacement && replace && allowReplacement) {
+        AlertDialog(
+            onDismissRequest = { confirmReplacement = false },
+            title = { Text("Mở lại bản nộp?") },
+            text = { Text("App sẽ bỏ các ảnh hỏng hoặc bị từ chối và giữ lại nội dung báo cáo cùng các ảnh còn lại.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmReplacement = false
+                        onRecover(true)
+                    },
+                ) { Text("Mở lại để thay ảnh") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmReplacement = false }) { Text("Quay lại") }
+            },
+        )
     }
 }
 
@@ -856,7 +937,7 @@ private fun WorkOrderDetailScreenRepairPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
 
@@ -873,7 +954,7 @@ private fun WorkOrderDetailScreenNoFaultsPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
 
@@ -890,7 +971,7 @@ private fun WorkOrderDetailScreenSurveyPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
 
@@ -907,7 +988,7 @@ private fun WorkOrderDetailScreenLoadingPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
 
@@ -924,7 +1005,7 @@ private fun WorkOrderDetailScreenEmptyPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
 
@@ -941,6 +1022,6 @@ private fun WorkOrderDetailScreenErrorPreview() {
         onFaultOutcomeSelected = { _, _ -> },
         onSubmit = {},
         onCaptureEvidence = {},
-        onRetakeEvidence = {},
+        onRemoveEvidence = {},
     )
 }
