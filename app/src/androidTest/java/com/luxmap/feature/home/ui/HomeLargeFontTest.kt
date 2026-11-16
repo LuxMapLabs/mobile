@@ -84,7 +84,7 @@ class HomeLargeFontTest {
                 substring = true,
                 useUnmergedTree = true,
             ).fetchSemanticsNode()
-        val stats = composeRule.onNodeWithText("Tổng nhiệm vụ", useUnmergedTree = true).fetchSemanticsNode()
+        val stats = composeRule.onNodeWithText("Tổng", useUnmergedTree = true).fetchSemanticsNode()
         val greetingBottom = greeting.positionInRoot.y + greeting.size.height
         assertTrue(
             "greeting clipped: visible ${greeting.boundsInRoot.height}px of ${greeting.size.height}px",

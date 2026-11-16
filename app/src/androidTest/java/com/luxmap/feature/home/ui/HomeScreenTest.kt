@@ -186,7 +186,7 @@ class HomeScreenTest {
     @Test
     fun the_three_stats_stay_on_one_row_on_a_narrow_screen() {
         setContent(uiState = successWith(item("R1", status = "in_progress"), item("R2")))
-        val total = composeTestRule.onNodeWithText("Tổng nhiệm vụ", useUnmergedTree = true).fetchSemanticsNode()
+        val total = composeTestRule.onNodeWithText("Tổng", useUnmergedTree = true).fetchSemanticsNode()
         val inProgress = composeTestRule.onNodeWithText("Đang làm", useUnmergedTree = true).fetchSemanticsNode()
         assertEquals(total.boundsInRoot.top, inProgress.boundsInRoot.top, 1f)
         val overdue = composeTestRule.onNodeWithText("Quá hạn", useUnmergedTree = true).fetchSemanticsNode()

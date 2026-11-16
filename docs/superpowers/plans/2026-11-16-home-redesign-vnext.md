@@ -21,7 +21,7 @@
 - Survey (`survey`) and pole GPS (`pole_gps_update`) work orders never appear on Home.
 - Copy (exact):
   - Top bar title `Việc hôm nay`; subtitle `Xin chào, {username} · {Thứ…, dd/MM/yyyy}` (no username → `Xin chào · {date}`).
-  - Stats labels `Tổng nhiệm vụ`, `Quá hạn`, `Đang làm`.
+  - Stats labels `Tổng`, `Quá hạn`, `Đang làm`.
   - Segments `Sửa chữa · {n}`, `Kiểm tra · {n}`.
   - Empty: title `Chưa có việc được giao`, message `Khi Kỹ sư bảo trì giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.`, action `Làm mới`.
   - Error network: title `Không tải được danh sách lệnh`, message `Kiểm tra kết nối rồi thử lại.`; error generic: title `Không tải được danh sách lệnh`, message `Vui lòng thử lại sau ít phút.`; button `Thử lại` (from `LuxErrorState`).

@@ -52,7 +52,7 @@
 │ Việc hôm nay                         🔔³  │  headlineMedium + chuông có badge
 │ Xin chào, {tên} · Thứ Hai, 16/11/2026     │  bodySmall
 ├───────────────────────────────────────────┤
-│ 5 Tổng nhiệm vụ │ 1 Quá hạn │ 2 Đang làm  │  thanh số liệu
+│ 5 Tổng │ 1 Quá hạn │ 2 Đang làm        │  thanh số liệu
 │ [ Sửa chữa  3 | Kiểm tra  2 ]             │  LuxSegmented, 48dp, RadioButton
 │ (banner dữ liệu đã lưu, nếu có)           │  LuxBanner
 │ ┌ thẻ lệnh ─────────────────────────────┐ │
@@ -63,7 +63,7 @@
 - **Top bar:** `LuxTabTopBar(title = "Việc hôm nay", subtitle = "Xin chào, {tên} · {thứ, ngày}")`, nền `surface`. Tên lấy từ `AuthRepository.observeUsername()` như hiện tại; không có tên thì "Xin chào". **Cùng một bar cho cả 4 trạng thái dữ liệu.**
 - **Chuông:** nằm trong `LuxTabTopBar`. `NavGraph` ẩn `NotificationBellBar` khi route là Home (giống Bản đồ), truyền `unreadNotificationCount` và hành động mở `Routes.Notification` vào `HomeRoute`. Khảo sát và Cá nhân **giữ nguyên** chuông nổi cho tới khi được redesign.
 - **Tập lệnh hiển thị (một nguồn duy nhất):** các lệnh có `task_kind` là `repair` hoặc `inspection`. Cả 3 số trên thanh số liệu, số đếm trên tab và việc xác định trạng thái rỗng (mục 5) **đều tính từ tập này**, không dùng `HomeMetrics` (vốn đếm cả lệnh khảo sát và đo GPS cột).
-- **Thanh số liệu:** 3 số: Tổng nhiệm vụ (số lệnh trong tập), Quá hạn (lệnh trong tập có `due_date` trước hôm nay), Đang làm (lệnh trong tập có `wo_status = in_progress`). Số "Quá hạn" > 0 dùng `LuxTheme.colors.dueOverdue`. Số đặt trong ô độ rộng tối thiểu cố định (Be Vietnam Pro không có `tnum`).
+- **Thanh số liệu:** 3 số, mỗi số chiếm 1/3 chiều ngang, số cạnh nhãn: Tổng (số lệnh trong tập; rút gọn từ "Tổng nhiệm vụ" ngày 2026-11-16 để không xuống hàng ở 360dp), Quá hạn (lệnh trong tập có `due_date` trước hôm nay), Đang làm (lệnh trong tập có `wo_status = in_progress`). Số "Quá hạn" > 0 dùng `LuxTheme.colors.dueOverdue`. Số đặt trong ô độ rộng tối thiểu cố định (Be Vietnam Pro không có `tnum`).
 - **Bộ chọn loại lệnh:** `LuxSegmented` (M3 `SegmentedButton` chọn một) với 2 lựa chọn, mỗi lựa chọn có nhãn + số đếm, mặc định Sửa chữa, `rememberSaveable`. **Semantics:** giữ đúng semantics có sẵn của component (`Role.RadioButton` + `selected`), không đổi sang `Role.Tab`; vNext chấp nhận cả hai cho bộ lọc này (`COMPONENT_SPECIFICATIONS.md`, `LuxSegmented`). Test kiểm tra đúng `RadioButton` + `selected`.
 - **Lề màn:** 16dp.
 

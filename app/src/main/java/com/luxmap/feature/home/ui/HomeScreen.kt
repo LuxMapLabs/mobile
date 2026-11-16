@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -225,10 +224,10 @@ private fun SummaryStatsRow(summary: HomeSummary) {
         if (summary.overdue > 0) LuxTheme.colors.dueOverdue else MaterialTheme.colorScheme.onSurface
     Row(
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         SummaryStatCell(
-            label = "Tổng nhiệm vụ",
+            label = "Tổng",
             value = summary.total,
             valueColor = MaterialTheme.colorScheme.onSurface,
         )
@@ -249,16 +248,16 @@ private fun RowScope.SummaryStatCell(
     value: Int,
     valueColor: Color,
 ) {
-    Column(
-        modifier = Modifier.weight(1f),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        modifier = Modifier.weight(1f).padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = "$value", style = MaterialTheme.typography.titleMedium, color = valueColor)
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
         )
     }
 }
