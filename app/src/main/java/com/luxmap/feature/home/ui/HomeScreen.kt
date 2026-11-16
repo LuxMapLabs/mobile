@@ -88,6 +88,7 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
+import com.luxmap.feature.workorder.data.CompletionSyncState
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -178,7 +179,7 @@ fun HomeScreen(
                             data = uiState.data,
                             isStale = uiState.isStale,
                             lastSyncedAt = uiState.lastSyncedAt,
-                            locallyCompletedWorkOrderIds = uiState.locallyCompletedWorkOrderIds,
+                            completionSyncStates = uiState.completionSyncStates,
                             onOpenWorkOrder = onOpenWorkOrder,
                         )
                     is HomeUiState.Empty -> EmptyState()
@@ -229,7 +230,7 @@ private fun HomeContent(
     data: HomeData,
     isStale: Boolean,
     lastSyncedAt: Instant?,
-    locallyCompletedWorkOrderIds: Set<String>,
+    completionSyncStates: Map<String, CompletionSyncState>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(HomeTaskTab.REPAIR) }
@@ -275,7 +276,7 @@ private fun HomeContent(
                     TaskRow(
                         item = item,
                         clusterLabel = item.communeId,
-                        isLocallyCompleted = item.workOrderId in locallyCompletedWorkOrderIds,
+                        isLocallyCompleted = item.workOrderId in completionSyncStates,
                         onClick = { onOpenWorkOrder(item.workOrderId) },
                     )
                 }

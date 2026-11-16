@@ -7,11 +7,14 @@ import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.home.data.WorkOrderCluster
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
+import com.luxmap.feature.workorder.data.CompletionSyncState
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,10 +25,13 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
-private fun fakeCompletionRepository(ids: Set<String> = emptySet()): WorkOrderCompletionRepository {
+private fun fakeCompletionRepository(
+    states: Flow<Map<String, CompletionSyncState>> = flowOf(emptyMap()),
+): WorkOrderCompletionRepository {
     val repository = mockk<WorkOrderCompletionRepository>()
-    every { repository.observeCompletedWorkOrderIds() } returns flowOf(ids)
+    every { repository.observeCompletionSyncStates() } returns states
     return repository
 }
 
@@ -118,16 +124,69 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `carries locally completed work order ids into the success state`() =
+    fun `carries sync states into Success and drops the badge once synced`() =
         runTest {
+            val states = MutableStateFlow(mapOf("WO-1" to CompletionSyncState.PENDING))
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(homeData(summaryItem("WO-1", "repair")))
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(setOf("WO-1")), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(states), fakeAuthRepository())
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
-                val success = awaitItem() as HomeUiState.Success
-                assertEquals(setOf("WO-1"), success.locallyCompletedWorkOrderIds)
+                assertEquals(
+                    mapOf("WO-1" to CompletionSyncState.PENDING),
+                    (awaitItem() as HomeUiState.Success).completionSyncStates,
+                )
+                states.value = emptyMap()
+                assertEquals(
+                    emptyMap<String, CompletionSyncState>(),
+                    (awaitItem() as HomeUiState.Success).completionSyncStates,
+                )
+            }
+        }
+
+    @Test
+    fun `an IOException is a network error, anything else is not`() =
+        runTest {
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returnsMany
+                listOf(
+                    flow { throw IOException("timeout") },
+                    flow { throw IllegalStateException("boom") },
+                )
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as HomeUiState.Error).isNetworkError)
+                viewModel.retry()
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(false, (awaitItem() as HomeUiState.Error).isNetworkError)
+            }
+        }
+
+    @Test
+    fun `retry cancels the previous collector so an old sync state cannot overwrite the new one`() =
+        runTest {
+            val oldStates = MutableStateFlow(mapOf("WO-1" to CompletionSyncState.PENDING))
+            val newStates = MutableStateFlow(mapOf("WO-1" to CompletionSyncState.FAILED))
+            val completion = mockk<WorkOrderCompletionRepository>()
+            every { completion.observeCompletionSyncStates() } returnsMany listOf(oldStates, newStates)
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returns flowOf(homeData(summaryItem("WO-1", "repair")))
+            val viewModel = HomeViewModel(repository, completion, fakeAuthRepository())
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                awaitItem()
+                viewModel.retry()
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(
+                    mapOf("WO-1" to CompletionSyncState.FAILED),
+                    (awaitItem() as HomeUiState.Success).completionSyncStates,
+                )
+                oldStates.value = mapOf("WO-1" to CompletionSyncState.CONFLICT)
+                expectNoEvents()
             }
         }
 

@@ -1,22 +1,20 @@
 package com.luxmap.feature.home.ui
 
 import com.luxmap.feature.home.data.HomeData
+import com.luxmap.feature.workorder.data.CompletionSyncState
 import java.time.Instant
 
-// Đủ 4 trạng thái bắt buộc theo CLAUDE.md (đang tải / có dữ liệu / rỗng / lỗi).
 sealed interface HomeUiState {
     data object Loading : HomeUiState
 
-    // lastSyncedAt là Instant thật (không phải field JSON) — do ViewModel tự gán lúc lấy dữ liệu
-    // thành công, không parse từ server, nên khác quy ước String ở WorkOrderSummaryItem.slaDueAt.
     data class Success(
         val data: HomeData,
         val isStale: Boolean = false,
         val lastSyncedAt: Instant? = null,
-        val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
+        val completionSyncStates: Map<String, CompletionSyncState> = emptyMap(),
     ) : HomeUiState
 
     data object Empty : HomeUiState
 
-    data class Error(val message: String) : HomeUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : HomeUiState
 }

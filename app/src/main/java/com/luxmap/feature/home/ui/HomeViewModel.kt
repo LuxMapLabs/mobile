@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.time.Instant
 import javax.inject.Inject
 
@@ -55,11 +56,15 @@ class HomeViewModel
                 viewModelScope.launch {
                     combine(
                         repository.observeHomeData(),
-                        completionRepository.observeCompletedWorkOrderIds(),
-                    ) { data, locallyCompletedWorkOrderIds -> data to locallyCompletedWorkOrderIds }
+                        completionRepository.observeCompletionSyncStates(),
+                    ) { data, syncStates -> data to syncStates }
                         .catch { e ->
-                            _uiState.value = HomeUiState.Error(e.message ?: "Không tải được dữ liệu")
-                        }.collect { (data, locallyCompletedWorkOrderIds) ->
+                            _uiState.value =
+                                HomeUiState.Error(
+                                    message = e.message ?: "Không tải được dữ liệu",
+                                    isNetworkError = e is IOException,
+                                )
+                        }.collect { (data, syncStates) ->
                             _uiState.value =
                                 if (data.visibleTasks().isEmpty()) {
                                     HomeUiState.Empty
@@ -67,7 +72,7 @@ class HomeViewModel
                                     HomeUiState.Success(
                                         data = data,
                                         lastSyncedAt = Instant.now(),
-                                        locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
+                                        completionSyncStates = syncStates,
                                     )
                                 }
                         }
