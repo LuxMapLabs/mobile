@@ -88,44 +88,31 @@ val BrandHeroGradient =
         1f to Blue600,
     )
 
-// Semantic — theo theme (mục 2.2), dùng trong LuxMapColorScheme ở Theme.kt
-data class LuxMapSemanticColors(
-    val background: Color,
-    val surface: Color,
-    val surfaceSubtle: Color,
-    val textPrimary: Color,
-    val textSecondary: Color,
-    val border: Color,
-    val focus: Color,
-    val navigationActive: Color,
-    val navigationInactive: Color,
-)
+val White = Color(0xFFFFFFFF)
+val Gray150 = Color(0xFFE8EDF3)
+val Slate800 = Color(0xFF1E293B)
+val Navy200 = Color(0xFFA9BCDD)
+val Blue50 = Color(0xFFE4EEF6)
+val Blue900 = Color(0xFF173B57)
+val Red700 = Color(0xFFB91C1C)
+val Red50 = Color(0xFFFEE2E2)
+val Red900 = Color(0xFF7F1D1D)
 
-val LightSemanticColors =
-    LuxMapSemanticColors(
-        background = Gray25,
-        surface = Color(0xFFFFFFFF),
-        surfaceSubtle = Gray50,
-        textPrimary = Gray900,
-        textSecondary = Slate600,
-        border = Gray200,
-        focus = Blue500,
-        navigationActive = Navy700,
-        navigationInactive = Slate600,
-    )
-
-val DarkSemanticColors =
-    LuxMapSemanticColors(
-        background = Dark950,
-        surface = Dark800,
-        surfaceSubtle = Dark900,
-        textPrimary = DarkText,
-        textSecondary = DarkSecondary,
-        border = Dark700,
-        focus = Green400,
-        navigationActive = Green400,
-        navigationInactive = DarkMuted,
-    )
+val Navy300 = Color(0xFF9DB7E0)
+val Navy750 = Color(0xFF21375C)
+val Navy950 = Color(0xFF0E1E38)
+val Blue100 = Color(0xFFD2E4F2)
+val Blue300 = Color(0xFF8FB8DA)
+val Blue800 = Color(0xFF1B3A52)
+val Blue950 = Color(0xFF0B2235)
+val Night100 = Color(0xFFE6E6E6)
+val Night500 = Color(0xFF8C8C8C)
+val Night750 = Color(0xFF2E2E2E)
+val Night800 = Color(0xFF262626)
+val Night850 = Color(0xFF1C1C1C)
+val NightError700 = Color(0xFF4A1717)
+val NightOnError = Color(0xFF3B0A0A)
+val NightOnErrorContainer = Color(0xFFFFD5D5)
 
 // Component — badge tình trạng tài sản (mục 2.3), cặp bg/text theo theme, không đổi
 enum class AssetCondition { NORMAL, DIM, OUT, UNKNOWN }
