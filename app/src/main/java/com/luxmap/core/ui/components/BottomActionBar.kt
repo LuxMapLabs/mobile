@@ -103,6 +103,7 @@ fun BottomActionBar(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                     modifier =
                         Modifier
+                            .fillMaxWidth()
                             .padding(bottom = Spacing.sm)
                             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
                 ) {
@@ -118,7 +119,7 @@ fun BottomActionBar(
                         text = hint,
                         style = MaterialTheme.typography.bodySmall,
                         color = hintColor ?: MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.Start,
                     )
                 }
             }

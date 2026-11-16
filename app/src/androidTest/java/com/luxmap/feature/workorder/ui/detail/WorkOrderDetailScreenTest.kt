@@ -171,6 +171,27 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun an_overdue_report_shows_one_short_hint_above_the_locked_button() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail = repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Đã khoá do quá hạn").assertExists()
+        composeRule.onNodeWithText("liên hệ Kỹ sư bảo trì để xử lý", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.").assertExists()
+    }
+
+    @Test
+    fun a_schedule_overdue_order_without_a_due_date_shows_the_banner_and_no_overdue_line() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday, dueDate = null)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Chưa có hạn").assertExists()
+        composeRule.onNodeWithText("Quá hạn 1 ngày").assertDoesNotExist()
+    }
+
+    @Test
     fun the_offline_banner_shows_alongside_the_business_banner() {
         val detail = repairDetail(woStatus = "assigned").copy(cancellationRequestStatus = "pending")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, isOnline = false))

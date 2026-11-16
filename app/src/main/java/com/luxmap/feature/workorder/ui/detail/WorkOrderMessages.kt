@@ -1,6 +1,5 @@
 package com.luxmap.feature.workorder.ui.detail
 
-import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.label
@@ -36,13 +35,12 @@ fun workOrderMessages(
 ): WorkOrderMessages {
     val status = workOrderStatusFromWire(detail.woStatus)
     val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
-    val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
     val candidates = mutableListOf<WorkOrderMessage>()
     if (isPastSchedule && status == WorkOrderStatus.IN_PROGRESS) {
         candidates +=
             WorkOrderMessage(
                 title = "Quá hạn nộp báo cáo",
-                body = "Hạn dự kiến $dueText. Form đã khoá. Liên hệ Kỹ sư bảo trì để được xử lý.",
+                body = "Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.",
                 tone = WorkOrderMessageTone.ERROR,
             )
     }
@@ -50,7 +48,7 @@ fun workOrderMessages(
         candidates +=
             WorkOrderMessage(
                 title = "Quá hạn bắt đầu",
-                body = "Hạn dự kiến $dueText. Liên hệ Kỹ sư bảo trì để được giao lại.",
+                body = "Liên hệ Kỹ sư bảo trì để được giao lại.",
                 tone = WorkOrderMessageTone.ERROR,
             )
     }
