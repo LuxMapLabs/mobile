@@ -293,3 +293,14 @@ Mức thấp nhất trong các cặp chữ là `warning` trên trắng: **5.02**
 | `primaryContainer` (chỉ báo tab) / surface | 1.31 | 1.58 |
 
 Tab active được nhận biết chủ yếu bằng **icon filled + nhãn màu primary + weight SemiBold**. Chỉ báo nền chỉ là tín hiệu phụ.
+
+## 9. 🆕 F01 brand surface — T-07 đã duyệt 2026-11-16
+
+Ngoại lệ chỉ cho header Login: navy phẳng, nhỏ gọn, không gradient; form vẫn theo theme.
+
+| Token Kotlin | Light | Night Field | Vai trò / nơi dùng |
+|---|---|---|---|
+| `LoginColors.headerContainer` | Navy700 `#1F3864` | Navy700 `#1F3864` | Nền header F01 |
+| `LoginColors.onHeader` | White `#FFFFFF` | White `#FFFFFF` | Wordmark, mô tả và icon/nhãn kết nối trên header |
+
+Cặp chữ/nền đạt **11.62:1** ở cả hai theme; không dùng `primary/onPrimary` cho khối này vì primary Night Field sáng hơn. Thanh trạng thái hệ thống giữ nền `surface`, nội dung header và form nằm ngoài vùng inset.

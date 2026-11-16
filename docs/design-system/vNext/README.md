@@ -74,6 +74,10 @@ bo góc                                → SHAPE_SURFACE.md §1 (MaterialTheme.s
 15. **T-03:** Badge ưu tiên dùng cặp nền/chữ + icon "vạch" (Khẩn: `PriorityHigh`).
 16. **T-06:** Radius: card 12, nút 12, sheet 24, chip 8 (`SHAPE_SURFACE.md` §1).
 
+**Duyệt bổ sung cho F01 (2026-11-16):**
+
+17. **T-07:** Header Đăng nhập dùng **navy phẳng, nhỏ gọn**, bỏ gradient, hình đèn trang trí và câu “Chào mừng trở lại”. Giữ LUXMAP, “Vận hành hiện trường”, trạng thái mạng; tiêu đề “Đăng nhập” đặt ở đầu form. Header cuộn cùng nội dung. Form theo Light/Night Field của theme.
+
 Mọi nội dung khác trong vNext là **đề xuất**.
 
 ## 5. Điểm còn chờ xác nhận
@@ -86,7 +90,7 @@ Mọi nội dung khác trong vNext là **đề xuất**.
 | T-04 | IoT "dữ liệu cũ": ngưỡng thời gian và nhãn? Backend chưa có khái niệm này | Chưa định nghĩa | Không chặn |
 | **T-05** | Chữ số không đều độ rộng: dùng font thứ hai (Roboto hệ thống có `tnum`) cho slot số liệu, hay chỉ giảm nhẹ bằng layout? | Giảm nhẹ bằng layout trước | Không chặn |
 | ~~T-06~~ | ✅ **Đã duyệt 2026-11-16:** radius card 12, nút 12, sheet 24, chip 8 | — | — |
-| **T-07** | Màn Đăng nhập: nền khối navy phẳng (không gradient) hay nền `background` như mọi màn? Giữ hình bóng đèn trang trí? | Navy phẳng, bỏ hình trang trí | Redesign F01 |
+| ~~T-07~~ | ✅ **Đã duyệt 2026-11-16:** Header navy phẳng, nhỏ gọn; bỏ hình đèn trang trí; cuộn cùng form | — | — |
 | T-08 | Thay `TopSlideToast` (trên đỉnh) bằng Snackbar M3 (dưới)? | Đồng ý | Component |
 | T-09 | Badge "Gần khu vực nhạy cảm": đổi từ tròn đỏ (trùng "Hỏng/Tắt") sang vuông trắng viền navy? | Đồng ý | Redesign bản đồ |
 | **T-10** | Marker: badge đổi **hình dạng** theo trạng thái (tam giác / thoi / tròn nét đứt) + thêm **viền tối ngoài** cho mọi marker? (sửa 7 file `ic_marker_*`) | Đồng ý | Redesign bản đồ |
