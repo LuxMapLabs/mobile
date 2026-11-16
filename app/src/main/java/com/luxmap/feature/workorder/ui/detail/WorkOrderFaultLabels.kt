@@ -10,17 +10,6 @@ fun faultTypeLabel(value: String): String =
         else -> value
     }
 
-fun faultStatusLabel(value: String): String =
-    when (value) {
-        "detected" -> "Đã phát hiện"
-        "confirmed" -> "Đã xác nhận"
-        "rejected" -> "Đã từ chối"
-        "in_progress" -> "Đang xử lý"
-        "resolved" -> "Đã xử lý"
-        "verified" -> "Đã nghiệm thu"
-        else -> value
-    }
-
 fun inspectionOutcomeLabel(value: String): String =
     when (value) {
         "fault_present" -> "Xác nhận có sự cố"
