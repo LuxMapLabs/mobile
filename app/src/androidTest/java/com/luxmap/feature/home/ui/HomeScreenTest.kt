@@ -1,5 +1,11 @@
 package com.luxmap.feature.home.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -98,6 +104,64 @@ class HomeScreenTest {
         setContent(uiState = successWith(item("WO-2031"), item("WO-2019")))
         composeTestRule.onNodeWithText("WO-2031", substring = true).assertExists()
         composeTestRule.onNodeWithText("WO-2019", substring = true).assertExists()
+    }
+
+    @Test
+    fun a_card_shows_title_fault_count_schedule_and_due_and_opens_the_order() {
+        var opened: String? = null
+        setContent(
+            uiState =
+                successWith(
+                    item("WO-7", title = "Sửa đèn chợ", faultCount = 3, scheduled = "2026-11-17", due = "2030-01-01"),
+                ),
+            onOpenWorkOrder = { opened = it },
+        )
+        composeTestRule.onNodeWithText("Sửa đèn chợ", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("3 sự cố · COM-001", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Làm: 17/11/2026", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Hạn 01/01/2030", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithContentDescription("Mở lệnh WO-7").performClick()
+        assertEquals("WO-7", opened)
+    }
+
+    @Test
+    fun a_card_without_dates_says_no_schedule() {
+        setContent(uiState = successWith(item("WO-8")))
+        composeTestRule.onNodeWithText("Chưa có lịch", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun sync_badges_follow_the_real_sync_state() {
+        setContent(
+            uiState =
+                successWith(
+                    item("WO-P"),
+                    item("WO-F"),
+                    item("WO-C"),
+                    item("WO-S", status = "in_progress"),
+                    states =
+                        mapOf(
+                            "WO-P" to CompletionSyncState.PENDING,
+                            "WO-F" to CompletionSyncState.FAILED,
+                            "WO-C" to CompletionSyncState.CONFLICT,
+                        ),
+                ),
+        )
+        composeTestRule.onNodeWithText("Đã nộp · chờ đồng bộ", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Đồng bộ lỗi", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Xung đột", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Đang thực hiện", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun the_kind_selector_is_a_radio_group_with_counts() {
+        setContent(uiState = successWith(item("R1"), item("I1", kind = "inspection")))
+        composeTestRule
+            .onNodeWithText("Sửa chữa · 1")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+            .assertIsSelected()
+        composeTestRule.onNodeWithText("Kiểm tra · 1").assertIsNotSelected().performClick()
+        composeTestRule.onNodeWithText("Kiểm tra · 1").assertIsSelected()
     }
 
     @Test

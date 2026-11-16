@@ -3,11 +3,12 @@ package com.luxmap.feature.home.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,21 +17,17 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,20 +46,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
@@ -70,21 +63,17 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.TitleTextStyle
-import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
-import com.luxmap.core.theme.workOrderStatusFromWire
-import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxSegment
+import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.home.data.HomeData
-import com.luxmap.feature.home.data.WorkOrderSummaryItem
 import com.luxmap.feature.workorder.data.CompletionSyncState
 import java.time.Instant
 import java.time.LocalDate
@@ -207,14 +196,10 @@ private fun HomeContent(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            SummaryStatsRow(
-                total = summary.total,
-                overdue = summary.overdue,
-                inProgress = summary.inProgress,
-            )
-            TaskFilterTabs(
+            SummaryStatsRow(summary = summary)
+            LuxSegmented(
+                segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} · ${tasks.countFor(it)}") },
                 selected = selectedTab,
-                counts = HomeTaskTab.entries.associateWith { tasks.countFor(it) },
                 onSelect = { selectedTab = it },
             )
         }
@@ -238,10 +223,10 @@ private fun HomeContent(
                 item { TabEmptyState(tab = selectedTab) }
             } else {
                 items(visibleItems, key = { it.workOrderId }) { item ->
-                    TaskRow(
+                    HomeTaskCard(
                         item = item,
-                        clusterLabel = item.communeId,
-                        isLocallyCompleted = item.workOrderId in completionSyncStates,
+                        syncState = completionSyncStates[item.workOrderId],
+                        today = today,
                         onClick = { onOpenWorkOrder(item.workOrderId) },
                     )
                 }
@@ -250,31 +235,29 @@ private fun HomeContent(
     }
 }
 
-// Simple 3-number row (Tổng nhiệm vụ / Quá hạn / Đang thực hiện), replacing the old progress-bar
-// + legend - the new mockup's header has no stats at all, they moved into this plain row inside
-// the white sheet. total comes from the actually-visible items list (same count the ALL tab
-// shows), not HomeMetrics.assignedCount - overdueCount is not a mutually-exclusive subset of
-// assigned/in_progress on the backend, so summing those three for a "total" would double count.
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SummaryStatsRow(
-    total: Int,
-    overdue: Int,
-    inProgress: Int,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+private fun SummaryStatsRow(summary: HomeSummary) {
+    val overdueColor =
+        if (summary.overdue > 0) LuxTheme.colors.dueOverdue else MaterialTheme.colorScheme.onSurface
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
-        SummaryStatCell(label = "Tổng nhiệm vụ", value = total, valueColor = MaterialTheme.colorScheme.onSurface)
-        SummaryStatDivider()
         SummaryStatCell(
-            label = "Quá hạn",
-            value = overdue,
-            valueColor = if (overdue > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            label = "Tổng nhiệm vụ",
+            value = summary.total,
+            valueColor = MaterialTheme.colorScheme.onSurface,
         )
         SummaryStatDivider()
-        SummaryStatCell(label = "Đang thực hiện", value = inProgress, valueColor = MaterialTheme.colorScheme.primary)
+        SummaryStatCell(label = "Quá hạn", value = summary.overdue, valueColor = overdueColor)
+        SummaryStatDivider()
+        SummaryStatCell(
+            label = "Đang làm",
+            value = summary.inProgress,
+            valueColor = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -284,60 +267,32 @@ private fun SummaryStatCell(
     value: Int,
     valueColor: Color,
 ) {
-    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(text = "$value", style = BodyStrongTextStyle, color = valueColor)
-        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            text = "$value",
+            style = MaterialTheme.typography.titleMedium,
+            color = valueColor,
+            modifier = Modifier.widthIn(min = 24.dp),
+            textAlign = TextAlign.End,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
 @Composable
 private fun SummaryStatDivider() {
-    Box(modifier = Modifier.width(1.dp).height(16.dp).background(MaterialTheme.colorScheme.outlineVariant))
-}
-
-@Composable
-private fun TaskFilterTabs(
-    selected: HomeTaskTab,
-    counts: Map<HomeTaskTab, Int>,
-    onSelect: (HomeTaskTab) -> Unit,
-) {
-    Row(
+    Box(
         modifier =
             Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
-                .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        HomeTaskTab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            val contentColor =
-                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            Row(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .heightIn(min = 40.dp)
-                        .clip(RoundedCornerShape(Radius.chip))
-                        .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
-                        .clickable { onSelect(tab) }
-                        .padding(horizontal = Spacing.xs, vertical = Spacing.sm),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = tab.label,
-                    style = LabelTextStyle,
-                    color = contentColor,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.width(Spacing.xs))
-                Text(text = "${counts[tab] ?: 0}", style = LabelTextStyle, color = contentColor)
-            }
-        }
-    }
+                .padding(vertical = Spacing.xs)
+                .width(1.dp)
+                .height(20.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+    )
 }
 
 // Per-kind empty copy matches the mockup's own TYPE[...].empty entries - distinct from the
@@ -403,119 +358,6 @@ private data class EmptyContent(
     val title: String,
     val body: String,
 )
-
-@Composable
-private fun TaskRow(
-    item: WorkOrderSummaryItem,
-    clusterLabel: String,
-    isLocallyCompleted: Boolean,
-    onClick: () -> Unit,
-) {
-    val kind = workOrderTaskKindFromWire(item.taskKind)
-    val status = workOrderStatusFromWire(item.woStatus)
-    val due = dueDateLabel(item.dueDate)
-    val kindColors = kind.badgeColors()
-    // Same 3-tier due-date color convention used across the work-order screens.
-    val dueColor =
-        when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
-            due.isToday -> LuxTheme.colors.dueToday
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
-        }
-    val dueIcon =
-        when {
-            due.isOverdue -> Icons.Filled.EventBusy
-            due.isToday -> Icons.Filled.Schedule
-            else -> Icons.Filled.EventAvailable
-        }
-    val borderColor =
-        if (due.isOverdue) {
-            MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-        } else {
-            MaterialTheme.colorScheme.outlineVariant
-        }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, borderColor, RoundedCornerShape(Radius.card)),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Box(
-                modifier = Modifier.size(44.dp).background(kindColors.background, RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = kind.icon(),
-                    contentDescription = null,
-                    tint = kindColors.text,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Text(
-                        text = "${kind.label()} · ${item.workOrderId}",
-                        style = LabelTextStyle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TaskStatusBadge(
-                        status = status,
-                        isOverdue = due.isOverdue,
-                        isLocallyCompleted = isLocallyCompleted,
-                    )
-                }
-                Text(text = clusterLabel, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)
-            }
-        }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
-        Row(
-            modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget).padding(horizontal = Spacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Icon(imageVector = dueIcon, contentDescription = null, tint = dueColor, modifier = Modifier.size(16.dp))
-            Text(text = due.text, style = LabelTextStyle, color = dueColor, modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outlineVariant,
-            )
-        }
-    }
-}
-
-// Overdue overrides the raw wo_status with its own "Quá hạn" chip, same as the mockup's
-// derived "over" status entry - the backend's real wo_status enum has no "overdue" value
-// (see CLAUDE.md), so this is purely a client-side display override, not a 7th wire status.
-@Composable
-private fun TaskStatusBadge(
-    status: WorkOrderStatus,
-    isOverdue: Boolean,
-    isLocallyCompleted: Boolean,
-) {
-    when {
-        isLocallyCompleted ->
-            StatusBadge(text = "Đã nộp · chờ đồng bộ", colors = WorkOrderStatus.ASSIGNED.badgeColors())
-        isOverdue ->
-            StatusBadge(
-                text = "Quá hạn",
-                colors = AssetCondition.OUT.badgeColors(),
-                icon = Icons.Filled.ErrorOutline,
-            )
-        else -> StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
-    }
-}
 
 // Shaped like the real content below it (stats/tabs placeholder + 4 TaskRowSkeleton) instead
 // of generic rows, so the loading state does not jump/resize once real data replaces it.
