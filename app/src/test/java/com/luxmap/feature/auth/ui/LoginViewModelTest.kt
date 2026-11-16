@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -49,6 +50,58 @@ class LoginViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `a missing identifier is rejected before calling authentication`() =
+        runTest {
+            val (vm, authRepository, _) = viewModel()
+            advanceUntilIdle()
+            vm.onLoginClick()
+            advanceUntilIdle()
+            assertEquals(LoginFailureReason.MissingIdentifier, (vm.uiState.value as LoginUiState.Error).reason)
+            coVerify(exactly = 0) { authRepository.login(any(), any(), any()) }
+        }
+
+    @Test
+    fun `a missing password is rejected before calling authentication`() =
+        runTest {
+            val (vm, authRepository, _) = viewModel()
+            advanceUntilIdle()
+            vm.onIdentifierChange("NV-0125")
+            vm.onLoginClick()
+            advanceUntilIdle()
+            assertEquals(LoginFailureReason.MissingPassword, (vm.uiState.value as LoginUiState.Error).reason)
+            coVerify(exactly = 0) { authRepository.login(any(), any(), any()) }
+        }
+
+    @Test
+    fun `password login preserves remember me choice and completes prefetch before success`() =
+        runTest {
+            val (vm, authRepository, _) = viewModel()
+            advanceUntilIdle()
+            coEvery { authRepository.login("NV-0125", "secret", false) } returns Result.success(Unit)
+            vm.onIdentifierChange("NV-0125")
+            vm.onPasswordChange("secret")
+            vm.onRememberMeChange(false)
+            vm.onLoginClick()
+            runCurrent()
+            assertEquals(LoginUiState.Prefetching, vm.uiState.value)
+            coVerify(exactly = 1) { authRepository.login("NV-0125", "secret", false) }
+            advanceUntilIdle()
+            assertEquals(LoginUiState.Success, vm.uiState.value)
+        }
+
+    @Test
+    fun `a remembered session enters prefetch and succeeds even while offline`() =
+        runTest {
+            val (vm, authRepository, googleSignInHelper) = viewModel(isOnline = false, isLoggedIn = true)
+            runCurrent()
+            assertEquals(LoginUiState.Prefetching, vm.uiState.value)
+            advanceUntilIdle()
+            assertEquals(LoginUiState.Success, vm.uiState.value)
+            coVerify(exactly = 0) { authRepository.login(any(), any(), any()) }
+            coVerify(exactly = 0) { googleSignInHelper.signIn(any()) }
+        }
 
     @Test
     fun `onGoogleSignInClick while offline fails fast without touching the helper`() =

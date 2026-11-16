@@ -75,7 +75,7 @@ background      #F8FAFC  (màn)          background      #0D0D0D
 2. Trong Night Field, card dùng `surfaceContainer`. Nền đen tuyệt đối chỉ dành cho `background` và camera.
 3. Tối đa **2 tầng lồng nhau** trong một card (ví dụ card → ô metric). Không lồng card trong card.
 4. **Không gradient** ở bất kỳ bề mặt nào (quyết định #5). Header là `surface` phẳng (Light) hoặc `surface` (NF). Màu thương hiệu xuất hiện qua chữ/icon `primary`, không qua nền khối lớn.
-5. ⚠️ **T-07:** quyết định #5 loại gradient "khỏi các màn hình". Cần xác nhận màn **Đăng nhập (F01)** có còn nền khối `brand.navy` phẳng (không gradient) hay chuyển sang nền `background` như các màn khác.
+5. ✅ **T-07 đã duyệt 2026-11-16:** riêng **Đăng nhập (F01)** dùng header navy phẳng, nhỏ gọn, bỏ hình đèn trang trí; header cuộn cùng form. Dùng cặp `LoginColors.headerContainer/onHeader` (`COLOR_SYSTEM.md` §9). Các header khác vẫn theo quy tắc 4.
 
 ## 5. Ảnh và media
 
