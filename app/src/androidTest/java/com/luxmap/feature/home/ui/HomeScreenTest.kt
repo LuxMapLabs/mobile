@@ -1,115 +1,114 @@
 package com.luxmap.feature.home.ui
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
 import com.luxmap.feature.home.data.WorkOrderCluster
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
+import com.luxmap.feature.workorder.data.CompletionSyncState
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-// Đúng 4 trạng thái bắt buộc theo CLAUDE.md (P9/A6) — mỗi trạng thái render đúng nội dung, không
-// có màn trắng. NOTE: chưa chạy được trong môi trường làm task này (không có adb/emulator kết
-// nối) — chỉ xác nhận compileDebugAndroidTestKotlin qua được, cần chạy connectedDebugAndroidTest
-// thật trên máy có thiết bị/emulator trước khi coi bước này đã xác minh xong.
+private fun item(
+    id: String,
+    kind: String = "repair",
+    status: String = "assigned",
+    title: String = "Lệnh $id",
+    faultCount: Int = 0,
+    scheduled: String? = null,
+    due: String? = null,
+) = WorkOrderSummaryItem(
+    workOrderId = id,
+    woStatus = status,
+    dueDate = due,
+    priorityScore = null,
+    taskKind = kind,
+    communeId = "COM-001",
+    title = title,
+    scheduledDate = scheduled,
+    faultCount = faultCount,
+)
+
+private fun successWith(
+    vararg items: WorkOrderSummaryItem,
+    states: Map<String, CompletionSyncState> = emptyMap(),
+) = HomeUiState.Success(
+    data =
+        HomeData(
+            metrics =
+                HomeMetrics(
+                    assignedCount = items.size,
+                    inProgressCount = 0,
+                    overdueCount = 0,
+                    plannedSweepCount = null,
+                ),
+            clusters = listOf(WorkOrderCluster(clusterLabel = "COM-001", items = items.toList())),
+        ),
+    completionSyncStates = states,
+)
+
 class HomeScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    @Test
-    fun loadingState_showsHeroHeader() {
+    private fun setContent(
+        uiState: HomeUiState,
+        username: String? = "kysu1",
+        unread: Int = 0,
+        onOpenNotifications: () -> Unit = {},
+        onOpenWorkOrder: (String) -> Unit = {},
+        onRetry: () -> Unit = {},
+    ) {
         composeTestRule.setContent {
             LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Loading, username = "kysu1", onOpenWorkOrder = {}, onRetry = {})
+                HomeScreen(
+                    uiState = uiState,
+                    username = username,
+                    onOpenWorkOrder = onOpenWorkOrder,
+                    onRetry = onRetry,
+                    unreadNotificationCount = unread,
+                    onOpenNotifications = onOpenNotifications,
+                )
             }
         }
+    }
 
+    @Test
+    fun the_top_bar_is_the_same_in_loading_and_has_the_greeting() {
+        setContent(uiState = HomeUiState.Loading)
         composeTestRule.onNodeWithText("Việc hôm nay").assertExists()
+        composeTestRule.onNodeWithText("Xin chào, kysu1", substring = true).assertExists()
+    }
+
+    @Test
+    fun the_bell_reads_its_unread_count_and_opens_notifications() {
+        var opened = 0
+        setContent(uiState = HomeUiState.Loading, unread = 3, onOpenNotifications = { opened++ })
+        composeTestRule.onNodeWithContentDescription("Thông báo, 3 chưa đọc").performClick()
+        assertEquals(1, opened)
     }
 
     @Test
     fun successState_showsRepairWorkOrdersInDefaultTab() {
-        val data =
-            HomeData(
-                metrics = HomeMetrics(assignedCount = 3, inProgressCount = 1, overdueCount = 0, plannedSweepCount = 2),
-                clusters =
-                    listOf(
-                        WorkOrderCluster(
-                            clusterLabel = "COM-001",
-                            items =
-                                listOf(
-                                    WorkOrderSummaryItem(
-                                        workOrderId = "WO-2031",
-                                        woStatus = "assigned",
-                                        dueDate = null,
-                                        priorityScore = 90.0,
-                                        taskKind = "repair",
-                                        communeId = "COM-001",
-                                        title = "Sửa đèn",
-                                        scheduledDate = null,
-                                        faultCount = 0,
-                                    ),
-                                    WorkOrderSummaryItem(
-                                        workOrderId = "WO-2019",
-                                        woStatus = "assigned",
-                                        dueDate = null,
-                                        priorityScore = 10.0,
-                                        taskKind = "repair",
-                                        communeId = "COM-001",
-                                        title = "Sửa đèn",
-                                        scheduledDate = null,
-                                        faultCount = 0,
-                                    ),
-                                ),
-                        ),
-                    ),
-            )
-
-        composeTestRule.setContent {
-            LuxMapTheme {
-                HomeScreen(
-                    uiState = HomeUiState.Success(data = data),
-                    username = "kysu1",
-                    onOpenWorkOrder = {},
-                    onRetry = {},
-                )
-            }
-        }
-
-        // The default tab is "Sửa chữa" (repair) - both items match it, so both rows render.
-        // workOrderId is not its own text node anymore, it's merged into "<kind label> · <id>"
-        // on one Text, hence substring = true instead of an exact match.
-        composeTestRule.onNodeWithText("Sửa chữa").assertExists()
+        setContent(uiState = successWith(item("WO-2031"), item("WO-2019")))
         composeTestRule.onNodeWithText("WO-2031", substring = true).assertExists()
         composeTestRule.onNodeWithText("WO-2019", substring = true).assertExists()
     }
 
     @Test
     fun emptyState_showsEmptyMessage() {
-        composeTestRule.setContent {
-            LuxMapTheme {
-                HomeScreen(uiState = HomeUiState.Empty, username = "kysu1", onOpenWorkOrder = {}, onRetry = {})
-            }
-        }
-
+        setContent(uiState = HomeUiState.Empty)
         composeTestRule.onNodeWithText("Không có việc nào cho hôm nay").assertExists()
     }
 
     @Test
     fun errorState_showsErrorMessage() {
-        composeTestRule.setContent {
-            LuxMapTheme {
-                HomeScreen(
-                    uiState = HomeUiState.Error(message = "Không tải được dữ liệu"),
-                    username = "kysu1",
-                    onOpenWorkOrder = {},
-                    onRetry = {},
-                )
-            }
-        }
-
+        setContent(uiState = HomeUiState.Error(message = "Không tải được dữ liệu"))
         composeTestRule.onNodeWithText("Không tải được dữ liệu").assertExists()
     }
 }

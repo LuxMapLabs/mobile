@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -65,9 +63,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BodyStrongTextStyle
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.DisplayTextStyle
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Radius
@@ -83,6 +79,7 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
@@ -99,6 +96,8 @@ import java.util.Locale
 @Composable
 fun HomeRoute(
     onOpenWorkOrder: (workOrderId: String) -> Unit,
+    unreadNotificationCount: Int,
+    onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -129,99 +128,65 @@ fun HomeRoute(
         username = username,
         onOpenWorkOrder = onOpenWorkOrder,
         onRetry = viewModel::retry,
+        unreadNotificationCount = unreadNotificationCount,
+        onOpenNotifications = onOpenNotifications,
         snackbarHostState = snackbarHostState,
         modifier = modifier,
     )
 }
 
-// F02 Việc hôm nay (Trang chủ) — điểm vào chính. Restyled per the "LuxMap-F02-Viec-Hom-Nay"
-// Claude Design mockup: compact navy greeting header (no stats inside it - the global
-// NotificationBellBar already floats over this header, see NavGraph.kt), a fixed
-// summary-stats + task-kind filter row, then a flat list of work orders sorted
-// overdue-first for the selected tab. Theo hệ thống (Light mặc định) — không thuộc danh
-// sách Dark bắt buộc ở CLAUDE.md.
+private val VI = Locale.forLanguageTag("vi")
+
+internal fun homeGreeting(
+    username: String?,
+    today: LocalDate,
+): String {
+    val date = today.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", VI)).replaceFirstChar { it.titlecase(VI) }
+    val name = username?.takeIf { it.isNotBlank() }
+    return if (name != null) "Xin chào, $name · $date" else "Xin chào · $date"
+}
+
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     username: String?,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
     onRetry: () -> Unit,
+    unreadNotificationCount: Int,
+    onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    val today = remember { LocalDate.now() }
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            LuxTabTopBar(
+                title = "Việc hôm nay",
+                subtitle = homeGreeting(username, today),
+                unreadNotificationCount = unreadNotificationCount,
+                onNotificationsClick = onOpenNotifications,
+            )
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { contentPadding ->
-        Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            HomeHeader(username = username)
-            // Overlaps the hero's bottom edge by Spacing.xl, same -24px margin-top the mockup
-            // uses, so the rounded top corners read as a sheet floating over the navy hero
-            // instead of a hard seam. Needs its own opaque background (not just Scaffold's) so
-            // the overlap actually occludes the hero gradient underneath it. The clip (not just
-            // background) matters once the list scrolls - background alone paints the rounded
-            // shape but never cuts the LazyColumn's own square corners, so a scrolled row's edge
-            // shows past the rounding at the top instead of following it.
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .offset(y = -Spacing.xl)
-                        .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                        .background(MaterialTheme.colorScheme.background),
-            ) {
-                when (uiState) {
-                    is HomeUiState.Loading -> LoadingSkeletonState()
-                    is HomeUiState.Success ->
-                        HomeContent(
-                            data = uiState.data,
-                            isStale = uiState.isStale,
-                            lastSyncedAt = uiState.lastSyncedAt,
-                            completionSyncStates = uiState.completionSyncStates,
-                            onOpenWorkOrder = onOpenWorkOrder,
-                        )
-                    is HomeUiState.Empty -> EmptyState()
-                    is HomeUiState.Error -> ErrorState(message = uiState.message, onRetry = onRetry)
-                }
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            when (uiState) {
+                is HomeUiState.Loading -> LoadingSkeletonState()
+                is HomeUiState.Success ->
+                    HomeContent(
+                        data = uiState.data,
+                        isStale = uiState.isStale,
+                        lastSyncedAt = uiState.lastSyncedAt,
+                        completionSyncStates = uiState.completionSyncStates,
+                        onOpenWorkOrder = onOpenWorkOrder,
+                    )
+                is HomeUiState.Empty -> EmptyState()
+                is HomeUiState.Error -> ErrorState(message = uiState.message, onRetry = onRetry)
             }
         }
-    }
-}
-
-// Fixed Navy700-gradient hero regardless of Light/Dark theme, same BrandHeroGradient as F01 -
-// this block is meant to read as a distinct brand surface, not blend into colorScheme.background.
-// No stats/sync pill here anymore (moved into the white sheet below, per the new mockup) - the
-// global NotificationBellBar (NavGraph.kt) already floats a bell over this header's top-right
-// corner, so no bell/avatar is drawn here either.
-@Composable
-private fun HomeHeader(username: String?) {
-    val today =
-        remember {
-            LocalDate.now().format(
-                DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", Locale.forLanguageTag("vi")),
-            )
-        }
-    val greetingName = username?.takeIf { it.isNotBlank() } ?: "bạn"
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                // Top padding matches NotificationBellBar's own top offset (statusBarsPadding +
-                // Spacing.xs) so the title lines up level with the floating bell.
-                .padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
-    ) {
-        Text(
-            text = "Xin chào, $greetingName · ${today.replaceFirstChar { it.titlecase(Locale.forLanguageTag("vi")) }}",
-            style = LabelTextStyle,
-            color = Color.White.copy(alpha = 0.75f),
-        )
-        Spacer(Modifier.height(Spacing.xs))
-        Text(text = "Việc hôm nay", style = DisplayTextStyle, color = Color.White)
     }
 }
 
