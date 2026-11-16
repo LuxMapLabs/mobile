@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +39,6 @@ import com.luxmap.feature.map.data.PoleLuminancePoint
 @Composable
 fun LuminanceTrendCard(
     detail: PoleDetail,
-    onViewFullHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Trim once here so the chart and the caption always agree on the same window — the chart
@@ -64,9 +62,6 @@ fun LuminanceTrendCard(
             text = trendCaption(points),
             style = MaterialTheme.typography.labelLarge,
         )
-        TextButton(onClick = onViewFullHistory) {
-            Text(text = "Xem lịch sử đầy đủ →", style = MaterialTheme.typography.bodySmall)
-        }
     }
 }
 

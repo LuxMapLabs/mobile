@@ -3,7 +3,6 @@ package com.luxmap.feature.map.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -26,9 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
@@ -41,47 +38,37 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleDetailFault
 import com.luxmap.feature.map.data.PoleDetailFrame
 import com.luxmap.feature.map.data.PoleLuminancePoint
 import com.luxmap.feature.map.data.PoleRuntimePoint
-import kotlinx.coroutines.launch
 import java.util.Locale
 
-// Nav-graph entry point — collects PoleDetailViewModel's state and delegates to the stateless
-// PoleDetailScreen below, which stays easy to drive with fixed data in @Preview. Also owns the
-// SnackbarHostState: actions that have no destination screen yet (menu, CTA, "xem lịch sử đầy
-// đủ"...) call showNotImplemented instead of doing nothing — the callback params on
-// PoleDetailScreen stay public so a caller can override any one of them once its target screen
-// exists, without touching this wiring.
 @Composable
 fun PoleDetailRoute(
     onBack: () -> Unit,
@@ -89,22 +76,11 @@ fun PoleDetailRoute(
     viewModel: PoleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val showNotImplemented: () -> Unit = {
-        scope.launch { snackbarHostState.showSnackbar("Chức năng đang được hoàn thiện") }
-    }
+    val context = LocalContext.current
     PoleDetailScreen(
         uiState = uiState,
         onBack = onBack,
-        onOpenMenu = showNotImplemented,
-        onOpenRouteToSurvey = showNotImplemented,
-        onCreateWorkOrder = showNotImplemented,
-        onViewLocation = showNotImplemented,
-        onViewFullHistory = showNotImplemented,
-        onOpenFault = { showNotImplemented() },
-        onViewAllFrames = showNotImplemented,
-        snackbarHostState = snackbarHostState,
+        onNavigateToPole = { lat, lng -> openInMaps(context, lat, lng) },
         modifier = modifier,
     )
 }
@@ -117,29 +93,16 @@ fun PoleDetailScreen(
     uiState: PoleDetailUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    onOpenMenu: () -> Unit = {},
-    onOpenRouteToSurvey: () -> Unit = {},
-    onCreateWorkOrder: () -> Unit = {},
-    onViewLocation: () -> Unit = {},
-    onViewFullHistory: () -> Unit = {},
-    onOpenFault: (faultId: String) -> Unit = {},
-    onViewAllFrames: () -> Unit = {},
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onNavigateToPole: (lat: Double, lng: Double) -> Unit = { _, _ -> },
 ) {
     Scaffold(
         modifier = modifier,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Chi tiết cột đèn") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onOpenMenu) {
-                        Icon(imageVector = Icons.Filled.MoreVert, contentDescription = "Thêm")
                     }
                 },
             )
@@ -151,12 +114,7 @@ fun PoleDetailScreen(
                 is PoleDetailUiState.Success ->
                     PoleDetailContent(
                         detail = uiState.detail,
-                        onOpenRouteToSurvey = onOpenRouteToSurvey,
-                        onCreateWorkOrder = onCreateWorkOrder,
-                        onViewLocation = onViewLocation,
-                        onViewFullHistory = onViewFullHistory,
-                        onOpenFault = onOpenFault,
-                        onViewAllFrames = onViewAllFrames,
+                        onNavigateToPole = onNavigateToPole,
                     )
                 is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
                 is PoleDetailUiState.Error -> MessageState(text = uiState.message)
@@ -168,12 +126,7 @@ fun PoleDetailScreen(
 @Composable
 private fun PoleDetailContent(
     detail: PoleDetail,
-    onOpenRouteToSurvey: () -> Unit,
-    onCreateWorkOrder: () -> Unit,
-    onViewLocation: () -> Unit,
-    onViewFullHistory: () -> Unit,
-    onOpenFault: (faultId: String) -> Unit,
-    onViewAllFrames: () -> Unit,
+    onNavigateToPole: (lat: Double, lng: Double) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -186,20 +139,15 @@ private fun PoleDetailContent(
     ) {
         PoleHeaderSection(detail)
         PriorityAlertCard(detail)
-        ActionButtonsRow(
-            detail = detail,
-            onOpenRouteToSurvey = onOpenRouteToSurvey,
-            onCreateWorkOrder = onCreateWorkOrder,
-            onViewLocation = onViewLocation,
-        )
-        LuminanceTrendCard(detail = detail, onViewFullHistory = onViewFullHistory)
+        NavigateToPoleButton(detail = detail, onNavigateToPole = onNavigateToPole)
+        LuminanceTrendCard(detail = detail)
         FixtureInfoSection(detail)
         if (detail.openFaults.isNotEmpty()) {
-            OpenFaultsSection(faults = detail.openFaults, onOpenFault = onOpenFault)
+            OpenFaultsSection(faults = detail.openFaults)
         }
         // Always shown, even when empty — a small empty state instead of skipping the
         // section entirely (Design System v3.0.1: "không để khoảng trống lớn").
-        RecentFramesSection(frames = detail.recentFrames, onViewAllFrames = onViewAllFrames)
+        RecentFramesSection(frames = detail.recentFrames)
     }
 }
 
@@ -299,41 +247,18 @@ private fun outAlertBody(detail: PoleDetail): String {
     return "Không phát sáng từ $since. Ảnh hưởng an toàn giao thông ban đêm."
 }
 
-// FM-27 chỉ hiển thị dữ liệu/kết quả AI của cột — không có hành động khảo sát trực tiếp
-// (không có "Bắt đầu khảo sát"/"Báo sự cố" ở đây). CTA chỉ đưa người dùng sang màn khác:
-// mở tuyến để lên kế hoạch khảo sát lại (F03), tạo lệnh sửa chữa, hoặc xem vị trí cột.
-// NORMAL không có gì bất thường nên chỉ có 1 nút xem vị trí, không có CTA hành động.
 @Composable
-private fun ActionButtonsRow(
+private fun NavigateToPoleButton(
     detail: PoleDetail,
-    onOpenRouteToSurvey: () -> Unit,
-    onCreateWorkOrder: () -> Unit,
-    onViewLocation: () -> Unit,
+    onNavigateToPole: (lat: Double, lng: Double) -> Unit,
 ) {
-    val hasLocation = detail.lat != null && detail.lng != null
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        when (detail.fixtureStatus) {
-            AssetCondition.OUT -> {
-                PrimaryButton(
-                    text = "Tạo lệnh sửa chữa",
-                    onClick = onCreateWorkOrder,
-                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
-                )
-                SecondaryOutlinedButton(text = "Mở tuyến để khảo sát lại", onClick = onOpenRouteToSurvey)
-            }
-            AssetCondition.DIM, AssetCondition.UNKNOWN -> {
-                PrimaryButton(
-                    text = "Mở tuyến để khảo sát lại",
-                    onClick = onOpenRouteToSurvey,
-                    modifier = Modifier.fillMaxWidth().height(PRIMARY_CTA_HEIGHT),
-                )
-                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation, enabled = hasLocation)
-            }
-            AssetCondition.NORMAL -> {
-                SecondaryOutlinedButton(text = "Xem vị trí cột", onClick = onViewLocation, enabled = hasLocation)
-            }
-        }
-    }
+    val lat = detail.lat
+    val lng = detail.lng
+    SecondaryOutlinedButton(
+        text = "Chỉ đường",
+        onClick = { if (lat != null && lng != null) onNavigateToPole(lat, lng) },
+        enabled = lat != null && lng != null,
+    )
 }
 
 @Composable
@@ -455,30 +380,21 @@ private fun InfoRow(
     }
 }
 
-// Design System v3.0.1: each fault is its own tappable card (icon + translated title +
-// translated "severity · status" + chevron), title carries the count. Translation functions
-// have an `else -> this` fallback since the full backend enum isn't known yet.
 @Composable
-private fun OpenFaultsSection(
-    faults: List<PoleDetailFault>,
-    onOpenFault: (faultId: String) -> Unit,
-) {
+private fun OpenFaultsSection(faults: List<PoleDetailFault>) {
     Column {
         Text(text = "Sự cố đang mở (${faults.size})", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             faults.forEach { fault ->
-                FaultCard(fault = fault, onClick = { onOpenFault(fault.faultId) })
+                FaultCard(fault = fault)
             }
         }
     }
 }
 
 @Composable
-private fun FaultCard(
-    fault: PoleDetailFault,
-    onClick: () -> Unit,
-) {
+private fun FaultCard(fault: PoleDetailFault) {
     // Reuse OUT's badge colors for the icon circle — a fault card is always in the "something's
     // wrong" tone regardless of the pole's overall fixture_status.
     val colors = AssetCondition.OUT.badgeColors()
@@ -488,7 +404,6 @@ private fun FaultCard(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
-                .clickable(onClick = onClick)
                 .padding(Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -514,11 +429,6 @@ private fun FaultCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Icon(
-            imageVector = Icons.Filled.ChevronRight,
-            contentDescription = "Mở chi tiết sự cố",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -548,10 +458,7 @@ private fun String.toFaultStatusLabel(): String =
 // Always rendered, even with 0 frames — shows a small empty state instead of the section
 // disappearing entirely (Design System v3.0.1: "không để khoảng trống lớn").
 @Composable
-private fun RecentFramesSection(
-    frames: List<PoleDetailFrame>,
-    onViewAllFrames: () -> Unit,
-) {
+private fun RecentFramesSection(frames: List<PoleDetailFrame>) {
     Column {
         Text(text = "Ảnh khảo sát gần đây", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
@@ -564,7 +471,6 @@ private fun RecentFramesSection(
         } else {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 items(frames) { frame -> FrameThumbnail(frame) }
-                item { ViewMoreFramesTile(onClick = onViewAllFrames) }
             }
         }
     }
@@ -599,25 +505,6 @@ private fun FrameThumbnail(frame: PoleDetailFrame) {
 }
 
 @Composable
-private fun ViewMoreFramesTile(onClick: () -> Unit) {
-    Box(
-        modifier =
-            Modifier
-                .size(FRAME_THUMBNAIL_SIZE)
-                .clip(RoundedCornerShape(Dimens.radiusSmall))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Xem thêm",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
 private fun BoxScope.LoadingState() {
     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
 }
@@ -632,7 +519,6 @@ private fun BoxScope.MessageState(text: String) {
 }
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
-private val PRIMARY_CTA_HEIGHT = 52.dp
 private val FAULT_ICON_SIZE = 36.dp
 private val FrameDateOverlayColor = Color.Black.copy(alpha = 0.55f)
 
