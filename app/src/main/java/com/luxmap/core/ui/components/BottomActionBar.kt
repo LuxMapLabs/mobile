@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.HorizontalDivider
@@ -27,8 +27,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.luxmap.core.theme.Navy700
-import com.luxmap.core.theme.ScreenMargin
 import com.luxmap.core.theme.Spacing
 
 // §3 BottomActionBar: a bottom-pinned hint + one primary CTA, used by screens where the main
@@ -63,25 +61,25 @@ fun BottomActionBar(
                     .fillMaxWidth()
                     .padding(
                         top = Spacing.md,
-                        start = if (pinned) ScreenMargin else 0.dp,
-                        end = if (pinned) ScreenMargin else 0.dp,
+                        start = if (pinned) Spacing.lg else 0.dp,
+                        end = if (pinned) Spacing.lg else 0.dp,
                         bottom = if (pinned) Spacing.lg else 0.dp,
                     ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             if (!progressSegments.isNullOrEmpty()) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(6.dp).padding(bottom = Spacing.xs),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.sm).height(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     progressSegments.forEach { done ->
-                        val color = if (done) Navy700 else MaterialTheme.colorScheme.outlineVariant
+                        val color = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                         Box(
                             modifier =
                                 Modifier
                                     .weight(1f)
                                     .height(6.dp)
-                                    .background(color, RoundedCornerShape(3.dp)),
+                                    .background(color, CircleShape),
                         )
                     }
                 }

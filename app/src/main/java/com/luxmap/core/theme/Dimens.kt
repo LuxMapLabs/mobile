@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.dp
 
 // Spacing scale (mục 4.1 Design System v2.0)
 object Spacing {
+    val xxs = 2.dp
     val xs = 4.dp
     val sm = 8.dp
     val md = 12.dp
