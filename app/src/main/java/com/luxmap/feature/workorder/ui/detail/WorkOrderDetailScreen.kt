@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,7 +32,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
@@ -43,7 +41,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
@@ -76,7 +73,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -85,9 +81,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
@@ -114,7 +108,6 @@ import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.EvidencePicker
 import com.luxmap.core.ui.components.InlineBanner
 import com.luxmap.core.ui.components.InlineBannerTone
 import com.luxmap.core.ui.components.LuxBanner
@@ -137,6 +130,7 @@ import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionSection
+import com.luxmap.feature.workorder.ui.detail.sections.RepairCompletionSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -660,7 +654,9 @@ private fun WorkOrderDetailContent(
                 }
                 if (canComplete) {
                     RepairCompletionSection(
-                        state = state,
+                        evidenceFilePath = state.localEvidence?.filePath,
+                        reportNote = state.reportNote,
+                        materialsUsed = state.materialsUsed,
                         locked = isFormLocked,
                         onReportNoteChanged = onReportNoteChanged,
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
@@ -1227,179 +1223,6 @@ private fun PoleGpsReportSection(
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RepairCompletionSection(
-    state: WorkOrderDetailUiState.Success,
-    locked: Boolean,
-    onReportNoteChanged: (String) -> Unit,
-    onMaterialsUsedChanged: (String) -> Unit,
-    onCaptureEvidence: () -> Unit,
-    onRetakeEvidence: () -> Unit,
-) {
-    val hasPhoto = state.localEvidence != null
-    val noteValid = state.reportNote.trim().length >= 10
-    val confirmedCount = state.detail.faults.count { it.inspectionOutcome == "fault_present" }
-    val requiredDone = listOf(hasPhoto, noteValid).count { it }
-    val pillColors =
-        if (requiredDone == 2) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors()
-    val focusManager = LocalFocusManager.current
-    // Tapping the filled tile used to call onRetakeEvidence directly, silently discarding the
-    // photo and reopening the camera - now it only opens a preview, which has its own explicit
-    // retake action.
-    var showEvidencePreview by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.FactCheck,
-            title = "Thực hiện & nghiệm thu",
-            pillText = "$requiredDone/2 bắt buộc",
-            pillColors = pillColors,
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            WorkflowStepRow(
-                number = 1,
-                title = "Bắt đầu thực hiện",
-                required = true,
-                done = true,
-                detail = "Đã bắt đầu thực hiện",
-            )
-            WorkflowStepRow(
-                number = 2,
-                title = "Xác nhận sự cố",
-                required = true,
-                done = true,
-                detail = "$confirmedCount/${state.detail.faults.size} sự cố đã xác nhận ở bước kiểm tra",
-            )
-            WorkflowStepRow(
-                number = 3,
-                title = "Ảnh sau sửa chữa",
-                required = true,
-                done = hasPhoto,
-                detail = if (hasPhoto) "1 ảnh" else "Chụp rõ chóa đèn sau khi sửa",
-            ) {
-                EvidencePicker(
-                    hasPhoto = hasPhoto,
-                    filePath = state.localEvidence?.filePath,
-                    onTileClick =
-                        when {
-                            hasPhoto -> ({ showEvidencePreview = true })
-                            locked -> ({})
-                            else -> onCaptureEvidence
-                        },
-                    enabled = !locked || hasPhoto,
-                )
-            }
-            WorkflowStepRow(
-                number = 4,
-                title = "Kết quả sửa chữa",
-                required = true,
-                done = noteValid,
-                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
-            ) {
-                OutlinedTextField(
-                    value = state.reportNote,
-                    onValueChange = onReportNoteChanged,
-                    placeholder = { Text("VD: Thay bóng LED, kiểm tra lại dây nguồn") },
-                    enabled = !locked,
-                    minLines = 2,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            WorkflowStepRow(
-                number = 5,
-                title = "Vật tư đã thay",
-                required = false,
-                done = state.materialsUsed.trim().isNotEmpty(),
-                isLast = true,
-            ) {
-                OutlinedTextField(
-                    value = state.materialsUsed,
-                    onValueChange = onMaterialsUsedChanged,
-                    placeholder = { Text("VD: 1 bóng LED 100W") },
-                    enabled = !locked,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-
-    val evidenceFilePath = state.localEvidence?.filePath
-    if (showEvidencePreview && evidenceFilePath != null) {
-        EvidencePreviewDialog(
-            filePath = evidenceFilePath,
-            showRetake = !locked,
-            onDismiss = { showEvidencePreview = false },
-            onRetake = {
-                showEvidencePreview = false
-                onRetakeEvidence()
-            },
-        )
-    }
-}
-
-// Full-size look at the captured "after" photo, opened by tapping EvidencePicker's filled tile -
-// retake is now an explicit choice here instead of the tile's only possible action. Hidden once
-// the work order is overdue to complete, since retaking would re-open an otherwise-locked form.
-@Composable
-private fun EvidencePreviewDialog(
-    filePath: String,
-    showRetake: Boolean,
-    onDismiss: () -> Unit,
-    onRetake: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
-                }
-            }
-            AsyncImage(
-                model = File(filePath),
-                contentDescription = "Ảnh sau sửa chữa",
-                contentScale = ContentScale.Fit,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3f / 4f)
-                        .clip(RoundedCornerShape(Radius.card)),
-            )
-            if (showRetake) {
-                Spacer(Modifier.height(Spacing.md))
-                OutlinedButton(
-                    onClick = onRetake,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-                ) {
-                    Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text("Chụp lại")
-                }
             }
         }
     }

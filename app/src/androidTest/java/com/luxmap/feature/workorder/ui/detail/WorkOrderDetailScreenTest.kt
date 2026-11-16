@@ -262,10 +262,26 @@ class WorkOrderDetailScreenTest {
 
     @Test
     fun a_repair_with_complete_allowed_shows_the_add_tile_and_the_unmet_requirement() {
+        var captured = 0
+        val detail = repairDetail(allowedActions = listOf("complete"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
+        composeRule.onNodeWithText("Ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
+        composeRule.onNodeWithContentDescription("Chụp ảnh").performScrollTo().performClick()
+        assertEquals(1, captured)
+    }
+
+    @Test
+    fun a_repair_in_progress_lists_only_the_real_completion_fields_without_fake_steps() {
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithContentDescription("Chụp ảnh").assertExists()
-        composeRule.onNodeWithText("Có ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithText("0/2 bắt buộc").assertExists()
+        composeRule.onNodeWithText("Kết quả sửa chữa").assertExists()
+        composeRule.onNodeWithText("Vật tư đã thay").assertExists()
+        composeRule.onAllNodesWithText("Bắt buộc").assertCountEquals(2)
+        composeRule.onNodeWithText("Không bắt buộc").assertExists()
+        composeRule.onNodeWithText("Bắt đầu thực hiện").assertDoesNotExist()
+        composeRule.onNodeWithText("Xác nhận sự cố").assertDoesNotExist()
     }
 
     @Test
