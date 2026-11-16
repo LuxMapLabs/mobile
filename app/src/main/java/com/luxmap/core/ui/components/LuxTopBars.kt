@@ -17,6 +17,8 @@ import androidx.compose.material3.TopAppBarColors
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,7 +108,9 @@ private fun NotificationAction(
         BadgedBox(
             badge = {
                 if (unreadCount > 0) {
-                    Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
+                    Badge(modifier = Modifier.testTag("notification_badge").atLeastAsWideAsTall()) {
+                        Text(if (unreadCount > 99) "99+" else unreadCount.toString())
+                    }
                 }
             },
         ) {
@@ -130,3 +134,11 @@ private fun LuxTopBarsPreview() {
         }
     }
 }
+
+private fun Modifier.atLeastAsWideAsTall(): Modifier =
+    layout { measurable, constraints ->
+        val height = measurable.minIntrinsicHeight(constraints.maxWidth)
+        val minWidth = height.coerceIn(constraints.minWidth, constraints.maxWidth)
+        val placeable = measurable.measure(constraints.copy(minWidth = minWidth))
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
