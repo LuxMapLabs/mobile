@@ -400,9 +400,6 @@ private fun SurveyHubContent(
     }
 }
 
-private val ImportAreaTileBackground = Color(0xFFF1EEFB)
-private val ImportAreaTileForeground = Color(0xFF5B3FB4)
-
 @Composable
 private fun PoleGpsUpdateOrderCard(
     order: AssignedSurveyRoute,
@@ -422,10 +419,13 @@ private fun PoleGpsUpdateOrderCard(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Box(
-            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(LuxTheme.status.kind.background, RoundedCornerShape(Radius.chip)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = LuxTheme.status.kind.text)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
@@ -453,10 +453,13 @@ private fun PoleLocationEntryCard(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Box(
-            modifier = Modifier.size(40.dp).background(ImportAreaTileBackground, RoundedCornerShape(Radius.chip)),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .background(LuxTheme.status.kind.background, RoundedCornerShape(Radius.chip)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = ImportAreaTileForeground)
+            Icon(imageVector = Icons.Filled.LocationOn, contentDescription = null, tint = LuxTheme.status.kind.text)
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(text = "Cột thiếu GPS", style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)

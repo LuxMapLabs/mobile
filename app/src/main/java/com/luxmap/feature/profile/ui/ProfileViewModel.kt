@@ -7,8 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.BuildConfig
-import com.luxmap.core.ble.BleConnectionState
-import com.luxmap.core.ble.LuxSensorBleClient
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
@@ -31,7 +29,6 @@ class ProfileViewModel
         private val profileRepository: ProfileRepository,
         syncQueueManager: SyncQueueManager,
         connectivityObserver: ConnectivityObserver,
-        bleClient: LuxSensorBleClient,
     ) : ViewModel() {
         val username: StateFlow<String?> =
             authRepository.observeUsername().stateIn(
@@ -59,8 +56,6 @@ class ProfileViewModel
 
         val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
         val appVersion: String = BuildConfig.VERSION_NAME
-
-        val bleConnectionState: StateFlow<BleConnectionState> = bleClient.connectionState
 
         val pendingSyncCount: StateFlow<Int> =
             syncQueueManager.pendingCount.stateIn(viewModelScope, SharingStarted.Eagerly, 0)

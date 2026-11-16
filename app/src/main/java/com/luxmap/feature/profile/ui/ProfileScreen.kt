@@ -24,9 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BluetoothConnected
-import androidx.compose.material.icons.filled.BluetoothDisabled
-import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Email
@@ -60,7 +57,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
@@ -95,7 +91,6 @@ fun ProfileRoute(
 ) {
     val username by viewModel.username.collectAsState()
     val profileState by viewModel.profileState.collectAsState()
-    val bleConnectionState by viewModel.bleConnectionState.collectAsState()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
     val errorSyncCount by viewModel.errorSyncCount.collectAsState()
     val lastSyncedAt by viewModel.lastSyncedAt.collectAsState()
@@ -108,7 +103,6 @@ fun ProfileRoute(
         isLoggingOut = viewModel.isLoggingOut,
         deviceModel = viewModel.deviceModel,
         appVersion = viewModel.appVersion,
-        bleConnectionState = bleConnectionState,
         pendingSyncCount = pendingSyncCount,
         errorSyncCount = errorSyncCount,
         lastSyncedAt = lastSyncedAt,
@@ -128,7 +122,6 @@ fun ProfileScreen(
     isLoggingOut: Boolean,
     deviceModel: String,
     appVersion: String,
-    bleConnectionState: BleConnectionState,
     pendingSyncCount: Int,
     errorSyncCount: Int,
     lastSyncedAt: Instant?,
@@ -169,7 +162,6 @@ fun ProfileScreen(
                         isLoggingOut = isLoggingOut,
                         deviceModel = deviceModel,
                         appVersion = appVersion,
-                        bleConnectionState = bleConnectionState,
                         pendingSyncCount = pendingSyncCount,
                         errorSyncCount = errorSyncCount,
                         lastSyncedAt = lastSyncedAt,
@@ -294,7 +286,6 @@ private fun ProfileContent(
     isLoggingOut: Boolean,
     deviceModel: String,
     appVersion: String,
-    bleConnectionState: BleConnectionState,
     pendingSyncCount: Int,
     errorSyncCount: Int,
     lastSyncedAt: Instant?,
@@ -307,7 +298,6 @@ private fun ProfileContent(
     ) {
         AccountSection(profile)
         ReadinessSection(
-            bleConnectionState = bleConnectionState,
             pendingSyncCount = pendingSyncCount,
             errorSyncCount = errorSyncCount,
             lastSyncedAt = lastSyncedAt,
@@ -384,7 +374,6 @@ private fun CommuneChips(communeIds: List<String>) {
 
 @Composable
 private fun ReadinessSection(
-    bleConnectionState: BleConnectionState,
     pendingSyncCount: Int,
     errorSyncCount: Int,
     lastSyncedAt: Instant?,
@@ -392,8 +381,7 @@ private fun ReadinessSection(
 ) {
     val issues =
         (if (!isOnline) 1 else 0) +
-            (if (errorSyncCount > 0) 1 else 0) +
-            (if (bleConnectionState != BleConnectionState.Connected) 1 else 0)
+            (if (errorSyncCount > 0) 1 else 0)
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(
@@ -417,8 +405,6 @@ private fun ReadinessSection(
             NetworkRow(isOnline = isOnline)
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             SyncRow(pendingSyncCount = pendingSyncCount, errorSyncCount = errorSyncCount, lastSyncedAt = lastSyncedAt)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            BleRow(state = bleConnectionState)
         }
     }
 }
@@ -482,39 +468,6 @@ private fun SyncRow(
                 modifier = Modifier.weight(1f),
             )
         }
-    }
-}
-
-@Composable
-private fun BleRow(state: BleConnectionState) {
-    val (icon, colors, label) =
-        when (state) {
-            BleConnectionState.Connected ->
-                Triple(
-                    Icons.Filled.BluetoothConnected,
-                    SyncStatus.DONE.badgeColors(),
-                    "Đã kết nối",
-                )
-            BleConnectionState.Connecting ->
-                Triple(Icons.Filled.BluetoothSearching, SyncStatus.QUEUED_ONLINE.badgeColors(), "Đang kết nối")
-            BleConnectionState.Disconnected ->
-                Triple(Icons.Filled.BluetoothDisabled, SyncStatus.QUEUED_OFFLINE.badgeColors(), "Chưa kết nối")
-        }
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        IconChip(icon = icon, colors = colors)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "Cảm biến lux", style = MaterialTheme.typography.bodyLarge)
-            Text(
-                text = "Bluetooth · cần cho khảo sát video",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        StatusBadge(text = label, colors = colors)
     }
 }
 

@@ -5,7 +5,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.luxmap.core.ble.BleConnectionState
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.profile.data.CurrentUserProfile
 import org.junit.Assert.assertTrue
@@ -30,7 +29,6 @@ class ProfileScreenTest {
         pendingSyncCount: Int = 0,
         errorSyncCount: Int = 0,
         lastSyncedAt: Instant? = null,
-        bleConnectionState: BleConnectionState = BleConnectionState.Connected,
         onConfirmLogout: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -41,7 +39,6 @@ class ProfileScreenTest {
                     isLoggingOut = false,
                     deviceModel = "Pixel 7a",
                     appVersion = "1.0.0",
-                    bleConnectionState = bleConnectionState,
                     pendingSyncCount = pendingSyncCount,
                     errorSyncCount = errorSyncCount,
                     lastSyncedAt = lastSyncedAt,
@@ -83,13 +80,13 @@ class ProfileScreenTest {
 
     @Test
     fun all_ready_shows_san_sang_label() {
-        setContent(isOnline = true, errorSyncCount = 0, bleConnectionState = BleConnectionState.Connected)
+        setContent(isOnline = true, errorSyncCount = 0)
         composeRule.onNodeWithText("Sẵn sàng").assertExists()
     }
 
     @Test
     fun offline_and_a_sync_error_shows_2_items_need_attention() {
-        setContent(isOnline = false, errorSyncCount = 1, bleConnectionState = BleConnectionState.Connected)
+        setContent(isOnline = false, errorSyncCount = 1)
         composeRule.onNodeWithText("2 mục cần kiểm tra").assertExists()
     }
 
@@ -118,9 +115,9 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun shows_chua_ket_noi_when_ble_is_disconnected() {
-        setContent(bleConnectionState = BleConnectionState.Disconnected)
-        composeRule.onNodeWithText("Chưa kết nối").assertExists()
+    fun readiness_no_longer_lists_the_lux_sensor() {
+        setContent()
+        composeRule.onNodeWithText("Cảm biến lux").assertDoesNotExist()
     }
 
     @Test
