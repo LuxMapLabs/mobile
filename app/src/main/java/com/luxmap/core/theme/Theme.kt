@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
 internal val LuxMapLightColorScheme =
@@ -96,10 +97,15 @@ fun LuxMapTheme(
     content: @Composable () -> Unit,
 ) {
     val useDarkTheme = forceDark || isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = if (useDarkTheme) LuxMapDarkColorScheme else LuxMapLightColorScheme,
-        typography = Typography,
-        shapes = LuxShapes,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalLuxExtendedColors provides if (useDarkTheme) NightFieldExtendedColors else LightExtendedColors,
+        LocalLuxStatusColors provides if (useDarkTheme) NightFieldStatusColors else LightStatusColors,
+    ) {
+        MaterialTheme(
+            colorScheme = if (useDarkTheme) LuxMapDarkColorScheme else LuxMapLightColorScheme,
+            typography = Typography,
+            shapes = LuxShapes,
+            content = content,
+        )
+    }
 }
