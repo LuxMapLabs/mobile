@@ -2,6 +2,7 @@ package com.luxmap.feature.workorder.ui.completion
 
 import androidx.lifecycle.SavedStateHandle
 import com.luxmap.core.location.LocationTracker
+import com.luxmap.feature.workorder.data.EvidenceKind
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import io.mockk.coVerify
 import io.mockk.every
@@ -62,14 +63,15 @@ class EvidenceCaptureViewModelTest {
             io.mockk.coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.97, 106.49)
             val vm = EvidenceCaptureViewModel(savedStateHandle(), repository, locationTracker)
             var doneCalled = false
-            val file = File("/data/evidence/${vm.clientOpId}.jpg")
+            val file = vm.outputFile(kotlin.io.path.createTempDirectory().toFile()).apply { writeText("jpeg") }
 
             vm.onPhotoCaptured(file) { doneCalled = true }
             dispatcher.scheduler.advanceUntilIdle()
 
             coVerify {
-                repository.captureAfterEvidence(
+                repository.captureEvidence(
                     workOrderId = WORK_ORDER_ID,
+                    kind = EvidenceKind.AFTER,
                     clientOpId = vm.clientOpId,
                     filePath = file.absolutePath,
                     lat = 10.97,
@@ -87,15 +89,17 @@ class EvidenceCaptureViewModelTest {
             val locationTracker = mockk<LocationTracker>()
             every { locationTracker.hasLocationPermission() } returns false
             io.mockk.coEvery { locationTracker.getCurrentLocation() } returns null
-            val vm = EvidenceCaptureViewModel(savedStateHandle(), repository, locationTracker)
-            val file = File("/data/evidence/${vm.clientOpId}.jpg")
+            val handle = savedStateHandle().apply { set("kind", "observation") }
+            val vm = EvidenceCaptureViewModel(handle, repository, locationTracker)
+            val file = vm.outputFile(kotlin.io.path.createTempDirectory().toFile()).apply { writeText("jpeg") }
 
             vm.onPhotoCaptured(file) {}
             dispatcher.scheduler.advanceUntilIdle()
 
             coVerify {
-                repository.captureAfterEvidence(
+                repository.captureEvidence(
                     workOrderId = WORK_ORDER_ID,
+                    kind = EvidenceKind.OBSERVATION,
                     clientOpId = vm.clientOpId,
                     filePath = file.absolutePath,
                     lat = 0.0,

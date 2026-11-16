@@ -110,7 +110,7 @@ class WorkOrderDetailViewModelTest {
         completion: LocalWorkOrderCompletionEntity? = null,
     ): WorkOrderDetailViewModel {
         every { detailRepository.observeWorkOrderDetail(WORK_ORDER_ID) } returns detailFlow
-        every { completionRepository.observeEvidence(WORK_ORDER_ID) } returns flowOf(evidence)
+        every { completionRepository.observeEvidenceList(WORK_ORDER_ID) } returns flowOf(listOfNotNull(evidence))
         every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(completion)
         val resolvedPoleGpsRepository =
             poleGpsRepository ?: mockk<PoleGpsRepository>().also {
@@ -248,9 +248,9 @@ class WorkOrderDetailViewModelTest {
                         },
                     completionRepository = completionRepository,
                 )
-            val evidenceFlow = MutableSharedFlow<LocalWorkOrderEvidenceEntity?>(replay = 1)
-            evidenceFlow.tryEmit(null)
-            every { completionRepository.observeEvidence(WORK_ORDER_ID) } returns evidenceFlow
+            val evidenceFlow = MutableSharedFlow<List<LocalWorkOrderEvidenceEntity>>(replay = 1)
+            evidenceFlow.tryEmit(emptyList())
+            every { completionRepository.observeEvidenceList(WORK_ORDER_ID) } returns evidenceFlow
             advanceUntilIdle()
             assertEquals(1, evidenceFlow.subscriptionCount.value)
 

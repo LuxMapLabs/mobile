@@ -15,6 +15,7 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleReference
@@ -22,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 
 private fun repairDetail(
@@ -87,7 +89,8 @@ class WorkOrderDetailScreenTest {
         onFaultOutcomeSelected: (String, String) -> Unit = { _, _ -> },
         onSubmit: () -> Unit = {},
         onCaptureEvidence: () -> Unit = {},
-        onRetakeEvidence: () -> Unit = {},
+        onRemoveEvidence: (String) -> Unit = {},
+        onRecoverEvidence: (Boolean) -> Unit = {},
         onOpenPdf: (String) -> Unit = {},
         onMeasurePole: (String) -> Unit = {},
         onRetryAttachment: (String) -> Unit = {},
@@ -109,7 +112,8 @@ class WorkOrderDetailScreenTest {
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onSubmit = onSubmit,
                     onCaptureEvidence = onCaptureEvidence,
-                    onRetakeEvidence = onRetakeEvidence,
+                    onRemoveEvidence = onRemoveEvidence,
+                    onRecoverEvidence = onRecoverEvidence,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -393,8 +397,19 @@ class WorkOrderDetailScreenTest {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
         composeRule.onNodeWithContentDescription("Ảnh sau sửa chữa, bắt buộc").assertExists()
         composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
-        composeRule.onNodeWithContentDescription("Chụp ảnh").performScrollTo().performClick()
+        composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
         assertEquals(1, captured)
+    }
+
+    @Test
+    fun an_inspection_can_open_the_shared_photo_picker() {
+        var opened = false
+        val detail = inspectionDetail(emptyList()).copy(allowedActions = listOf("complete"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { opened = true })
+
+        composeRule.onNodeWithText("Ảnh hiện trường").assertExists()
+        composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
+        assertEquals(true, opened)
     }
 
     @Test
@@ -429,6 +444,38 @@ class WorkOrderDetailScreenTest {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, localCompletion = completion))
         composeRule.onNodeWithText("Hoàn thành lệnh").assertDoesNotExist()
         composeRule.onNodeWithText("Đã nộp — Chờ đồng bộ").assertExists().assertIsNotEnabled()
+    }
+
+    @Test
+    fun a_rejected_photo_can_reopen_the_submission_for_replacement_after_confirmation() {
+        var replaceRequested = false
+        val detail = repairDetail(allowedActions = listOf("complete"))
+        val completion =
+            LocalWorkOrderCompletionEntity(detail.workOrderId, "Đã thay bóng đèn mới", null, null, "report", "failed")
+        val photo =
+            LocalWorkOrderEvidenceEntity(
+                "photo",
+                detail.workOrderId,
+                "after",
+                "/data/evidence/photo.jpg",
+                Instant.EPOCH,
+                10.0,
+                106.0,
+                "replaceable_error",
+            )
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail,
+                    localEvidence = listOf(photo),
+                    localCompletion = completion,
+                ),
+            onRecoverEvidence = { replaceRequested = it },
+        )
+        composeRule.onNodeWithText("Cần thay ảnh").assertExists()
+        composeRule.onNodeWithText("Thay ảnh lỗi").performScrollTo().performClick()
+        composeRule.onNodeWithText("Mở lại để thay ảnh").performClick()
+        assertTrue(replaceRequested)
     }
 
     @Test

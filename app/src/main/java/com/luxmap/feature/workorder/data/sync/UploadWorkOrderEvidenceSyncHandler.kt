@@ -16,6 +16,8 @@ import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 
+internal const val EVIDENCE_REPLACEMENT_REQUIRED = "Evidence replacement required"
+
 class UploadWorkOrderEvidenceSyncHandler
     @Inject
     constructor(
@@ -31,9 +33,11 @@ class UploadWorkOrderEvidenceSyncHandler
             val payload = Json.decodeFromString<EvidenceSyncPayload>(payloadJson)
             val evidence =
                 dao.evidenceByClientOpId(payload.clientOpId) ?: return SyncOpResult.Failed("Local evidence row missing")
+            if (evidence.uploadStatus == "synced") return SyncOpResult.Done
+            val file = File(evidence.filePath)
+            if (!file.isFile) return SyncOpResult.Failed(EVIDENCE_REPLACEMENT_REQUIRED)
 
             return try {
-                val file = File(evidence.filePath)
                 val filePart =
                     MultipartBody.Part.createFormData(
                         "file",
@@ -55,7 +59,8 @@ class UploadWorkOrderEvidenceSyncHandler
             } catch (e: HttpException) {
                 when (e.code()) {
                     409 -> SyncOpResult.Conflict(e.errorCodeOrNull() ?: "conflict")
-                    400, 403, 404, 415 -> SyncOpResult.Failed(e.errorCodeOrNull() ?: "HTTP ${e.code()}")
+                    400, 413, 415 -> SyncOpResult.Failed(EVIDENCE_REPLACEMENT_REQUIRED)
+                    403, 404 -> SyncOpResult.Failed(e.errorCodeOrNull() ?: "HTTP ${e.code()}")
                     else -> SyncOpResult.RetryLater
                 }
             } catch (e: IOException) {
