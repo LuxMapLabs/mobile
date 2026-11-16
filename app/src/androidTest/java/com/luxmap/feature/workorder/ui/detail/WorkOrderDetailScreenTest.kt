@@ -305,6 +305,21 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun fault_rows_have_no_severity_badge() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("POLE-0047", substring = true).assertExists()
+        composeRule.onNodeWithText("Cao").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_fault_without_coordinates_says_so_and_has_no_severity_badge() {
+        val noLocation = repairDetail().faults.single().copy(lat = 0.0, lng = 0.0)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail().copy(faults = listOf(noLocation))))
+        composeRule.onNodeWithText("Chưa có toạ độ").assertExists()
+        composeRule.onNodeWithText("Cao").assertDoesNotExist()
+    }
+
+    @Test
     fun empty_state_shows_the_no_work_order_message_and_a_way_back() {
         var backed = false
         setContent(uiState = WorkOrderDetailUiState.Empty, onBack = { backed = true })
@@ -356,7 +371,7 @@ class WorkOrderDetailScreenTest {
         var captured = 0
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
-        composeRule.onNodeWithText("Ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithContentDescription("Ảnh sau sửa chữa, bắt buộc").assertExists()
         composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
         composeRule.onNodeWithContentDescription("Chụp ảnh").performScrollTo().performClick()
         assertEquals(1, captured)
@@ -367,10 +382,14 @@ class WorkOrderDetailScreenTest {
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("0/2 bắt buộc").assertExists()
-        composeRule.onNodeWithText("Kết quả sửa chữa").assertExists()
-        composeRule.onNodeWithText("Vật tư đã thay").assertExists()
-        composeRule.onAllNodesWithText("Bắt buộc").assertCountEquals(2)
-        composeRule.onNodeWithText("Không bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Kết quả sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay").assertExists()
+        composeRule.onNodeWithText("Bắt buộc").assertDoesNotExist()
+        composeRule.onNodeWithText("Không bắt buộc").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Kết quả sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Ảnh sau sửa chữa, bắt buộc").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay").assertExists()
+        composeRule.onNodeWithContentDescription("Vật tư đã thay, bắt buộc").assertDoesNotExist()
         composeRule.onNodeWithText("Bắt đầu thực hiện").assertDoesNotExist()
         composeRule.onNodeWithText("Xác nhận sự cố").assertDoesNotExist()
     }

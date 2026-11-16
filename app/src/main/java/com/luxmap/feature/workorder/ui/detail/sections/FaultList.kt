@@ -32,8 +32,6 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.theme.label
-import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxListItem
 import com.luxmap.core.ui.components.StatusBadge
@@ -86,7 +84,6 @@ private fun FaultItem(
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
 ) {
-    val priority = severityFromWire(fault.severity)
     LuxListItem(
         headline = faultTypeLabel(fault.faultType),
         supporting = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
@@ -96,7 +93,6 @@ private fun FaultItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                StatusBadge(text = priority.label(), colors = priority.badgeColors())
                 if (fault.hasLocation()) {
                     IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
                         Icon(

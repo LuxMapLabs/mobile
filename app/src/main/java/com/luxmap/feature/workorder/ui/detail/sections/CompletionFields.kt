@@ -13,9 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxSectionHeader
 
@@ -41,19 +45,24 @@ internal fun CompletionFieldHeader(
     title: String,
     required: Boolean,
 ) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        Text(
-            text = if (required) "Bắt buộc" else "Không bắt buộc",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    val errorColor = MaterialTheme.colorScheme.error
+    val label =
+        buildAnnotatedString {
+            append(title)
+            if (required) {
+                withStyle(SpanStyle(color = errorColor)) { append(" *") }
+            }
+        }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier =
+            Modifier.fillMaxWidth().semantics {
+                heading()
+                contentDescription = if (required) "$title, bắt buộc" else title
+            },
+    )
 }
 
 @Composable
