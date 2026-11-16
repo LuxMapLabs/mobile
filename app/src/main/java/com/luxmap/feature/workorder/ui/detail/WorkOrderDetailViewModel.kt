@@ -12,6 +12,8 @@ import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -47,12 +49,30 @@ class WorkOrderDetailViewModel
         private val _startedSurveyWorkOrderId = MutableSharedFlow<String>(extraBufferCapacity = 1)
         val startedSurveyWorkOrderId: SharedFlow<String> = _startedSurveyWorkOrderId.asSharedFlow()
 
+        private var loadJob: Job? = null
+
         init {
             load()
         }
 
+        fun retry() {
+            val current = _uiState.value
+            if (current !is WorkOrderDetailUiState.Error && current !is WorkOrderDetailUiState.Empty) return
+            detailState.value = null
+            _uiState.value = WorkOrderDetailUiState.Loading
+            load()
+        }
+
         private fun load() {
-            viewModelScope.launch {
+            loadJob?.cancel()
+            loadJob =
+                viewModelScope.launch {
+                    collectDetail()
+                }
+        }
+
+        private suspend fun collectDetail() =
+            coroutineScope {
                 launch {
                     val detail =
                         try {
@@ -60,7 +80,11 @@ class WorkOrderDetailViewModel
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            _uiState.value = WorkOrderDetailUiState.Error(e.message ?: "Không tải được dữ liệu lệnh")
+                            _uiState.value =
+                                WorkOrderDetailUiState.Error(
+                                    message = e.message ?: "Không tải được dữ liệu lệnh",
+                                    isNetworkError = e is IOException,
+                                )
                             return@launch
                         }
                     if (detail == null) {
@@ -118,7 +142,6 @@ class WorkOrderDetailViewModel
                         }
                     }
             }
-        }
 
         fun retryAttachment(attachmentId: String) {
             viewModelScope.launch { poleGpsRepository.retryAttachment(workOrderId, attachmentId) }

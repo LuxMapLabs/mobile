@@ -4,7 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -50,6 +52,8 @@ fun BottomActionBar(
     ctaIcon: ImageVector? = null,
     modifier: Modifier = Modifier,
     pinned: Boolean = true,
+    secondaryText: String? = null,
+    onSecondaryClick: (() -> Unit)? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth().let { if (pinned) it.navigationBarsPadding() else it }) {
         if (pinned) {
@@ -118,13 +122,34 @@ fun BottomActionBar(
                     )
                 }
             }
-            PrimaryButton(
-                text = ctaText,
-                onClick = onCtaClick,
-                enabled = ctaEnabled,
-                trailingIcon = ctaIcon,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (secondaryText != null && onSecondaryClick != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    LuxDestructiveButton(
+                        text = secondaryText,
+                        onClick = onSecondaryClick,
+                        filled = false,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    PrimaryButton(
+                        text = ctaText,
+                        onClick = onCtaClick,
+                        enabled = ctaEnabled,
+                        trailingIcon = ctaIcon,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+            } else {
+                PrimaryButton(
+                    text = ctaText,
+                    onClick = onCtaClick,
+                    enabled = ctaEnabled,
+                    trailingIcon = ctaIcon,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

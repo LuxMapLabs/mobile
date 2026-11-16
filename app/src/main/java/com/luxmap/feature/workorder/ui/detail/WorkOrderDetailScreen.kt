@@ -1,79 +1,43 @@
 package com.luxmap.feature.workorder.ui.detail
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PowerOff
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.WbTwilight
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -85,73 +49,62 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BadgeColors
-import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Gray500
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.Navy700
-import com.luxmap.core.theme.Navy900
 import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.TitleTextStyle
-import com.luxmap.core.theme.WorkOrderPriority
 import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
-import com.luxmap.core.theme.severityFromWire
 import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
-import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.BottomActionBar
-import com.luxmap.core.ui.components.CancelRequestButton
 import com.luxmap.core.ui.components.CancelRequestSheet
-import com.luxmap.core.ui.components.EvidencePicker
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
-import com.luxmap.core.ui.components.LifecycleTracker
-import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.OutcomeSegment
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxBottomSheet
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSecondaryButton
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.core.ui.components.Requirement
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
-import com.luxmap.feature.workorder.data.hasLocation
-import kotlinx.coroutines.Dispatchers
+import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
+import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
+import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
+import com.luxmap.feature.workorder.ui.detail.sections.InspectionSection
+import com.luxmap.feature.workorder.ui.detail.sections.PoleGpsSection
+import com.luxmap.feature.workorder.ui.detail.sections.RepairCompletionSection
+import com.luxmap.feature.workorder.ui.detail.sections.SurveySection
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 import java.time.LocalDate
-import java.util.Locale
 
 @Composable
 fun WorkOrderDetailRoute(
@@ -185,6 +138,8 @@ fun WorkOrderDetailRoute(
         onOpenPdf = onOpenPdf,
         onMeasurePole = onMeasurePole,
         onRetryAttachment = viewModel::retryAttachment,
+        onRetry = viewModel::retry,
+        onOpenSurvey = onStartSurvey,
         modifier = modifier,
     )
 }
@@ -205,6 +160,8 @@ fun WorkOrderDetailScreen(
     onOpenPdf: (String) -> Unit = {},
     onMeasurePole: (String) -> Unit = {},
     onRetryAttachment: (String) -> Unit = {},
+    onRetry: () -> Unit = {},
+    onOpenSurvey: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
@@ -215,12 +172,16 @@ fun WorkOrderDetailScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = modifier,
-            // Success renders its own navy hero with an embedded back button (see
-            // WorkOrderHeroSection) instead of this plain top bar - the other 3 states have no
-            // detail to put in a hero, so they keep the plain bar with a generic title.
             topBar = {
-                if (uiState !is WorkOrderDetailUiState.Success) {
-                    AppTopBar(title = "Chi tiết lệnh", onBack = onBack)
+                if (uiState is WorkOrderDetailUiState.Success) {
+                    val kind = workOrderTaskKindFromWire(uiState.detail.taskKind)
+                    LuxChildTopBar(
+                        title = uiState.detail.title,
+                        subtitle = "${kind.label()} · ${uiState.detail.workOrderId}",
+                        onBack = onBack,
+                    )
+                } else {
+                    LuxChildTopBar(title = "Chi tiết lệnh", onBack = onBack)
                 }
             },
             bottomBar = {
@@ -234,40 +195,31 @@ fun WorkOrderDetailScreen(
                                 scheduleWindow.canActOnSchedule &&
                                 (uiState.localCompletion == null || isReturnedForRework(uiState))
                         val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
-                        if (showCancelRequest) {
-                            SideBySideBottomBar(
-                                hint = cta.hint,
-                                hintColor = cta.hintColor,
-                                primaryText = cta.text,
-                                primaryIcon = cta.icon,
-                                primaryEnabled = cta.enabled,
-                                onPrimaryClick = onCtaClick,
-                                onCancelClick = { showCancelSheet = true },
-                            )
-                        } else {
-                            BottomActionBar(
-                                ctaText = cta.text,
-                                ctaIcon = cta.icon,
-                                onCtaClick = onCtaClick,
-                                ctaEnabled = cta.enabled,
-                                hint = cta.hint,
-                                hintColor = cta.hintColor,
-                                showHintIcon = cta.hint != null,
-                                progressText = cta.progressText,
-                                progressSegments = cta.progressSegments,
-                            )
-                        }
+                        val actionError = uiState.startError ?: uiState.submitError
+                        BottomActionBar(
+                            ctaText = cta.text,
+                            ctaIcon = cta.icon,
+                            onCtaClick = onCtaClick,
+                            ctaEnabled = cta.enabled,
+                            hint = actionError ?: cta.hint,
+                            hintColor = if (actionError != null) MaterialTheme.colorScheme.error else cta.hintColor,
+                            showHintIcon = actionError != null || cta.hint != null,
+                            progressText = cta.progressText,
+                            progressSegments = cta.progressSegments,
+                            secondaryText = if (showCancelRequest) "Yêu cầu hủy" else null,
+                            onSecondaryClick = if (showCancelRequest) ({ showCancelSheet = true }) else null,
+                        )
                     }
                 }
             },
         ) { contentPadding ->
             Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
                 when (uiState) {
-                    is WorkOrderDetailUiState.Loading -> LoadingState()
+                    is WorkOrderDetailUiState.Loading -> WorkOrderDetailLoading()
                     is WorkOrderDetailUiState.Success ->
                         WorkOrderDetailContent(
                             state = uiState,
-                            onBack = onBack,
+                            onOpenSurvey = onOpenSurvey,
                             onNavigateFault = onNavigateFault,
                             onReportNoteChanged = onReportNoteChanged,
                             onMaterialsUsedChanged = onMaterialsUsedChanged,
@@ -279,20 +231,20 @@ fun WorkOrderDetailScreen(
                             onRetryAttachment = onRetryAttachment,
                         )
                     is WorkOrderDetailUiState.Empty ->
-                        MessageState(
-                            icon = Icons.Filled.Assignment,
-                            iconColors = SyncStatus.DONE.badgeColors(),
+                        LuxEmptyState(
                             title = "Không tìm thấy lệnh này",
-                            subtitle = "Lệnh có thể đã bị xoá hoặc không thuộc phạm vi của bạn.",
-                            action = {},
+                            message = "Lệnh có thể đã bị huỷ hoặc không còn thuộc địa bàn của bạn.",
+                            actionLabel = "Quay lại",
+                            onAction = onBack,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                     is WorkOrderDetailUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.CloudOff,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
-                            title = uiState.message,
-                            subtitle = "Kiểm tra kết nối mạng rồi thử lại.",
-                            action = {},
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (uiState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            secondaryActionLabel = "Quay lại",
+                            onSecondaryAction = onBack,
+                            modifier = Modifier.align(Alignment.Center),
                         )
                 }
             }
@@ -341,248 +293,15 @@ fun WorkOrderDetailScreen(
     }
 }
 
-private data class WorkOrderCtaState(
-    val text: String,
-    val icon: ImageVector,
-    val enabled: Boolean,
-    val onClick: () -> Unit,
-    val hint: String? = null,
-    val hintColor: Color? = null,
-    val progressText: String? = null,
-    val progressSegments: List<Boolean>? = null,
-    val requiresConfirmation: Boolean = false,
-)
-
-@Composable
-private fun SideBySideBottomBar(
-    hint: String?,
-    hintColor: Color?,
-    primaryText: String,
-    primaryIcon: ImageVector,
-    primaryEnabled: Boolean,
-    onPrimaryClick: () -> Unit,
-    onCancelClick: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = Spacing.md, start = Spacing.lg, end = Spacing.lg, bottom = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            if (hint != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    modifier = Modifier.padding(bottom = Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Info,
-                        contentDescription = null,
-                        tint = hintColor ?: MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = hint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = hintColor ?: MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().height(PrimaryButtonHeight),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                CancelRequestButton(
-                    onClick = onCancelClick,
-                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
-                    contentPadding = PaddingValues(horizontal = Spacing.sm),
-                )
-                PrimaryButton(
-                    text = primaryText,
-                    onClick = onPrimaryClick,
-                    enabled = primaryEnabled,
-                    trailingIcon = primaryIcon,
-                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
-                )
-            }
-        }
-    }
-}
-
-private fun isReturnedForRework(state: WorkOrderDetailUiState.Success): Boolean =
-    !state.justSubmitted &&
-        workOrderStatusFromWire(state.detail.woStatus) == WorkOrderStatus.IN_PROGRESS &&
-        !state.detail.reviewNote.isNullOrBlank()
-
-// Single bottom-pinned CTA slot for every state this screen can be in - matches the F09
-// redesign mockup, which always pins exactly one button (start/complete/locked/done) instead of
-// the old layout's separate inline buttons for each case.
-@Composable
-private fun workOrderCtaState(
-    state: WorkOrderDetailUiState.Success,
-    onStart: () -> Unit,
-    onSubmit: () -> Unit,
-    today: LocalDate = LocalDate.now(),
-): WorkOrderCtaState? {
-    val detail = state.detail
-    val kind = workOrderTaskKindFromWire(detail.taskKind)
-    val scheduleWindow = workOrderScheduleWindow(detail.scheduledDate, today)
-    val canSubmitNow = state.canSubmit() && !state.isSubmitting && !scheduleWindow.isOverdueToComplete
-    return when {
-        "start" in detail.allowedActions && scheduleWindow.canActOnSchedule &&
-            detail.cancellationRequestStatus == "pending" ->
-            WorkOrderCtaState(
-                text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
-                enabled = false,
-                onClick = {},
-                hint = "Đang chờ duyệt yêu cầu hủy",
-                hintColor = SyncStatus.QUEUED_ONLINE.badgeColors().text,
-            )
-        "start" in detail.allowedActions && scheduleWindow.canActOnSchedule ->
-            WorkOrderCtaState(
-                text = "Bắt đầu",
-                icon = Icons.Filled.PlayArrow,
-                enabled = !state.isStarting,
-                onClick = onStart,
-            )
-        // Two different reasons the window is closed - too early (unlocksOn still set) vs the
-        // work order went overdue without ever being started (unlocksOn cleared, see
-        // workOrderScheduleWindow). scheduleWindow.unlocksOn is only null when there is no
-        // scheduled_date (canActOnSchedule = true then, never reaching this branch) or when
-        // isOverdueToComplete is true, so the two conditions never both apply.
-        "start" in detail.allowedActions && scheduleWindow.isOverdueToComplete ->
-            WorkOrderCtaState(
-                text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
-                enabled = false,
-                onClick = {},
-                hint = "Đã quá hạn bắt đầu · liên hệ Kỹ sư bảo trì để được giao lại",
-                hintColor = MaterialTheme.colorScheme.error,
-            )
-        "start" in detail.allowedActions ->
-            WorkOrderCtaState(
-                text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
-                enabled = false,
-                onClick = {},
-                hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
-                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        "complete" in detail.allowedActions && state.localCompletion != null && !isReturnedForRework(state) ->
-            WorkOrderCtaState(
-                text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
-                icon = Icons.Filled.HourglassTop,
-                enabled = false,
-                onClick = {},
-            )
-        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.REPAIR ->
-            WorkOrderCtaState(
-                text = "Hoàn thành lệnh",
-                icon = if (canSubmitNow) Icons.Filled.Check else Icons.Filled.Lock,
-                enabled = canSubmitNow,
-                onClick = onSubmit,
-                hint =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
-                    } else {
-                        missingRequirementsHint(repairRequirements(state))
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
-                requiresConfirmation = true,
-            )
-        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
-            val recordedCount = detail.faults.count { state.faultOutcomes.containsKey(it.faultId) }
-            val missingCount = detail.faults.size - recordedCount
-            WorkOrderCtaState(
-                text = "Nộp báo cáo kiểm tra",
-                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
-                enabled = canSubmitNow,
-                onClick = onSubmit,
-                hint =
-                    when {
-                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
-                        missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
-                        else -> null
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
-                progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
-                progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
-                requiresConfirmation = true,
-            )
-        }
-        "complete" in detail.allowedActions && kind == WorkOrderTaskKind.POLE_GPS_UPDATE -> {
-            val measured = state.poleMeasurements.map { it.poleId }.toSet().size
-            val missing = state.poleReferences.size - measured
-            WorkOrderCtaState(
-                text = "Nộp báo cáo",
-                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
-                enabled = canSubmitNow,
-                onClick = onSubmit,
-                hint =
-                    when {
-                        scheduleWindow.isOverdueToComplete -> "Đã quá hạn nộp báo cáo · liên hệ Kỹ sư bảo trì để xử lý"
-                        missing > 0 -> "Còn $missing cột chưa chụp"
-                        else -> null
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
-                requiresConfirmation = true,
-            )
-        }
-        workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
-            WorkOrderCtaState(
-                text = "Đã nộp báo cáo",
-                icon = Icons.Filled.HourglassTop,
-                enabled = false,
-                onClick = {},
-                hint = "Chờ Kỹ sư bảo trì duyệt (cổng #2)",
-                hintColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        else -> null
-    }
-}
-
-// Same 2 requirements RequirementList shows in the "Nghiệm thu" card, reused here to build the
-// "Cần ..." lock hint instead of duplicating the wording in 2 places.
-private fun repairRequirements(state: WorkOrderDetailUiState.Success): List<Requirement> =
-    listOf(
-        Requirement("Có ít nhất 1 ảnh sau sửa chữa", met = state.localEvidence != null),
-        Requirement("Đã ghi chú kết quả (≥ 10 ký tự)", met = state.reportNote.trim().length >= 10),
-    )
-
-private fun missingRequirementsHint(requirements: List<Requirement>): String? {
-    val missing = requirements.filterNot { it.met }
-    if (missing.isEmpty()) return null
-    return "Cần " + missing.joinToString(" và ") { it.label.lowercase() }
-}
-
 private data class SubmitSummaryRow(val icon: ImageVector, val iconColor: Color, val label: String, val value: String)
 
 @Composable
 private fun submitSummaryRows(
     kind: WorkOrderTaskKind,
     state: WorkOrderDetailUiState.Success,
-): List<SubmitSummaryRow> =
-    if (kind == WorkOrderTaskKind.INSPECTION) {
+): List<SubmitSummaryRow> {
+    val primary = MaterialTheme.colorScheme.primary
+    return if (kind == WorkOrderTaskKind.INSPECTION) {
         val outcomes = state.faultOutcomes.values
         listOf(
             SubmitSummaryRow(
@@ -607,24 +326,29 @@ private fun submitSummaryRows(
     } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
         listOf(
-            SubmitSummaryRow(Icons.Filled.Navigation, Navy700, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
-            SubmitSummaryRow(Icons.Filled.StickyNote2, Navy700, "Tệp PDF", state.poleAttachments.size.toString()),
-            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Filled.Navigation, primary, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
+            SubmitSummaryRow(Icons.Filled.StickyNote2, primary, "Tệp PDF", state.poleAttachments.size.toString()),
+            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
     } else {
         listOf(
-            SubmitSummaryRow(Icons.Filled.ReportProblem, Gray500, "Sự cố đã sửa", state.detail.faults.size.toString()),
+            SubmitSummaryRow(
+                Icons.Filled.ReportProblem,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                "Sự cố đã sửa",
+                state.detail.faults.size.toString(),
+            ),
             SubmitSummaryRow(
                 Icons.Filled.PhotoCamera,
-                Navy700,
+                primary,
                 "Ảnh nghiệm thu",
                 if (state.localEvidence != null) "1 ảnh" else "0 ảnh",
             ),
-            SubmitSummaryRow(Icons.Filled.EditNote, Navy700, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
         )
     }
+}
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SubmitConfirmationSheet(
     state: WorkOrderDetailUiState.Success,
@@ -634,100 +358,72 @@ private fun SubmitConfirmationSheet(
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val rows = submitSummaryRows(kind, state)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
+    LuxBottomSheet(title = "Nộp báo cáo?", onDismiss = onDismiss) {
+        Text(
+            text = "${kind.label()} · ${detail.workOrderId}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
+                    .padding(horizontal = Spacing.md),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Box(
+            rows.forEachIndexed { index, row ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
                     modifier =
                         Modifier
-                            .size(52.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-                    contentAlignment = Alignment.Center,
+                            .fillMaxWidth()
+                            .heightIn(min = Dimens.minTouchTarget)
+                            .padding(vertical = Spacing.xs)
+                            .semantics(mergeDescendants = true) {},
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Send,
+                        imageVector = row.icon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = row.iconColor,
+                        modifier = Modifier.size(20.dp),
                     )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(text = "Nộp báo cáo?", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
                     Text(
-                        text = detail.workOrderId,
-                        style = LabelTextStyle,
+                        text = row.label,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = row.value,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card))
-                        .padding(horizontal = Spacing.md),
-            ) {
-                rows.forEachIndexed { index, row ->
-                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    ) {
-                        Icon(
-                            imageVector = row.icon,
-                            contentDescription = null,
-                            tint = row.iconColor,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Text(
-                            text = row.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            text = row.value,
-                            style = BodyStrongTextStyle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            Text(
-                text =
-                    "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
-                        "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        }
+        Text(
+            text =
+                "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
+                    "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            LuxSecondaryButton(
+                text = "Kiểm tra lại",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f).height(PrimaryButtonHeight),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text("Kiểm tra lại", maxLines = 1)
-                }
-                Button(
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors = ButtonDefaults.buttonColors(containerColor = Navy700, contentColor = Color.White),
-                ) {
-                    Text("Nộp báo cáo")
-                    Spacer(Modifier.width(Spacing.sm))
-                    Icon(imageVector = Icons.Filled.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-            }
+            PrimaryButton(
+                text = "Nộp báo cáo",
+                onClick = onConfirm,
+                trailingIcon = Icons.Filled.Send,
+                modifier = Modifier.weight(1.5f),
+            )
         }
     }
 }
@@ -735,7 +431,7 @@ private fun SubmitConfirmationSheet(
 @Composable
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
-    onBack: () -> Unit,
+    onOpenSurvey: (String) -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
@@ -755,175 +451,129 @@ private fun WorkOrderDetailContent(
     // backend), so this already means "started but overdue to submit", not "overdue to start".
     val isFormLocked = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        WorkOrderHeroSection(detail = detail, showSubmittedBadge = hasActiveLocalCompletion, onBack = onBack)
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.background)
-                    .padding(start = Spacing.md, top = Spacing.md, end = Spacing.md, bottom = Spacing.xxl),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    .padding(start = Spacing.lg, top = Spacing.md, end = Spacing.lg, bottom = Spacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
-            WorkOrderSummaryCard(detail)
-            WorkOrderHeaderSection(detail)
-            state.syncStatus()?.let { status ->
-                StatusBadge(text = status.label(), colors = status.badgeColors())
+            val messages =
+                workOrderMessages(
+                    detail = detail,
+                    hasActiveLocalCompletion = hasActiveLocalCompletion,
+                    syncStatus = state.syncStatus(),
+                    isOnline = state.isOnline,
+                    today = LocalDate.now(),
+                )
+            WorkOrderSummaryCard(
+                detail = detail,
+                showSubmittedBadge = hasActiveLocalCompletion,
+                syncStatus = state.syncStatus(),
+            )
+            if (messages.showOffline) {
+                LuxBanner(
+                    title = "Đang ngoại tuyến",
+                    message = "Thao tác sẽ được lưu trên thiết bị và đồng bộ khi có mạng.",
+                    tone = LuxBannerTone.NEUTRAL,
+                )
+            }
+            messages.prominent?.let { message ->
+                LuxBanner(
+                    title = message.title,
+                    message = message.body.orEmpty(),
+                    tone = message.tone.toBannerTone(),
+                )
+            }
+            if (messages.notes.isNotEmpty()) {
+                WorkOrderNotesCard(notes = messages.notes)
             }
             if (kind == WorkOrderTaskKind.SURVEY) {
-                Text(text = "Lệnh khảo sát — xem trong tab Khảo sát", style = MaterialTheme.typography.bodyMedium)
+                SurveySection(
+                    started = status == WorkOrderStatus.IN_PROGRESS,
+                    canStart = "start" in detail.allowedActions,
+                    onOpenSurvey = { onOpenSurvey(detail.workOrderId) },
+                )
             } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
-                PoleGpsOverviewSection(
-                    state = state,
+                PoleGpsSection(
+                    attachments = state.poleAttachments,
+                    references = state.poleReferences,
+                    measurements = state.poleMeasurements,
                     canCapture = canComplete && !isFormLocked,
+                    showReport = canComplete,
+                    reportNote = state.reportNote,
+                    locked = isFormLocked,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
+                    onReportNoteChanged = onReportNoteChanged,
                 )
-                if (canComplete) {
-                    PoleGpsReportSection(
-                        state = state,
-                        locked = isFormLocked,
-                        onReportNoteChanged = onReportNoteChanged,
-                    )
+            } else if (kind == WorkOrderTaskKind.INSPECTION) {
+                InspectionSection(
+                    faults = detail.faults,
+                    selectedOutcomes = state.faultOutcomes,
+                    reportNote = state.reportNote,
+                    editable = canComplete,
+                    locked = isFormLocked,
+                    onNavigateFault = onNavigateFault,
+                    onFaultOutcomeSelected = onFaultOutcomeSelected,
+                    onReportNoteChanged = onReportNoteChanged,
+                )
+                if (status == WorkOrderStatus.ASSIGNED) {
+                    PreStartRequirementsPreview(kind = kind)
                 }
             } else {
-                FaultListSection(
-                    kind = kind,
+                FaultListCard(
+                    title = "Sự cố cần sửa",
                     faults = detail.faults,
                     onNavigateFault = onNavigateFault,
-                    answeredFaultIds = state.faultOutcomes.keys,
+                    footer = { fault ->
+                        fault.inspectionOutcome?.let { outcome ->
+                            FaultFooter { InspectionOutcomeBadge(outcome) }
+                        }
+                    },
                 )
                 if (status == WorkOrderStatus.ASSIGNED) {
                     PreStartRequirementsPreview(kind = kind)
                 }
                 if (canComplete) {
-                    when (kind) {
-                        WorkOrderTaskKind.REPAIR ->
-                            RepairCompletionSection(
-                                state = state,
-                                locked = isFormLocked,
-                                onReportNoteChanged = onReportNoteChanged,
-                                onMaterialsUsedChanged = onMaterialsUsedChanged,
-                                onCaptureEvidence = onCaptureEvidence,
-                                onRetakeEvidence = onRetakeEvidence,
-                            )
-                        WorkOrderTaskKind.INSPECTION ->
-                            InspectionCompletionSection(
-                                state = state,
-                                locked = isFormLocked,
-                                onReportNoteChanged = onReportNoteChanged,
-                                onFaultOutcomeSelected = onFaultOutcomeSelected,
-                            )
-                        WorkOrderTaskKind.SURVEY -> Unit
-                        WorkOrderTaskKind.POLE_GPS_UPDATE -> Unit
-                    }
+                    RepairCompletionSection(
+                        evidenceFilePath = state.localEvidence?.filePath,
+                        reportNote = state.reportNote,
+                        materialsUsed = state.materialsUsed,
+                        locked = isFormLocked,
+                        onReportNoteChanged = onReportNoteChanged,
+                        onMaterialsUsedChanged = onMaterialsUsedChanged,
+                        onCaptureEvidence = onCaptureEvidence,
+                        onRetakeEvidence = onRetakeEvidence,
+                    )
                 }
-            }
-            if (state.startError != null) {
-                Text(
-                    text = state.startError,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            if (state.submitError != null) {
-                InlineBanner(message = state.submitError, tone = InlineBannerTone.ERROR)
             }
         }
     }
 }
 
-private val HeroBackButtonTouchSize = 48.dp
-private val HeroBackButtonChipSize = 40.dp
-private val HeroMinHeight = 136.dp
-private val HeroBackChipColor = Color(0xFF1E3D6B)
-private val HeroBackChipRing = Color(0xFF93B2E0)
+private fun WorkOrderMessageTone.toBannerTone(): LuxBannerTone =
+    when (this) {
+        WorkOrderMessageTone.ERROR -> LuxBannerTone.ERROR
+        WorkOrderMessageTone.WARNING -> LuxBannerTone.WARNING
+        WorkOrderMessageTone.NEUTRAL -> LuxBannerTone.NEUTRAL
+        WorkOrderMessageTone.INFO -> LuxBannerTone.INFO
+    }
 
 @Composable
-private fun WorkOrderHeroSection(
+private fun WorkOrderSummaryCard(
     detail: WorkOrderDetail,
     showSubmittedBadge: Boolean,
-    onBack: () -> Unit,
+    syncStatus: SyncStatus?,
 ) {
-    val status = workOrderStatusFromWire(detail.woStatus)
-    val kind = workOrderTaskKindFromWire(detail.taskKind)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(Navy900)
-                .statusBarsPadding()
-                .heightIn(min = HeroMinHeight)
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier.size(HeroBackButtonTouchSize),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(HeroBackButtonChipSize)
-                        .clip(RoundedCornerShape(Radius.chip))
-                        .background(HeroBackChipColor)
-                        .border(1.dp, HeroBackChipRing.copy(alpha = 0.22f), RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ArrowBack,
-                    contentDescription = "Quay lại",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text =
-                        if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
-                            detail.workOrderId.uppercase(Locale.forLanguageTag("vi"))
-                        } else {
-                            "Lệnh ${kind.label()} · ${detail.workOrderId}".uppercase(Locale.forLanguageTag("vi"))
-                        },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF9FB6D6),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (showSubmittedBadge) {
-                    StatusBadge(text = "Đã nộp", colors = WorkOrderStatus.VERIFIED.badgeColors())
-                } else if (status != WorkOrderStatus.ASSIGNED) {
-                    StatusBadge(text = status.label(), colors = status.badgeColors())
-                }
-            }
-            Text(
-                text = detail.title,
-                style = TitleTextStyle.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val due = dueDateLabel(detail.dueDate)
     val dueColor =
         when {
-            due.isOverdue -> MaterialTheme.colorScheme.error
+            due.isOverdue -> LuxTheme.colors.dueOverdue
             due.isToday -> LuxTheme.colors.dueToday
             else -> MaterialTheme.colorScheme.onSurface
         }
@@ -931,388 +581,141 @@ private fun WorkOrderSummaryCard(detail: WorkOrderDetail) {
         when (kind) {
             WorkOrderTaskKind.REPAIR -> "Lịch sửa chữa"
             WorkOrderTaskKind.POLE_GPS_UPDATE -> "Lịch đo GPS"
-            else -> "Lịch kiểm tra"
+            WorkOrderTaskKind.SURVEY -> "Lịch khảo sát"
+            WorkOrderTaskKind.INSPECTION -> "Lịch kiểm tra"
         }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SummaryMetricCell(
+    LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary")) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (showSubmittedBadge) {
+                StatusBadge(
+                    text = "Đã nộp",
+                    colors = WorkOrderStatus.DONE.badgeColors(),
+                    icon = WorkOrderStatus.DONE.icon(),
+                )
+            } else {
+                StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+            }
+            syncStatus?.let { sync ->
+                StatusBadge(text = sync.label(), colors = sync.badgeColors(), icon = sync.icon())
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            SummaryMetric(
                 label = "Hạn xử lý",
                 value = due.text,
                 valueColor = dueColor,
+                showAlert = due.isOverdue || due.isToday,
                 modifier = Modifier.weight(1f),
             )
-            SummaryMetricCell(
+            SummaryMetric(
                 label = scheduleLabel,
                 value = scheduleValue,
                 valueColor = MaterialTheme.colorScheme.onSurface,
+                showAlert = false,
                 modifier = Modifier.weight(1f),
             )
         }
         if (status != WorkOrderStatus.CANCELLED) {
-            val lifecycleSteps = workOrderLifecycleSteps(status, kind)
-            if (lifecycleSteps.isNotEmpty()) {
-                LifecycleTracker(steps = lifecycleSteps)
-            }
+            Spacer(Modifier.height(Spacing.md))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(Spacing.md))
+            Text(
+                text = "Giai đoạn hiện tại: ${kind.label()}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun SummaryMetricCell(
+private fun SummaryMetric(
     label: String,
     value: String,
     valueColor: Color,
+    showAlert: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip))
-                .padding(Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(text = label, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(
-            text = value,
-            style = BodyStrongTextStyle,
-            color = valueColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun WorkOrderHeaderSection(detail: WorkOrderDetail) {
-    val hasCancellationBanner = detail.cancellationRequestStatus != "none"
-    val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
-    val status = workOrderStatusFromWire(detail.woStatus)
-    val isOverdueToStart = isPastSchedule && status == WorkOrderStatus.ASSIGNED
-    val isOverdueToComplete = isPastSchedule && status == WorkOrderStatus.IN_PROGRESS
-    val hasAnyBanner =
-        !detail.note.isNullOrBlank() ||
-            !detail.reviewNote.isNullOrBlank() ||
-            hasCancellationBanner ||
-            isOverdueToStart ||
-            isOverdueToComplete
-    if (!hasAnyBanner) return
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        if (isOverdueToStart) {
-            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
-            InlineBanner(
-                message =
-                    "Quá hạn bắt đầu (dự kiến $dueText) · Không thể bắt đầu, liên hệ Kỹ sư bảo trì để được giao lại",
-                tone = InlineBannerTone.ERROR,
-            )
-        }
-        if (isOverdueToComplete) {
-            val dueText = DateFormatUtils.formatPlainDate(detail.scheduledDate)
-            InlineBanner(
-                message = "Quá hạn nộp báo cáo (dự kiến $dueText) · Form đã khoá, liên hệ Kỹ sư bảo trì để xử lý",
-                tone = InlineBannerTone.ERROR,
-            )
-        }
-        if (!detail.reviewNote.isNullOrBlank()) {
-            if (status == WorkOrderStatus.IN_PROGRESS) {
-                InlineBanner(
-                    message = "Manager yêu cầu bổ sung: ${detail.reviewNote}",
-                    tone = InlineBannerTone.ERROR,
-                )
-            } else {
-                InlineBanner(
-                    message = "Ghi chú của Manager: ${detail.reviewNote}",
-                    tone = InlineBannerTone.OFFLINE,
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (showAlert) {
+                Icon(
+                    imageVector = Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = valueColor,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-        }
-        when (detail.cancellationRequestStatus) {
-            "pending" ->
-                InlineBanner(
-                    message = "Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt",
-                    tone = InlineBannerTone.PENDING,
-                )
-            "rejected" ->
-                InlineBanner(
-                    message = "Yêu cầu hủy bị từ chối: ${detail.cancellationRejectNote}",
-                    tone = InlineBannerTone.ERROR,
-                )
-        }
-        if (!detail.note.isNullOrBlank()) {
-            ManagerNoteCard(note = detail.note)
-        }
-    }
-}
-
-private const val MANAGER_NOTE_CLAMP_THRESHOLD = 110
-
-@Composable
-private fun ManagerNoteCard(note: String) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val canToggle = note.length > MANAGER_NOTE_CLAMP_THRESHOLD
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Icon(
-            imageVector = Icons.Filled.StickyNote2,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = "Ghi chú từ Manager",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = note,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (canToggle && !expanded) MANAGER_NOTE_CLAMP_LINES else Int.MAX_VALUE,
+                text = value,
+                style = MaterialTheme.typography.titleMedium,
+                color = valueColor,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (canToggle) {
-                TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(0.dp)) {
-                    Text(if (expanded) "Thu gọn" else "Xem thêm")
-                }
-            }
         }
     }
 }
 
-private const val MANAGER_NOTE_CLAMP_LINES = 3
+private const val NOTE_CLAMP_THRESHOLD = 110
+private const val NOTE_CLAMP_LINES = 3
 
 @Composable
-private fun FaultListSection(
-    kind: WorkOrderTaskKind,
-    faults: List<WorkOrderFaultDetail>,
-    onNavigateFault: (lat: Double, lng: Double) -> Unit,
-    answeredFaultIds: Set<String>,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.ReportProblem,
-            title = if (kind == WorkOrderTaskKind.REPAIR) "Sự cố cần sửa" else "Sự cố cần kiểm tra",
-            pillText = "${faults.size} sự cố",
-            pillColors = WorkOrderStatus.ASSIGNED.badgeColors(),
+private fun WorkOrderNotesCard(notes: List<WorkOrderNote>) {
+    LuxCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Ghi chú & lịch sử",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-        if (faults.isEmpty()) {
+        notes.forEachIndexed { index, note ->
+            if (index > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = Spacing.md),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+            } else {
+                Spacer(Modifier.height(Spacing.md))
+            }
+            WorkOrderNoteRow(note = note)
+        }
+    }
+}
+
+@Composable
+private fun WorkOrderNoteRow(note: WorkOrderNote) {
+    var expanded by rememberSaveable(note.label) { mutableStateOf(false) }
+    val canToggle = note.text.length > NOTE_CLAMP_THRESHOLD
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+            text = note.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (note.text.isNotBlank()) {
             Text(
-                text = "Không có sự cố nào trong lệnh này",
+                text = note.text,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                faults.forEach { fault ->
-                    FaultRow(
-                        kind = kind,
-                        fault = fault,
-                        onNavigate = { onNavigateFault(fault.lat, fault.lng) },
-                        isAnswered = fault.faultId in answeredFaultIds,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private val FaultSectionAvatarSize = 32.dp
-private val FaultTypeIconSize = 44.dp
-private val FaultNavigateButtonSize = 48.dp
-
-@Composable
-private fun faultTypeVisual(faultType: String): Pair<ImageVector, BadgeColors> =
-    when (faultType) {
-        "lamp_out" -> Icons.Filled.Lightbulb to AssetCondition.OUT.badgeColors()
-        "lamp_dim" -> Icons.Filled.WbTwilight to AssetCondition.DIM.badgeColors()
-        "segment_outage" -> Icons.Filled.PowerOff to AssetCondition.OUT.badgeColors()
-        "node_offline" -> Icons.Filled.SensorsOff to AssetCondition.UNKNOWN.badgeColors()
-        "runtime_decline" -> Icons.Filled.TrendingDown to AssetCondition.DIM.badgeColors()
-        else -> Icons.Filled.ReportProblem to AssetCondition.UNKNOWN.badgeColors()
-    }
-
-@Composable
-private fun FaultRow(
-    kind: WorkOrderTaskKind,
-    fault: WorkOrderFaultDetail,
-    onNavigate: () -> Unit,
-    isAnswered: Boolean,
-) {
-    val priority = severityFromWire(fault.severity)
-    val (typeIcon, typeColors) = faultTypeVisual(fault.faultType)
-    val borderColor = if (isAnswered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, borderColor, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(FaultTypeIconSize)
-                    .background(typeColors.background, RoundedCornerShape(Radius.chip)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(imageVector = typeIcon, contentDescription = null, tint = typeColors.text)
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(text = faultTypeLabel(fault.faultType), style = MaterialTheme.typography.titleMedium)
-                PriorityBadgeLabel(priority = priority)
-            }
-            Text(
-                text = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (kind == WorkOrderTaskKind.REPAIR && fault.inspectionOutcome != null) {
-                StatusBadge(
-                    text = inspectionOutcomeLabel(fault.inspectionOutcome),
-                    colors = WorkOrderStatus.VERIFIED.badgeColors(),
-                )
-            }
-        }
-        if (fault.hasLocation()) {
-            NavigateButton(onClick = onNavigate)
-        } else {
-            Text(
-                text = "Chưa có toạ độ",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = if (canToggle && !expanded) NOTE_CLAMP_LINES else Int.MAX_VALUE,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-    }
-}
-
-@Composable
-private fun PriorityBadgeLabel(priority: WorkOrderPriority) {
-    StatusBadge(text = priority.label(), colors = priority.badgeColors())
-}
-
-@Composable
-private fun NavigateButton(onClick: () -> Unit) {
-    val colors = WorkOrderStatus.ASSIGNED.badgeColors()
-    IconButton(
-        onClick = onClick,
-        modifier =
-            Modifier
-                .size(FaultNavigateButtonSize)
-                .background(colors.background, RoundedCornerShape(Radius.control)),
-    ) {
-        Icon(imageVector = Icons.Filled.Navigation, contentDescription = "Điều hướng", tint = colors.text)
-    }
-}
-
-private val StepNumberSize = 24.dp
-private val StepConnectorWidth = 2.dp
-
-@Composable
-private fun WorkflowStepRow(
-    number: Int,
-    title: String,
-    required: Boolean,
-    done: Boolean,
-    detail: String? = null,
-    isLast: Boolean = false,
-    content: @Composable () -> Unit = {},
-) {
-    val tagColors =
-        when {
-            !required -> WorkOrderStatus.OPEN.badgeColors()
-            done -> WorkOrderStatus.VERIFIED.badgeColors()
-            else -> AssetCondition.OUT.badgeColors()
-        }
-    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-        Column(
-            modifier = Modifier.fillMaxHeight().width(StepNumberSize),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(StepNumberSize)
-                        .clip(CircleShape)
-                        .background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-                        .border(
-                            width = if (done) 0.dp else 2.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant,
-                            shape = CircleShape,
-                        ),
-                contentAlignment = Alignment.Center,
+        if (canToggle) {
+            TextButton(
+                onClick = { expanded = !expanded },
+                modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
+                contentPadding = PaddingValues(0.dp),
             ) {
-                if (done) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp),
-                    )
-                } else {
-                    Text(text = "$number", style = BadgeTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+                Text(if (expanded) "Thu gọn" else "Xem thêm")
             }
-            if (!isLast) {
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .width(StepConnectorWidth)
-                            .padding(vertical = Spacing.xs)
-                            .background(
-                                if (done) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.outlineVariant
-                                },
-                            ),
-                )
-            }
-        }
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(start = Spacing.md, bottom = if (isLast) 0.dp else Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                Text(
-                    text = title,
-                    style = BodyStrongTextStyle,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                StatusBadge(text = if (required) "Bắt buộc" else "Không bắt buộc", colors = tagColors)
-            }
-            if (detail != null) {
-                Text(text = detail, style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            content()
         }
     }
 }
@@ -1361,7 +764,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Theo cấu hình của Manager · nhập sau khi bắt đầu",
+                text = "Theo cấu hình của Kỹ sư bảo trì · nhập sau khi bắt đầu",
                 style = LabelTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1397,511 +800,17 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
 }
 
 @Composable
-private fun PoleGpsOverviewSection(
-    state: WorkOrderDetailUiState.Success,
-    canCapture: Boolean,
-    onOpenPdf: (String) -> Unit,
-    onMeasurePole: (String) -> Unit,
-    onRetryAttachment: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var pendingDownload by remember {
-        mutableStateOf<com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment?>(null)
-    }
-    val saveLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-            val localPath = pendingDownload?.localPath
-            pendingDownload = null
-            if (uri != null && localPath != null) {
-                scope.launch {
-                    val saved =
-                        withContext(Dispatchers.IO) {
-                            runCatching {
-                                context.contentResolver.openOutputStream(uri)?.use { output ->
-                                    File(localPath).inputStream().use { it.copyTo(output) }
-                                }
-                            }.isSuccess
-                        }
-                    val message = if (saved) "Đã lưu file vào thiết bị" else "Không lưu được file"
-                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.StickyNote2,
-            title = "Tệp PDF",
-            pillText = "${state.poleAttachments.size} file",
-            pillColors = WorkOrderStatus.ASSIGNED.badgeColors(),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            state.poleAttachments.forEach { attachment ->
-                PdfAttachmentRow(
-                    attachment = attachment,
-                    onOpen = { onOpenPdf(attachment.attachmentId) },
-                    onRetry = { onRetryAttachment(attachment.attachmentId) },
-                    onDownload = {
-                        pendingDownload = attachment
-                        saveLauncher.launch(attachment.fileName)
-                    },
-                )
-            }
-        }
-        val referenceIds = state.poleReferences.map { it.poleId }.toSet()
-        val measuredIds = state.poleMeasurements.map { it.poleId }.toSet().intersect(referenceIds)
-        CompletionSectionHeader(
-            icon = Icons.Filled.Navigation,
-            title = "Cột đèn",
-            pillText = "${measuredIds.size}/${state.poleReferences.size} đã đo",
-            pillColors = WorkOrderStatus.ASSIGNED.badgeColors(),
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            state.poleReferences.forEach { reference ->
-                PoleGpsRow(
-                    reference = reference,
-                    measurement = state.poleMeasurements.firstOrNull { it.poleId == reference.poleId },
-                    enabled = canCapture,
-                    onClick = { onMeasurePole(reference.poleId) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun PdfAttachmentRow(
-    attachment: com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment,
-    onOpen: () -> Unit,
-    onRetry: () -> Unit,
-    onDownload: () -> Unit,
-) {
-    val (canTap, onTap) =
-        when (attachment.status) {
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY -> true to onOpen
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.FAILED -> true to onRetry
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.DOWNLOADING -> false to {}
-            com.luxmap.feature.workorder.polegps.data.AttachmentStatus.PENDING -> false to {}
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .clickable(onClick = onTap, enabled = canTap)
-                .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+private fun WorkOrderDetailLoading() {
+    LuxLoadingRegion(
+        description = "Đang tải chi tiết lệnh",
+        modifier = Modifier.fillMaxWidth().padding(Spacing.lg).testTag("work_order_detail_loading"),
     ) {
-        Icon(
-            imageVector = Icons.Filled.StickyNote2,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(text = attachment.fileName, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        if (attachment.status == com.luxmap.feature.workorder.polegps.data.AttachmentStatus.READY) {
-            IconButton(onClick = onDownload) {
-                Icon(
-                    imageVector = Icons.Filled.Download,
-                    contentDescription = "Tải file ${attachment.fileName} về máy",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        LuxSkeleton(modifier = Modifier.fillMaxWidth().height(140.dp), shape = MaterialTheme.shapes.medium)
+        LuxSkeleton(modifier = Modifier.width(160.dp).height(20.dp))
+        repeat(3) {
+            LuxSkeleton(modifier = Modifier.fillMaxWidth().height(72.dp), shape = MaterialTheme.shapes.medium)
         }
     }
-}
-
-@Composable
-private fun PoleGpsRow(
-    reference: com.luxmap.feature.workorder.polegps.data.PoleReference,
-    measurement: com.luxmap.feature.workorder.polegps.data.PoleMeasurement?,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    val oldPosition =
-        if (reference.lat != null && reference.lng != null) {
-            "%.6f, %.6f".format(reference.lat, reference.lng)
-        } else {
-            "Chưa có"
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.card))
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = reference.poleId, style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "GPS cũ: $oldPosition",
-                style = LabelTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // No minimum-accuracy warning here: WorkOrderService.cs's Report() only validates
-        // lat in [-90, 90], lng in [-180, 180] and accuracy_m >= 0 and finite - there is no
-        // BE-enforced "good enough" threshold to warn against (the 8m figure removed from here
-        // belonged to the now-deleted continuous-video-survey flow, a different feature).
-        when {
-            measurement != null -> StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
-            !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
-            else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
-        }
-    }
-}
-
-@Composable
-private fun PoleGpsReportSection(
-    state: WorkOrderDetailUiState.Success,
-    locked: Boolean,
-    onReportNoteChanged: (String) -> Unit,
-) {
-    val noteValid = state.reportNote.trim().length >= 10
-    val focusManager = LocalFocusManager.current
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.FactCheck,
-            title = "Báo cáo",
-            pillText = if (noteValid) "Đã đủ" else "Cần ghi chú",
-            pillColors =
-                if (noteValid) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors(),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            WorkflowStepRow(
-                number = 1,
-                title = "Kết quả đo GPS",
-                required = true,
-                done = noteValid,
-                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
-                isLast = true,
-            ) {
-                OutlinedTextField(
-                    value = state.reportNote,
-                    onValueChange = onReportNoteChanged,
-                    placeholder = { Text("VD: Đã đo xong các cột, 1 cột chưa bắt được tín hiệu GPS") },
-                    enabled = !locked,
-                    minLines = 2,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RepairCompletionSection(
-    state: WorkOrderDetailUiState.Success,
-    locked: Boolean,
-    onReportNoteChanged: (String) -> Unit,
-    onMaterialsUsedChanged: (String) -> Unit,
-    onCaptureEvidence: () -> Unit,
-    onRetakeEvidence: () -> Unit,
-) {
-    val hasPhoto = state.localEvidence != null
-    val noteValid = state.reportNote.trim().length >= 10
-    val confirmedCount = state.detail.faults.count { it.inspectionOutcome == "fault_present" }
-    val requiredDone = listOf(hasPhoto, noteValid).count { it }
-    val pillColors =
-        if (requiredDone == 2) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors()
-    val focusManager = LocalFocusManager.current
-    // Tapping the filled tile used to call onRetakeEvidence directly, silently discarding the
-    // photo and reopening the camera - now it only opens a preview, which has its own explicit
-    // retake action.
-    var showEvidencePreview by remember { mutableStateOf(false) }
-
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.FactCheck,
-            title = "Thực hiện & nghiệm thu",
-            pillText = "$requiredDone/2 bắt buộc",
-            pillColors = pillColors,
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            WorkflowStepRow(
-                number = 1,
-                title = "Bắt đầu thực hiện",
-                required = true,
-                done = true,
-                detail = "Đã bắt đầu thực hiện",
-            )
-            WorkflowStepRow(
-                number = 2,
-                title = "Xác nhận sự cố",
-                required = true,
-                done = true,
-                detail = "$confirmedCount/${state.detail.faults.size} sự cố đã xác nhận ở bước kiểm tra",
-            )
-            WorkflowStepRow(
-                number = 3,
-                title = "Ảnh sau sửa chữa",
-                required = true,
-                done = hasPhoto,
-                detail = if (hasPhoto) "1 ảnh" else "Chụp rõ chóa đèn sau khi sửa",
-            ) {
-                EvidencePicker(
-                    hasPhoto = hasPhoto,
-                    filePath = state.localEvidence?.filePath,
-                    onTileClick =
-                        when {
-                            hasPhoto -> ({ showEvidencePreview = true })
-                            locked -> ({})
-                            else -> onCaptureEvidence
-                        },
-                    enabled = !locked || hasPhoto,
-                )
-            }
-            WorkflowStepRow(
-                number = 4,
-                title = "Kết quả sửa chữa",
-                required = true,
-                done = noteValid,
-                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
-            ) {
-                OutlinedTextField(
-                    value = state.reportNote,
-                    onValueChange = onReportNoteChanged,
-                    placeholder = { Text("VD: Thay bóng LED, kiểm tra lại dây nguồn") },
-                    enabled = !locked,
-                    minLines = 2,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            WorkflowStepRow(
-                number = 5,
-                title = "Vật tư đã thay",
-                required = false,
-                done = state.materialsUsed.trim().isNotEmpty(),
-                isLast = true,
-            ) {
-                OutlinedTextField(
-                    value = state.materialsUsed,
-                    onValueChange = onMaterialsUsedChanged,
-                    placeholder = { Text("VD: 1 bóng LED 100W") },
-                    enabled = !locked,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-
-    val evidenceFilePath = state.localEvidence?.filePath
-    if (showEvidencePreview && evidenceFilePath != null) {
-        EvidencePreviewDialog(
-            filePath = evidenceFilePath,
-            showRetake = !locked,
-            onDismiss = { showEvidencePreview = false },
-            onRetake = {
-                showEvidencePreview = false
-                onRetakeEvidence()
-            },
-        )
-    }
-}
-
-// Full-size look at the captured "after" photo, opened by tapping EvidencePicker's filled tile -
-// retake is now an explicit choice here instead of the tile's only possible action. Hidden once
-// the work order is overdue to complete, since retaking would re-open an otherwise-locked form.
-@Composable
-private fun EvidencePreviewDialog(
-    filePath: String,
-    showRetake: Boolean,
-    onDismiss: () -> Unit,
-    onRetake: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = onDismiss) {
-                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
-                }
-            }
-            AsyncImage(
-                model = File(filePath),
-                contentDescription = "Ảnh sau sửa chữa",
-                contentScale = ContentScale.Fit,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3f / 4f)
-                        .clip(RoundedCornerShape(Radius.card)),
-            )
-            if (showRetake) {
-                Spacer(Modifier.height(Spacing.md))
-                OutlinedButton(
-                    onClick = onRetake,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-                ) {
-                    Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text("Chụp lại")
-                }
-            }
-        }
-    }
-}
-
-// Shared by RepairCompletionSection ("Nghiệm thu") and InspectionCompletionSection ("Ghi chú
-// kiểm tra") - same icon-avatar + title + requirement-count pill header FaultListSection uses.
-@Composable
-private fun CompletionSectionHeader(
-    icon: ImageVector,
-    title: String,
-    pillText: String? = null,
-    pillColors: BadgeColors? = null,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(FaultSectionAvatarSize)
-                        .background(Navy700, RoundedCornerShape(Radius.chip)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-            }
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-        }
-        if (pillText != null && pillColors != null) {
-            StatusBadge(text = pillText, colors = pillColors)
-        }
-    }
-}
-
-@Composable
-private fun InspectionCompletionSection(
-    state: WorkOrderDetailUiState.Success,
-    locked: Boolean,
-    onReportNoteChanged: (String) -> Unit,
-    onFaultOutcomeSelected: (String, String) -> Unit,
-) {
-    val faults = state.detail.faults
-    val recordedCount = faults.count { state.faultOutcomes.containsKey(it.faultId) }
-    val allRecorded = faults.isNotEmpty() && recordedCount == faults.size
-    val noteValid = state.reportNote.trim().length >= 10
-    val requiredDone = listOf(allRecorded, noteValid).count { it }
-    val pillColors =
-        if (requiredDone == 2) WorkOrderStatus.VERIFIED.badgeColors() else WorkOrderStatus.ASSIGNED.badgeColors()
-    val focusManager = LocalFocusManager.current
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        CompletionSectionHeader(
-            icon = Icons.Filled.FactCheck,
-            title = "Thực hiện & nghiệm thu",
-            pillText = "$requiredDone/2 bắt buộc",
-            pillColors = pillColors,
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                    .padding(Spacing.md),
-        ) {
-            WorkflowStepRow(
-                number = 1,
-                title = "Bắt đầu thực hiện",
-                required = true,
-                done = true,
-                detail = "Đã bắt đầu thực hiện",
-            )
-            WorkflowStepRow(
-                number = 2,
-                title = "Kết quả từng sự cố",
-                required = true,
-                done = allRecorded,
-                detail = "$recordedCount/${faults.size} sự cố đã có kết quả",
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    faults.forEach { fault ->
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            Text(
-                                text = "${faultTypeLabel(fault.faultType)} · ${fault.poleId.orEmpty()}",
-                                style = LabelTextStyle,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            OutcomeSegment(
-                                selected = state.faultOutcomes[fault.faultId],
-                                onSelected = { outcome -> onFaultOutcomeSelected(fault.faultId, outcome) },
-                                enabled = !locked,
-                            )
-                        }
-                    }
-                }
-            }
-            WorkflowStepRow(
-                number = 3,
-                title = "Ghi chú kiểm tra",
-                required = true,
-                done = noteValid,
-                detail = "${state.reportNote.trim().length}/10 ký tự tối thiểu",
-                isLast = true,
-            ) {
-                OutlinedTextField(
-                    value = state.reportNote,
-                    onValueChange = onReportNoteChanged,
-                    placeholder = { Text("VD: Cảm biến mất tín hiệu từ 08/10") },
-                    enabled = !locked,
-                    minLines = 2,
-                    maxLines = 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BoxScope.LoadingState() {
-    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center).testTag("work_order_detail_loading"))
 }
 
 private fun sampleRepairWithFaults() =

@@ -33,7 +33,7 @@ sealed interface WorkOrderDetailUiState {
 
     data object Empty : WorkOrderDetailUiState
 
-    data class Error(val message: String) : WorkOrderDetailUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : WorkOrderDetailUiState
 }
 
 fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {

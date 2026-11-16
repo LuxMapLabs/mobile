@@ -5,10 +5,12 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
@@ -17,8 +19,10 @@ import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 private fun repairDetail(
     woStatus: String = "in_progress",
@@ -87,12 +91,17 @@ class WorkOrderDetailScreenTest {
         onOpenPdf: (String) -> Unit = {},
         onMeasurePole: (String) -> Unit = {},
         onRetryAttachment: (String) -> Unit = {},
+        onRetry: () -> Unit = {},
+        onBack: () -> Unit = {},
+        onOpenSurvey: (String) -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
                 WorkOrderDetailScreen(
                     uiState = uiState,
-                    onBack = {},
+                    onBack = onBack,
+                    onRetry = onRetry,
+                    onOpenSurvey = onOpenSurvey,
                     onStart = onStart,
                     onNavigateFault = onNavigateFault,
                     onReportNoteChanged = onReportNoteChanged,
@@ -116,30 +125,62 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun a_repair_in_progress_shows_the_app_top_bar_title_and_every_lifecycle_step_label() {
+    fun the_summary_shows_the_current_stage_without_a_multi_step_tracker() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
-        composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại: Sửa chữa").assertExists()
         listOf("Khảo sát", "Duyệt #1", "Kiểm tra", "Duyệt #2").forEach { label ->
-            composeRule.onNodeWithText(label).assertExists()
+            composeRule.onNodeWithText(label).assertDoesNotExist()
         }
-        // "Sửa chữa" appears twice for a repair order - the kind badge and the current
-        // lifecycle step both use the same real label.
-        composeRule.onAllNodesWithText("Sửa chữa").assertCountEquals(2)
     }
 
     @Test
-    fun a_cancelled_work_order_hides_the_lifecycle_tracker() {
+    fun a_cancelled_work_order_shows_its_status_but_no_current_stage() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail(woStatus = "cancelled")))
         composeRule.onNodeWithText("Đã huỷ").assertExists()
-        composeRule.onNodeWithText("Đã nghiệm thu").assertDoesNotExist()
-        composeRule.onNodeWithText("Sửa chữa").assertExists()
+        composeRule.onNodeWithText("Giai đoạn hiện tại", substring = true).assertDoesNotExist()
     }
 
     @Test
-    fun a_review_note_shows_the_managers_request() {
+    fun a_review_note_shows_the_maintenance_engineers_request() {
         val detail = repairDetail().copy(reviewNote = "Chụp thêm ảnh góc rộng")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Manager yêu cầu bổ sung: Chụp thêm ảnh góc rộng").assertExists()
+        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Chụp thêm ảnh góc rộng").assertExists()
+    }
+
+    @Test
+    fun only_the_most_urgent_message_is_a_banner_and_the_rest_go_to_the_notes_card() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail =
+            repairDetail(allowedActions = listOf("complete"))
+                .copy(scheduledDate = yesterday, reviewNote = "Bổ sung ảnh", note = "Ưu tiên trước mưa")
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Ghi chú & lịch sử").assertExists()
+        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Ghi chú giao việc").assertExists()
+        composeRule.onNodeWithText("Ưu tiên trước mưa").assertExists()
+    }
+
+    @Test
+    fun the_offline_banner_shows_alongside_the_business_banner() {
+        val detail = repairDetail(woStatus = "assigned").copy(cancellationRequestStatus = "pending")
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, isOnline = false))
+        composeRule.onNodeWithText("Đang ngoại tuyến").assertExists()
+        composeRule.onNodeWithText("Đã gửi yêu cầu hủy").assertExists()
+    }
+
+    @Test
+    fun no_text_on_the_screen_mentions_manager_or_an_internal_review_gate() {
+        val detail =
+            repairDetail(woStatus = "done").copy(
+                allowedActions = emptyList(),
+                reviewNote = "Đạt",
+                note = "Giao việc",
+            )
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Manager", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("cổng", substring = true).assertDoesNotExist()
     }
 
     // Client-only lock (not enforced server-side - allowed_actions still has "start" while
@@ -153,17 +194,74 @@ class WorkOrderDetailScreenTest {
             repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
                 .copy(cancellationRequestStatus = "pending")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Đã gửi yêu cầu hủy lệnh · Chờ Kỹ sư bảo trì duyệt").assertExists()
+        composeRule.onNodeWithText("Đã gửi yêu cầu hủy").assertExists()
         composeRule.onNodeWithText("Đang chờ duyệt yêu cầu hủy").assertExists()
         composeRule.onNodeWithText("Bắt đầu").assertIsNotEnabled()
+    }
+
+    @Test
+    fun cancel_request_sits_next_to_start_in_one_bottom_bar_and_opens_the_reason_sheet() {
+        val detail = repairDetail(woStatus = "assigned", allowedActions = listOf("start", "request_cancellation"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Bắt đầu").assertIsEnabled()
+        composeRule.onNodeWithText("Yêu cầu hủy").performClick()
+        composeRule.onNodeWithText("Yêu cầu hủy lệnh").assertExists()
+    }
+
+    @Test
+    fun a_start_error_is_shown_once_right_above_the_button() {
+        val detail = repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(detail = detail, startError = "Mất kết nối. Vui lòng thử lại."),
+        )
+        composeRule.onAllNodesWithText("Mất kết nối. Vui lòng thử lại.").assertCountEquals(1)
+    }
+
+    @Test
+    fun confirming_the_submit_sheet_submits_the_report() {
+        var submitted = 0
+        val faults = listOf(fault("FAULT-1", "POLE-0047"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = inspectionDetail(faults),
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                    reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                ),
+            onSubmit = { submitted++ },
+        )
+        composeRule.onNodeWithText("Nộp báo cáo kiểm tra").performClick()
+        composeRule.onNodeWithText("Nộp báo cáo?").assertExists()
+        composeRule.onNodeWithText("Nộp báo cáo").performClick()
+        assertEquals(1, submitted)
+    }
+
+    @Test
+    fun dismissing_the_submit_sheet_does_not_submit() {
+        var submitted = 0
+        val faults = listOf(fault("FAULT-1", "POLE-0047"))
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = inspectionDetail(faults),
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                    reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                ),
+            onSubmit = { submitted++ },
+        )
+        composeRule.onNodeWithText("Nộp báo cáo kiểm tra").performClick()
+        composeRule.onNodeWithText("Kiểm tra lại").performClick()
+        composeRule.onNodeWithText("Nộp báo cáo?").assertDoesNotExist()
+        assertEquals(0, submitted)
     }
 
     @Test
     fun a_done_work_order_with_no_allowed_actions_shows_the_disabled_submitted_hint() {
         val detail = repairDetail(woStatus = "done").copy(allowedActions = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Đã nộp báo cáo").assertExists()
-        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt (cổng #2)").assertExists()
+        composeRule.onAllNodesWithText("Đã nộp báo cáo").onFirst().assertExists()
+        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt").assertExists()
     }
 
     @Test
@@ -178,23 +276,71 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun empty_state_shows_the_no_work_order_message() {
-        setContent(uiState = WorkOrderDetailUiState.Empty)
-        composeRule.onNodeWithText("Không tìm thấy lệnh này").assertExists()
+    fun empty_state_shows_the_no_work_order_message_and_a_way_back() {
+        var backed = false
+        setContent(uiState = WorkOrderDetailUiState.Empty, onBack = { backed = true })
+        composeRule.onNodeWithText("Không tìm thấy lệnh này", substring = true).assertExists()
+        composeRule.onAllNodesWithText("Quay lại").onFirst().performClick()
+        assertTrue(backed)
     }
 
     @Test
-    fun error_state_shows_the_message() {
-        setContent(uiState = WorkOrderDetailUiState.Error("Không tải được dữ liệu lệnh"))
-        composeRule.onNodeWithText("Không tải được dữ liệu lệnh").assertExists()
+    fun error_state_offers_retry_and_hides_the_raw_exception_message() {
+        var retries = 0
+        setContent(
+            uiState = WorkOrderDetailUiState.Error("java.net.SocketTimeoutException: timeout"),
+            onRetry = { retries++ },
+        )
+        composeRule.onNodeWithText("Không tải được dữ liệu", substring = true).assertExists()
+        composeRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun a_network_error_says_saved_data_is_safe() {
+        setContent(uiState = WorkOrderDetailUiState.Error("timeout", isNetworkError = true))
+        composeRule.onNodeWithText("Không có kết nối mạng", substring = true).assertExists()
+        composeRule.onNodeWithText("vẫn an toàn", substring = true).assertExists()
+    }
+
+    @Test
+    fun the_top_bar_keeps_the_same_back_button_while_loading_and_when_loaded() {
+        setContent(uiState = WorkOrderDetailUiState.Loading)
+        composeRule.onNodeWithText("Chi tiết lệnh").assertExists()
+        composeRule.onNodeWithContentDescription("Quay lại").assertExists()
+    }
+
+    @Test
+    fun a_loaded_work_order_shows_its_title_and_kind_with_code_in_the_top_bar() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
+        composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
+        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertExists()
+        composeRule.onNodeWithContentDescription("Quay lại").assertExists()
     }
 
     @Test
     fun a_repair_with_complete_allowed_shows_the_add_tile_and_the_unmet_requirement() {
+        var captured = 0
+        val detail = repairDetail(allowedActions = listOf("complete"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { captured++ })
+        composeRule.onNodeWithText("Ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithText("ảnh sau sửa chữa", substring = true, ignoreCase = false).assertExists()
+        composeRule.onNodeWithContentDescription("Chụp ảnh").performScrollTo().performClick()
+        assertEquals(1, captured)
+    }
+
+    @Test
+    fun a_repair_in_progress_lists_only_the_real_completion_fields_without_fake_steps() {
         val detail = repairDetail(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithContentDescription("Chụp ảnh").assertExists()
-        composeRule.onNodeWithText("Có ảnh sau sửa chữa").assertExists()
+        composeRule.onNodeWithText("0/2 bắt buộc").assertExists()
+        composeRule.onNodeWithText("Kết quả sửa chữa").assertExists()
+        composeRule.onNodeWithText("Vật tư đã thay").assertExists()
+        composeRule.onAllNodesWithText("Bắt buộc").assertCountEquals(2)
+        composeRule.onNodeWithText("Không bắt buộc").assertExists()
+        composeRule.onNodeWithText("Bắt đầu thực hiện").assertDoesNotExist()
+        composeRule.onNodeWithText("Xác nhận sự cố").assertDoesNotExist()
     }
 
     @Test
@@ -235,7 +381,7 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun an_inspection_shows_an_outcome_segment_per_fault_and_the_progress_hint() {
+    fun an_inspection_lists_each_fault_once_with_its_own_outcome_choice() {
         val faults = listOf(fault("FAULT-1", "POLE-0047"), fault("FAULT-2", "POLE-0048"))
         val state =
             WorkOrderDetailUiState.Success(
@@ -243,9 +389,11 @@ class WorkOrderDetailScreenTest {
                 faultOutcomes = mapOf("FAULT-1" to "fault_present"),
             )
         setContent(uiState = state)
+        composeRule.onAllNodesWithText("POLE-0047", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("POLE-0048", substring = true).assertCountEquals(1)
+        composeRule.onAllNodesWithText("Có sự cố").assertCountEquals(2)
         composeRule.onNodeWithText("1/2 sự cố đã có kết quả").assertExists()
-        composeRule.onNodeWithText("POLE-0047").assertExists()
-        composeRule.onNodeWithText("POLE-0048").assertExists()
+        composeRule.onNodeWithText("0/10 ký tự tối thiểu").assertExists()
     }
 
     @Test
@@ -256,8 +404,32 @@ class WorkOrderDetailScreenTest {
             uiState = WorkOrderDetailUiState.Success(detail = inspectionDetail(faults)),
             onFaultOutcomeSelected = { faultId, outcome -> picked = faultId to outcome },
         )
-        composeRule.onAllNodesWithText("Có sự cố")[0].performClick()
-        assertEquals("FAULT-1" to "fault_present", picked)
+        composeRule.onAllNodesWithText("Không có")[1].performScrollTo().performClick()
+        assertEquals("FAULT-2" to "fault_absent", picked)
+    }
+
+    @Test
+    fun an_inspection_not_yet_started_shows_the_faults_without_outcome_choices() {
+        val detail =
+            inspectionDetail(listOf(fault("FAULT-1", "POLE-0047")))
+                .copy(woStatus = "assigned", allowedActions = listOf("start"))
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("POLE-0047", substring = true).assertExists()
+        composeRule.onNodeWithText("Có sự cố").assertDoesNotExist()
+    }
+
+    @Test
+    fun an_inspection_past_its_schedule_keeps_outcome_choices_visible_but_locked() {
+        val yesterday = LocalDate.now().minusDays(1).toString()
+        val detail = inspectionDetail(listOf(fault("FAULT-1", "POLE-0047"))).copy(scheduledDate = yesterday)
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = detail,
+                    faultOutcomes = mapOf("FAULT-1" to "fault_present"),
+                ),
+        )
+        composeRule.onNodeWithText("Có sự cố").assertIsNotEnabled()
     }
 
     @Test
@@ -270,6 +442,41 @@ class WorkOrderDetailScreenTest {
                 ),
         )
         composeRule.onNodeWithText("GPS cũ: Chưa có").assertExists()
+    }
+
+    @Test
+    fun a_pdf_that_failed_to_download_says_so_and_retries_on_tap() {
+        var retriedId: String? = null
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(),
+                    poleAttachments =
+                        listOf(PoleGpsAttachment("A-1", "qr.pdf", 10L, AttachmentStatus.FAILED, null)),
+                ),
+            onRetryAttachment = { retriedId = it },
+        )
+        composeRule.onNodeWithText("Tải lỗi · chạm để thử lại", substring = true).performClick()
+        assertEquals("A-1", retriedId)
+    }
+
+    @Test
+    fun a_started_survey_offers_a_shortcut_to_the_survey_tab() {
+        var opened: String? = null
+        val detail = repairDetail(woStatus = "in_progress").copy(taskKind = "survey", faults = emptyList())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onOpenSurvey = { opened = it })
+        composeRule.onNodeWithText("Mở tab Khảo sát").performClick()
+        assertEquals("WO-1042", opened)
+    }
+
+    @Test
+    fun a_survey_not_yet_started_explains_how_to_start_without_a_shortcut() {
+        val detail =
+            repairDetail(woStatus = "assigned", allowedActions = listOf("start"))
+                .copy(taskKind = "survey", faults = emptyList())
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
+        composeRule.onNodeWithText("Bấm Bắt đầu", substring = true).assertExists()
+        composeRule.onNodeWithText("Mở tab Khảo sát").assertDoesNotExist()
     }
 
     @Test

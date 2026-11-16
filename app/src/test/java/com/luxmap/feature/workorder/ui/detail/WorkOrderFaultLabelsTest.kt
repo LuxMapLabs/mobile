@@ -15,17 +15,6 @@ class WorkOrderFaultLabelsTest {
     }
 
     @Test
-    fun `fault status labels`() {
-        assertEquals("Đã phát hiện", faultStatusLabel("detected"))
-        assertEquals("Đã xác nhận", faultStatusLabel("confirmed"))
-        assertEquals("Đã từ chối", faultStatusLabel("rejected"))
-        assertEquals("Đang xử lý", faultStatusLabel("in_progress"))
-        assertEquals("Đã xử lý", faultStatusLabel("resolved"))
-        assertEquals("Đã nghiệm thu", faultStatusLabel("verified"))
-        assertEquals("future_status", faultStatusLabel("future_status"))
-    }
-
-    @Test
     fun `inspection outcome labels, with a fallback for an unknown value`() {
         assertEquals("Xác nhận có sự cố", inspectionOutcomeLabel("fault_present"))
         assertEquals("Không phát hiện sự cố", inspectionOutcomeLabel("fault_absent"))

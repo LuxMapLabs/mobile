@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -43,28 +42,8 @@ import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.badgeColors
 
 // Shared by F09 (WorkOrderDetailScreen) and the Survey Hub route cards - both call the same
-// generic POST /work-orders/{id}/request-cancellation, so the reason sheet and its trigger
-// button are not duplicated per feature (CLAUDE.md WO-CANCEL-REQUEST).
-@Composable
-fun CancelRequestButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .heightIn(min = Dimens.minTouchTarget),
-        contentPadding = contentPadding,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-    ) {
-        Text("Yêu cầu hủy", maxLines = 1, softWrap = false)
-    }
-}
-
+// generic POST /work-orders/{id}/request-cancellation, so the reason sheet is not duplicated
+// per feature (CLAUDE.md WO-CANCEL-REQUEST).
 private val CANCEL_REASON_OPTIONS =
     listOf(
         "Thời tiết không cho phép",
