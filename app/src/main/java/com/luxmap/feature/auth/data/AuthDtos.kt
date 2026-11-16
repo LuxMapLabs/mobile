@@ -14,6 +14,12 @@ data class LoginRequestDto(
     val password: String,
 )
 
+// POST /api/v1/auth/google (ACCT-4) — the ONLY body field.
+@Serializable
+data class GoogleLoginRequestDto(
+    val id_token: String,
+)
+
 @Serializable
 data class RefreshRequestDto(
     val refresh_token: String,

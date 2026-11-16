@@ -1,6 +1,7 @@
 package com.luxmap.core.network
 
 import com.luxmap.feature.auth.data.AuthTokenResponseDto
+import com.luxmap.feature.auth.data.GoogleLoginRequestDto
 import com.luxmap.feature.auth.data.LoginRequestDto
 import com.luxmap.feature.auth.data.LogoutRequestDto
 import com.luxmap.feature.auth.data.RefreshRequestDto
@@ -15,6 +16,12 @@ interface AuthApi {
     @POST("api/v1/auth/login")
     suspend fun login(
         @Body body: LoginRequestDto,
+    ): AuthTokenResponseDto
+
+    // Signs in to an account a System Admin already created (ACCT-4) — never registers a new one.
+    @POST("api/v1/auth/google")
+    suspend fun google(
+        @Body body: GoogleLoginRequestDto,
     ): AuthTokenResponseDto
 
     @POST("api/v1/auth/refresh")

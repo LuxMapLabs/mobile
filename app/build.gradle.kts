@@ -35,6 +35,16 @@ android {
         // OpenFreeMap style in that case, so a missing key never breaks the build.
         val mapTilerApiKey = localProperties.getProperty("MAPTILER_API_KEY", "")
         buildConfigField("String", "MAPTILER_API_KEY", "\"$mapTilerApiKey\"")
+
+        // OAuth "Web application" client ID (ACCT-4) — public by nature (ships inside every APK
+        // that calls Google Sign-In), so the real value is the default here, not a secret kept
+        // only in local.properties. Must match luxmap_backend's GOOGLE_CLIENT_IDS allowlist.
+        val googleWebClientId =
+            localProperties.getProperty(
+                "GOOGLE_WEB_CLIENT_ID",
+                "210445938129-v82tqujb4quqsh8tpecmrr6r360mv4hs.apps.googleusercontent.com",
+            )
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
@@ -150,6 +160,10 @@ dependencies {
     implementation(libs.androidx.media3.common)
 
     implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -63,6 +65,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -102,6 +105,7 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val identifierFocusRequester = remember { FocusRequester() }
@@ -374,6 +378,18 @@ fun LoginScreen(
             }
 
             Spacer(Modifier.height(Spacing.lg))
+            OrDivider()
+            Spacer(Modifier.height(Spacing.lg))
+            OutlinedButton(
+                onClick = { viewModel.onGoogleSignInClick(context) },
+                enabled = !isSubmitting,
+                shape = RoundedCornerShape(Radius.control),
+                modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+            ) {
+                Text("Đăng nhập bằng Google")
+            }
+
+            Spacer(Modifier.height(Spacing.lg))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(Spacing.lg))
 
@@ -435,6 +451,20 @@ private val FieldUnfocusedBackground = Color(0xFFF8F7F4)
 private const val FIELD_SUBMITTING_ALPHA = 0.6f
 private val SheetOverlap = 24.dp
 private val SheetElevation = 2.dp
+
+@Composable
+private fun OrDivider() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+        Text(
+            text = "Hoặc",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = Spacing.sm),
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outline)
+    }
+}
 
 @Composable
 private fun NetworkChip(isOnline: Boolean) {
@@ -557,5 +587,6 @@ private fun errorPlacementFor(error: LoginUiState.Error): ErrorPlacement =
         LoginFailureReason.AccountLocked,
         LoginFailureReason.Network,
         LoginFailureReason.Unknown,
+        LoginFailureReason.GoogleSignInFailed,
         -> ErrorPlacement(bannerMessage = error.message)
     }

@@ -1,5 +1,6 @@
 package com.luxmap.feature.auth.ui
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -25,6 +26,7 @@ class LoginViewModel
     @Inject
     constructor(
         private val authRepository: AuthRepository,
+        private val googleSignInHelper: GoogleSignInHelper,
         connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -99,15 +101,37 @@ class LoginViewModel
                 authRepository
                     .login(identifier, password, rememberMe)
                     .onSuccess { runPrefetchAndSucceed() }
-                    .onFailure { e ->
-                        _uiState.value =
-                            LoginUiState.Error(
-                                reason = (e as? LoginFailedException)?.reason ?: LoginFailureReason.Unknown,
-                                message = e.message ?: LOGIN_FAILED_MESSAGE,
-                            )
-                    }
+                    .onFailure { e -> _uiState.value = errorStateFor(e) }
             }
         }
+
+        // Skips the username/password form entirely. rememberMe still applies - it is a page-level
+        // choice, not specific to the password fields.
+        fun onGoogleSignInClick(context: Context) {
+            if (!isOnline.value) {
+                _uiState.value = LoginUiState.Error(LoginFailureReason.Network, OFFLINE_MESSAGE)
+                return
+            }
+            viewModelScope.launch {
+                _uiState.value = LoginUiState.LoggingIn
+                when (val outcome = googleSignInHelper.signIn(context)) {
+                    is GoogleSignInOutcome.Success ->
+                        authRepository
+                            .loginWithGoogle(outcome.idToken, rememberMe, outcome.email)
+                            .onSuccess { runPrefetchAndSucceed() }
+                            .onFailure { e -> _uiState.value = errorStateFor(e) }
+                    GoogleSignInOutcome.Cancelled -> _uiState.value = LoginUiState.Idle
+                    is GoogleSignInOutcome.Failed ->
+                        _uiState.value = LoginUiState.Error(LoginFailureReason.GoogleSignInFailed, outcome.message)
+                }
+            }
+        }
+
+        private fun errorStateFor(e: Throwable): LoginUiState.Error =
+            LoginUiState.Error(
+                reason = (e as? LoginFailedException)?.reason ?: LoginFailureReason.Unknown,
+                message = e.message ?: LOGIN_FAILED_MESSAGE,
+            )
 
         private fun validateForm(): LoginUiState.Error? =
             when {
