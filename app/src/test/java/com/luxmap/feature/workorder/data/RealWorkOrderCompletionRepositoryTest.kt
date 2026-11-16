@@ -1,12 +1,17 @@
 package com.luxmap.feature.workorder.data
 
+import app.cash.turbine.test
+import com.luxmap.core.sync.SyncQueueDao
+import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -15,13 +20,86 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.time.Instant
 
+private fun syncCompletion(
+    workOrderId: String,
+    clientOpId: String,
+    submitStatus: String,
+) = LocalWorkOrderCompletionEntity(
+    workOrderId = workOrderId,
+    reportNote = "note",
+    materialsUsed = null,
+    faultOutcomesJson = null,
+    clientOpId = clientOpId,
+    submitStatus = submitStatus,
+)
+
+private fun syncOp(
+    clientOpId: String,
+    status: String,
+) = SyncQueueEntity(
+    clientOpId = clientOpId,
+    opType = "complete_work_order",
+    payloadJson = "{}",
+    dependsOnClientOpId = null,
+    status = status,
+    createdAt = Instant.EPOCH,
+    updatedAt = Instant.EPOCH,
+)
+
 class RealWorkOrderCompletionRepositoryTest {
+    @Test
+    fun `sync states map queued, failed, conflict and a missing op, and leave out synced rows`() =
+        runTest {
+            val dao = mockk<WorkOrderCompletionDao>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            every { dao.observeAllCompletions() } returns
+                flowOf(
+                    listOf(
+                        syncCompletion("WO-Q", "OP-Q", "pending"),
+                        syncCompletion("WO-F", "OP-F", "pending"),
+                        syncCompletion("WO-C", "OP-C", "pending"),
+                        syncCompletion("WO-M", "OP-M", "pending"),
+                        syncCompletion("WO-S", "OP-S", "synced"),
+                    ),
+                )
+            every { syncQueueDao.observeStatusesFor(listOf("OP-Q", "OP-F", "OP-C", "OP-M")) } returns
+                flowOf(listOf(syncOp("OP-Q", "queued"), syncOp("OP-F", "failed"), syncOp("OP-C", "conflict")))
+            val repository = RealWorkOrderCompletionRepository(dao, mockk(relaxed = true), syncQueueDao)
+
+            assertEquals(
+                mapOf(
+                    "WO-Q" to CompletionSyncState.PENDING,
+                    "WO-F" to CompletionSyncState.FAILED,
+                    "WO-C" to CompletionSyncState.CONFLICT,
+                    "WO-M" to CompletionSyncState.PENDING,
+                ),
+                repository.observeCompletionSyncStates().first(),
+            )
+        }
+
+    @Test
+    fun `a completion moving from pending to synced leaves the sync state map`() =
+        runTest {
+            val dao = mockk<WorkOrderCompletionDao>()
+            val syncQueueDao = mockk<SyncQueueDao>()
+            val completions = MutableStateFlow(listOf(syncCompletion("WO-1", "OP-1", "pending")))
+            every { dao.observeAllCompletions() } returns completions
+            every { syncQueueDao.observeStatusesFor(listOf("OP-1")) } returns flowOf(listOf(syncOp("OP-1", "syncing")))
+            val repository = RealWorkOrderCompletionRepository(dao, mockk(relaxed = true), syncQueueDao)
+
+            repository.observeCompletionSyncStates().test {
+                assertEquals(mapOf("WO-1" to CompletionSyncState.PENDING), awaitItem())
+                completions.value = listOf(syncCompletion("WO-1", "OP-1", "synced"))
+                assertEquals(emptyMap<String, CompletionSyncState>(), awaitItem())
+            }
+        }
+
     @Test
     fun `captureAfterEvidence writes the local row then enqueues an upload op with no dependency`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
-            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager, mockk(relaxed = true))
 
             repository.captureAfterEvidence(
                 workOrderId = "WO-1",
@@ -51,7 +129,7 @@ class RealWorkOrderCompletionRepositoryTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
             io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
-            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager, mockk(relaxed = true))
 
             repository.submitCompletion(
                 workOrderId = "WO-1",
@@ -76,7 +154,7 @@ class RealWorkOrderCompletionRepositoryTest {
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
             val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
-            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager, mockk(relaxed = true))
 
             repository.submitCompletion(
                 workOrderId = "WO-2",
@@ -122,7 +200,7 @@ class RealWorkOrderCompletionRepositoryTest {
                 )
             io.mockk.every { dao.observeLatestEvidence("WO-1") } returns flowOf(evidence)
             io.mockk.every { dao.observeCompletion("WO-1") } returns flowOf(completion)
-            val repository = RealWorkOrderCompletionRepository(dao, mockk(relaxed = true))
+            val repository = RealWorkOrderCompletionRepository(dao, mockk(relaxed = true), mockk(relaxed = true))
 
             assertEquals("OP-1", repository.observeEvidence("WO-1").first()?.clientOpId)
             assertEquals("COMP-1", repository.observeCompletion("WO-1").first()?.clientOpId)
@@ -147,7 +225,7 @@ class RealWorkOrderCompletionRepositoryTest {
                 )
             io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
             io.mockk.coEvery { dao.evidenceByClientOpId("OP-1") } returns pending
-            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager, mockk(relaxed = true))
 
             repository.retakeEvidence("WO-1")
 
@@ -173,7 +251,7 @@ class RealWorkOrderCompletionRepositoryTest {
                 )
             io.mockk.coEvery { dao.latestEvidenceClientOpId("WO-1") } returns "OP-1"
             io.mockk.coEvery { dao.evidenceByClientOpId("OP-1") } returns synced
-            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager)
+            val repository = RealWorkOrderCompletionRepository(dao, syncQueueManager, mockk(relaxed = true))
 
             repository.retakeEvidence("WO-1")
 

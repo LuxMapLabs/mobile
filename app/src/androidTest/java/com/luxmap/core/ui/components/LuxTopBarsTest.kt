@@ -5,6 +5,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
@@ -15,6 +16,20 @@ import org.junit.Test
 
 class LuxTopBarsTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun a_single_digit_unread_badge_is_a_circle() {
+        composeRule.setContent {
+            LuxMapTheme {
+                LuxTabTopBar(title = "Việc hôm nay", unreadNotificationCount = 3, onNotificationsClick = {})
+            }
+        }
+        val badge = composeRule.onNodeWithTag("notification_badge", useUnmergedTree = true).fetchSemanticsNode()
+        val density = badge.layoutInfo.density.density
+        val widthDp = badge.size.width / density
+        val heightDp = badge.size.height / density
+        assertTrue("badge was ${widthDp}x${heightDp}dp", kotlin.math.abs(widthDp - heightDp) < 1f)
+    }
 
     private val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 

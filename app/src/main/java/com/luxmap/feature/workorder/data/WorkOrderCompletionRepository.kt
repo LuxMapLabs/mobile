@@ -13,6 +13,8 @@ interface WorkOrderCompletionRepository {
 
     fun observeCompletedWorkOrderIds(): Flow<Set<String>>
 
+    fun observeCompletionSyncStates(): Flow<Map<String, CompletionSyncState>>
+
     suspend fun captureAfterEvidence(
         workOrderId: String,
         clientOpId: String,
