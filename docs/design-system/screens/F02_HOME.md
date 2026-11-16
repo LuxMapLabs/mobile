@@ -1,6 +1,6 @@
 # Đề xuất redesign: Việc hôm nay (F02)
 
-> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT (lần 2).** Hướng thiết kế đã thống nhất 2026-11-16 (Q1–Q3); đã đưa 5 góp ý review R1–R5 vào (mục 10). Chưa có code nào thay đổi.
+> **Trạng thái:** **ĐÃ DUYỆT VÀ ĐÃ CODE XONG 2026-11-16** trên nhánh `style/redesign-home-vnext` (kế hoạch `docs/superpowers/plans/2026-11-16-home-redesign-vnext.md`). Còn nợ: kiểm tra tay ở Light/Night Field và cỡ chữ 200%, kiểm tra chuông trên máy đã đăng nhập.
 > **Màn:** `feature/home/ui/HomeScreen.kt` (683 dòng), route `home`, tab 1 của bottom nav.
 > **Căn cứ:** `docs/design-system/AUDIT_REPORT.md` (mục 6.2, P-11, A1, A3, A4, A6, quy tắc Compose #20), `docs/design-system/vNext/` (component, màu, chữ), code hiện tại (đọc ngày 2026-11-16), quyết định trước của PR #109 và PR #127.
 > **Phụ thuộc:** bộ component vNext (`LuxTabTopBar`, `LuxSegmented`, `LuxCard`, `LuxEmptyState`, `LuxErrorState`, `LuxSkeleton`, `LuxBanner`) đã có trên `dev`.
