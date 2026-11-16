@@ -3,7 +3,6 @@ package com.luxmap.feature.home.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.feature.auth.data.AuthRepository
-import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,6 +15,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.time.Instant
 import javax.inject.Inject
 
@@ -56,19 +56,23 @@ class HomeViewModel
                 viewModelScope.launch {
                     combine(
                         repository.observeHomeData(),
-                        completionRepository.observeCompletedWorkOrderIds(),
-                    ) { data, locallyCompletedWorkOrderIds -> data to locallyCompletedWorkOrderIds }
+                        completionRepository.observeCompletionSyncStates(),
+                    ) { data, syncStates -> data to syncStates }
                         .catch { e ->
-                            _uiState.value = HomeUiState.Error(e.message ?: "Không tải được dữ liệu")
-                        }.collect { (data, locallyCompletedWorkOrderIds) ->
                             _uiState.value =
-                                if (data.isEmpty()) {
+                                HomeUiState.Error(
+                                    message = e.message ?: "Không tải được dữ liệu",
+                                    isNetworkError = e is IOException,
+                                )
+                        }.collect { (data, syncStates) ->
+                            _uiState.value =
+                                if (data.visibleTasks().isEmpty()) {
                                     HomeUiState.Empty
                                 } else {
                                     HomeUiState.Success(
                                         data = data,
                                         lastSyncedAt = Instant.now(),
-                                        locallyCompletedWorkOrderIds = locallyCompletedWorkOrderIds,
+                                        completionSyncStates = syncStates,
                                     )
                                 }
                         }
@@ -79,12 +83,3 @@ class HomeViewModel
             const val STOP_TIMEOUT_MS = 5_000L
         }
     }
-
-// Rỗng khi không có việc nào để làm hôm nay - dựa trên 3 số liệu work-order thật (nguyên tắc A6:
-// không coi offline/cache là Error, chỉ Empty khi thật sự không có dữ liệu). plannedSweepCount
-// không tính vào đây: null nghĩa là "chưa có nguồn dữ liệu", không phải "chắc chắn bằng 0", nên
-// không thể dùng nó để kết luận màn hình rỗng.
-private fun HomeData.isEmpty(): Boolean =
-    metrics.assignedCount == 0 &&
-        metrics.inProgressCount == 0 &&
-        metrics.overdueCount == 0

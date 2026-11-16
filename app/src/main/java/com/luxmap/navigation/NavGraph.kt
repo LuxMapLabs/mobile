@@ -155,17 +155,14 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             // Hidden on Map specifically (per product decision) - the bottom nav bar's own
             // visibility is untouched, only the bell bar is skipped for this one tab.
             AnimatedVisibility(
-                visible = showBottomBar && currentRoute != Routes.Map.route,
+                visible = showBottomBar && currentRoute != Routes.Map.route && currentRoute != Routes.Home.route,
                 enter = fadeIn(animationSpec = tween(FADE_IN_MS)),
                 exit = fadeOut(animationSpec = tween(FADE_OUT_MS)),
             ) {
                 NotificationBellBar(
                     unreadCount = unreadNotificationCount,
                     onClick = { navController.navigate(Routes.Notification.route) },
-                    onDarkHero =
-                        currentRoute == Routes.Home.route ||
-                            currentRoute == Routes.Survey.route ||
-                            currentRoute == Routes.Profile.route,
+                    onDarkHero = currentRoute == Routes.Survey.route || currentRoute == Routes.Profile.route,
                 )
             }
         },
@@ -220,6 +217,8 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
+                    unreadNotificationCount = unreadNotificationCount,
+                    onOpenNotifications = { navController.navigate(Routes.Notification.route) },
                 )
             }
             composable(

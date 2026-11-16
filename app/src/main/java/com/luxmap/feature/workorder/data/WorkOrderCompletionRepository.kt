@@ -39,6 +39,8 @@ interface WorkOrderCompletionRepository {
 
     suspend fun reopenEvidenceSubmission(workOrderId: String): Boolean
 
+    fun observeCompletionSyncStates(): Flow<Map<String, CompletionSyncState>>
+
     suspend fun captureAfterEvidence(
         workOrderId: String,
         clientOpId: String,
