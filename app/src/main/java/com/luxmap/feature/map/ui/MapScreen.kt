@@ -63,7 +63,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.luxmap.core.map.IOT_BADGE_ICON_ID
 import com.luxmap.core.map.MapMarkerColors
 import com.luxmap.core.map.POI_BADGE_ICON_ID
 import com.luxmap.core.map.VECTOR_STYLE_URL
@@ -108,6 +107,7 @@ private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
 private const val MOCK_AREA_ZOOM = 15.0
 
 private const val POLES_SOURCE_ID = "poles-source"
+private const val CABINET_TAP_PREFIX = "cab:"
 
 // Kept as "circle" in the id string even though FM-37 turned this into a SymbolLayer — renaming
 // the id would be a pointless churn, it is just a style source/layer identifier string, not a
@@ -115,7 +115,6 @@ private const val POLES_SOURCE_ID = "poles-source"
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
 private const val POLES_SELECTED_HALO_LAYER_ID = "poles-selected-halo-layer"
 private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
-private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 
@@ -204,6 +203,9 @@ fun MapScreen(
     // default camera and layer settings.
     var showFixtures by rememberSaveable { mutableStateOf(true) }
     var showRoadSegments by rememberSaveable { mutableStateOf(true) }
+    var showCabinets by rememberSaveable { mutableStateOf(true) }
+    var showCommunes by rememberSaveable { mutableStateOf(true) }
+    val cabinetSelection by viewModel.cabinetSelection.collectAsState()
     // Last camera as [latitude, longitude, zoom, bearing]; null until the map has been moved once.
     var savedCamera by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     // True once the camera has been auto-moved to the real map_bounds.center — guards against
@@ -321,7 +323,15 @@ fun MapScreen(
                             }
                         }
                         map.setStyle(Style.Builder().fromUri(VECTOR_STYLE_URL)) { style ->
-                            setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
+                            setupMapLayers(
+                                context,
+                                style,
+                                uiState,
+                                showFixtures,
+                                showRoadSegments,
+                                showCabinets,
+                                showCommunes,
+                            )
                             // Style/source/layer are only guaranteed ready here (inside the
                             // onStyleLoaded callback) — assign maplibreMap at this point so the
                             // LaunchedEffects reacting to state don't run before the layers exist.
@@ -331,7 +341,7 @@ fun MapScreen(
                             val screenPoint = map.projection.toScreenLocation(latLng)
                             val clusterUnderFinger =
                                 map.queryRenderedFeatures(screenPoint, CLUSTER_CIRCLE_LAYER_ID).isNotEmpty()
-                            val tappedPoleId =
+                            val tappedId =
                                 if (clusterUnderFinger) {
                                     null
                                 } else {
@@ -345,9 +355,16 @@ fun MapScreen(
                                                     screenPoint.y,
                                                     context.resources.displayMetrics.density,
                                                 ),
-                                                POLES_CIRCLE_LAYER_ID,
+                                                *listOf(POLES_CIRCLE_LAYER_ID, CABINETS_LAYER_ID)
+                                                    .filter { map.style?.getLayer(it) != null }
+                                                    .toTypedArray(),
                                             ).mapNotNull { feature ->
-                                                val id = feature.getStringProperty("pole_id") ?: return@mapNotNull null
+                                                val id =
+                                                    feature.getStringProperty("pole_id")
+                                                        ?: feature
+                                                            .getStringProperty("cabinet_id")
+                                                            ?.let { CABINET_TAP_PREFIX + it }
+                                                        ?: return@mapNotNull null
                                                 val point = feature.geometry() as? Point ?: return@mapNotNull null
                                                 val screen =
                                                     map.projection.toScreenLocation(
@@ -357,8 +374,14 @@ fun MapScreen(
                                             },
                                     )
                                 }
+                            if (tappedId != null && tappedId.startsWith(CABINET_TAP_PREFIX)) {
+                                selectedPole = null
+                                selectedSegment = null
+                                viewModel.selectCabinet(tappedId.removePrefix(CABINET_TAP_PREFIX))
+                                return@addOnMapClickListener true
+                            }
                             val tappedPole =
-                                tappedPoleId?.let { id ->
+                                tappedId?.let { id ->
                                     uiState.polesOrEmpty().firstOrNull { it.poleId == id }
                                 }
                             if (tappedPole != null) {
@@ -406,6 +429,7 @@ fun MapScreen(
                                 return@addOnMapClickListener true
                             }
 
+                            viewModel.clearCabinet()
                             false
                         }
                     } else {
@@ -433,6 +457,11 @@ fun MapScreen(
             (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
             (style.getSource(ROAD_SEGMENTS_SOURCE_ID) as? GeoJsonSource)
                 ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
+            setNetworkGeoJson(
+                style,
+                uiState.cabinetsOrEmpty().toCabinetGeoJson(),
+                uiState.communesOrEmpty().toCommuneGeoJson(),
+            )
         }
 
         // Moves the camera to the real area the first time it's known (FM-15 "Hướng B") — only
@@ -463,6 +492,25 @@ fun MapScreen(
         LaunchedEffect(maplibreMap, showFixtures, showRoadSegments) {
             val style = maplibreMap?.style ?: return@LaunchedEffect
             applyLayerVisibility(style, showFixtures, showRoadSegments)
+        }
+
+        LaunchedEffect(maplibreMap, showCabinets, showCommunes) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            showCabinetLayer(style, showCabinets)
+            showCommuneLayers(style, showCommunes, belowLayerId = ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)
+        }
+
+        LaunchedEffect(maplibreMap, cabinetSelection) {
+            val style = maplibreMap?.style ?: return@LaunchedEffect
+            val selection = cabinetSelection
+            val topology = (selection?.topology as? TopologyState.Loaded)?.topology
+            setTopologyGeoJson(
+                style,
+                if (selection != null && topology != null) topology.toTopologyGeoJson(selection.cabinet) else null,
+            )
+            style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(
+                PropertyFactory.iconOpacity(poleOpacityExpression(topology?.poleIds.orEmpty())),
+            )
         }
 
         // Selected marker gets a bigger icon + halo ring (F12/FM-37) — re-styles the existing
@@ -739,6 +787,10 @@ private fun MapUiState.allPolesOrEmpty() = (this as? MapUiState.Success)?.datase
 
 private fun MapUiState.allRoadSegmentsOrEmpty() = (this as? MapUiState.Success)?.dataset?.segments.orEmpty()
 
+private fun MapUiState.cabinetsOrEmpty() = (this as? MapUiState.Success)?.dataset?.cabinets.orEmpty()
+
+private fun MapUiState.communesOrEmpty() = (this as? MapUiState.Success)?.dataset?.communes.orEmpty()
+
 private fun MapUiState.centerOrNull() = (this as? MapUiState.Success)?.dataset?.center
 
 private fun MapUiState.bboxOrNull() = (this as? MapUiState.Success)?.dataset?.bbox
@@ -764,6 +816,8 @@ private fun setupMapLayers(
     uiState: MapUiState,
     showFixtures: Boolean,
     showRoadSegments: Boolean,
+    showCabinets: Boolean,
+    showCommunes: Boolean,
 ) {
     registerMarkerBadgeIcons(context, style)
 
@@ -773,8 +827,12 @@ private fun setupMapLayers(
     style.addSource(GeoJsonSource(ROAD_SEGMENTS_SOURCE_ID, uiState.roadSegmentsOrEmpty().toGeoJson()))
     style.addSource(GeoJsonSource(POLES_SOURCE_ID, uiState.polesOrEmpty().toGeoJson(), buildClusterOptions()))
 
+    addNetworkSources(style, uiState.cabinetsOrEmpty().toCabinetGeoJson(), uiState.communesOrEmpty().toCommuneGeoJson())
     if (showRoadSegments) addRoadSegmentLayers(style)
+    addTopologyLayer(style, belowLayerId = null)
     if (showFixtures) addFixtureLayers(style)
+    showCommuneLayers(style, showCommunes, belowLayerId = ROAD_SEGMENTS_GLOW_LINE_LAYER_ID)
+    showCabinetLayer(style, showCabinets)
 }
 
 // Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
@@ -884,7 +942,6 @@ private fun addFixtureLayers(style: Style) {
     style.addLayer(buildPoleSelectedHaloLayer())
     style.addLayer(buildPoleIconLayer())
     style.addLayer(buildPoiBadgeLayer())
-    style.addLayer(buildIotBadgeLayer())
 }
 
 private fun removeFixtureLayers(style: Style) {
@@ -893,7 +950,6 @@ private fun removeFixtureLayers(style: Style) {
     style.removeLayer(POLES_SELECTED_HALO_LAYER_ID)
     style.removeLayer(POLES_CIRCLE_LAYER_ID)
     style.removeLayer(POLES_POI_BADGE_LAYER_ID)
-    style.removeLayer(POLES_IOT_BADGE_LAYER_ID)
 }
 
 // Routes must sit below the pole layers — if fixtures are currently shown, insert directly
@@ -1000,24 +1056,6 @@ private fun buildPoiBadgeLayer(): SymbolLayer =
                 ),
             )
             // FM-37 LOD rule: badges only worth showing once zoomed in enough to read them.
-            minZoom = BADGE_MIN_ZOOM
-        }
-
-private fun buildIotBadgeLayer(): SymbolLayer =
-    SymbolLayer(POLES_IOT_BADGE_LAYER_ID, POLES_SOURCE_ID)
-        .withProperties(
-            PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.45f),
-            PropertyFactory.iconOffset(arrayOf(-13f, 13f)),
-            PropertyFactory.iconAllowOverlap(true),
-            PropertyFactory.iconIgnorePlacement(true),
-        ).apply {
-            setFilter(
-                Expression.all(
-                    Expression.not(Expression.has("point_count")),
-                    Expression.eq(Expression.get("has_iot_node"), Expression.literal(true)),
-                ),
-            )
             minZoom = BADGE_MIN_ZOOM
         }
 

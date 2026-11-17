@@ -9,7 +9,8 @@ import com.luxmap.core.theme.AssetCondition
 import org.maplibre.android.maps.Style
 
 const val POI_BADGE_ICON_ID = "poi_badge_icon"
-const val IOT_BADGE_ICON_ID = "iot_badge_icon"
+const val CABINET_NORMAL_ICON_ID = "cabinet_icon_normal"
+const val CABINET_FAULT_ICON_ID = "cabinet_icon_fault"
 
 // Marker shape per fixture_status (F12/FM-37, Design System 3.4) — each icon has its own baked-in
 // color (see the 4 ic_marker_*.xml drawables), picked via Expression.match on iconImage, same
@@ -38,8 +39,11 @@ fun registerMarkerBadgeIcons(
     if (style.getImage(POI_BADGE_ICON_ID) == null) {
         style.addImage(POI_BADGE_ICON_ID, context.drawableToBitmap(R.drawable.ic_poi_badge))
     }
-    if (style.getImage(IOT_BADGE_ICON_ID) == null) {
-        style.addImage(IOT_BADGE_ICON_ID, context.drawableToBitmap(R.drawable.ic_iot_badge))
+    if (style.getImage(CABINET_NORMAL_ICON_ID) == null) {
+        style.addImage(CABINET_NORMAL_ICON_ID, context.drawableToBitmap(R.drawable.ic_cabinet_normal))
+    }
+    if (style.getImage(CABINET_FAULT_ICON_ID) == null) {
+        style.addImage(CABINET_FAULT_ICON_ID, context.drawableToBitmap(R.drawable.ic_cabinet_fault))
     }
     if (style.getImage(MARKER_NORMAL_ICON_ID) == null) {
         style.addImage(MARKER_NORMAL_ICON_ID, context.drawableToBitmap(R.drawable.ic_marker_normal))
