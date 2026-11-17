@@ -1,13 +1,24 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import com.luxmap.core.theme.LuxMapTheme
 import org.junit.Assert.assertEquals
@@ -39,6 +50,9 @@ private fun successState(
 
 class PolePhotoResultScreenTest {
     @get:Rule val composeRule = createComposeRule()
+
+    private fun choice(label: String) =
+        composeRule.onNode(hasText(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
 
     @Test
     fun loading_state_shows_the_skeleton() {
@@ -318,7 +332,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("KỸ SƯ XÁC NHẬN NHÃN").assertDoesNotExist()
+        composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertDoesNotExist()
     }
 
     @Test
@@ -336,7 +350,7 @@ class PolePhotoResultScreenTest {
         }
         composeRule.onNodeWithText("AI không xử lý được · cần bạn chọn nhãn").assertExists()
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Chưa có kết luận")
-        composeRule.onNodeWithText("KỸ SƯ XÁC NHẬN NHÃN").assertExists()
+        composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").performScrollTo().assertExists()
     }
 
     @Test
@@ -354,7 +368,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_on").performClick()
+        choice("Đèn sáng").performScrollTo().performClick()
         composeRule.onNodeWithText("Đồng ý với AI").performClick()
         assertEquals("on" to null, submitted)
     }
@@ -412,12 +426,47 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("review_choice_off").performClick()
+        choice("Đèn tắt").performScrollTo().performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
         composeRule.onNodeWithText("Lưu nhãn đã sửa").assertIsNotEnabled()
 
-        composeRule.onNodeWithText("Ghi chú").performTextInput("Thấy đèn tắt khi kiểm tra")
-        composeRule.onNodeWithText("Lưu nhãn đã sửa").performClick()
+        composeRule.onNodeWithText("Ghi chú", substring = true).performTextInput("Thấy đèn tắt khi kiểm tra")
+        composeRule.onNodeWithText("Lưu nhãn đã sửa").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(true, submitted)
+    }
+
+    @Test
+    fun the_review_choice_is_a_radio_group() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+        choice("Đèn sáng").performScrollTo().assertIsSelected()
+        choice("Đèn tắt").performScrollTo().performClick().assertIsSelected()
+        choice("Đèn sáng").assertIsNotSelected()
+    }
+
+    @Test
+    fun only_the_submit_button_is_pinned() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("Đồng ý với AI").assertIsDisplayed()
+        composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertIsNotDisplayed()
     }
 }

@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.net.Uri
 import android.view.LayoutInflater
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,11 +15,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -35,18 +34,18 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +63,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -81,7 +86,6 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -90,7 +94,11 @@ import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSectionHeader
+import com.luxmap.core.ui.components.LuxSegment
+import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.TopSlideToast
@@ -117,6 +125,7 @@ fun PolePhotoResultScreen(
     val scope = rememberCoroutineScope()
     val reviewable = state as? PolePhotoResultUiState.Success
     val showFooter = reviewable != null && reviewable.decision == null
+    val draft = if (reviewable != null && showFooter) rememberReviewDraft(poleId, reviewable) else null
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -139,7 +148,9 @@ fun PolePhotoResultScreen(
                     is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
 
                     is PolePhotoResultUiState.Success ->
-                        PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader)
+                        PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader) {
+                            if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
+                        }
 
                     // heightIn (not a fixed height) - MessageState's action button (Error) makes this
                     // content taller than the skeleton needs, and a fixed height here clipped
@@ -173,10 +184,9 @@ fun PolePhotoResultScreen(
                 Spacer(Modifier.height(Spacing.lg))
             }
 
-            if (reviewable != null && showFooter) {
-                ReviewFooter(
-                    poleId = poleId,
-                    state = reviewable,
+            if (draft != null) {
+                ReviewSubmitBar(
+                    draft = draft,
                     onSubmit = { finalCvState, reviewNote ->
                         scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
                         onSubmitReview(finalCvState, reviewNote)
@@ -269,8 +279,9 @@ private fun PolePhotoResultBody(
     state: PolePhotoResultUiState.Success,
     onRetake: () -> Unit,
     onRequestAuthorizationHeader: suspend () -> String?,
+    reviewCard: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         if (state.isStale) {
             LuxBanner(
                 message = "Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất",
@@ -285,6 +296,8 @@ private fun PolePhotoResultBody(
         PolePhotoPreview(state, onRequestAuthorizationHeader)
 
         ConclusionCard(state)
+
+        reviewCard()
 
         TechnicalDetails(poleId = poleId, state = state, onRetake = onRetake)
     }
@@ -386,20 +399,20 @@ private fun TechnicalDetails(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = Dimens.minTouchTarget)
-                    .clickable { expanded = !expanded }
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics { stateDescription = if (expanded) "Đang mở" else "Đang đóng" }
                     .testTag("details_toggle"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "Chi tiết kỹ thuật",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (expanded) {
@@ -416,19 +429,17 @@ private fun TechnicalDetails(
     }
 
     if (confirmRetake) {
-        AlertDialog(
-            onDismissRequest = { confirmRetake = false },
-            title = { Text("Chụp lại cột này?") },
-            text = { Text("Ảnh hiện tại sẽ được thay bằng ảnh mới.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmRetake = false
-                        onRetake()
-                    },
-                ) { Text("Chụp lại") }
+        LuxConfirmDialog(
+            title = "Chụp lại cột này?",
+            message = "Ảnh hiện tại sẽ được thay bằng ảnh mới.",
+            confirmLabel = "Chụp lại",
+            onConfirm = {
+                confirmRetake = false
+                onRetake()
             },
-            dismissButton = { TextButton(onClick = { confirmRetake = false }) { Text("Hủy") } },
+            onDismiss = { confirmRetake = false },
+            dismissLabel = "Hủy",
+            destructive = true,
         )
     }
 }
@@ -449,147 +460,101 @@ private fun DetailRow(
     }
 }
 
+@Stable
+private class ReviewDraft(
+    val aiCvState: String?,
+    val baselineCvState: String?,
+    val baselineNote: String?,
+    selectedState: MutableState<String?>,
+    noteState: MutableState<String>,
+) {
+    var selected by selectedState
+    var note by noteState
+    val noteRequired: Boolean get() = selected != null && selected != aiCvState
+    val normalizedNote: String? get() = note.trim().ifBlank { null }
+    val hasChange: Boolean get() = selected != baselineCvState || normalizedNote != baselineNote
+    val canSubmit: Boolean get() = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
+}
+
 @Composable
-private fun ReviewFooter(
+private fun rememberReviewDraft(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
-) {
+): ReviewDraft {
     val baselineCvState = state.draftFinalCvState ?: state.finalCvState
     val baselineNote = state.draftReviewNote ?: state.reviewNote
-    var selected by
+    val selected =
         rememberSaveable(poleId) {
             mutableStateOf(baselineCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
         }
-    var note by rememberSaveable(poleId) { mutableStateOf(baselineNote.orEmpty()) }
-    // Required whenever the chosen label differs from the AI's own cvState, including when
-    // cvState is "inconclusive" or null (server rule, see docs/contract-drift.md "PATCH
-    // .../review" - review_note is mandatory even when AI never reached on/off or failed
-    // outright, not only when it disagrees).
-    val noteRequired = selected != null && selected != state.cvState
-    val normalizedNote = note.trim().ifBlank { null }
-    val hasChange = selected != baselineCvState || normalizedNote != baselineNote
-    val canSubmit = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
+    val note = rememberSaveable(poleId) { mutableStateOf(baselineNote.orEmpty()) }
+    return ReviewDraft(state.cvState, baselineCvState, baselineNote, selected, note)
+}
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = "KỸ SƯ XÁC NHẬN NHÃN",
-            style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
-
-        if (noteRequired) {
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("Ghi chú") },
-                isError = note.isBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (note.isBlank()) {
-                Text(
-                    text = "Cần ghi chú vì khác với nhận định của AI",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+@Composable
+private fun ReviewCard(
+    draft: ReviewDraft,
+    hasSavedDraft: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        LuxSectionHeader(title = "Kỹ sư xác nhận nhãn")
+        LuxCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                LuxSegmented(
+                    segments = listOf(LuxSegment("on", "Đèn sáng"), LuxSegment("off", "Đèn tắt")),
+                    selected = draft.selected,
+                    onSelect = { draft.selected = it },
                 )
+                if (draft.noteRequired) {
+                    OutlinedTextField(
+                        value = draft.note,
+                        onValueChange = { draft.note = it },
+                        label = {
+                            Text(
+                                buildAnnotatedString {
+                                    append("Ghi chú ")
+                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.error)) { append("*") }
+                                },
+                            )
+                        },
+                        isError = draft.note.isBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (draft.note.isBlank()) {
+                        Text(
+                            text = "Cần ghi chú vì khác với nhận định của AI",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (hasSavedDraft && !draft.hasChange) {
+                    Text(
+                        text = "Đã lưu, sẽ gửi khi Hoàn tất",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-
-        if (state.draftFinalCvState != null && !hasChange) {
-            Text(
-                text = "Đã lưu, sẽ gửi khi Hoàn tất",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        PrimaryButton(
-            text = reviewActionLabel(selected, state.cvState),
-            onClick = { selected?.let { onSubmit(it, normalizedNote) } },
-            enabled = canSubmit,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
 @Composable
-private fun ReviewChoiceSegment(
-    selected: String?,
-    onSelected: (String) -> Unit,
+private fun ReviewSubmitBar(
+    draft: ReviewDraft,
+    onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
-            ReviewChoiceCard(
-                value = value,
-                label = label,
-                isSelected = selected == value,
-                onClick = { onSelected(value) },
-                modifier = Modifier.weight(1f),
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            PrimaryButton(
+                text = reviewActionLabel(draft.selected, draft.aiCvState),
+                onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
+                enabled = draft.canSubmit,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             )
         }
-    }
-}
-
-@Composable
-private fun ReviewChoiceCard(
-    value: String,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = cvStateColors(value)
-    val shape = RoundedCornerShape(Radius.chip)
-    Row(
-        modifier =
-            modifier
-                .heightIn(min = Dimens.minTouchTarget)
-                // clip must come before clickable, otherwise the tap ripple draws as a full
-                // rectangle instead of following this card's rounded corners (found on a real
-                // device, 2026-10-29).
-                .clip(shape)
-                .background(if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant, shape)
-                .border(if (isSelected) 2.dp else 0.dp, colors.text, shape)
-                .clickable(onClick = onClick)
-                .testTag("review_choice_$value")
-                .padding(Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .background(
-                        if (isSelected) colors.text else colors.background,
-                        RoundedCornerShape(Dimens.radiusSmall),
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = if (value == "on") Icons.Filled.Lightbulb else Icons.Outlined.Lightbulb,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else colors.text,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 
@@ -813,15 +778,10 @@ private fun RetakeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
+    LuxSecondaryButton(
+        text = "Chụp lại cột này",
         onClick = onClick,
-        modifier = modifier.heightIn(min = Dimens.minTouchTarget),
-        shape = RoundedCornerShape(Radius.control),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-    ) {
-        Icon(imageVector = Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(Spacing.sm))
-        Text(text = "Chụp lại cột này")
-    }
+        modifier = modifier,
+        leadingIcon = Icons.Filled.PhotoCamera,
+    )
 }
