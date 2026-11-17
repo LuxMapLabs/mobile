@@ -40,11 +40,15 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
     val noteValid = reportNote.trim().length >= 10
     return when (detail.taskKind) {
         "repair" -> noteValid && localEvidence.any { it.kind == "after" }
-        "inspection" -> noteValid && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
+        "inspection" ->
+            noteValid && hasInspectionPhoto() && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
         "pole_gps_update" -> noteValid && poleMeasurements.isNotEmpty()
         else -> false
     }
 }
+
+internal fun WorkOrderDetailUiState.Success.hasInspectionPhoto(): Boolean =
+    localEvidence.any { it.kind == "observation" }
 
 internal fun WorkOrderDetailUiState.Success.hasActiveLocalCompletion(): Boolean =
     localCompletion?.let { it.submitStatus != "draft" && !isReturnedForRework(this) } == true

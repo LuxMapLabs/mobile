@@ -53,6 +53,18 @@ private fun repairDetail(
         ),
 )
 
+private fun inspectionPhoto(workOrderId: String) =
+    LocalWorkOrderEvidenceEntity(
+        clientOpId = "inspection-photo",
+        workOrderId = workOrderId,
+        kind = "observation",
+        filePath = "/data/inspection.jpg",
+        capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+        lat = 10.0,
+        lng = 106.0,
+        uploadStatus = "draft",
+    )
+
 private fun inspectionDetail(faults: List<WorkOrderFaultDetail>) =
     repairDetail(allowedActions = listOf("complete")).copy(taskKind = "inspection", faults = faults)
 
@@ -281,6 +293,7 @@ class WorkOrderDetailScreenTest {
                     detail = inspectionDetail(faults),
                     faultOutcomes = mapOf("FAULT-1" to "fault_present"),
                     reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                    localEvidence = listOf(inspectionPhoto(inspectionDetail(faults).workOrderId)),
                 ),
             onSubmit = { submitted++ },
         )
@@ -300,6 +313,7 @@ class WorkOrderDetailScreenTest {
                     detail = inspectionDetail(faults),
                     faultOutcomes = mapOf("FAULT-1" to "fault_present"),
                     reportNote = "Đèn tắt hẳn, chóa bị nứt",
+                    localEvidence = listOf(inspectionPhoto(inspectionDetail(faults).workOrderId)),
                 ),
             onSubmit = { submitted++ },
         )

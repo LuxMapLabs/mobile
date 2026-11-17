@@ -543,7 +543,7 @@ private fun WorkOrderDetailContent(
                     LuxCard {
                         CompletionEvidenceSection(
                             title = "Ảnh hiện trường",
-                            required = false,
+                            required = true,
                             photos = photos,
                             editable = canComplete && !isFormLocked && !state.isSubmitting,
                             onAdd = onCaptureEvidence,
@@ -822,6 +822,7 @@ private val PRE_START_ITEMS =
                     "Có sự cố / Không có / Chưa rõ cho từng sự cố",
                     true,
                 ),
+                PreStartItem(Icons.Filled.PhotoCamera, "Ảnh hiện trường", "Thêm ít nhất 1 ảnh", true),
                 PreStartItem(Icons.Filled.EditNote, "Ghi chú kiểm tra", "Tối thiểu 10 ký tự", true),
             ),
     )

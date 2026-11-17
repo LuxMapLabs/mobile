@@ -125,7 +125,12 @@ internal fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint = submitLock?.first ?: if (missingCount > 0) "Còn $missingCount sự cố chưa có kết quả" else null,
+                hint =
+                    submitLock?.first ?: when {
+                        !state.hasInspectionPhoto() -> "Cần có ít nhất 1 ảnh hiện trường"
+                        missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
+                        else -> null
+                    },
                 hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
                 progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
