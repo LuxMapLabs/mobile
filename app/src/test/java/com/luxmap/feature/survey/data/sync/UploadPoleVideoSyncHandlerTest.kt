@@ -215,4 +215,28 @@ class UploadPoleVideoSyncHandlerTest {
                 )
             }
         }
+
+    @Test
+    fun `a malformed analyzed_at still finishes the upload`() =
+        runTest {
+            val tempFile = File.createTempFile("pole", ".tmp").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byId("PHOTO-1") } returns videoEntity(tempFile.absolutePath)
+            coEvery { api.uploadPoleVideo(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+                PolePhotoUploadResponseDto(
+                    photoId = "PPH-000002",
+                    aiStatus = "available",
+                    cvState = "on",
+                    analyzedAt = "yesterday",
+                )
+            coJustRun { dao.updateServerPhotoId("PHOTO-1", "PPH-000002") }
+            coJustRun { dao.updateUploadAiResult(any(), any(), any(), any(), any(), any()) }
+            val handler = UploadPoleVideoSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
+
+            assertTrue(result is SyncOpResult.Done)
+            coVerify { dao.updateUploadAiResult("PHOTO-1", "available", "on", null, null, null) }
+        }
 }

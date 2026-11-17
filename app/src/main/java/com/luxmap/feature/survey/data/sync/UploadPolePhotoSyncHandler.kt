@@ -60,7 +60,7 @@ class UploadPolePhotoSyncHandler
                         cvState = response.cvState,
                         confidence = response.confidence,
                         modelVersion = response.modelVersion,
-                        analyzedAt = response.analyzedAt?.let(Instant::parse),
+                        analyzedAt = response.analyzedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
                     )
                 }
                 SyncOpResult.Done
