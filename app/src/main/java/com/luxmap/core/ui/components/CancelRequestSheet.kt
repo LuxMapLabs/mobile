@@ -40,6 +40,7 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.TitleTextStyle
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.clearFocusOnTapOutside
 
 // Shared by F09 (WorkOrderDetailScreen) and the Survey Hub route cards - both call the same
 // generic POST /work-orders/{id}/request-cancellation, so the reason sheet is not duplicated
@@ -65,7 +66,10 @@ fun CancelRequestSheet(
     val focusManager = LocalFocusManager.current
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            modifier =
+                Modifier.fillMaxWidth()
+                    .clearFocusOnTapOutside()
+                    .padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             Text(text = "Yêu cầu hủy lệnh", style = TitleTextStyle, color = MaterialTheme.colorScheme.onSurface)
