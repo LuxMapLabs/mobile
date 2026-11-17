@@ -15,5 +15,5 @@ sealed interface PoleDetailUiState {
     // đây không phải lỗi mạng, cần thông báo riêng.
     data object Empty : PoleDetailUiState
 
-    data class Error(val message: String) : PoleDetailUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : PoleDetailUiState
 }

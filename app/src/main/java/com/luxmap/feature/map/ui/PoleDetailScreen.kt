@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Power
@@ -31,15 +29,11 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,6 +55,12 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleDetailFault
@@ -81,43 +81,62 @@ fun PoleDetailRoute(
         uiState = uiState,
         onBack = onBack,
         onNavigateToPole = { lat, lng -> openInMaps(context, lat, lng) },
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
 
 // FM-27 — chi tiết cột đèn mở từ bản đồ (mở rộng từ PoleQuickViewBottomSheet), tách khỏi
 // FM-17 vì không cần Work Order gán trước.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PoleDetailScreen(
     uiState: PoleDetailUiState,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onNavigateToPole: (lat: Double, lng: Double) -> Unit = { _, _ -> },
+    onRetry: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = { Text("Chi tiết cột đèn") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại")
-                    }
-                },
+            LuxChildTopBar(
+                title = "Chi tiết cột đèn",
+                onBack = onBack,
+                subtitle = (uiState as? PoleDetailUiState.Success)?.detail?.poleId,
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             when (uiState) {
-                is PoleDetailUiState.Loading -> LoadingState()
+                is PoleDetailUiState.Loading ->
+                    LuxLoadingRegion(description = "Đang tải chi tiết cột", modifier = Modifier.padding(Spacing.lg)) {
+                        LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
+                        LuxSkeleton(Modifier.fillMaxWidth().height(160.dp), MaterialTheme.shapes.medium)
+                        LuxSkeleton(Modifier.fillMaxWidth().height(120.dp), MaterialTheme.shapes.medium)
+                    }
                 is PoleDetailUiState.Success ->
                     PoleDetailContent(
                         detail = uiState.detail,
                         onNavigateToPole = onNavigateToPole,
                     )
-                is PoleDetailUiState.Empty -> MessageState(text = "Không tìm thấy cột đèn này")
-                is PoleDetailUiState.Error -> MessageState(text = uiState.message)
+                is PoleDetailUiState.Empty ->
+                    LuxEmptyState(
+                        title = "Không tìm thấy cột đèn này",
+                        message = "Cột có thể đã bị xoá hoặc không thuộc địa bàn của bạn.",
+                    )
+                is PoleDetailUiState.Error ->
+                    LuxErrorState(
+                        onRetry = onRetry,
+                        kind = if (uiState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                        title = "Không tải được chi tiết cột",
+                        message =
+                            if (uiState.isNetworkError) {
+                                "Kiểm tra kết nối rồi thử lại."
+                            } else {
+                                "Vui lòng thử lại sau ít phút."
+                            },
+                    )
             }
         }
     }
@@ -154,10 +173,6 @@ private fun PoleDetailContent(
 @Composable
 private fun PoleHeaderSection(detail: PoleDetail) {
     Column {
-        // Design System v3.0.1: pole code is the biggest, boldest text on the screen — field
-        // crew must recognize which pole this is in under 2 seconds.
-        Text(text = detail.poleId, style = MaterialTheme.typography.displaySmall)
-        Spacer(Modifier.height(Spacing.xs))
         Text(
             text = detail.segmentName ?: "Chưa gắn tuyến đường",
             style = MaterialTheme.typography.bodyMedium,
@@ -502,20 +517,6 @@ private fun FrameThumbnail(frame: PoleDetailFrame) {
             )
         }
     }
-}
-
-@Composable
-private fun BoxScope.LoadingState() {
-    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-}
-
-@Composable
-private fun BoxScope.MessageState(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.align(Alignment.Center).padding(Spacing.lg),
-    )
 }
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
