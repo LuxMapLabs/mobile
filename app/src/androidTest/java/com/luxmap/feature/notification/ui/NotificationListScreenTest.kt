@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -38,11 +39,11 @@ class NotificationListScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_progress_indicator() {
+    fun loading_is_one_announced_region() {
         composeRule.setContent {
             LuxMapTheme { NotificationListScreen(state = NotificationListUiState.Loading, onBack = {}) }
         }
-        composeRule.onNodeWithTag("notification_list_loading").assertExists()
+        composeRule.onNodeWithContentDescription("Đang tải thông báo").assertExists()
     }
 
     @Test
@@ -97,20 +98,22 @@ class NotificationListScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message_and_retry_calls_onRetry() {
-        var retried = false
+    fun a_network_error_uses_screen_copy_and_retries() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
                 NotificationListScreen(
-                    state = NotificationListUiState.Error("network down"),
+                    state = NotificationListUiState.Error("java.net.SocketTimeoutException", isNetworkError = true),
                     onBack = {},
-                    onRetry = { retried = true },
+                    onRetry = { retries++ },
                 )
             }
         }
-        composeRule.onNodeWithText("network down").assertExists()
+        composeRule.onNodeWithText("Không tải được thông báo").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
-        assertEquals(true, retried)
+        assertEquals(1, retries)
     }
 
     @Test

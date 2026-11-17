@@ -1,7 +1,6 @@
 package com.luxmap.feature.notification.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Autorenew
@@ -27,8 +25,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Verified
@@ -54,23 +52,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxTextButton
-import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.notification.data.NotificationType
 import com.luxmap.feature.notification.data.notificationTypeFromWire
 import java.time.Instant
@@ -133,7 +128,22 @@ fun NotificationListScreen(
         Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (state) {
-                    is NotificationListUiState.Loading -> NotificationSkeletonList()
+                    is NotificationListUiState.Loading ->
+                        LuxLoadingRegion(
+                            description = "Đang tải thông báo",
+                            modifier = Modifier.padding(Spacing.lg),
+                        ) {
+                            LuxSkeleton(
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = MaterialTheme.shapes.small,
+                            )
+                            repeat(5) {
+                                LuxSkeleton(
+                                    modifier = Modifier.fillMaxWidth().height(72.dp),
+                                    shape = MaterialTheme.shapes.medium,
+                                )
+                            }
+                        }
 
                     is NotificationListUiState.Success ->
                         NotificationSuccessContent(
@@ -143,25 +153,23 @@ fun NotificationListScreen(
                         )
 
                     is NotificationListUiState.Empty ->
-                        MessageState(
-                            icon = Icons.Filled.EventAvailable,
-                            iconColors = SyncStatus.DONE.badgeColors(),
+                        LuxEmptyState(
                             title = "Chưa có thông báo nào",
-                            subtitle = "Thông báo về việc được giao, khảo sát và sự cố sẽ xuất hiện ở đây.",
-                            action = {},
+                            message = "Thông báo về việc được giao, khảo sát và sự cố sẽ xuất hiện ở đây.",
+                            icon = Icons.Filled.NotificationsNone,
                         )
 
                     is NotificationListUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.ErrorOutline,
-                            iconColors =
-                                BadgeColors(
-                                    AssetCondition.OUT.badgeColors().background,
-                                    MaterialTheme.colorScheme.error,
-                                ),
-                            title = "Không tải được danh sách thông báo",
-                            subtitle = state.message,
-                            action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            title = "Không tải được thông báo",
+                            message =
+                                if (state.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
                         )
                 }
             }
@@ -238,61 +246,6 @@ private fun NotificationSuccessContent(
                                     .testTag("notification_list_more_footer"),
                         )
                     }
-                }
-            }
-        }
-    }
-}
-
-private val NotificationSkeletonTileCorner = Radius.chip
-
-@Composable
-private fun NotificationSkeletonList() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg).testTag("notification_list_loading"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        repeat(5) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
-                        .padding(Spacing.md),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(NotificationTileSize)
-                            .background(
-                                MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(NotificationSkeletonTileCorner),
-                            ),
-                )
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth(0.4f)
-                                .height(10.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(5.dp)),
-                    )
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(12.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
-                    )
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth(0.7f)
-                                .height(12.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp)),
-                    )
                 }
             }
         }
