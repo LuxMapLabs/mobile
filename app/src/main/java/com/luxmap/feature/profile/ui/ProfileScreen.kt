@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxConfirmDialog
@@ -372,7 +373,7 @@ private fun LogoutSection(
             Text(
                 text = "Còn $pendingSyncCount mục chưa đồng bộ trên thiết bị này",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = LuxTheme.colors.warning,
             )
         }
     }

@@ -231,4 +231,21 @@ class NotificationListScreenTest {
             .onNode(hasText("Sự cố mới", substring = true) and hasClickAction())
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
     }
+
+    @Test
+    fun a_read_row_that_opens_nothing_has_no_click_action() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(row(id = "READ-FAULT", entityType = "fault", title = "Sự cố đã đọc", isRead = true)),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNode(hasText("Sự cố đã đọc", substring = true) and hasClickAction()).assertDoesNotExist()
+        composeRule.onNodeWithText("Sự cố đã đọc").assertExists()
+    }
 }

@@ -274,10 +274,16 @@ private fun NotificationRow(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = Dimens.minTouchTarget)
-                .clickable(
-                    onClickLabel = if (isNavigable) "Mở" else "Đánh dấu đã đọc",
-                    role = if (isNavigable) Role.Button else null,
-                    onClick = onClick,
+                .then(
+                    if (isNavigable || !row.isRead) {
+                        Modifier.clickable(
+                            onClickLabel = if (isNavigable) "Mở" else "Đánh dấu đã đọc",
+                            role = if (isNavigable) Role.Button else null,
+                            onClick = onClick,
+                        )
+                    } else {
+                        Modifier
+                    },
                 ).semantics { if (!row.isRead) stateDescription = "chưa đọc" }
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
