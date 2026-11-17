@@ -123,8 +123,6 @@ private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 // halo layer's filter value when nothing is selected, so it matches zero features.
 private const val NO_SELECTION_SENTINEL = ""
 
-// Marker icons are 28x35dp pin-shaped source vectors (see ic_marker_*.xml, Icon Cot Den Map
-// design), so size 1.0f renders at their full 28x35dp and 1.3f at ~36x45dp for the selected pole.
 private const val MARKER_ICON_SIZE = 1.0f
 private const val MARKER_ICON_SIZE_SELECTED = 24f / 18f
 private const val SELECTED_HALO_RADIUS = 15f
@@ -287,7 +285,7 @@ fun MapScreen(
                 view.getMapAsync { map ->
                     if (map.style == null) {
                         // Hide the MapLibre logo and the attribution button. The tile providers
-                        // (MapTiler, OpenStreetMap) ask for credit in their terms, so show it
+                        // (OpenStreetMap) ask for credit in their terms, so show it
                         // somewhere else in the app (for example the Profile screen).
                         map.uiSettings.isLogoEnabled = false
                         map.uiSettings.isAttributionEnabled = false
@@ -518,8 +516,6 @@ fun MapScreen(
                         WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
                     ),
         ) {
-            // Top area (F12/FM-36) — single search bar + KPI summary, replaces the old separate
-            // basemap-toggle FAB and layer-toggle card that used to sit at TopStart/TopEnd.
             Column(
                 modifier =
                     Modifier
@@ -583,10 +579,6 @@ fun MapScreen(
                         .padding(start = Spacing.lg, end = Spacing.lg, bottom = MAP_CONTROLS_BOTTOM_PADDING),
             )
 
-            // Right-side control stack (F12) — exactly 4 floating controls, declutters what used to
-            // be 4 separate pieces scattered across all 4 corners: basemap, zoom in, zoom out,
-            // locate, top to bottom. One shared Column + spacedBy() instead of each button computing
-            // its own manual padding to avoid overlapping its neighbor.
             Column(
                 modifier =
                     Modifier
@@ -600,12 +592,6 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(Spacing.sm),
                 horizontalAlignment = Alignment.End,
             ) {
-                // Satellite <-> vector basemap toggle — the free satellite imagery is only sharp in
-                // urban areas, rural areas (LuxMap's actual scope) have lower-resolution source
-                // imagery so it looks noticeably softer/blurrier. There is no way to fix this in code
-                // because the source imagery just doesn't have that resolution — this button lets
-                // the field crew switch to the vector basemap (drawn with lines, always sharp) when
-                // needed.
                 LocateMeButton(
                     isLocating = isLocating,
                     onClick = {
@@ -764,9 +750,6 @@ private fun RoadSegmentLine.toLatLngBounds(): LatLngBounds {
     return builder.build()
 }
 
-// Add every F12 source/layer onto a freshly loaded Style — used both for the first load AND
-// every time the user taps the satellite/vector basemap toggle, because map.setStyle() replaces
-// the whole style so all old sources/layers are gone and must be added again from scratch.
 private fun setupMapLayers(
     context: Context,
     style: Style,
@@ -788,9 +771,6 @@ private fun setupMapLayers(
 
 // Turns on MapLibre's own "blue dot" (LocationComponent) instead of a hand-built GeoJSON
 // marker — draws the dot, accuracy ring and pulse itself, and keeps working across pan/zoom.
-// NOTE: a Style is only valid until the next map.setStyle() call — whoever adds another
-// setStyle() call later (e.g. a satellite/vector basemap toggle) must call this function
-// again in that same style-loaded callback, or the dot silently disappears after the switch.
 @SuppressLint("MissingPermission")
 private fun enableLocationComponent(
     context: Context,
@@ -843,8 +823,7 @@ private fun showQuickLocationFix(
 // "Surveyed route" (F12/FM-37) — colored by has_active_segment_fault to match how Web GIS shows
 // grid faults (MapMarkerColors.RouteFault / RouteNormal). Does NOT show a fault detail panel on
 // tap — that is still Web GIS scope, mobile only needs the color as a visual warning for the
-// field crew. Drawn as glow (wide, blurred, translucent) + core (narrow, solid) — same 2-layer
-// idea as the pole glow/dot pair, so routes read with the same visual language as markers.
+// field crew. Drawn as glow (wide, blurred, translucent) + core (narrow, solid).
 private fun routeLineColorExpression(): Expression =
     Expression.switchCase(
         Expression.get("has_active_segment_fault"),
@@ -871,8 +850,7 @@ private fun buildRoadSegmentsLineLayer(): LineLayer =
 
 // Toggling a SymbolLayer's visibility property off then back on does not repaint it on a real
 // device (confirmed FM-37 field test: the layer's own visibility property reads back "visible"
-// correctly, but the icons never reappear) — removing and re-adding the layer instead, the same
-// recovery setStyle() already needs for the basemap toggle, reliably redraws it. Sources are
+// correctly, but the icons never reappear) — removing and re-adding the layer instead reliably redraws it. Sources are
 // never removed/re-added here: only FakeMapRepository/RealMapRepository emit new GeoJSON, and
 // re-adding a GeoJsonSource with the same id would throw.
 private fun applyLayerVisibility(
@@ -959,10 +937,6 @@ private fun buildPoleIconLayer(): SymbolLayer =
             PropertyFactory.iconIgnorePlacement(true),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
 
-// Soft status-colored shadow at the selected pin's tip (Icon Cot Den Map design, 2026-11-04,
-// replaces the old white-fill/colored-stroke ring) — filtered to a single pole_id, re-applied
-// whenever the selection changes (see updateSelectedPoleStyle). Starts filtered to
-// NO_SELECTION_SENTINEL so it draws nothing before anything is selected.
 private fun buildPoleSelectedHaloLayer(): CircleLayer =
     CircleLayer(POLES_SELECTED_HALO_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
@@ -983,8 +957,6 @@ private fun selectedIconSizeExpression(selectedPoleId: String): Expression =
         Expression.stop(selectedPoleId, Expression.literal(MARKER_ICON_SIZE_SELECTED)),
     )
 
-// Re-applied every time `selectedPole` changes (LaunchedEffect in MapScreen) — a Style's layers
-// are mutable in place, no need to rebuild the whole style like the basemap toggle does.
 private fun updateSelectedPoleStyle(
     style: Style,
     selectedPoleId: String?,
@@ -996,18 +968,12 @@ private fun updateSelectedPoleStyle(
     (style.getLayer(POLES_SELECTED_HALO_LAYER_ID) as? CircleLayer)?.setFilter(selectedPoleFilter(id))
 }
 
-// "Near sensitive area" badge (F12, near_sensitive_poi) — bottom-right corner of the pin's white
-// circle (moved from top-right in the old center-anchored dot design, since the new status badge
-// now takes that corner). IoT badge goes bottom-left so a pole with both badges doesn't overlap.
-// Badge icons are 24dp source vectors too, same as the marker, so 0.7f here against
-// MARKER_ICON_SIZE = 1.0f keeps the badge at ~70% of the marker's size — big enough to actually
-// read on a real device, still clearly smaller/secondary to the status icon.
 private fun buildPoiBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(POI_BADGE_ICON_ID),
             PropertyFactory.iconSize(1f),
-            PropertyFactory.iconOffset(arrayOf(10f, -10f)),
+            PropertyFactory.iconOffset(arrayOf(6f, -6f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -1025,8 +991,8 @@ private fun buildIotBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_IOT_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(-10f, 10f)),
+            PropertyFactory.iconSize(0.45f),
+            PropertyFactory.iconOffset(arrayOf(-13f, 13f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -1061,9 +1027,6 @@ private fun buildClusterOptions(): GeoJsonOptions =
             ),
         )
 
-// Icon Cot Den Map design (2026-11-04): white fill + colored border by max severity (was a flat
-// colored fill before) — border width bumped to 3f so the severity color still reads clearly
-// against a white basemap or satellite imagery.
 private fun buildClusterCircleLayer(): CircleLayer =
     CircleLayer(CLUSTER_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
