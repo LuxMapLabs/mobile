@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -36,6 +35,8 @@ class PoleGpsMeasureViewModel
         private val _currentFix = MutableStateFlow<GpsFix?>(null)
         val currentFix: StateFlow<GpsFix?> = _currentFix.asStateFlow()
         private var watchingLocation = false
+        private val _locationMissing = MutableStateFlow(false)
+        val locationMissing: StateFlow<Boolean> = _locationMissing.asStateFlow()
 
         // Starts as soon as permission is known, in parallel with the camera, instead of only
         // being asked for once the photo is confirmed - a fix already has a few seconds to settle
@@ -75,6 +76,7 @@ class PoleGpsMeasureViewModel
             hasLocationPermission: Boolean,
             onDone: () -> Unit,
         ) {
+            _locationMissing.value = false
             viewModelScope.launch {
                 val fix =
                     if (hasLocationPermission) {
@@ -82,21 +84,20 @@ class PoleGpsMeasureViewModel
                     } else {
                         null
                     }
-                val (lat, lng) =
-                    if (fix != null) {
-                        exif.write(file, fix.lat, fix.lng)
-                        exif.read(file) ?: (fix.lat to fix.lng)
-                    } else {
-                        0.0 to 0.0
-                    }
+                if (fix == null) {
+                    _locationMissing.value = true
+                    return@launch
+                }
+                exif.write(file, fix.lat, fix.lng)
+                val (lat, lng) = exif.read(file) ?: (fix.lat to fix.lng)
                 repository.saveCapturedPhoto(
                     workOrderId = workOrderId,
                     poleId = poleId,
                     filePath = file.absolutePath,
                     lat = lat,
                     lng = lng,
-                    accuracyM = fix?.accuracyM ?: 0.0,
-                    capturedAt = fix?.capturedAt ?: Instant.now(),
+                    accuracyM = fix.accuracyM,
+                    capturedAt = fix.capturedAt,
                 )
                 onDone()
             }

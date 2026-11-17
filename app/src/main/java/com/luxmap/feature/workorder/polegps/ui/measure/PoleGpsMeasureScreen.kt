@@ -44,6 +44,7 @@ import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.LuxActionPair
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.PrimaryButton
 import java.io.File
 
@@ -58,6 +59,7 @@ fun PoleGpsMeasureRoute(
     var previewFile by remember { mutableStateOf<File?>(null) }
     var hasLocationPermission by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    val locationMissing by viewModel.locationMissing.collectAsState()
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
 
     val takePictureLauncher =
@@ -80,7 +82,7 @@ fun PoleGpsMeasureRoute(
     // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
     // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
     // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
-    // stays best-effort, matching EvidenceCaptureScreen/PolePhotoCaptureScreen.
+    // is requested too; without a GPS fix the photo is held for a retry instead of saved.
     val permissionsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             hasLocationPermission = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -124,13 +126,36 @@ fun PoleGpsMeasureRoute(
         }
     }
 
+    val retryLocationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            hasLocationPermission = granted
+            previewFile?.let { viewModel.onPhotoCaptured(it, granted, onBack) }
+        }
+
+    fun retryLocation() {
+        val file = previewFile ?: return
+        hasLocationPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (hasLocationPermission) {
+            viewModel.onPhotoCaptured(file, true, onBack)
+        } else {
+            retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    fun discardPhoto() {
+        previewFile?.delete()
+        onBack()
+    }
+
     LaunchedEffect(Unit) { requestPermissionsAndStart() }
 
     val fileToPreview = previewFile
     if (fileToPreview != null) {
         PhotoPreview(
             file = fileToPreview,
-            isSaving = isSaving,
+            isSaving = isSaving && !locationMissing,
             onConfirm = {
                 isSaving = true
                 viewModel.onPhotoCaptured(fileToPreview, hasLocationPermission, onBack)
@@ -141,6 +166,16 @@ fun PoleGpsMeasureRoute(
                 launchCamera()
             },
         )
+        if (locationMissing) {
+            LuxConfirmDialog(
+                title = "Chưa lấy được vị trí",
+                message = "Đo vị trí cột cần GPS thật. Bật định vị rồi thử lại, hoặc bỏ ảnh này.",
+                confirmLabel = "Thử lại",
+                onConfirm = ::retryLocation,
+                onDismiss = ::discardPhoto,
+                dismissLabel = "Bỏ ảnh",
+            )
+        }
     } else {
         PoleGpsMeasureContent(state = state, onBack = onBack, onRetryPermission = ::retryPermissions)
     }

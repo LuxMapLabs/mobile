@@ -24,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -108,26 +109,50 @@ class PoleGpsMeasureViewModelTest {
         }
 
     @Test
-    fun `onPhotoCaptured without location permission saves zeroed coordinates instead of crashing`() =
+    fun `onPhotoCaptured without location permission saves nothing and flags the missing location`() =
         runTest {
             val vm = viewModel()
-            val file = File("p1.jpg")
             var done = false
-            vm.onPhotoCaptured(file, hasLocationPermission = false) { done = true }
-            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", file.absolutePath, 0.0, 0.0, 0.0, any()) }
-            assertTrue(done)
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = false) { done = true }
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+            assertTrue(vm.locationMissing.value)
+            assertFalse(done)
         }
 
     @Test
-    fun `onPhotoCaptured gives up and saves zeroed coordinates when no gps fix ever arrives`() =
+    fun `onPhotoCaptured saves nothing and flags the missing location when no gps fix ever arrives`() =
         runTest {
             fixesFlow = flow { awaitCancellation() }
             val vm = viewModel()
+            var done = false
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) { done = true }
+            advanceTimeBy(PoleGpsMeasureViewModel.FIX_TIMEOUT_MILLIS + 1)
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+            assertTrue(vm.locationMissing.value)
+            assertFalse(done)
+        }
+
+    @Test
+    fun `retrying with location permission after a missing fix saves the real fix and clears the flag`() =
+        runTest {
+            fixesFlow = flowOf(GpsFix(10.5, 106.5, 7.0, Instant.ofEpochSecond(42)))
+            val vm = viewModel()
             val file = File("p1.jpg")
             var done = false
+            vm.onPhotoCaptured(file, hasLocationPermission = false) {}
             vm.onPhotoCaptured(file, hasLocationPermission = true) { done = true }
-            advanceTimeBy(PoleGpsMeasureViewModel.FIX_TIMEOUT_MILLIS + 1)
-            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", file.absolutePath, 0.0, 0.0, 0.0, any()) }
+            coVerify {
+                repository.saveCapturedPhoto(
+                    "WO-1",
+                    "P-1",
+                    file.absolutePath,
+                    10.5,
+                    106.5,
+                    7.0,
+                    Instant.ofEpochSecond(42),
+                )
+            }
+            assertFalse(vm.locationMissing.value)
             assertTrue(done)
         }
 
