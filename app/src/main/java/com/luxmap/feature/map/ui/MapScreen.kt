@@ -29,13 +29,9 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -58,7 +54,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -535,6 +530,7 @@ fun MapScreen(
                     query = searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
                     onFilterClick = { showLayerFilterSheet = true },
+                    hiddenStatusCount = AssetCondition.entries.size - statusFilter.size,
                 )
                 if (searchQuery.isNotBlank()) {
                     MapSearchResultsList(
@@ -608,7 +604,8 @@ fun MapScreen(
                 // because the source imagery just doesn't have that resolution — this button lets
                 // the field crew switch to the vector basemap (drawn with lines, always sharp) when
                 // needed.
-                FloatingActionButton(
+                LocateMeButton(
+                    isLocating = isLocating,
                     onClick = {
                         showLocationPermissionDenied = false
                         showLocationPermissionSettingsHint = false
@@ -623,19 +620,7 @@ fun MapScreen(
                             locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
                         }
                     },
-                ) {
-                    if (isLocating) {
-                        // Shown until the first location arrives, so the user knows the app is
-                        // still working after the tap.
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    } else {
-                        Icon(imageVector = Icons.Filled.LocationOn, contentDescription = "Định vị vị trí hiện tại")
-                    }
-                }
+                )
             }
 
             if (showLayerFilterSheet) {
