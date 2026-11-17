@@ -268,9 +268,15 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 PolePhotoResultRoute(
                     photoId = resultPhotoId,
                     onBack = { navController.popBackStack() },
-                    onRetake = { poleId ->
+                    onRetake = { poleId, mediaType, source ->
                         navController.popBackStack()
-                        navController.navigate(Routes.PolePhotoCapture.createRoute(resultWorkOrderId, poleId, "camera"))
+                        val route =
+                            if (mediaType == "video") {
+                                Routes.PoleVideoCapture.createRoute(resultWorkOrderId, poleId, source)
+                            } else {
+                                Routes.PolePhotoCapture.createRoute(resultWorkOrderId, poleId, source)
+                            }
+                        navController.navigate(route)
                     },
                     viewModel = sharedViewModel,
                 )

@@ -40,10 +40,11 @@ fun verdictSourceText(
     when {
         reviewedCvState != null && reviewedCvState == cvState -> "Bạn đã xác nhận cùng AI"
         reviewedCvState != null && isConclusive(cvState) -> "Bạn đã sửa · AI nhận định ${cvStateLabel(cvState)}"
-        reviewedCvState != null -> "Bạn đã chọn nhãn · AI không kết luận"
+        reviewedCvState != null && cvState == null -> "Bạn đã xác nhận · AI không xử lý được"
+        reviewedCvState != null -> "Bạn đã xác nhận · AI: Không xác định"
         isConclusive(cvState) -> "AI nhận định"
         cvState == null -> "AI không xử lý được · cần bạn chọn nhãn"
-        else -> "AI không rõ ràng · cần bạn chọn nhãn"
+        else -> "AI: Không xác định"
     }
 
 fun reviewActionLabel(
@@ -55,7 +56,22 @@ fun cvStateLabel(cvState: String?): String =
     when (cvState) {
         "on" -> "Đèn sáng"
         "off" -> "Đèn tắt"
-        "inconclusive" -> "Không rõ ràng"
         null -> "AI không xử lý được"
-        else -> "Không rõ"
+        else -> "Không xác định"
+    }
+
+internal const val GALLERY_MEDIA_PREFIX = "gallery-"
+
+internal fun mediaCaptureSource(filePath: String): String =
+    if (filePath.substringAfterLast('/').startsWith(GALLERY_MEDIA_PREFIX)) "gallery" else "camera"
+
+internal fun mediaReplacementLabel(
+    mediaType: String,
+    source: String,
+): String =
+    when {
+        mediaType == "video" && source == "gallery" -> "Chọn video khác"
+        mediaType == "video" -> "Quay lại"
+        source == "gallery" -> "Chọn ảnh khác"
+        else -> "Chụp lại"
     }

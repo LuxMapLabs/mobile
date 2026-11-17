@@ -145,9 +145,9 @@ class PolePhotoResultScreenTest {
             }
         }
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
-        composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
+        composeRule.onNodeWithText("Chụp lại").performScrollTo().performClick()
         assertEquals(false, retaken)
-        composeRule.onNodeWithText("Chụp lại").performClick()
+        composeRule.onNodeWithText("Tiếp tục").performClick()
         assertEquals(true, retaken)
     }
 
@@ -159,7 +159,7 @@ class PolePhotoResultScreenTest {
                 PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
-                    state = successState(),
+                    state = successState().copy(filePath = "/data/gallery-sample.mp4", mediaType = "video"),
                     onBack = {},
                     onRetry = {},
                     onRetake = { retaken = true },
@@ -167,7 +167,7 @@ class PolePhotoResultScreenTest {
             }
         }
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
-        composeRule.onNodeWithText("Chụp lại cột này").performScrollTo().performClick()
+        composeRule.onNodeWithText("Chọn video khác").performScrollTo().performClick()
         composeRule.onNodeWithText("Hủy").performClick()
         assertEquals(false, retaken)
     }
@@ -186,7 +186,7 @@ class PolePhotoResultScreenTest {
             }
         }
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
-        composeRule.onNodeWithText("Chụp lại cột này").assertDoesNotExist()
+        composeRule.onNodeWithText("Chụp lại").assertDoesNotExist()
     }
 
     @Test
@@ -496,7 +496,7 @@ class PolePhotoResultScreenTest {
         composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertDoesNotExist()
         composeRule.onNodeWithText("Đồng ý với AI").assertDoesNotExist()
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
-        composeRule.onNodeWithText("Chụp lại cột này").assertDoesNotExist()
+        composeRule.onNodeWithText("Chụp lại").assertDoesNotExist()
     }
 
     @Test

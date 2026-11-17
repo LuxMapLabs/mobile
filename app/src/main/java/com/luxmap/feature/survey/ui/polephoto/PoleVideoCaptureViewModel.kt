@@ -21,12 +21,14 @@ class PoleVideoCaptureViewModel
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val poleId: String = checkNotNull(savedStateHandle[POLE_ID_ARG])
+        private val source: String? = savedStateHandle["source"]
         private val videoFileName: String = UUID.randomUUID().toString()
 
         fun outputFile(filesDir: File): File {
             val dir = File(filesDir, "pole-videos/$workOrderId")
             dir.mkdirs()
-            return File(dir, "$videoFileName.mp4")
+            val prefix = if (source.equals("gallery", ignoreCase = true)) GALLERY_MEDIA_PREFIX else ""
+            return File(dir, "$prefix$videoFileName.mp4")
         }
 
         fun onVideoCaptured(
