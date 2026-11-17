@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,25 +24,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -57,30 +59,29 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.HeadlineTextStyle
 import com.luxmap.core.theme.LabelTextStyle
-import com.luxmap.core.theme.Navy700
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
@@ -160,22 +161,20 @@ fun PoleListScreen(
     // afterward that it worked (see CLAUDE.md).
     var showCompleteConfirm by rememberSaveable { mutableStateOf(false) }
     var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        PoleListHeader(workOrderId = workOrderId, onBack = onBack)
-        // Overlaps the hero's bottom edge, same pattern as SurveyHubScreen's own sheet - reads as
-        // a sheet floating over the navy hero instead of a hard seam between the two. The clip
-        // (not just background) matters once the list scrolls - background alone paints the
-        // rounded shape but never cuts the LazyColumn's own square corners, so a scrolled row's
-        // edge shows past the rounding at the top instead of following it.
-        Box(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .offset(y = -Spacing.xl)
-                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
+    Scaffold(
+        topBar = { LuxChildTopBar(title = "Chụp ảnh cột đèn", onBack = onBack, subtitle = workOrderId) },
+        bottomBar = {
+            if (state is PoleListUiState.Success) {
+                PoleListBottomBar(
+                    left = state.poles.count { it.syncStatus == null },
+                    isCompleted = state.isCompleted,
+                    onTapComplete = { showCompleteConfirm = true },
+                )
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
             Box(Modifier.fillMaxSize()) {
                 when (state) {
                     is PoleListUiState.Loading -> PoleListLoadingSkeleton()
@@ -184,42 +183,45 @@ fun PoleListScreen(
                         val nextIndex = state.poles.indexOfFirst { it.syncStatus == null }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm),
+                            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.md),
                             verticalArrangement = Arrangement.spacedBy(Spacing.md),
                         ) {
                             if (state.isStale) {
                                 item {
-                                    InlineBanner(
+                                    LuxBanner(
                                         message =
                                             "Đang xem danh sách cột đã lưu trên máy, " +
                                                 "có thể chưa phải bản mới nhất",
-                                        tone = InlineBannerTone.OFFLINE,
+                                        tone = LuxBannerTone.INFO,
                                     )
                                 }
                             }
-                            item { PoleListSectionHeader(count = state.poles.size) }
+                            item { LuxSectionHeader(title = "Cột trên tuyến · ${state.poles.size}") }
                             item {
-                                Column(
-                                    modifier = Modifier.fillMaxWidth().cardOutline(),
-                                ) {
-                                    state.poles.forEachIndexed { index, pole ->
-                                        if (index > 0) {
-                                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                                        }
-                                        PoleRow(
-                                            pole = pole,
-                                            isNext = index == nextIndex,
-                                            // Matches the mock's canReport: !state.done - no point
-                                            // reporting a new issue after the survey was already
-                                            // marked complete.
-                                            onClick =
-                                                if (state.isCompleted) {
-                                                    {}
-                                                } else {
-                                                    { reportMethodSheetPoleId = pole.poleId }
+                                LuxCard(contentPadding = PaddingValues(0.dp)) {
+                                    Column {
+                                        state.poles.forEachIndexed { index, pole ->
+                                            if (index > 0) {
+                                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                            }
+                                            val action = poleRowAction(pole, state.isCompleted)
+                                            PoleRow(
+                                                pole = pole,
+                                                isNext = index == nextIndex,
+                                                action = action,
+                                                onClick = {
+                                                    when (action) {
+                                                        is PoleRowAction.OpenAiResult ->
+                                                            onViewAiResult(
+                                                                action.serverPhotoId,
+                                                            )
+                                                        PoleRowAction.OpenReportSheet ->
+                                                            reportMethodSheetPoleId = pole.poleId
+                                                        PoleRowAction.None -> Unit
+                                                    }
                                                 },
-                                            onViewAiResult = { pole.serverPhotoId?.let(onViewAiResult) },
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -245,13 +247,6 @@ fun PoleListScreen(
                         )
                 }
             }
-        }
-        if (state is PoleListUiState.Success) {
-            PoleListBottomBar(
-                left = state.poles.count { it.syncStatus == null },
-                isCompleted = state.isCompleted,
-                onTapComplete = { showCompleteConfirm = true },
-            )
         }
     }
 
@@ -410,43 +405,6 @@ private fun ReportMethodOption(
     }
 }
 
-// Fixed Navy-gradient hero, same BrandHeroGradient as SurveyHubScreen - this screen is a
-// drill-down from the Survey Hub's "Chụp ảnh cột đèn" button, not a tab root, but the design doc
-// (mã 4b) still gives it the same hero treatment rather than the flat AppTopBar other drill-down
-// screens use.
-@Composable
-private fun PoleListHeader(
-    workOrderId: String,
-    onBack: () -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clickable(onClick = onBack)
-                        .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(Radius.control)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-            }
-            Column {
-                Text(text = workOrderId, style = LabelTextStyle, color = Color.White.copy(alpha = 0.75f))
-                Text(text = "Chụp ảnh cột đèn", style = HeadlineTextStyle, color = Color.White)
-            }
-        }
-    }
-}
-
 // "Còn lại N cột chưa chụp" + an outlined "Hoàn tất" CTA, matching the design doc's horizontal
 // bottom bar - not the shared BottomActionBar component (that one stacks a centered hint above a
 // full-width filled button, a different layout other screens like F03 still rely on; bespoke here
@@ -557,25 +515,13 @@ private fun Modifier.cardOutline(): Modifier =
         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
         .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
 
-@Composable
-private fun PoleListSectionHeader(count: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = "Tất cả cột trên tuyến", style = MaterialTheme.typography.titleMedium)
-        StatusBadge(text = "$count cột", colors = WorkOrderStatus.ASSIGNED.badgeColors())
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PoleRow(
     pole: PoleListRowState,
     isNext: Boolean,
+    action: PoleRowAction,
     onClick: () -> Unit,
-    onViewAiResult: () -> Unit,
 ) {
     val condition =
         when (pole.fixtureStatus) {
@@ -584,13 +530,20 @@ private fun PoleRow(
             "out" -> AssetCondition.OUT
             else -> AssetCondition.UNKNOWN
         }
-    val hasAi = pole.syncStatus == SyncStatus.DONE && pole.serverPhotoId != null
+    val click =
+        when (action) {
+            is PoleRowAction.OpenAiResult ->
+                Modifier.clickable(onClickLabel = "Xem kết quả AI", role = Role.Button, onClick = onClick)
+            PoleRowAction.OpenReportSheet -> Modifier.clickable(onClickLabel = "Chụp ảnh cột", onClick = onClick)
+            PoleRowAction.None -> Modifier
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(Spacing.md),
+                .heightIn(min = Dimens.minTouchTarget)
+                .then(click)
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
@@ -602,93 +555,73 @@ private fun PoleRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // Condition + sync badges share one row here instead of the sync badge sitting in
-            // the row's trailing slot - with the AI-result icon button also in that slot, 2
-            // variable-width badges plus a button no longer fit on screen width without wrapping.
-            // FlowRow (not Row) so a 3rd badge (hasPendingReview) wraps onto a second line
-            // instead of overflowing the column width (found on a real device, 2026-11-10).
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                StatusBadge(text = condition.label(), colors = condition.badgeColors())
-                if (pole.syncStatus != null) {
-                    StatusBadge(
-                        text = polePhotoSyncLabel(pole.syncStatus),
-                        colors = pole.syncStatus.badgeColors(),
-                        icon = pole.syncStatus.icon(),
-                    )
-                }
-                if (pole.hasPendingReview) {
-                    StatusBadge(
-                        text = "Đã xác nhận",
-                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
-                        icon = SyncStatus.QUEUED_ONLINE.icon(),
-                    )
-                } else if (pole.hasPendingDecision) {
-                    StatusBadge(
-                        text = "Chờ duyệt",
-                        colors = SyncStatus.QUEUED_ONLINE.badgeColors(),
-                        icon = SyncStatus.QUEUED_ONLINE.icon(),
-                    )
+                StatusBadge(text = condition.label(), colors = condition.badgeColors(), icon = condition.rowIcon())
+                poleProgressBadge(pole)?.let { progress ->
+                    val (status, label) = progress.badge()
+                    StatusBadge(text = label, colors = status.badgeColors(), icon = status.icon())
                 }
             }
         }
-        // Trailing slot now holds exactly one action affordance - the AI-result icon when
-        // available, otherwise the not-yet-captured camera icon - not a status badge too.
-        if (hasAi) {
-            IconButton(onClick = onViewAiResult) {
+        when {
+            action is PoleRowAction.OpenAiResult ->
                 Icon(
-                    imageVector = Icons.Filled.SmartToy,
-                    contentDescription = "Xem kết quả AI",
-                    tint = MaterialTheme.colorScheme.primary,
+                    imageVector = Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("pole_chevron_${pole.poleId}"),
                 )
-            }
-        } else if (pole.syncStatus == null) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(Dimens.minTouchTarget)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.control)),
-                contentAlignment = Alignment.Center,
-            ) {
+            action is PoleRowAction.OpenReportSheet && pole.syncStatus == null ->
                 Icon(
                     imageVector = Icons.Filled.CameraAlt,
-                    contentDescription = "Chụp ảnh",
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
-            }
         }
     }
 }
 
-// "Đã tải lên" reads more naturally than the shared SyncStatus.DONE wording ("Đã đồng bộ") for a
-// single uploaded pole photo - a local override for this row only, not a change to the shared
-// sync badge table in core/theme/Color.kt (that wording still fits other screens using it).
-private fun polePhotoSyncLabel(status: SyncStatus): String =
-    if (status == SyncStatus.DONE) "Đã tải lên" else status.label()
+private fun AssetCondition.rowIcon(): ImageVector =
+    when (this) {
+        AssetCondition.NORMAL -> Icons.Filled.CheckCircle
+        AssetCondition.DIM -> Icons.Filled.Warning
+        AssetCondition.OUT -> Icons.Filled.Error
+        AssetCondition.UNKNOWN -> Icons.Filled.Help
+    }
 
-// isNext (navy, matches SurveyHubScreen's own fixed-navy accent) takes priority over hasSync
-// (a neutral "already handled" chip reusing WorkOrderStatus.ASSIGNED's pair) over the plain
-// "not reached yet" surfaceVariant default.
+private fun PoleProgress.badge(): Pair<SyncStatus, String> =
+    when (this) {
+        PoleProgress.SYNC_FAILED -> SyncStatus.FAILED to "Đồng bộ lỗi"
+        PoleProgress.SYNC_CONFLICT -> SyncStatus.CONFLICT to "Xung đột"
+        PoleProgress.SYNCING -> SyncStatus.SYNCING to SyncStatus.SYNCING.label()
+        PoleProgress.QUEUED_OFFLINE -> SyncStatus.QUEUED_OFFLINE to SyncStatus.QUEUED_OFFLINE.label()
+        PoleProgress.QUEUED_ONLINE -> SyncStatus.QUEUED_ONLINE to SyncStatus.QUEUED_ONLINE.label()
+        PoleProgress.REVIEW_SAVED -> SyncStatus.QUEUED_ONLINE to "Đã xác nhận"
+        PoleProgress.AWAITING_DECISION -> SyncStatus.QUEUED_ONLINE to "Chờ duyệt"
+        PoleProgress.UPLOADED -> SyncStatus.DONE to "Đã tải lên"
+    }
+
 @Composable
 private fun PoleNumberAvatar(
     position: Int?,
     isNext: Boolean,
     hasSync: Boolean,
 ) {
-    val assigned = WorkOrderStatus.ASSIGNED.badgeColors()
+    val colors = MaterialTheme.colorScheme
     val (background, textColor) =
         when {
-            isNext -> Navy700 to Color.White
-            hasSync -> assigned.background to assigned.text
-            else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+            isNext -> colors.primary to colors.onPrimary
+            hasSync -> colors.primaryContainer to colors.onPrimaryContainer
+            else -> colors.surfaceContainerHigh to colors.onSurfaceVariant
         }
     Box(
-        modifier = Modifier.size(36.dp).background(background, RoundedCornerShape(Radius.chip)),
+        modifier = Modifier.size(40.dp).background(background, MaterialTheme.shapes.small),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = position?.toString() ?: "-", style = MaterialTheme.typography.labelLarge, color = textColor)
+        Text(text = position?.toString() ?: "–", style = MaterialTheme.typography.labelLarge, color = textColor)
     }
 }
 

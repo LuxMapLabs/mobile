@@ -1,6 +1,12 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,18 +30,19 @@ class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_hero_header() {
+    fun the_top_bar_shows_the_title_and_the_work_order() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Loading,
+                    state = PoleListUiState.Success(poles = listOf(pole())),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("Chụp ảnh cột đèn").assertExists()
+        composeRule.onNodeWithText("WO-1").assertExists()
     }
 
     @Test
@@ -153,42 +160,72 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun success_state_tapping_the_ai_result_icon_calls_onViewAiResult_with_the_server_photo_id() {
-        var viewedServerPhotoId: String? = null
+    fun tapping_a_pole_with_an_ai_result_opens_it() {
+        var viewed: String? = null
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
-                            poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
+                            poles = listOf(pole(serverPhotoId = "PH-9", syncStatus = SyncStatus.DONE)),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
-                    onViewAiResult = { viewedServerPhotoId = it },
+                    onViewAiResult = { viewed = it },
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Xem kết quả AI").performClick()
-        assertEquals("SERVER-PH-1", viewedServerPhotoId)
+        composeRule
+            .onNode(hasText("POLE-1", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        assertEquals("PH-9", viewed)
+        composeRule.onNodeWithTag("pole_chevron_POLE-1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Báo lỗi cột").assertDoesNotExist()
     }
 
     @Test
-    fun success_state_hides_the_ai_result_icon_when_the_photo_has_not_finished_syncing() {
+    fun a_sync_error_hides_the_review_badge() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
-                            poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.SYNCING)),
+                            poles = listOf(pole(syncStatus = SyncStatus.FAILED).copy(hasPendingReview = true)),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Xem kết quả AI").assertDoesNotExist()
+        composeRule.onNodeWithText("Đồng bộ lỗi").assertExists()
+        composeRule.onNodeWithText("Đã xác nhận").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_completed_survey_keeps_ai_rows_clickable_but_not_the_others() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "PH-9", syncStatus = SyncStatus.DONE),
+                                    pole(poleId = "POLE-2", position = 2),
+                                ),
+                            isCompleted = true,
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNode(hasText("POLE-1", substring = true) and hasClickAction()).assertExists()
+        composeRule.onNode(hasText("POLE-2", substring = true) and hasClickAction()).assertDoesNotExist()
     }
 
     @Test
