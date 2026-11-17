@@ -74,6 +74,7 @@ import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.GisMapBbox
 import com.luxmap.feature.map.data.PoleMarker
@@ -635,7 +636,7 @@ fun MapScreen(
                     Column(modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
                         Text(text = "Hiển thị trên bản đồ", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(Spacing.md))
-                        Text(text = "Lớp bản đồ", style = MaterialTheme.typography.labelLarge)
+                        LuxSectionHeader(title = "Lớp bản đồ")
                         MapLayerToggle(
                             showFixtures = showFixtures,
                             onShowFixturesChange = { showFixtures = it },
@@ -647,7 +648,7 @@ fun MapScreen(
                             modifier = Modifier.padding(vertical = Spacing.sm),
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
-                        Text(text = "Hiển thị trạng thái cột", style = MaterialTheme.typography.labelLarge)
+                        LuxSectionHeader(title = "Trạng thái cột")
                         MapStatusFilterRow(
                             selectedStatuses = statusFilter,
                             onToggle = { condition -> viewModel.setStatusFilter(statusFilter.toggled(condition)) },
