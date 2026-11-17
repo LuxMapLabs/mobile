@@ -35,9 +35,9 @@ class PolePhotoReviewLogicTest {
 
     @Test
     fun `confidence label puts the risk wording before the number`() {
-        assertEquals("Tin cậy cao · 92%", confidenceLabel(0.92))
-        assertEquals("Tin cậy vừa · 73%", confidenceLabel(0.73))
-        assertEquals("Tin cậy thấp · 48%", confidenceLabel(0.48))
+        assertEquals("Tin cậy cao (92%)", confidenceLabel(0.92))
+        assertEquals("Tin cậy vừa (73%)", confidenceLabel(0.73))
+        assertEquals("Tin cậy thấp (48%)", confidenceLabel(0.48))
     }
 
     @Test
@@ -71,7 +71,7 @@ class PolePhotoReviewLogicTest {
     @Test
     fun `source line names the ai verdict the engineer overrode`() {
         assertEquals(
-            "Bạn đã sửa · AI nhận định Đèn tắt",
+            "Bạn đã sửa. AI nhận định Đèn tắt",
             verdictSourceText(cvState = "off", reviewedCvState = "on"),
         )
     }
@@ -84,7 +84,7 @@ class PolePhotoReviewLogicTest {
     @Test
     fun `source line asks for a choice when ai failed`() {
         assertEquals(
-            "AI không xử lý được · cần bạn chọn nhãn",
+            "AI không xử lý được. Hãy chọn trạng thái đèn.",
             verdictSourceText(cvState = null, reviewedCvState = null),
         )
     }
@@ -100,7 +100,7 @@ class PolePhotoReviewLogicTest {
     @Test
     fun `source line after overriding an inconclusive ai does not claim ai judged`() {
         assertEquals(
-            "Bạn đã xác nhận · AI: Không xác định",
+            "Bạn đã xác nhận. AI: Không xác định",
             verdictSourceText(cvState = "inconclusive", reviewedCvState = "on"),
         )
     }

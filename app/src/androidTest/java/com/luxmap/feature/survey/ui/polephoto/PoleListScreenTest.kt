@@ -1,5 +1,8 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.SyncStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -32,6 +36,29 @@ private fun pole(
 
 class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun survey_feedback_is_displayed_above_the_bottom_action() {
+        val host = SnackbarHostState()
+        val message = "Đã hoàn tất khảo sát"
+        composeRule.setContent {
+            LuxMapTheme(forceDark = true) {
+                LaunchedEffect(host) {
+                    host.showSnackbar(message, duration = SnackbarDuration.Indefinite)
+                }
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(syncStatus = SyncStatus.DONE))),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                    snackbarHostState = host,
+                )
+            }
+        }
+        val feedback = composeRule.onNodeWithText(message).fetchSemanticsNode()
+        val action = composeRule.onNode(hasText("Hoàn tất") and hasClickAction()).fetchSemanticsNode()
+        assertTrue(feedback.boundsInRoot.bottom <= action.boundsInRoot.top)
+    }
 
     @Test
     fun the_top_bar_shows_the_title_and_the_work_order() {

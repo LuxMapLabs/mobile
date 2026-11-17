@@ -40,7 +40,7 @@ class LuxContentTest {
         composeRule.setContent {
             LuxMapTheme {
                 LuxListItem(
-                    overline = "Sửa chữa · WO-1042",
+                    overline = "Sửa chữa WO-1042",
                     headline = "Tuyến ĐH-12",
                     supporting = "Hạn hôm nay",
                     leadingIcon = Icons.Filled.Build,

@@ -39,11 +39,8 @@ class ProfileScreenTest {
         composeRule.setContent {
             LuxMapTheme {
                 ProfileScreen(
-                    username = "fe_thinh",
                     profileState = profileState,
                     isLoggingOut = false,
-                    deviceModel = "Pixel 7a",
-                    appVersion = "1.0.0",
                     pendingSyncCount = pendingSyncCount,
                     errorSyncCount = errorSyncCount,
                     lastSyncedAt = lastSyncedAt,
@@ -64,10 +61,10 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun success_state_shows_the_full_name_username_and_email() {
+    fun success_state_shows_the_full_name_and_email_without_a_handle() {
         setContent()
         composeRule.onNodeWithText("Nguyễn Văn Bình").assertExists()
-        composeRule.onNodeWithText("@fe_thinh", substring = true).assertExists()
+        composeRule.onNodeWithText("@fe_thinh", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("binh.nv@luxmap.vn").assertExists()
     }
 
@@ -76,14 +73,14 @@ class ProfileScreenTest {
         setContent()
         composeRule.onNodeWithText("COM-001").assertExists()
         composeRule.onNodeWithText("COM-002").assertExists()
-        composeRule.onNodeWithText("Địa bàn phụ trách · 2", substring = true).assertExists()
+        composeRule.onNodeWithText("Địa bàn phụ trách (2)", substring = true).assertExists()
     }
 
     @Test
-    fun success_state_shows_the_device_model_and_version_in_the_footer() {
+    fun success_state_hides_the_device_model_and_version_footer() {
         setContent()
-        composeRule.onNodeWithText("Pixel 7a", substring = true).assertExists()
-        composeRule.onNodeWithText("1.0.0", substring = true).assertExists()
+        composeRule.onNodeWithText("Pixel 7a", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Phiên bản", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -91,7 +88,7 @@ class ProfileScreenTest {
         setContent(isOnline = false, pendingSyncCount = 2, errorSyncCount = 1, lastSyncedAt = null)
         composeRule.onNodeWithText("Tình trạng làm việc").assertExists()
         composeRule.onNodeWithText("Ngoại tuyến").assertExists()
-        composeRule.onNodeWithText("Chờ 2 · Lỗi 1").assertExists()
+        composeRule.onNodeWithText("Chờ 2\nLỗi 1").assertExists()
         composeRule.onNodeWithText("Sẵn sàng").assertDoesNotExist()
         composeRule.onNodeWithText("mục cần kiểm tra", substring = true).assertDoesNotExist()
     }

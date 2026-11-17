@@ -1,12 +1,10 @@
 package com.luxmap.feature.profile.ui
 
-import android.os.Build
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.luxmap.BuildConfig
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
@@ -33,13 +31,6 @@ class ProfileViewModel
         syncQueueManager: SyncQueueManager,
         connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
-        val username: StateFlow<String?> =
-            authRepository.observeUsername().stateIn(
-                viewModelScope,
-                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-                null,
-            )
-
         private val _profileState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
         val profileState: StateFlow<ProfileUiState> = _profileState.asStateFlow()
 
@@ -73,9 +64,6 @@ class ProfileViewModel
                 }
         }
 
-        val deviceModel: String = "${Build.MANUFACTURER} ${Build.MODEL}"
-        val appVersion: String = BuildConfig.VERSION_NAME
-
         val pendingSyncCount: StateFlow<Int> =
             syncQueueManager.pendingCount.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
         val errorSyncCount: StateFlow<Int> =
@@ -100,9 +88,5 @@ class ProfileViewModel
                     isLoggingOut = false
                 }
             }
-        }
-
-        private companion object {
-            const val STOP_TIMEOUT_MS = 5_000L
         }
     }

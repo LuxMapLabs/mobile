@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,11 +34,11 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,7 +68,6 @@ import com.luxmap.core.theme.BodyStrongTextStyle
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
@@ -82,21 +80,22 @@ import com.luxmap.core.theme.workOrderStatusFromWire
 import com.luxmap.core.theme.workOrderTaskKindFromWire
 import com.luxmap.core.ui.components.BottomActionBar
 import com.luxmap.core.ui.components.CancelRequestSheet
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxBottomSheet
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
 import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.TopSlideToast
-import com.luxmap.core.ui.components.TopToastState
 import com.luxmap.feature.workorder.data.EvidenceKind
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
@@ -180,95 +179,89 @@ fun WorkOrderDetailScreen(
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
-    val toastState = remember { TopToastState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = modifier,
-            topBar = {
-                val title =
-                    if (uiState is WorkOrderDetailUiState.Success) {
-                        workOrderHeaderTitle(workOrderTaskKindFromWire(uiState.detail.taskKind))
-                    } else {
-                        "Chi tiết lệnh"
-                    }
-                LuxChildTopBar(title = title, onBack = onBack)
-            },
-            bottomBar = {
+    Scaffold(
+        snackbarHost = { LuxSnackbarHost(snackbarHostState) },
+        modifier = modifier,
+        topBar = {
+            val title =
                 if (uiState is WorkOrderDetailUiState.Success) {
-                    val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
-                    if (cta != null) {
-                        val scheduleWindow =
-                            workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
-                        val showCancelRequest =
-                            "request_cancellation" in uiState.detail.allowedActions &&
-                                scheduleWindow.canActOnSchedule &&
-                                !uiState.hasActiveLocalCompletion()
-                        val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
-                        val actionError = uiState.startError ?: uiState.submitError
-                        BottomActionBar(
-                            ctaText = cta.text,
-                            ctaIcon = cta.icon,
-                            onCtaClick = onCtaClick,
-                            ctaEnabled = cta.enabled,
-                            hint = actionError ?: cta.hint,
-                            hintColor = if (actionError != null) MaterialTheme.colorScheme.error else cta.hintColor,
-                            showHintIcon = actionError != null || cta.hint != null,
-                            progressText = cta.progressText,
-                            progressSegments = cta.progressSegments,
-                            secondaryText = if (showCancelRequest) "Yêu cầu hủy" else null,
-                            onSecondaryClick = if (showCancelRequest) ({ showCancelSheet = true }) else null,
-                        )
-                    }
+                    workOrderHeaderTitle(workOrderTaskKindFromWire(uiState.detail.taskKind))
+                } else {
+                    "Chi tiết lệnh"
                 }
-            },
-        ) { contentPadding ->
-            Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-                when (uiState) {
-                    is WorkOrderDetailUiState.Loading -> WorkOrderDetailLoading()
-                    is WorkOrderDetailUiState.Success ->
-                        WorkOrderDetailContent(
-                            state = uiState,
-                            onOpenSurvey = onOpenSurvey,
-                            onNavigateFault = onNavigateFault,
-                            onReportNoteChanged = onReportNoteChanged,
-                            onMaterialsUsedChanged = onMaterialsUsedChanged,
-                            onFaultOutcomeSelected = onFaultOutcomeSelected,
-                            onCaptureEvidence = onCaptureEvidence,
-                            onRemoveEvidence = onRemoveEvidence,
-                            onRecoverEvidence = onRecoverEvidence,
-                            onOpenPdf = onOpenPdf,
-                            onMeasurePole = onMeasurePole,
-                            onRetryAttachment = onRetryAttachment,
-                        )
-                    is WorkOrderDetailUiState.Empty ->
-                        LuxEmptyState(
-                            title = "Không tìm thấy lệnh này",
-                            message = "Lệnh có thể đã bị huỷ hoặc không còn thuộc địa bàn của bạn.",
-                            actionLabel = "Quay lại",
-                            onAction = onBack,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
-                    is WorkOrderDetailUiState.Error ->
-                        LuxErrorState(
-                            onRetry = onRetry,
-                            kind = if (uiState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
-                            secondaryActionLabel = "Quay lại",
-                            onSecondaryAction = onBack,
-                            modifier = Modifier.align(Alignment.Center),
-                        )
+            LuxChildTopBar(title = title, onBack = onBack)
+        },
+        bottomBar = {
+            if (uiState is WorkOrderDetailUiState.Success) {
+                val cta = workOrderCtaState(state = uiState, onStart = onStart, onSubmit = onSubmit)
+                if (cta != null) {
+                    val scheduleWindow =
+                        workOrderScheduleWindow(uiState.detail.scheduledDate, today = LocalDate.now())
+                    val showCancelRequest =
+                        "request_cancellation" in uiState.detail.allowedActions &&
+                            scheduleWindow.canActOnSchedule &&
+                            !uiState.hasActiveLocalCompletion()
+                    val onCtaClick = { if (cta.requiresConfirmation) showSubmitConfirm = true else cta.onClick() }
+                    val actionError = uiState.startError ?: uiState.submitError
+                    BottomActionBar(
+                        ctaText = cta.text,
+                        ctaIcon = cta.icon,
+                        onCtaClick = onCtaClick,
+                        ctaEnabled = cta.enabled,
+                        hint = actionError ?: cta.hint,
+                        hintColor = if (actionError != null) MaterialTheme.colorScheme.error else cta.hintColor,
+                        showHintIcon = actionError != null || cta.hint != null,
+                        progressText = cta.progressText,
+                        progressSegments = cta.progressSegments,
+                        secondaryText = if (showCancelRequest) "Yêu cầu hủy" else null,
+                        onSecondaryClick = if (showCancelRequest) ({ showCancelSheet = true }) else null,
+                    )
                 }
             }
+        },
+    ) { contentPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            when (uiState) {
+                is WorkOrderDetailUiState.Loading -> WorkOrderDetailLoading()
+                is WorkOrderDetailUiState.Success ->
+                    WorkOrderDetailContent(
+                        state = uiState,
+                        onOpenSurvey = onOpenSurvey,
+                        onNavigateFault = onNavigateFault,
+                        onReportNoteChanged = onReportNoteChanged,
+                        onMaterialsUsedChanged = onMaterialsUsedChanged,
+                        onFaultOutcomeSelected = onFaultOutcomeSelected,
+                        onCaptureEvidence = onCaptureEvidence,
+                        onRemoveEvidence = onRemoveEvidence,
+                        onRecoverEvidence = onRecoverEvidence,
+                        onOpenPdf = onOpenPdf,
+                        onMeasurePole = onMeasurePole,
+                        onRetryAttachment = onRetryAttachment,
+                        onAttachmentFeedback = { message ->
+                            scope.launch { snackbarHostState.showSnackbar(message) }
+                        },
+                    )
+                is WorkOrderDetailUiState.Empty ->
+                    LuxEmptyState(
+                        title = "Không tìm thấy lệnh này",
+                        message = "Lệnh có thể đã bị huỷ hoặc không còn thuộc địa bàn của bạn.",
+                        actionLabel = "Quay lại",
+                        onAction = onBack,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                is WorkOrderDetailUiState.Error ->
+                    LuxErrorState(
+                        onRetry = onRetry,
+                        kind = if (uiState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                        secondaryActionLabel = "Quay lại",
+                        onSecondaryAction = onBack,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+            }
         }
-        TopSlideToast(
-            state = toastState,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        )
     }
 
     if (showSubmitConfirm && uiState is WorkOrderDetailUiState.Success) {
@@ -279,7 +272,7 @@ fun WorkOrderDetailScreen(
                 showSubmitConfirm = false
                 onSubmit()
                 scope.launch {
-                    toastState.show("Nộp báo cáo thành công · Chờ Kỹ sư bảo trì duyệt")
+                    snackbarHostState.showSnackbar("Nộp báo cáo thành công. Chờ Kỹ sư bảo trì duyệt")
                 }
             },
         )
@@ -299,7 +292,7 @@ fun WorkOrderDetailScreen(
         if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
             showCancelSheet = false
             scope.launch {
-                toastState.show("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt")
+                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Kỹ sư bảo trì duyệt")
             }
         }
     }
@@ -378,7 +371,7 @@ private fun SubmitConfirmationSheet(
     val rows = submitSummaryRows(kind, state)
     LuxBottomSheet(title = "Nộp báo cáo?", onDismiss = onDismiss) {
         Text(
-            text = "${kind.label()} · ${detail.workOrderId}",
+            text = "${kind.label()} ${detail.workOrderId}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -430,19 +423,23 @@ private fun SubmitConfirmationSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            LuxSecondaryButton(
-                text = "Kiểm tra lại",
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f).height(PrimaryButtonHeight),
-            )
-            PrimaryButton(
-                text = "Nộp báo cáo",
-                onClick = onConfirm,
-                trailingIcon = Icons.Filled.Send,
-                modifier = Modifier.weight(1.5f),
-            )
-        }
+        LuxActionPair(
+            secondary = { actionModifier ->
+                LuxSecondaryButton(
+                    text = "Kiểm tra lại",
+                    onClick = onDismiss,
+                    modifier = actionModifier,
+                )
+            },
+            primary = { actionModifier ->
+                PrimaryButton(
+                    text = "Nộp báo cáo",
+                    onClick = onConfirm,
+                    trailingIcon = Icons.Filled.Send,
+                    modifier = actionModifier,
+                )
+            },
+        )
     }
 }
 
@@ -460,6 +457,7 @@ private fun WorkOrderDetailContent(
     onOpenPdf: (String) -> Unit,
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
+    onAttachmentFeedback: (String) -> Unit,
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
@@ -527,6 +525,7 @@ private fun WorkOrderDetailContent(
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
                     onReportNoteChanged = onReportNoteChanged,
+                    onAttachmentFeedback = onAttachmentFeedback,
                 )
             } else if (kind == WorkOrderTaskKind.INSPECTION) {
                 InspectionSection(
@@ -615,21 +614,16 @@ private fun EvidenceRecoveryActions(
         LuxSecondaryButton(text = "Thử lại ảnh lỗi", enabled = !state.isSubmitting, onClick = { onRecover(false) })
     }
     if (confirmReplacement && replace && allowReplacement) {
-        AlertDialog(
-            onDismissRequest = { confirmReplacement = false },
-            title = { Text("Mở lại bản nộp?") },
-            text = { Text("App sẽ bỏ các ảnh hỏng hoặc bị từ chối và giữ lại nội dung báo cáo cùng các ảnh còn lại.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReplacement = false
-                        onRecover(true)
-                    },
-                ) { Text("Mở lại để thay ảnh") }
+        LuxConfirmDialog(
+            title = "Mở lại bản nộp?",
+            message = "App sẽ bỏ các ảnh hỏng hoặc bị từ chối và giữ lại nội dung báo cáo cùng các ảnh còn lại.",
+            confirmLabel = "Mở lại để thay ảnh",
+            dismissLabel = "Quay lại",
+            onConfirm = {
+                confirmReplacement = false
+                onRecover(true)
             },
-            dismissButton = {
-                TextButton(onClick = { confirmReplacement = false }) { Text("Quay lại") }
-            },
+            onDismiss = { confirmReplacement = false },
         )
     }
 }
@@ -849,7 +843,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Theo cấu hình của Kỹ sư bảo trì · nhập sau khi bắt đầu",
+                text = "Theo cấu hình của Kỹ sư bảo trì. Nhập sau khi bắt đầu.",
                 style = LabelTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -198,8 +198,8 @@ private fun LuxContentPreview() {
             LuxSectionHeader(title = "Sự cố cần sửa", actionLabel = "Xem tất cả", onAction = {})
             LuxCard(contentPadding = PaddingValues(0.dp)) {
                 LuxListItem(
-                    overline = "Sửa chữa · WO-1042",
-                    headline = "Tuyến ĐH-12 · Xã Tân Phú",
+                    overline = "Sửa chữa WO-1042",
+                    headline = "Tuyến ĐH-12 (Xã Tân Phú)",
                     supporting = "Hạn hôm nay",
                     leadingIcon = Icons.Filled.Build,
                     onClick = {},

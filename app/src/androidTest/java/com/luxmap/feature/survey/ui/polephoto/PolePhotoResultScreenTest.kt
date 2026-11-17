@@ -90,7 +90,7 @@ class PolePhotoResultScreenTest {
             }
         }
         composeRule.onNodeWithText("Kết quả AI").assertExists()
-        composeRule.onNodeWithText("Cột 3 · P-0103").assertExists()
+        composeRule.onNodeWithText("Cột 3 (P-0103)").assertExists()
     }
 
     @Test
@@ -237,7 +237,7 @@ class PolePhotoResultScreenTest {
         }
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Đèn sáng")
         composeRule.onNodeWithText("AI nhận định").assertExists()
-        composeRule.onNodeWithText("Tin cậy cao · 92%").assertExists()
+        composeRule.onNodeWithText("Tin cậy cao (92%)").assertExists()
     }
 
     @Test
@@ -356,7 +356,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("AI không xử lý được · cần bạn chọn nhãn").assertExists()
+        composeRule.onNodeWithText("AI không xử lý được. Hãy chọn trạng thái đèn.").assertExists()
         composeRule.onNodeWithTag("ai_verdict_label").assertTextEquals("Chưa có kết luận")
         composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").performScrollTo().assertExists()
     }

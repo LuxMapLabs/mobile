@@ -54,7 +54,7 @@ class PoleGpsMeasureScreenTest {
 
     @Test
     fun top_bar_shows_the_pole_label_once_ready() {
-        show(PoleGpsMeasureUiState.Success("Cột 3 · P-1", PoleReference("P-1", 3, 10.0, 106.0)))
-        rule.onNodeWithText("Cột 3 · P-1").assertExists()
+        show(PoleGpsMeasureUiState.Success("Cột 3 (P-1)", PoleReference("P-1", 3, 10.0, 106.0)))
+        rule.onNodeWithText("Cột 3 (P-1)").assertExists()
     }
 }

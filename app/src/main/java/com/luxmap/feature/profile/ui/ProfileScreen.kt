@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Dimens
@@ -62,7 +61,6 @@ fun ProfileRoute(
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
-    val username by viewModel.username.collectAsState()
     val profileState by viewModel.profileState.collectAsState()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsState()
     val errorSyncCount by viewModel.errorSyncCount.collectAsState()
@@ -70,11 +68,8 @@ fun ProfileRoute(
     val isOnline by viewModel.isOnline.collectAsState()
 
     ProfileScreen(
-        username = username ?: "Tài khoản",
         profileState = profileState,
         isLoggingOut = viewModel.isLoggingOut,
-        deviceModel = viewModel.deviceModel,
-        appVersion = viewModel.appVersion,
         pendingSyncCount = pendingSyncCount,
         errorSyncCount = errorSyncCount,
         lastSyncedAt = lastSyncedAt,
@@ -89,11 +84,8 @@ fun ProfileRoute(
 
 @Composable
 fun ProfileScreen(
-    username: String,
     profileState: ProfileUiState,
     isLoggingOut: Boolean,
-    deviceModel: String,
-    appVersion: String,
     pendingSyncCount: Int,
     errorSyncCount: Int,
     lastSyncedAt: Instant?,
@@ -136,21 +128,17 @@ fun ProfileScreen(
                 is ProfileUiState.Success ->
                     ProfileBody(
                         isLoggingOut = isLoggingOut,
-                        deviceModel = deviceModel,
-                        appVersion = appVersion,
                         pendingSyncCount = pendingSyncCount,
                         errorSyncCount = errorSyncCount,
                         lastSyncedAt = lastSyncedAt,
                         isOnline = isOnline,
                         onLogoutClick = { showConfirmDialog = true },
                     ) {
-                        ProfileCard(profile = profileState.profile, username = username)
+                        ProfileCard(profileState.profile)
                     }
                 is ProfileUiState.Error ->
                     ProfileBody(
                         isLoggingOut = isLoggingOut,
-                        deviceModel = deviceModel,
-                        appVersion = appVersion,
                         pendingSyncCount = pendingSyncCount,
                         errorSyncCount = errorSyncCount,
                         lastSyncedAt = lastSyncedAt,
@@ -190,8 +178,6 @@ fun ProfileScreen(
 @Composable
 private fun ProfileBody(
     isLoggingOut: Boolean,
-    deviceModel: String,
-    appVersion: String,
     pendingSyncCount: Int,
     errorSyncCount: Int,
     lastSyncedAt: Instant?,
@@ -215,22 +201,12 @@ private fun ProfileBody(
             lastSyncedAt = lastSyncedAt,
         )
         LogoutSection(isLoggingOut = isLoggingOut, pendingSyncCount = pendingSyncCount, onLogoutClick = onLogoutClick)
-        Text(
-            text = "$deviceModel · Phiên bản $appVersion",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ProfileCard(
-    profile: CurrentUserProfile,
-    username: String,
-) {
+private fun ProfileCard(profile: CurrentUserProfile) {
     LuxCard {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(
@@ -242,19 +218,16 @@ private fun ProfileCard(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = initialsOf(profile.fullName.ifBlank { username }),
+                        text = initialsOf(profile.fullName),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = profile.fullName, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "@$username · Tổ khảo sát/sửa chữa",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = profile.fullName,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             FlowRow(
@@ -271,7 +244,7 @@ private fun ProfileCard(
                 Text(text = profile.email, style = MaterialTheme.typography.bodyLarge)
             }
             Text(
-                text = "Địa bàn phụ trách · ${profile.communeIds.size}",
+                text = "Địa bàn phụ trách (${profile.communeIds.size})",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -103,7 +103,7 @@ class PoleGpsMeasureViewModel
         }
 
         private fun poleLabel(reference: PoleReference): String =
-            reference.position?.let { "Cột $it · ${reference.poleId}" } ?: reference.poleId
+            reference.position?.let { "Cột $it (${reference.poleId})" } ?: reference.poleId
 
         companion object {
             const val FIX_TIMEOUT_MILLIS = 10_000L

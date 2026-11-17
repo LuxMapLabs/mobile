@@ -81,7 +81,7 @@ fun CabinetQuickViewBottomSheet(
                                 ?.let { "$it cột chưa gắn tuyến" },
                         )
                     if (notes.isNotEmpty()) {
-                        LuxBanner(message = notes.joinToString(" · "), tone = LuxBannerTone.INFO)
+                        LuxBanner(message = notes.joinToString("\n"), tone = LuxBannerTone.INFO)
                     }
                 }
             }
@@ -105,7 +105,9 @@ private fun FeederRow(feeder: CabinetFeeder) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = "Lộ ${feeder.feederId}", style = MaterialTheme.typography.bodyLarge)
             Text(
-                text = listOfNotNull(feeder.relayNo?.let { "Rơ-le $it" }, feeder.mode.label()).joinToString(" · "),
+                text =
+                    listOfNotNull(feeder.relayNo?.let { "Rơ-le $it" }, "Chế độ: ${feeder.mode.label()}")
+                        .joinToString(", "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -188,8 +188,8 @@ private fun NotificationSuccessContent(
         LuxSegmented(
             segments =
                 listOf(
-                    LuxSegment(NotificationFilter.ALL, "Tất cả · ${state.items.size}"),
-                    LuxSegment(NotificationFilter.UNREAD, "Chưa đọc · $unreadCount"),
+                    LuxSegment(NotificationFilter.ALL, "Tất cả (${state.items.size})"),
+                    LuxSegment(NotificationFilter.UNREAD, "Chưa đọc ($unreadCount)"),
                 ),
             selected = state.filter,
             onSelect = onFilterSelected,
@@ -300,7 +300,7 @@ private fun NotificationRow(
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
-                text = "${type.label()} · $timeLabel",
+                text = "${type.label()}\n$timeLabel",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -95,7 +95,7 @@ fun scheduleValue(
             null
         } ?: return "Chưa có lịch"
     val text = DateFormatUtils.formatPlainDate(scheduledDate)
-    return if (parsed == today) "$text · Hôm nay" else text
+    return if (parsed == today) "Hôm nay ($text)" else text
 }
 
 private val VI = Locale.forLanguageTag("vi")

@@ -64,7 +64,7 @@ class PoleGpsMeasureViewModelTest {
             val vm = viewModel()
             vm.onPermissionGranted()
             val state = vm.state.value as PoleGpsMeasureUiState.Success
-            assertEquals("Cột 3 · P-1", state.poleLabel)
+            assertEquals("Cột 3 (P-1)", state.poleLabel)
             assertEquals(3, state.previous?.position)
         }
 

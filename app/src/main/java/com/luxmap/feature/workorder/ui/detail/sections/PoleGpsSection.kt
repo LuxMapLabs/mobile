@@ -1,6 +1,5 @@
 package com.luxmap.feature.workorder.ui.detail.sections
 
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +50,7 @@ internal fun PoleGpsSection(
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
     onReportNoteChanged: (String) -> Unit,
+    onAttachmentFeedback: (String) -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -64,13 +64,13 @@ internal fun PoleGpsSection(
                     val saved =
                         withContext(Dispatchers.IO) {
                             runCatching {
-                                context.contentResolver.openOutputStream(uri)?.use { output ->
+                                checkNotNull(context.contentResolver.openOutputStream(uri)).use { output ->
                                     File(localPath).inputStream().use { it.copyTo(output) }
                                 }
                             }.isSuccess
                         }
                     val message = if (saved) "Đã lưu file vào thiết bị" else "Không lưu được file"
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                    onAttachmentFeedback(message)
                 }
             }
         }
@@ -138,7 +138,7 @@ private fun PdfAttachmentItem(
     val (supporting, onTap) =
         when (attachment.status) {
             AttachmentStatus.READY -> "Chạm để xem" to onOpen
-            AttachmentStatus.FAILED -> "Tải lỗi · chạm để thử lại" to onRetry
+            AttachmentStatus.FAILED -> "Tải lỗi. Chạm để thử lại." to onRetry
             AttachmentStatus.DOWNLOADING -> "Đang tải…" to null
             AttachmentStatus.PENDING -> "Chờ tải" to null
         }

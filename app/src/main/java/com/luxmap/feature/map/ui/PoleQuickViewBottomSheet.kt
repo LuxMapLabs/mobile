@@ -2,7 +2,6 @@ package com.luxmap.feature.map.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -18,6 +17,7 @@ import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxSecondaryButton
@@ -70,15 +70,19 @@ fun PoleQuickViewBottomSheet(
                     tone = LuxBannerTone.WARNING,
                 )
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                LuxSecondaryButton(
-                    text = "Đường đi",
-                    onClick = onNavigate ?: { openInMaps(context, pole.lat, pole.lng) },
-                    leadingIcon = Icons.Filled.Navigation,
-                    modifier = Modifier.weight(1f),
-                )
-                PrimaryButton(text = "Chi tiết", onClick = onOpenDetail, modifier = Modifier.weight(1f))
-            }
+            LuxActionPair(
+                secondary = { actionModifier ->
+                    LuxSecondaryButton(
+                        text = "Đường đi",
+                        onClick = onNavigate ?: { openInMaps(context, pole.lat, pole.lng) },
+                        leadingIcon = Icons.Filled.Navigation,
+                        modifier = actionModifier,
+                    )
+                },
+                primary = { actionModifier ->
+                    PrimaryButton(text = "Chi tiết", onClick = onOpenDetail, modifier = actionModifier)
+                },
+            )
         }
     }
 }

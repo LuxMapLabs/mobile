@@ -23,7 +23,7 @@ fun confidenceLabel(confidence: Double?): String? {
             ConfidenceBand.MEDIUM -> "Tin cậy vừa"
             ConfidenceBand.LOW -> "Tin cậy thấp"
         }
-    return "$wording · ${(confidence * 100).roundToInt()}%"
+    return "$wording (${(confidence * 100).roundToInt()}%)"
 }
 
 private fun isConclusive(cvState: String?) = cvState == "on" || cvState == "off"
@@ -39,11 +39,11 @@ fun verdictSourceText(
 ): String =
     when {
         reviewedCvState != null && reviewedCvState == cvState -> "Bạn đã xác nhận cùng AI"
-        reviewedCvState != null && isConclusive(cvState) -> "Bạn đã sửa · AI nhận định ${cvStateLabel(cvState)}"
-        reviewedCvState != null && cvState == null -> "Bạn đã xác nhận · AI không xử lý được"
-        reviewedCvState != null -> "Bạn đã xác nhận · AI: Không xác định"
+        reviewedCvState != null && isConclusive(cvState) -> "Bạn đã sửa. AI nhận định ${cvStateLabel(cvState)}"
+        reviewedCvState != null && cvState == null -> "Bạn đã xác nhận. AI không xử lý được"
+        reviewedCvState != null -> "Bạn đã xác nhận. AI: Không xác định"
         isConclusive(cvState) -> "AI nhận định"
-        cvState == null -> "AI không xử lý được · cần bạn chọn nhãn"
+        cvState == null -> "AI không xử lý được. Hãy chọn trạng thái đèn."
         else -> "AI: Không xác định"
     }
 

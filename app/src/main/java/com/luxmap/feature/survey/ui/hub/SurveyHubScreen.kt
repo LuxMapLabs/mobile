@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,6 +18,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -46,9 +45,8 @@ import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.LuxTabTopBar
-import com.luxmap.core.ui.components.TopSlideToast
-import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -117,80 +115,71 @@ fun SurveyHubScreen(
     // Which route's "Yeu cau huy" sheet is open, if any - lives here (not in the ViewModel) same
     // as F09's own showCancelSheet, since it is pure navigation/presentation state.
     var cancelSheetWorkOrderId by remember { mutableStateOf<String?>(null) }
-    val toastState = remember { TopToastState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            topBar = {
-                LuxTabTopBar(
-                    title = "Khảo sát",
-                    subtitle = surveyHubDate(remember { LocalDate.now() }),
-                    unreadNotificationCount = unreadNotificationCount,
-                    onNotificationsClick = onOpenNotifications,
-                )
-            },
-            containerColor = MaterialTheme.colorScheme.background,
-        ) { padding ->
-            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                when (state) {
-                    is SurveyHubUiState.Loading ->
-                        LuxLoadingRegion(
-                            description = "Đang tải việc khảo sát",
-                            modifier = Modifier.padding(Spacing.lg),
-                        ) {
-                            LuxSkeleton(modifier = Modifier.fillMaxWidth(0.4f).height(20.dp))
-                            repeat(3) {
-                                LuxSkeleton(
-                                    modifier = Modifier.fillMaxWidth().height(140.dp),
-                                    shape = MaterialTheme.shapes.medium,
-                                )
-                            }
+    Scaffold(
+        snackbarHost = { LuxSnackbarHost(snackbarHostState) },
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            LuxTabTopBar(
+                title = "Khảo sát",
+                subtitle = surveyHubDate(remember { LocalDate.now() }),
+                unreadNotificationCount = unreadNotificationCount,
+                onNotificationsClick = onOpenNotifications,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when (state) {
+                is SurveyHubUiState.Loading ->
+                    LuxLoadingRegion(
+                        description = "Đang tải việc khảo sát",
+                        modifier = Modifier.padding(Spacing.lg),
+                    ) {
+                        LuxSkeleton(modifier = Modifier.fillMaxWidth(0.4f).height(20.dp))
+                        repeat(3) {
+                            LuxSkeleton(
+                                modifier = Modifier.fillMaxWidth().height(140.dp),
+                                shape = MaterialTheme.shapes.medium,
+                            )
                         }
+                    }
 
-                    is SurveyHubUiState.Success ->
-                        SurveyHubContent(
-                            state = state,
-                            onCapturePolePhotos = onCapturePolePhotos,
-                            onStartRoute = onStartRoute,
-                            onOpenCancelSheet = { cancelSheetWorkOrderId = it },
-                            highlightWorkOrderId = highlightWorkOrderId,
-                            onOpenWorkOrderDetail = onOpenWorkOrderDetail,
-                        )
+                is SurveyHubUiState.Success ->
+                    SurveyHubContent(
+                        state = state,
+                        onCapturePolePhotos = onCapturePolePhotos,
+                        onStartRoute = onStartRoute,
+                        onOpenCancelSheet = { cancelSheetWorkOrderId = it },
+                        highlightWorkOrderId = highlightWorkOrderId,
+                        onOpenWorkOrderDetail = onOpenWorkOrderDetail,
+                    )
 
-                    is SurveyHubUiState.Empty ->
-                        LuxEmptyState(
-                            title = "Chưa có việc khảo sát được giao",
-                            message = "Khi Kỹ sư bảo trì giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
-                            icon = Icons.Filled.EventAvailable,
-                            actionLabel = "Làm mới",
-                            onAction = onRetry,
-                        )
+                is SurveyHubUiState.Empty ->
+                    LuxEmptyState(
+                        title = "Chưa có việc khảo sát được giao",
+                        message = "Khi Kỹ sư bảo trì giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
+                        icon = Icons.Filled.EventAvailable,
+                        actionLabel = "Làm mới",
+                        onAction = onRetry,
+                    )
 
-                    is SurveyHubUiState.Error ->
-                        LuxErrorState(
-                            onRetry = onRetry,
-                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
-                            title = "Không tải được việc khảo sát",
-                            message =
-                                if (state.isNetworkError) {
-                                    "Kiểm tra kết nối rồi thử lại."
-                                } else {
-                                    "Vui lòng thử lại sau ít phút."
-                                },
-                        )
-                }
+                is SurveyHubUiState.Error ->
+                    LuxErrorState(
+                        onRetry = onRetry,
+                        kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                        title = "Không tải được việc khảo sát",
+                        message =
+                            if (state.isNetworkError) {
+                                "Kiểm tra kết nối rồi thử lại."
+                            } else {
+                                "Vui lòng thử lại sau ít phút."
+                            },
+                    )
             }
         }
-        TopSlideToast(
-            state = toastState,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        )
     }
 
     val sheetWorkOrderId = cancelSheetWorkOrderId
@@ -207,7 +196,7 @@ fun SurveyHubScreen(
     LaunchedEffect(state) {
         val success = state as? SurveyHubUiState.Success
         if (sheetWorkOrderId != null && success?.cancelledWorkOrderIds?.contains(sheetWorkOrderId) == true) {
-            scope.launch { toastState.show("Đã gửi yêu cầu hủy · Chờ Kỹ sư bảo trì duyệt") }
+            scope.launch { snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Kỹ sư bảo trì duyệt") }
             cancelSheetWorkOrderId = null
         }
     }
@@ -269,7 +258,7 @@ private fun SurveyHubContent(
         }
         groups.forEach { group ->
             item(key = "header_${group.section}") {
-                LuxSectionHeader(title = "${group.section.title} · ${group.items.size}")
+                LuxSectionHeader(title = "${group.section.title} (${group.items.size})")
             }
             items(group.items, key = { it.order.workOrderId }) { item ->
                 val id = item.order.workOrderId

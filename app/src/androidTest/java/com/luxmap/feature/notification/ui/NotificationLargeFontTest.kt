@@ -47,7 +47,7 @@ class NotificationLargeFontTest {
     fun top_bar_action_filter_and_row_keep_48dp_targets_at_large_font() {
         show()
         composeRule.onNodeWithText("Đọc tất cả").assertTouchTargetIsAtLeast(48.dp)
-        composeRule.onNodeWithText("Tất cả · 1").assertTouchTargetIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Tất cả (1)").assertTouchTargetIsAtLeast(48.dp)
         composeRule
             .onNode(hasClickAction() and hasText("Bạn được giao phiếu", substring = true))
             .assertTouchTargetIsAtLeast(48.dp)

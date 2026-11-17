@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +43,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.PrimaryButton
 import java.io.File
 
@@ -195,29 +195,31 @@ private fun CaptureActions(
     onRetake: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        OutlinedButton(
-            onClick = onRetake,
-            enabled = enabled,
-            modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-        ) { Text("Chụp lại") }
-        Button(
-            onClick = onConfirm,
-            enabled = enabled,
-            modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-            shape = RoundedCornerShape(Radius.control),
-        ) {
-            if (isSaving) {
-                CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Dùng ảnh này")
+    LuxActionPair(
+        modifier = Modifier.navigationBarsPadding(),
+        secondary = { actionModifier ->
+            OutlinedButton(
+                onClick = onRetake,
+                enabled = enabled,
+                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+            ) { Text("Chụp lại") }
+        },
+        primary = { actionModifier ->
+            Button(
+                onClick = onConfirm,
+                enabled = enabled,
+                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
+                shape = RoundedCornerShape(Radius.control),
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Dùng ảnh này")
+                }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

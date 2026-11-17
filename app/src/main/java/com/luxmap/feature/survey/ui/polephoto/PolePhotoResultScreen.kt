@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,9 +99,8 @@ import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.core.ui.components.TopSlideToast
-import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -119,7 +118,7 @@ fun PolePhotoResultScreen(
     onRequestAuthorizationHeader: suspend () -> String? = { null },
     isCompleted: Boolean = false,
 ) {
-    val toastState = remember { TopToastState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val reviewable = state as? PolePhotoResultUiState.Success
     val showFooter = reviewable != null && reviewable.decision == null && !isCompleted
@@ -130,78 +129,78 @@ fun PolePhotoResultScreen(
             LuxChildTopBar(
                 title = "Kết quả AI",
                 onBack = onBack,
-                subtitle = if (position > 0) "Cột $position · $poleId" else poleId,
+                subtitle = if (position > 0) "Cột $position ($poleId)" else poleId,
             )
 
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                        .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
-            ) {
-                when (state) {
-                    is PolePhotoResultUiState.Loading ->
-                        LuxLoadingRegion(description = "Đang tải kết quả AI") {
-                            LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
-                            LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
-                            LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
-                        }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                            .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
+                ) {
+                    when (state) {
+                        is PolePhotoResultUiState.Loading ->
+                            LuxLoadingRegion(description = "Đang tải kết quả AI") {
+                                LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
+                                LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
+                                LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
+                            }
 
-                    is PolePhotoResultUiState.Success ->
-                        PolePhotoResultBody(
-                            poleId,
-                            state,
-                            if (isCompleted) null else onRetake,
-                            onRequestAuthorizationHeader,
-                        ) {
-                            if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
-                        }
+                        is PolePhotoResultUiState.Success ->
+                            PolePhotoResultBody(
+                                poleId,
+                                state,
+                                if (isCompleted) null else onRetake,
+                                onRequestAuthorizationHeader,
+                            ) {
+                                if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
+                            }
 
-                    is PolePhotoResultUiState.Empty ->
-                        LuxEmptyState(
-                            title = "AI chưa phân loại được ảnh này",
-                            message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                            icon = Icons.Filled.SmartToy,
-                        )
+                        is PolePhotoResultUiState.Empty ->
+                            LuxEmptyState(
+                                title = "AI chưa phân loại được ảnh này",
+                                message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                                icon = Icons.Filled.SmartToy,
+                            )
 
-                    is PolePhotoResultUiState.Error ->
-                        LuxErrorState(
-                            onRetry = onRetry,
-                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
-                            title = "Không tải được kết quả AI",
-                            message =
-                                if (state.isNetworkError) {
-                                    "Kiểm tra kết nối rồi thử lại."
-                                } else {
-                                    "Vui lòng thử lại sau ít phút."
-                                },
-                        )
+                        is PolePhotoResultUiState.Error ->
+                            LuxErrorState(
+                                onRetry = onRetry,
+                                kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                                title = "Không tải được kết quả AI",
+                                message =
+                                    if (state.isNetworkError) {
+                                        "Kiểm tra kết nối rồi thử lại."
+                                    } else {
+                                        "Vui lòng thử lại sau ít phút."
+                                    },
+                            )
+                    }
+
+                    Spacer(Modifier.height(Spacing.lg))
                 }
-
-                Spacer(Modifier.height(Spacing.lg))
+                LuxSnackbarHost(
+                    state = snackbarHostState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
+                )
             }
 
             if (draft != null) {
                 ReviewSubmitBar(
                     draft = draft,
                     onSubmit = { finalCvState, reviewNote ->
-                        scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
+                        scope.launch { snackbarHostState.showSnackbar("Đã lưu, sẽ gửi khi Hoàn tất") }
                         onSubmitReview(finalCvState, reviewNote)
                     },
                 )
             }
         }
-        TopSlideToast(
-            state = toastState,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
-        )
     }
 }
 

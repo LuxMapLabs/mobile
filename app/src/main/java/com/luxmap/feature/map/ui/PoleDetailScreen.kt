@@ -190,7 +190,7 @@ private fun PoleHeaderSection(detail: PoleDetail) {
             val updatedAt = DateFormatUtils.formatIsoInstant(detail.determinedAt)
             val sourceLabel = detail.sourceChannel?.toSourceChannelLabel() ?: "-"
             Text(
-                text = "Cập nhật $updatedAt · Phát hiện từ $sourceLabel",
+                text = "Cập nhật $updatedAt\nPhát hiện từ $sourceLabel",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -326,13 +326,13 @@ private fun String.toIotStatusLabel(): String =
         else -> this
     }
 
-// "Online · báo 06:00, 20/08/2026" — status label + last_report_at. Uses the absolute
+// "Online, báo 06:00, 20/08/2026" — status label + last_report_at. Uses the absolute
 // formatter (not a relative "X giờ trước") to avoid adding separate duration-math logic; the
 // mockup's "báo 2 giờ trước" wording is a nice-to-have, not required for this pass.
 private fun PoleDetail.toIotValueLabel(): String {
     val statusLabel = iotNodeStatus?.toIotStatusLabel() ?: "-"
     val lastReport = DateFormatUtils.formatIsoInstant(iotLastReportAt)
-    return "$statusLabel · báo $lastReport"
+    return "$statusLabel, báo $lastReport"
 }
 
 // Icon (left) + label (small, secondary) above value (bold) — matches the "Thông tin nhanh"
@@ -410,7 +410,7 @@ private fun FaultCard(fault: PoleDetailFault) {
             val severityLabel = fault.severity.toSeverityLabel()
             val statusLabel = fault.faultStatus.toFaultStatusLabel()
             Text(
-                text = "$severityLabel · $statusLabel",
+                text = "$severityLabel ($statusLabel)",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

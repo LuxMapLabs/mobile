@@ -25,6 +25,7 @@ import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
 import com.luxmap.core.theme.workOrderStatusFromWire
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxDestructiveButton
 import com.luxmap.core.ui.components.PrimaryButton
@@ -153,7 +154,7 @@ fun SurveyRouteCard(
                 item.order.woStatus != "assigned" -> Unit
                 isCancelled ->
                     Text(
-                        text = "Đã gửi yêu cầu hủy · chờ duyệt",
+                        text = "Đã gửi yêu cầu hủy, chờ duyệt",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -166,21 +167,25 @@ fun SurveyRouteCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        LuxDestructiveButton(
-                            text = "Yêu cầu hủy",
-                            onClick = onRequestCancellation,
-                            filled = false,
-                            enabled = gate == StartGate.Open,
-                            modifier = Modifier.weight(1f),
-                        )
-                        PrimaryButton(
-                            text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu",
-                            onClick = onStart,
-                            enabled = gate == StartGate.Open && !isStarting,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
+                    LuxActionPair(
+                        secondary = { actionModifier ->
+                            LuxDestructiveButton(
+                                text = "Yêu cầu hủy",
+                                onClick = onRequestCancellation,
+                                filled = false,
+                                enabled = gate == StartGate.Open,
+                                modifier = actionModifier,
+                            )
+                        },
+                        primary = { actionModifier ->
+                            PrimaryButton(
+                                text = if (isStarting) "Đang bắt đầu…" else "Bắt đầu",
+                                onClick = onStart,
+                                enabled = gate == StartGate.Open && !isStarting,
+                                modifier = actionModifier,
+                            )
+                        },
+                    )
                 }
             }
         }

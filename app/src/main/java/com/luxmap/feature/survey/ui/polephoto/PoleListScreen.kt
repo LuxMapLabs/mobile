@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -39,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -69,6 +69,7 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
@@ -80,10 +81,9 @@ import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
-import com.luxmap.core.ui.components.TopSlideToast
-import com.luxmap.core.ui.components.TopToastState
 import kotlinx.coroutines.launch
 
 @Composable
@@ -97,47 +97,34 @@ fun PoleListRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Completing the survey otherwise gives no visible feedback at all (found on a real device,
-    // 2026-10-29 - see CLAUDE.md). TopSlideToast (not a Material Snackbar) matches the Khao Sat
-    // v4 mock's own toast, which slides down from above the content instead of appearing at the
-    // bottom where it would be easy to miss.
-    val toastState = remember { TopToastState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         viewModel.surveyCompleted.collect { pendingReviews ->
             val message =
                 if (pendingReviews > 0) {
-                    "Đã hoàn tất $workOrderId · $pendingReviews review đang gửi lên Kỹ sư bảo trì"
+                    "Đã hoàn tất $workOrderId. Đang gửi $pendingReviews kết quả xác nhận cho Kỹ sư bảo trì."
                 } else {
-                    "Đã hoàn tất $workOrderId · Kết quả đã gửi Kỹ sư bảo trì"
+                    "Đã hoàn tất $workOrderId. Đã gửi kết quả cho Kỹ sư bảo trì."
                 }
-            scope.launch { toastState.show(message) }
+            scope.launch { snackbarHostState.showSnackbar(message) }
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        PoleListScreen(
-            workOrderId = workOrderId,
-            state = uiState,
-            onCapturePole = onCapturePole,
-            onCaptureVideo = onCaptureVideo,
-            // Pure navigation - this used to also silently call onComplete() (found on a real
-            // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
-            // mark the whole survey complete even if the user only meant to leave.
-            onBack = onDone,
-            onComplete = viewModel::onComplete,
-            onRetry = viewModel::onRetry,
-            onViewAiResult = onViewAiResult,
-        )
-        TopSlideToast(
-            state = toastState,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        )
-    }
+    PoleListScreen(
+        snackbarHostState = snackbarHostState,
+        workOrderId = workOrderId,
+        state = uiState,
+        onCapturePole = onCapturePole,
+        onCaptureVideo = onCaptureVideo,
+        // Pure navigation - this used to also silently call onComplete() (found on a real
+        // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
+        // mark the whole survey complete even if the user only meant to leave.
+        onBack = onDone,
+        onComplete = viewModel::onComplete,
+        onRetry = viewModel::onRetry,
+        onViewAiResult = onViewAiResult,
+    )
 }
 
 @Composable
@@ -150,6 +137,7 @@ fun PoleListScreen(
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
     onViewAiResult: (serverPhotoId: String) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
     // the design mock's sheet trigger, but only offers the choice itself here.
@@ -159,6 +147,7 @@ fun PoleListScreen(
     var showCompleteConfirm by rememberSaveable { mutableStateOf(false) }
     var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     Scaffold(
+        snackbarHost = { LuxSnackbarHost(snackbarHostState) },
         topBar = { LuxChildTopBar(title = "Chụp ảnh cột đèn", onBack = onBack, subtitle = workOrderId) },
         bottomBar = {
             if (state is PoleListUiState.Success) {
@@ -202,7 +191,7 @@ fun PoleListScreen(
                                     )
                                 }
                             }
-                            item { LuxSectionHeader(title = "Cột trên tuyến · ${state.poles.size}") }
+                            item { LuxSectionHeader(title = "Cột trên tuyến (${state.poles.size})") }
                             item {
                                 LuxCard(contentPadding = PaddingValues(0.dp)) {
                                     Column {
@@ -421,14 +410,18 @@ private fun CompleteSurveyConfirmSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                LuxSecondaryButton(text = "Kiểm tra lại", onClick = onDismiss, modifier = Modifier.weight(1f))
-                PrimaryButton(
-                    text = "Hoàn tất",
-                    onClick = onConfirm,
-                    modifier = Modifier.weight(1f).testTag("confirm_survey_complete"),
-                )
-            }
+            LuxActionPair(
+                secondary = { actionModifier ->
+                    LuxSecondaryButton(text = "Kiểm tra lại", onClick = onDismiss, modifier = actionModifier)
+                },
+                primary = { actionModifier ->
+                    PrimaryButton(
+                        text = "Hoàn tất",
+                        onClick = onConfirm,
+                        modifier = actionModifier.testTag("confirm_survey_complete"),
+                    )
+                },
+            )
         }
     }
 }

@@ -199,10 +199,10 @@ class NotificationListScreenTest {
             }
         }
         composeRule
-            .onNodeWithText("Tất cả · 2")
+            .onNodeWithText("Tất cả (2)")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
             .assertIsSelected()
-        composeRule.onNodeWithText("Chưa đọc · 1").assertIsNotSelected()
+        composeRule.onNodeWithText("Chưa đọc (1)").assertIsNotSelected()
     }
 
     @Test

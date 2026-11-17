@@ -68,7 +68,7 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
-        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
     }
 
     // Merged CTA (Khao Sat v4 mock, CLAUDE.md 2026-10-29) - "Bat dau tuyen" and the separately
@@ -174,7 +174,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
         composeRule.onNodeWithText("Đo GPS cột").assertExists()
     }
 
@@ -268,8 +268,8 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đang làm · 1").assertExists()
-        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Đang làm (1)").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
         composeRule.onNodeWithText("Đo GPS ấp 3", useUnmergedTree = true).assertExists()
     }
 
@@ -323,7 +323,7 @@ class SurveyHubScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chờ đồng bộ · 1").assertExists()
+        composeRule.onNodeWithText("Chờ đồng bộ (1)").assertExists()
         composeRule.onNodeWithText("Đồng bộ lỗi").assertExists()
         composeRule.onNodeWithText("Chụp ảnh/video từng cột").assertDoesNotExist()
     }
@@ -377,7 +377,7 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Tuyến đã xong").assertDoesNotExist()
-        composeRule.onNodeWithText("Chưa bắt đầu · 1").assertExists()
+        composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
     }
 
     @Test

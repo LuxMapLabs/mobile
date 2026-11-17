@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxChildTopBar
 import java.io.File
 
@@ -161,25 +162,32 @@ fun EvidenceCaptureRoute(
                 )
             },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        val granted =
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                        if (granted == PackageManager.PERMISSION_GRANTED) {
-                            viewModel.useCurrentLocation()
-                        } else {
-                            locationPermission.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                                ),
-                            )
+                LuxActionPair(
+                    secondary = {
+                        TextButton(onClick = viewModel::skipPhotosWithoutLocation, modifier = it) {
+                            Text("Bỏ qua ảnh này")
                         }
                     },
-                ) { Text("Dùng vị trí hiện tại") }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::skipPhotosWithoutLocation) { Text("Bỏ qua ảnh này") }
+                    primary = { actionModifier ->
+                        TextButton(
+                            onClick = {
+                                val granted =
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                                if (granted == PackageManager.PERMISSION_GRANTED) {
+                                    viewModel.useCurrentLocation()
+                                } else {
+                                    locationPermission.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                                        ),
+                                    )
+                                }
+                            },
+                            modifier = actionModifier,
+                        ) { Text("Dùng vị trí hiện tại") }
+                    },
+                )
             },
         )
     }

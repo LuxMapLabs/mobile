@@ -716,7 +716,7 @@ fun MapScreen(
             // data keeps rendering as usual (uiState below is independent of this), so this is
             // just a heads-up, not an error state.
             if (!isOnline) {
-                MessageOverlay(text = "Không tải được nền bản đồ · Dữ liệu cột vẫn khả dụng")
+                MessageOverlay(text = "Không tải được nền bản đồ. Dữ liệu cột vẫn khả dụng.")
             }
 
             when (uiState) {

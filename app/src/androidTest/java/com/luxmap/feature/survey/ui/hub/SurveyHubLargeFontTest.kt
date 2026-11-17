@@ -14,6 +14,7 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
 import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.LocalDate
@@ -35,7 +36,7 @@ class SurveyHubLargeFontTest {
     }
 
     @Test
-    fun both_route_buttons_stay_on_one_row_with_48dp_targets_and_the_title_is_visible() {
+    fun route_buttons_stack_with_equal_width_and_keep_48dp_targets() {
         show(
             SurveyHubUiState.Success(
                 assignedRoutes =
@@ -53,7 +54,8 @@ class SurveyHubLargeFontTest {
         )
         val start = composeRule.onNodeWithText("Bắt đầu").assertTouchTargetIsAtLeast(48.dp).fetchSemanticsNode()
         val cancel = composeRule.onNodeWithText("Yêu cầu hủy").assertTouchTargetIsAtLeast(48.dp).fetchSemanticsNode()
-        assertEquals(start.boundsInRoot.top, cancel.boundsInRoot.top, 1f)
+        assertEquals(start.boundsInRoot.width, cancel.boundsInRoot.width, 1f)
+        assertTrue(cancel.boundsInRoot.bottom < start.boundsInRoot.top)
         composeRule.onNodeWithText("Khảo sát tuyến đường liên xã Phước Hiệp đoạn qua chợ").assertIsDisplayed()
     }
 }

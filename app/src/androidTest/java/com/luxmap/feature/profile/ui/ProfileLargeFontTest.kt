@@ -34,11 +34,8 @@ class ProfileLargeFontTest {
                 LuxMapTheme {
                     Box(modifier = Modifier.width(360.dp)) {
                         ProfileScreen(
-                            username = "kysu_hien_truong_01",
                             profileState = ProfileUiState.Success(profile),
                             isLoggingOut = false,
-                            deviceModel = "Samsung SM-A075F",
-                            appVersion = "1.0.0",
                             pendingSyncCount = 2,
                             errorSyncCount = 1,
                             lastSyncedAt = null,
@@ -56,7 +53,7 @@ class ProfileLargeFontTest {
     fun long_identity_and_sync_summary_stay_visible_at_large_font() {
         show()
         composeRule.onNodeWithText("Nguyễn Hoàng Phước Thịnh Trường Giang").assertIsDisplayed()
-        composeRule.onNodeWithText("Chờ 2 · Lỗi 1").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Chờ 2\nLỗi 1").performScrollTo().assertIsDisplayed()
     }
 
     @Test

@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +54,7 @@ import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.workorder.data.CompletionSyncState
@@ -115,7 +115,7 @@ internal fun homeGreeting(
 ): String {
     val date = today.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", VI)).replaceFirstChar { it.titlecase(VI) }
     val name = username?.takeIf { it.isNotBlank() }
-    return if (name != null) "Xin chào, $name · $date" else "Xin chào · $date"
+    return if (name != null) "Xin chào, $name\n$date" else "Xin chào\n$date"
 }
 
 @Composable
@@ -141,7 +141,7 @@ fun HomeScreen(
                 onNotificationsClick = onOpenNotifications,
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LuxSnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
@@ -181,7 +181,7 @@ private fun HomeContent(
         ) {
             SummaryStatsRow(summary = summary)
             LuxSegmented(
-                segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} · ${tasks.countFor(it)}") },
+                segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
                 selected = selectedTab,
                 onSelect = { selectedTab = it },
             )

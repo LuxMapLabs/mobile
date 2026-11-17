@@ -4,9 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -124,24 +122,25 @@ fun BottomActionBar(
                 }
             }
             if (secondaryText != null && onSecondaryClick != null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    LuxDestructiveButton(
-                        text = secondaryText,
-                        onClick = onSecondaryClick,
-                        filled = false,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                    PrimaryButton(
-                        text = ctaText,
-                        onClick = onCtaClick,
-                        enabled = ctaEnabled,
-                        trailingIcon = ctaIcon,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
-                }
+                LuxActionPair(
+                    secondary = { actionModifier ->
+                        LuxDestructiveButton(
+                            text = secondaryText,
+                            onClick = onSecondaryClick,
+                            filled = false,
+                            modifier = actionModifier,
+                        )
+                    },
+                    primary = { actionModifier ->
+                        PrimaryButton(
+                            text = ctaText,
+                            onClick = onCtaClick,
+                            enabled = ctaEnabled,
+                            trailingIcon = ctaIcon,
+                            modifier = actionModifier,
+                        )
+                    },
+                )
             } else {
                 PrimaryButton(
                     text = ctaText,

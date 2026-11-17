@@ -83,7 +83,7 @@ class SurveyHubListTest {
 
     @Test
     fun `schedule value`() {
-        assertEquals("17/11/2026 · Hôm nay", scheduleValue("2026-11-17", TODAY))
+        assertEquals("Hôm nay (17/11/2026)", scheduleValue("2026-11-17", TODAY))
         assertEquals("20/11/2026", scheduleValue("2026-11-20", TODAY))
         assertEquals("Chưa có lịch", scheduleValue(null, TODAY))
         assertEquals("Chưa có lịch", scheduleValue("bad", TODAY))
