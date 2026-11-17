@@ -1,8 +1,10 @@
 package com.luxmap.feature.map.ui
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
@@ -11,10 +13,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.luxmap.core.theme.Dimens
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 
 // Single search entry point for F12 (replaces the old always-open layer-toggle card) — the filter
 // icon opens a bottom sheet with layer/status filters instead of a floating card, per FM-36.
@@ -26,22 +31,50 @@ fun MapSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onFilterClick: () -> Unit,
+    hiddenStatusCount: Int = 0,
+    hiddenLayerCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp,
+    ) {
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(Dimens.radiusMedium),
+            shape = MaterialTheme.shapes.medium,
             placeholder = { Text("Tìm theo mã cột hoặc tên tuyến") },
             leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
-                // Opens the "Hiển thị trên bản đồ" sheet — layer/status display options, not a
-                // search filter, so the icon reads as stacked map layers, not a filter/menu icon.
+                val hiddenParts =
+                    listOfNotNull(
+                        "$hiddenStatusCount trạng thái".takeIf { hiddenStatusCount > 0 },
+                        "$hiddenLayerCount lớp".takeIf { hiddenLayerCount > 0 },
+                    )
+                val description =
+                    if (hiddenParts.isEmpty()) {
+                        "Lọc và lớp bản đồ"
+                    } else {
+                        "Lọc và lớp bản đồ. Đang lọc: ẩn ${hiddenParts.joinToString(", ")}"
+                    }
                 IconButton(onClick = onFilterClick) {
-                    Icon(imageVector = Icons.Filled.Layers, contentDescription = "Tùy chọn hiển thị bản đồ")
+                    Box {
+                        Icon(imageVector = Icons.Filled.Layers, contentDescription = description)
+                        if (hiddenParts.isNotEmpty()) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.TopEnd)
+                                        .size(8.dp)
+                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                        .testTag("map_filter_dot"),
+                            )
+                        }
+                    }
                 }
             },
             colors =

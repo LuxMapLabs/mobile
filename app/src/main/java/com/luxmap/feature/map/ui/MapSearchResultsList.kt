@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Route
@@ -53,7 +52,7 @@ fun MapSearchResultsList(
             modifier =
                 modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
+                    .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
                     .padding(Spacing.md),
         )
         return
@@ -64,7 +63,7 @@ fun MapSearchResultsList(
             modifier
                 .fillMaxWidth()
                 .heightIn(max = RESULTS_LIST_MAX_HEIGHT)
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium)),
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium),
     ) {
         // No tab to pick "pole" or "route" anymore (FM-36) — both groups show together, poles
         // first, each with its own small header so results still read as two kinds, not one

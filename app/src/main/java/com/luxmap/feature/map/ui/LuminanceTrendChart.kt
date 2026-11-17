@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,13 +21,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.luxmap.core.theme.Amber500
+import com.luxmap.core.map.markerFill
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Gray500
-import com.luxmap.core.theme.Rose600
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.Success600
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleLuminancePoint
 
@@ -50,8 +46,8 @@ fun LuminanceTrendCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 .padding(Spacing.lg),
     ) {
         Text(text = "Xu hướng độ sáng", style = MaterialTheme.typography.titleMedium)
@@ -88,6 +84,8 @@ private fun LuminanceTrendChart(
     val values = points.map { it.baselineRatio!! * 100.0 }
     val latestPercent = values.last().toInt()
     val lineColor = status.trendColor()
+    val gridLineColor = MaterialTheme.colorScheme.outlineVariant
+    val thresholdLineColor = LuxTheme.colors.warning
 
     // Baseline (100%) and threshold (80%) are always part of the scale, so max-min is at
     // least 20 even when every data point is identical or there's only 1 point — no need to
@@ -109,14 +107,14 @@ private fun LuminanceTrendChart(
         fun yFor(percent: Double): Float = (size.height * (1f - ((percent - minVal) / range))).toFloat()
 
         drawLine(
-            color = GridLineColor,
+            color = gridLineColor,
             start = Offset(0f, yFor(BASELINE_PERCENT)),
             end = Offset(size.width, yFor(BASELINE_PERCENT)),
             strokeWidth = GRID_LINE_WIDTH.toPx(),
             pathEffect = dashEffect,
         )
         drawLine(
-            color = Amber500,
+            color = thresholdLineColor,
             start = Offset(0f, yFor(THRESHOLD_PERCENT)),
             end = Offset(size.width, yFor(THRESHOLD_PERCENT)),
             strokeWidth = GRID_LINE_WIDTH.toPx(),
@@ -156,15 +154,8 @@ private fun trendCaption(history: List<PoleLuminancePoint>): String {
     }
 }
 
-private fun AssetCondition.trendColor(): Color =
-    when (this) {
-        AssetCondition.NORMAL -> Success600
-        AssetCondition.DIM -> Amber500
-        AssetCondition.OUT -> Rose600
-        AssetCondition.UNKNOWN -> Gray500
-    }
+private fun AssetCondition.trendColor(): Color = markerFill()
 
-private val GridLineColor = Color(0xFFCBD5E1)
 private val CHART_HEIGHT = 96.dp
 private val GRID_LINE_WIDTH = 1.dp
 private val TREND_LINE_WIDTH = 2.5.dp

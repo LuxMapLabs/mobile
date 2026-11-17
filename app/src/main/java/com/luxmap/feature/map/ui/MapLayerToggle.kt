@@ -1,26 +1,19 @@
 package com.luxmap.feature.map.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Spacing
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 
-// Toggle map layers (F12: "Toggle map layers") — poles by status and surveyed route
-// (RoadSegment). Each row has a minimum 48dp touch target (one-hand use, works with gloves).
 @Composable
 fun MapLayerToggle(
     showFixtures: Boolean,
@@ -29,27 +22,14 @@ fun MapLayerToggle(
     onShowRoadSegmentsChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .padding(vertical = Spacing.xs),
-    ) {
-        LayerToggleRow(
-            label = "Cột đèn theo tình trạng",
-            checked = showFixtures,
-            onCheckedChange = onShowFixturesChange,
-        )
-        LayerToggleRow(
-            label = "Tuyến đã khảo sát",
-            checked = showRoadSegments,
-            onCheckedChange = onShowRoadSegmentsChange,
-        )
+    Column(modifier = modifier) {
+        LayerSwitchRow(label = "Cột đèn", checked = showFixtures, onCheckedChange = onShowFixturesChange)
+        LayerSwitchRow(label = "Tuyến đường", checked = showRoadSegments, onCheckedChange = onShowRoadSegmentsChange)
     }
 }
 
 @Composable
-private fun LayerToggleRow(
+private fun LayerSwitchRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -58,13 +38,11 @@ private fun LayerToggleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = Dimens.minTouchTarget)
-                .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = Spacing.sm),
+                .heightIn(min = 56.dp)
+                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Spacer(modifier = Modifier.width(Spacing.xs))
-        Text(text = label, style = MaterialTheme.typography.bodyMedium)
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = null)
     }
 }

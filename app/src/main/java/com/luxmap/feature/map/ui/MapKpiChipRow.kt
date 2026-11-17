@@ -1,28 +1,20 @@
 package com.luxmap.feature.map.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import com.luxmap.core.theme.Dimens
+import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxFilterChip
 
-// Summary row under the search bar (F12) — total poles, poles needing attention (dim/out), total
-// surveyed routes. Not yet a Design System component (section 10 only lists
-// Legend/LayerControl/ZoomControl for the map), so this reuses the same plain
-// MaterialTheme.colorScheme.surface card look as MapLegend/MapLayerToggle instead of inventing a
-// new chip style. Only "cần xử lý" is a shortcut into the FM-36 status filter (tap to filter the
-// map to dim/out poles, tap again to clear) — the other 2 are informational totals only.
 @Composable
 fun MapKpiChipRow(
     poleCount: Int,
@@ -32,38 +24,34 @@ fun MapKpiChipRow(
     onNeedsAttentionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        KpiChip(text = "$poleCount cột")
-        KpiChip(
-            text = "$needsAttentionCount cần xử lý",
-            active = needsAttentionActive,
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        InfoChip(text = "$poleCount cột")
+        LuxFilterChip(
+            label = "$needsAttentionCount cần xử lý",
+            selected = needsAttentionActive,
             onClick = onNeedsAttentionClick,
         )
-        KpiChip(text = "$routeCount tuyến")
+        InfoChip(text = "$routeCount tuyến")
     }
 }
 
 @Composable
-private fun KpiChip(
-    text: String,
-    active: Boolean = false,
-    onClick: (() -> Unit)? = null,
-) {
-    val backgroundColor = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-    val contentColor = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-    val shape = RoundedCornerShape(Dimens.radiusPill)
-    Box(
-        modifier =
-            Modifier
-                .defaultMinSize(minHeight = Dimens.minTouchTarget)
-                // Clip before clickable, or the press ripple is drawn as a gray rectangle
-                // that sticks out past the rounded corners.
-                .clip(shape)
-                .background(backgroundColor, shape)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(horizontal = Spacing.md, vertical = Spacing.xs),
-        contentAlignment = Alignment.Center,
+private fun InfoChip(text: String) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 3.dp,
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = contentColor)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.heightIn(min = 32.dp).padding(horizontal = Spacing.md, vertical = Spacing.xs),
+        )
     }
 }

@@ -4,7 +4,7 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
     <!-- "Has IoT node" badge (has_iot_node) on the pole marker (F12) — Blue500 blue dot + white
-         lightning bolt, white outline to stand out on the satellite basemap. -->
+         lightning bolt, white outline. -->
     <path
         android:fillColor="#FF3E86C9"
         android:strokeColor="#FFFFFFFF"

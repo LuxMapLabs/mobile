@@ -93,6 +93,7 @@ class MapViewModelTest {
                 assertEquals(MapUiState.Loading, awaitItem())
                 val error = awaitItem() as MapUiState.Error
                 assertEquals("network down", error.message)
+                assertEquals(false, error.isNetworkError)
             }
         }
 
@@ -117,6 +118,19 @@ class MapViewModelTest {
                 assertEquals(MapUiState.Loading, awaitItem())
                 val success = awaitItem() as MapUiState.Success
                 assertEquals(dataset, success.dataset)
+            }
+        }
+
+    @Test
+    fun `an IOException is a network error`() =
+        runTest {
+            val repository = mockk<MapRepository>()
+            every { repository.observeGisMapDataset() } returns flow { throw java.io.IOException("offline") }
+            val viewModel = MapViewModel(repository, fakeConnectivityObserver())
+
+            viewModel.uiState.test {
+                assertEquals(MapUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as MapUiState.Error).isNetworkError)
             }
         }
 }

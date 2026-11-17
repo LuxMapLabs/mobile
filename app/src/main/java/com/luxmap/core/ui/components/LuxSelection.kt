@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
@@ -97,6 +98,7 @@ fun LuxFilterChip(
     modifier: Modifier = Modifier,
     count: Int? = null,
     enabled: Boolean = true,
+    leadingDot: (@Composable () -> Unit)? = null,
 ) {
     val spoken = if (count != null) "$label, $count" else label
     FilterChip(
@@ -106,7 +108,11 @@ fun LuxFilterChip(
         modifier = modifier.semantics { contentDescription = spoken },
         shape = MaterialTheme.shapes.small,
         label = {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                leadingDot?.invoke()
                 Text(text = label, style = MaterialTheme.typography.labelMedium)
                 if (count != null) {
                     Text(text = count.toString(), style = MaterialTheme.typography.labelMedium)
