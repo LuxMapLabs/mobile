@@ -1,6 +1,6 @@
 # Đề xuất redesign: Chụp ảnh cột đèn (danh sách cột, xem trước, kết quả AI)
 
-> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT.** Hướng đã thống nhất 2026-11-17 (P1–P3, mục 8). Chưa có code nào thay đổi.
+> **Trạng thái:** **ĐÃ DUYỆT VÀ ĐÃ CODE XONG** trên nhánh `style/redesign-pole-photo-vnext` (2026-11-17). Còn nợ: kiểm tra tay trên máy đã đăng nhập (Light/Night Field, 200%), chụp/quay thật.
 > **Màn:** `feature/survey/ui/polephoto/` — `PoleListScreen.kt` (749 dòng), `PolePhotoCaptureScreen.kt` (351), `PoleVideoCaptureScreen.kt` (433), `PolePhotoResultScreen.kt` (912).
 > **Căn cứ:** `docs/design-system/AUDIT_REPORT.md` (mục 6.4, 6.5), `docs/design-system/vNext/` (đặc biệt `DARK_NIGHT_FIELD.md` mục 3), CLAUDE.md mục "chụp ảnh/video ngắn theo từng cột đèn" và "PHOTO-REVIEW", code hiện tại (đọc 2026-11-17), cách đã làm ở F02, F09, Hub Khảo sát, Cá nhân/Thông báo.
 

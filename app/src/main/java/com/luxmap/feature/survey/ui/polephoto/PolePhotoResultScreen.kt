@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -85,7 +84,6 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.LuxBanner
@@ -627,7 +625,7 @@ private fun VideoPreviewPlaceholder() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(Radius.card))
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
@@ -720,7 +718,7 @@ private fun VideoPlayer(
             (LayoutInflater.from(viewContext).inflate(R.layout.view_player_texture, null) as PlayerView)
                 .apply { this.player = player }
         },
-        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
+        modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
     )
 }
 
