@@ -36,7 +36,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
-import com.luxmap.core.ui.components.NotificationBellBar
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
 import com.luxmap.feature.home.ui.HomeRoute
@@ -140,34 +139,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
 
     Scaffold(
         // Each screen handles its own status/navigation bar insets (see MainActivity), so the
-        // Scaffold must only add the height of the bottom bar to innerPadding - the bell bar
-        // below floats over content and pads itself (see NotificationBellBar), it does not
-        // reserve top space the way a real topBar normally would.
+        // Scaffold must only add the height of the bottom bar to innerPadding.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         // Fades in/out with the same durations as the content transition (screenEnter/screenExit
         // above) instead of popping instantly - showBottomBar flips the moment the back stack's
         // current entry changes, which happens before the NavHost's own crossfade finishes, so an
         // un-animated "if" here made the bell/bottom bar flash in while the old screen was still
         // fading out underneath it.
-        topBar = {
-            // Hidden on Map specifically (per product decision) - the bottom nav bar's own
-            // visibility is untouched, only the bell bar is skipped for this one tab.
-            AnimatedVisibility(
-                visible =
-                    showBottomBar &&
-                        currentRoute != Routes.Map.route &&
-                        currentRoute != Routes.Home.route &&
-                        currentRoute != Routes.Survey.route,
-                enter = fadeIn(animationSpec = tween(FADE_IN_MS)),
-                exit = fadeOut(animationSpec = tween(FADE_OUT_MS)),
-            ) {
-                NotificationBellBar(
-                    unreadCount = unreadNotificationCount,
-                    onClick = { navController.navigate(Routes.Notification.route) },
-                    onDarkHero = currentRoute == Routes.Profile.route,
-                )
-            }
-        },
         bottomBar = {
             AnimatedVisibility(
                 visible = showBottomBar,
@@ -351,7 +329,10 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 )
             }
             composable(Routes.Profile.route) {
-                ProfileRoute()
+                ProfileRoute(
+                    unreadNotificationCount = unreadNotificationCount,
+                    onOpenNotifications = { navController.navigate(Routes.Notification.route) },
+                )
             }
             composable(Routes.Notification.route) {
                 // Refreshes the shared badge on ANY way this destination leaves composition - the

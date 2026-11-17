@@ -1,5 +1,6 @@
 package com.luxmap.feature.profile.ui
 
+import app.cash.turbine.test
 import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.auth.data.AuthRepository
@@ -8,6 +9,7 @@ import com.luxmap.feature.profile.data.ProfileRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -21,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 import java.time.Instant
 
 private val SAMPLE_PROFILE =
@@ -39,11 +42,12 @@ class ProfileViewModelTest {
         lastSyncedAt: Instant? = null,
         isOnline: Boolean = true,
         profileResult: Result<CurrentUserProfile> = Result.success(SAMPLE_PROFILE),
+        profileResults: List<Result<CurrentUserProfile>> = listOf(profileResult),
     ): ProfileViewModel {
         val authRepository = mockk<AuthRepository>()
         every { authRepository.observeUsername() } returns flowOf("fe_thinh")
         val profileRepository = mockk<ProfileRepository>()
-        coEvery { profileRepository.fetchCurrentUser() } returns profileResult
+        coEvery { profileRepository.fetchCurrentUser() } returnsMany profileResults
         val syncQueueManager = mockk<SyncQueueManager>()
         every { syncQueueManager.pendingCount } returns flowOf(pendingCount)
         every { syncQueueManager.errorCount } returns flowOf(errorCount)
@@ -117,5 +121,50 @@ class ProfileViewModelTest {
             val state = vm.profileState.value
             assertTrue(state is ProfileUiState.Error)
             assertEquals("network down", (state as ProfileUiState.Error).message)
+        }
+
+    @Test
+    fun `an IOException is a network error and retry recovers`() =
+        runTest {
+            val vm =
+                viewModel(
+                    profileResults = listOf(Result.failure(IOException("timeout")), Result.success(SAMPLE_PROFILE)),
+                )
+            vm.profileState.test {
+                assertEquals(ProfileUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as ProfileUiState.Error).isNetworkError)
+                vm.retry()
+                assertEquals(ProfileUiState.Loading, awaitItem())
+                assertEquals(ProfileUiState.Success(SAMPLE_PROFILE), awaitItem())
+            }
+        }
+
+    @Test
+    fun `a retry while a load is running never flashes an error from the cancelled load`() =
+        runTest {
+            val firstCall = CompletableDeferred<CurrentUserProfile>()
+            var calls = 0
+            val authRepository = mockk<AuthRepository>()
+            every { authRepository.observeUsername() } returns flowOf("fe_thinh")
+            val profileRepository = mockk<ProfileRepository>()
+            coEvery { profileRepository.fetchCurrentUser() } coAnswers {
+                calls++
+                if (calls == 1) runCatching { firstCall.await() } else Result.success(SAMPLE_PROFILE)
+            }
+            val syncQueueManager = mockk<SyncQueueManager>()
+            every { syncQueueManager.pendingCount } returns flowOf(0)
+            every { syncQueueManager.errorCount } returns flowOf(0)
+            every { syncQueueManager.lastSyncedAt } returns flowOf(null)
+            val connectivityObserver = mockk<ConnectivityObserver>()
+            every { connectivityObserver.isOnline } returns flowOf(true)
+            val vm = ProfileViewModel(authRepository, profileRepository, syncQueueManager, connectivityObserver)
+            vm.profileState.test {
+                assertEquals(ProfileUiState.Loading, awaitItem())
+                testScheduler.runCurrent()
+                vm.retry()
+                assertEquals(ProfileUiState.Success(SAMPLE_PROFILE), awaitItem())
+                testScheduler.advanceUntilIdle()
+                expectNoEvents()
+            }
         }
 }

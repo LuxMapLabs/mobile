@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 sealed interface NotificationNavigationEvent {
@@ -102,7 +103,10 @@ class NotificationListViewModel
                     },
                     onFailure = { e ->
                         _uiState.value =
-                            NotificationListUiState.Error(e.message ?: "Không tải được danh sách thông báo")
+                            NotificationListUiState.Error(
+                                message = e.message ?: "Không tải được danh sách thông báo",
+                                isNetworkError = e is IOException,
+                            )
                     },
                 )
             }

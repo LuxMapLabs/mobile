@@ -8,5 +8,5 @@ sealed interface ProfileUiState {
 
     data class Success(val profile: CurrentUserProfile) : ProfileUiState
 
-    data class Error(val message: String) : ProfileUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : ProfileUiState
 }

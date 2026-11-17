@@ -1,6 +1,15 @@
 package com.luxmap.feature.notification.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,10 +23,11 @@ private fun row(
     type: String = "work_order_assigned",
     entityType: String = "work_order",
     isRead: Boolean = false,
+    title: String = "Bạn được giao phiếu WO-1001",
 ) = NotificationListRowState(
     id,
     type,
-    "Bạn được giao phiếu WO-1001",
+    title,
     "WO-1001 — Thay bóng đèn.",
     entityType,
     "WO-1001",
@@ -29,11 +39,11 @@ class NotificationListScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_progress_indicator() {
+    fun loading_is_one_announced_region() {
         composeRule.setContent {
             LuxMapTheme { NotificationListScreen(state = NotificationListUiState.Loading, onBack = {}) }
         }
-        composeRule.onNodeWithTag("notification_list_loading").assertExists()
+        composeRule.onNodeWithContentDescription("Đang tải thông báo").assertExists()
     }
 
     @Test
@@ -88,20 +98,22 @@ class NotificationListScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message_and_retry_calls_onRetry() {
-        var retried = false
+    fun a_network_error_uses_screen_copy_and_retries() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
                 NotificationListScreen(
-                    state = NotificationListUiState.Error("network down"),
+                    state = NotificationListUiState.Error("java.net.SocketTimeoutException", isNetworkError = true),
                     onBack = {},
-                    onRetry = { retried = true },
+                    onRetry = { retries++ },
                 )
             }
         }
-        composeRule.onNodeWithText("network down").assertExists()
+        composeRule.onNodeWithText("Không tải được thông báo").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
-        assertEquals(true, retried)
+        assertEquals(1, retries)
     }
 
     @Test
@@ -160,5 +172,80 @@ class NotificationListScreenTest {
             }
         }
         composeRule.onNodeWithTag("notification_list_more_footer").assertDoesNotExist()
+    }
+
+    @Test
+    fun mark_all_read_is_hidden_when_everything_is_read() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(state = NotificationListUiState.Success(listOf(row(isRead = true))), onBack = {})
+            }
+        }
+        composeRule.onNodeWithText("Đọc tất cả").assertDoesNotExist()
+        composeRule.onNodeWithText("Thông báo").assertExists()
+    }
+
+    @Test
+    fun the_filter_is_a_radio_group_with_counts() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(row(isRead = false), row(id = "NTF-2", isRead = true)),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithText("Tất cả · 2")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+            .assertIsSelected()
+        composeRule.onNodeWithText("Chưa đọc · 1").assertIsNotSelected()
+    }
+
+    @Test
+    fun only_work_order_rows_are_buttons_with_a_chevron_and_unread_is_announced() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(
+                                row(id = "WO-ROW", entityType = "work_order", title = "Giao lệnh mới"),
+                                row(id = "FAULT-ROW", entityType = "fault", title = "Sự cố mới"),
+                            ),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule
+            .onNode(hasText("Giao lệnh mới", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chưa đọc"))
+        composeRule.onNodeWithTag("notification_chevron_WO-ROW", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("notification_chevron_FAULT-ROW", useUnmergedTree = true).assertDoesNotExist()
+        composeRule
+            .onNode(hasText("Sự cố mới", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
+    }
+
+    @Test
+    fun a_read_row_that_opens_nothing_has_no_click_action() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(row(id = "READ-FAULT", entityType = "fault", title = "Sự cố đã đọc", isRead = true)),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNode(hasText("Sự cố đã đọc", substring = true) and hasClickAction()).assertDoesNotExist()
+        composeRule.onNodeWithText("Sự cố đã đọc").assertExists()
     }
 }

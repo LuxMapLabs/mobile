@@ -128,6 +128,7 @@ class NotificationListViewModelTest {
                 assertEquals(NotificationListUiState.Loading, awaitItem())
                 val error = awaitItem() as NotificationListUiState.Error
                 assertEquals("network down", error.message)
+                assertEquals(false, error.isNetworkError)
             }
         }
 
@@ -236,6 +237,19 @@ class NotificationListViewModelTest {
                     ),
                 )
                 assertEquals(NotificationNavigationEvent.OpenWorkOrderDetail("WO-1"), awaitItem())
+            }
+        }
+
+    @Test
+    fun `an IOException is a network error`() =
+        runTest {
+            val repository = mockk<NotificationRepository>()
+            coEvery { repository.list() } returns Result.failure(java.io.IOException("timeout"))
+            val vm = NotificationListViewModel(repository, fakeWorkOrderDetailRepository())
+
+            vm.uiState.test {
+                assertEquals(NotificationListUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as NotificationListUiState.Error).isNetworkError)
             }
         }
 }
