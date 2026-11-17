@@ -1,6 +1,6 @@
 # Đề xuất redesign: Cá nhân (F15) và Thông báo (F14)
 
-> **Trạng thái:** **CHỜ DUYỆT BẢN VIẾT.** Hướng đã thống nhất 2026-11-17 (T1–T3, mục 7). Chưa có code nào thay đổi.
+> **Trạng thái:** **ĐÃ DUYỆT VÀ ĐÃ CODE XONG** trên nhánh `style/redesign-profile-notification-vnext` (2026-11-17). Còn nợ: kiểm tra tay trên máy đã đăng nhập (Light/Night Field, 200%).
 > **Màn:** `feature/profile/ui/ProfileScreen.kt` (575 dòng, tab 4) và `feature/notification/ui/NotificationListScreen.kt` (632 dòng, mở từ chuông).
 > **Căn cứ:** `docs/design-system/AUDIT_REPORT.md` (mục 6.10, 6.11), `docs/design-system/vNext/`, code hiện tại (đọc 2026-11-17), cách đã làm ở F02, F09 và Hub Khảo sát.
 
