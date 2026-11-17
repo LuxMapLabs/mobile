@@ -2,11 +2,13 @@ package com.luxmap.feature.profile.ui
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.profile.data.CurrentUserProfile
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +32,9 @@ class ProfileScreenTest {
         errorSyncCount: Int = 0,
         lastSyncedAt: Instant? = null,
         onConfirmLogout: () -> Unit = {},
+        unread: Int = 0,
+        onOpenNotifications: () -> Unit = {},
+        onRetry: () -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
@@ -44,6 +49,9 @@ class ProfileScreenTest {
                     lastSyncedAt = lastSyncedAt,
                     isOnline = isOnline,
                     onConfirmLogout = onConfirmLogout,
+                    unreadNotificationCount = unread,
+                    onOpenNotifications = onOpenNotifications,
+                    onRetry = onRetry,
                 )
             }
         }
@@ -134,5 +142,14 @@ class ProfileScreenTest {
         composeRule.onNodeWithText("Đăng xuất khỏi thiết bị này?").assertExists()
         composeRule.onAllNodesWithText("Đăng xuất")[1].performClick()
         assertTrue(loggedOut)
+    }
+
+    @Test
+    fun the_top_bar_has_the_title_and_a_bell_that_opens_notifications() {
+        var opened = 0
+        setContent(unread = 4, onOpenNotifications = { opened++ })
+        composeRule.onNodeWithText("Cá nhân").assertExists()
+        composeRule.onNodeWithContentDescription("Thông báo, 4 chưa đọc").performClick()
+        assertEquals(1, opened)
     }
 }

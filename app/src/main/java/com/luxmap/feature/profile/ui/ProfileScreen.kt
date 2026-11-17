@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -60,16 +59,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
-import com.luxmap.core.theme.BrandHeroGradient
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.DisplayTextStyle
-import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.Success600
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.profile.data.CurrentUserProfile
@@ -86,6 +83,8 @@ private val SyncDetailIndent = 48.dp
 
 @Composable
 fun ProfileRoute(
+    unreadNotificationCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -108,6 +107,9 @@ fun ProfileRoute(
         lastSyncedAt = lastSyncedAt,
         isOnline = isOnline,
         onConfirmLogout = viewModel::onConfirmLogout,
+        unreadNotificationCount = unreadNotificationCount,
+        onOpenNotifications = onOpenNotifications,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -127,26 +129,27 @@ fun ProfileScreen(
     lastSyncedAt: Instant?,
     isOnline: Boolean,
     onConfirmLogout: () -> Unit,
+    unreadNotificationCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
+    onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Survives rotation, so the dialog does not disappear while the user is deciding.
     var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        ProfileHeader(username = username, profileState = profileState)
-        // Overlaps the hero's bottom edge, same pattern as Home/Survey Hub/pole list - the clip
-        // (not just background) matters once this content scrolls, see the F02/F05 fix this
-        // exact bug needed: background alone paints the rounded shape but never cuts the
-        // column's own square corners.
-        Box(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .offset(y = -Spacing.xl)
-                    .clip(RoundedCornerShape(topStart = Radius.sheet, topEnd = Radius.sheet))
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            LuxTabTopBar(
+                title = "Cá nhân",
+                unreadNotificationCount = unreadNotificationCount,
+                onNotificationsClick = onOpenNotifications,
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (profileState) {
                 is ProfileUiState.Loading ->
                     Box(
@@ -159,6 +162,7 @@ fun ProfileScreen(
                 is ProfileUiState.Success ->
                     ProfileContent(
                         profile = profileState.profile,
+                        username = username,
                         isLoggingOut = isLoggingOut,
                         deviceModel = deviceModel,
                         appVersion = appVersion,
@@ -219,70 +223,10 @@ fun ProfileScreen(
     }
 }
 
-// The notification bell is already floated globally by NavGraph's Scaffold (NotificationBellBar,
-// on every tab) - this hero deliberately has no bell of its own, that would duplicate it.
-@Composable
-private fun ProfileHeader(
-    username: String,
-    profileState: ProfileUiState,
-) {
-    // Falls back to the auth username while the richer profile is still loading or failed to
-    // load, instead of leaving the hero blank or branching its whole layout on profileState.
-    val displayName = (profileState as? ProfileUiState.Success)?.profile?.fullName ?: username
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg)
-                .padding(top = Spacing.xs, bottom = Spacing.xxxl),
-    ) {
-        Text(text = "Cá nhân", style = DisplayTextStyle, color = Color.White)
-        Spacer(Modifier.height(Spacing.lg))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            ProfileAvatar(initials = initialsOf(displayName))
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(text = displayName, style = MaterialTheme.typography.titleLarge, color = Color.White)
-                Text(
-                    text = "@$username",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.75f),
-                )
-                RoleBadge()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProfileAvatar(initials: String) {
-    Box(
-        modifier = Modifier.size(64.dp).clip(CircleShape).background(Color.White),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text = initials, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-// Only one mobile role exists (Field Engineer, see CLAUDE.md) - a static label, not driven by
-// CurrentUserProfile.role, same as the design doc's own hardcoded badge text.
-@Composable
-private fun RoleBadge() {
-    Box(
-        modifier =
-            Modifier
-                .padding(top = Spacing.xs)
-                .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(Dimens.radiusPill))
-                .padding(horizontal = Spacing.sm, vertical = 4.dp),
-    ) {
-        Text(text = "Tổ khảo sát/sửa chữa", style = LabelTextStyle, color = Color.White)
-    }
-}
-
 @Composable
 private fun ProfileContent(
     profile: CurrentUserProfile,
+    username: String,
     isLoggingOut: Boolean,
     deviceModel: String,
     appVersion: String,
@@ -296,6 +240,12 @@ private fun ProfileContent(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.xl),
     ) {
+        Text(text = profile.fullName, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "@$username",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         AccountSection(profile)
         ReadinessSection(
             pendingSyncCount = pendingSyncCount,
