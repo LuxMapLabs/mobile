@@ -51,6 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -68,10 +69,7 @@ import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.luxmap.core.map.IOT_BADGE_ICON_ID
-import com.luxmap.core.map.MAP_STYLE_URL
-import com.luxmap.core.map.MARKER_BADGE_DIM_ICON_ID
-import com.luxmap.core.map.MARKER_BADGE_OUT_ICON_ID
-import com.luxmap.core.map.MARKER_BADGE_UNKNOWN_ICON_ID
+import com.luxmap.core.map.MapMarkerColors
 import com.luxmap.core.map.POI_BADGE_ICON_ID
 import com.luxmap.core.map.VECTOR_STYLE_URL
 import com.luxmap.core.map.markerColorArgb
@@ -113,14 +111,12 @@ private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
 private const val MOCK_AREA_ZOOM = 15.0
 
 private const val POLES_SOURCE_ID = "poles-source"
-private const val POLES_GLOW_CIRCLE_LAYER_ID = "poles-glow-circle-layer"
 
 // Kept as "circle" in the id string even though FM-37 turned this into a SymbolLayer — renaming
 // the id would be a pointless churn, it is just a style source/layer identifier string, not a
 // type name.
 private const val POLES_CIRCLE_LAYER_ID = "poles-circle-layer"
 private const val POLES_SELECTED_HALO_LAYER_ID = "poles-selected-halo-layer"
-private const val POLES_STATUS_BADGE_LAYER_ID = "poles-status-badge-layer"
 private const val POLES_POI_BADGE_LAYER_ID = "poles-poi-badge-layer"
 private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
@@ -133,8 +129,8 @@ private const val NO_SELECTION_SENTINEL = ""
 // Marker icons are 28x35dp pin-shaped source vectors (see ic_marker_*.xml, Icon Cot Den Map
 // design), so size 1.0f renders at their full 28x35dp and 1.3f at ~36x45dp for the selected pole.
 private const val MARKER_ICON_SIZE = 1.0f
-private const val MARKER_ICON_SIZE_SELECTED = 1.3f
-private const val SELECTED_HALO_RADIUS = 20f
+private const val MARKER_ICON_SIZE_SELECTED = 24f / 18f
+private const val SELECTED_HALO_RADIUS = 15f
 
 // Badges/labels only worth showing once zoomed in enough to read them (F12/FM-37 LOD rule) —
 // below this the map is zoomed out far enough that individual badges would just be clutter.
@@ -172,11 +168,6 @@ private const val SEARCH_RESULT_POLE_ZOOM = 18.0
 private val LOCATION_PERMISSIONS =
     arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 
-// Camera zoom cap while on the satellite basemap — see the comment where
-// map.setMaxZoomPreference() is called for why (rural satellite imagery gets blurry past its
-// source resolution when over-zoomed). The vector basemap is drawn with lines so it doesn't
-// blur, and allows zooming in much further.
-private const val SATELLITE_MAX_ZOOM = 18.5
 private const val VECTOR_MAX_ZOOM = 20.0
 
 // What the KPI "cần xử lý" chip filters to (FM-36) — poles that need a field visit, tapping the
@@ -218,10 +209,6 @@ fun MapScreen(
     // default camera and layer settings.
     var showFixtures by rememberSaveable { mutableStateOf(true) }
     var showRoadSegments by rememberSaveable { mutableStateOf(true) }
-    // Vector (OpenFreeMap) is the default for field operation — always sharp, no API key needed.
-    // The basemap toggle lets the user switch to satellite (MapTiler Hybrid) when they need to
-    // compare against real-world imagery (see MAP_STYLE_URL/VECTOR_STYLE_URL in MapLibreConfig.kt).
-    var isSatelliteBasemap by rememberSaveable { mutableStateOf(false) }
     // Last camera as [latitude, longitude, zoom, bearing]; null until the map has been moved once.
     var savedCamera by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     // True once the camera has been auto-moved to the real map_bounds.center — guards against
@@ -311,7 +298,7 @@ fun MapScreen(
                         // rotation off the compass is not needed.
                         map.uiSettings.isRotateGesturesEnabled = false
                         map.uiSettings.isCompassEnabled = false
-                        map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
+                        map.setMaxZoomPreference(VECTOR_MAX_ZOOM)
                         val camera = savedCamera
                         map.cameraPosition =
                             if (camera != null) {
@@ -338,8 +325,7 @@ fun MapScreen(
                                 userMovedCamera = true
                             }
                         }
-                        val initialStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
-                        map.setStyle(Style.Builder().fromUri(initialStyleUrl)) { style ->
+                        map.setStyle(Style.Builder().fromUri(VECTOR_STYLE_URL)) { style ->
                             setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
                             // Style/source/layer are only guaranteed ready here (inside the
                             // onStyleLoaded callback) — assign maplibreMap at this point so the
@@ -349,10 +335,27 @@ fun MapScreen(
                         map.addOnMapClickListener addOnMapClickListener@{ latLng ->
                             val screenPoint = map.projection.toScreenLocation(latLng)
                             val tappedPoleId =
-                                map
-                                    .queryRenderedFeatures(screenPoint, POLES_CIRCLE_LAYER_ID)
-                                    .firstOrNull()
-                                    ?.getStringProperty("pole_id")
+                                pickNearestFeature(
+                                    screenPoint.x,
+                                    screenPoint.y,
+                                    map
+                                        .queryRenderedFeatures(
+                                            tapSquare(
+                                                screenPoint.x,
+                                                screenPoint.y,
+                                                context.resources.displayMetrics.density,
+                                            ),
+                                            POLES_CIRCLE_LAYER_ID,
+                                        ).mapNotNull { feature ->
+                                            val id = feature.getStringProperty("pole_id") ?: return@mapNotNull null
+                                            val point = feature.geometry() as? Point ?: return@mapNotNull null
+                                            val screen =
+                                                map.projection.toScreenLocation(
+                                                    LatLng(point.latitude(), point.longitude()),
+                                                )
+                                            TapCandidate(id, screen.x, screen.y)
+                                        },
+                                )
                             val tappedPole =
                                 tappedPoleId?.let { id ->
                                     uiState.polesOrEmpty().firstOrNull { it.poleId == id }
@@ -605,29 +608,6 @@ fun MapScreen(
                 // because the source imagery just doesn't have that resolution — this button lets
                 // the field crew switch to the vector basemap (drawn with lines, always sharp) when
                 // needed.
-                FloatingActionButton(
-                    onClick = {
-                        isSatelliteBasemap = !isSatelliteBasemap
-                        val map = maplibreMap ?: return@FloatingActionButton
-                        map.setMaxZoomPreference(if (isSatelliteBasemap) SATELLITE_MAX_ZOOM else VECTOR_MAX_ZOOM)
-                        val newStyleUrl = if (isSatelliteBasemap) MAP_STYLE_URL else VECTOR_STYLE_URL
-                        map.setStyle(Style.Builder().fromUri(newStyleUrl)) { style ->
-                            setupMapLayers(context, style, uiState, showFixtures, showRoadSegments)
-                            // setStyle() drops the LocationComponent along with the rest of the old
-                            // style — re-enable it here or the blue dot disappears after toggling
-                            // basemap (see the NOTE on enableLocationComponent).
-                            if (hasLocationPermission) {
-                                enableLocationComponent(context, map, style)
-                            }
-                        }
-                    },
-                ) {
-                    Text(
-                        text = if (isSatelliteBasemap) "Vector" else "Vệ tinh",
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-
                 FloatingActionButton(
                     onClick = {
                         showLocationPermissionDenied = false
@@ -929,9 +909,7 @@ private fun addFixtureLayers(style: Style) {
     style.addLayer(buildClusterCircleLayer())
     style.addLayer(buildClusterCountLayer())
     style.addLayer(buildPoleSelectedHaloLayer())
-    style.addLayer(buildPoleGlowCircleLayer())
     style.addLayer(buildPoleIconLayer())
-    style.addLayer(buildStatusBadgeLayer())
     style.addLayer(buildPoiBadgeLayer())
     style.addLayer(buildIotBadgeLayer())
 }
@@ -940,9 +918,7 @@ private fun removeFixtureLayers(style: Style) {
     style.removeLayer(CLUSTER_CIRCLE_LAYER_ID)
     style.removeLayer(CLUSTER_COUNT_LAYER_ID)
     style.removeLayer(POLES_SELECTED_HALO_LAYER_ID)
-    style.removeLayer(POLES_GLOW_CIRCLE_LAYER_ID)
     style.removeLayer(POLES_CIRCLE_LAYER_ID)
-    style.removeLayer(POLES_STATUS_BADGE_LAYER_ID)
     style.removeLayer(POLES_POI_BADGE_LAYER_ID)
     style.removeLayer(POLES_IOT_BADGE_LAYER_ID)
 }
@@ -965,28 +941,6 @@ private fun removeRoadSegmentLayers(style: Style) {
     style.removeLayer(ROAD_SEGMENTS_LINE_LAYER_ID)
 }
 
-// Soft glow around each pole marker (F12) — matches the glow effect on Web GIS. Static, no
-// blinking: web only pulses the "out" state with a CSS animation, but adding a loop animation
-// on native MapLibre just for looks is over-engineering for F12 scope.
-private fun buildPoleGlowCircleLayer(): CircleLayer =
-    CircleLayer(POLES_GLOW_CIRCLE_LAYER_ID, POLES_SOURCE_ID)
-        .withProperties(
-            PropertyFactory.circleRadius(14f),
-            PropertyFactory.circleBlur(1f),
-            // Lowered from 0.35f so the status icon reads as the focal point, not the glow behind
-            // it, now that the icon itself is bigger (see MARKER_ICON_SIZE).
-            PropertyFactory.circleOpacity(0.22f),
-            PropertyFactory.circleColor(
-                Expression.match(
-                    Expression.get("fixture_status"),
-                    Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
-                    Expression.stop("normal", Expression.color(AssetCondition.NORMAL.markerColorArgb())),
-                    Expression.stop("dim", Expression.color(AssetCondition.DIM.markerColorArgb())),
-                    Expression.stop("out", Expression.color(AssetCondition.OUT.markerColorArgb())),
-                ),
-            ),
-        ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
-
 // Marker shape per fixture_status (F12/FM-37, Design System 3.4) — SymbolLayer + the 4
 // ic_marker_*.xml icons registered in registerMarkerBadgeIcons(), replacing the old flat-color
 // CircleLayer dot. Icon size doubles as the "selected" state (see updateSelectedPoleStyle) via a
@@ -1004,9 +958,16 @@ private fun buildPoleIconLayer(): SymbolLayer =
                 ),
             ),
             PropertyFactory.iconSize(selectedIconSizeExpression(NO_SELECTION_SENTINEL)),
-            // Icon Cot Den Map design (2026-11-04): the pin's point (not its center) is now the
-            // actual geo-coordinate, since the icon switched from a centered dot to a teardrop pin.
-            PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+            PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+            PropertyFactory.symbolSortKey(
+                Expression.match(
+                    Expression.get("fixture_status"),
+                    Expression.literal(0),
+                    Expression.stop("out", Expression.literal(3)),
+                    Expression.stop("dim", Expression.literal(2)),
+                    Expression.stop("normal", Expression.literal(1)),
+                ),
+            ),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
@@ -1019,16 +980,10 @@ private fun buildPoleSelectedHaloLayer(): CircleLayer =
     CircleLayer(POLES_SELECTED_HALO_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.circleRadius(SELECTED_HALO_RADIUS),
-            PropertyFactory.circleOpacity(0.35f),
-            PropertyFactory.circleColor(
-                Expression.match(
-                    Expression.get("fixture_status"),
-                    Expression.color(AssetCondition.UNKNOWN.markerColorArgb()),
-                    Expression.stop("normal", Expression.color(AssetCondition.NORMAL.markerColorArgb())),
-                    Expression.stop("dim", Expression.color(AssetCondition.DIM.markerColorArgb())),
-                    Expression.stop("out", Expression.color(AssetCondition.OUT.markerColorArgb())),
-                ),
-            ),
+            PropertyFactory.circleOpacity(0f),
+            PropertyFactory.circleStrokeWidth(3f),
+            PropertyFactory.circleStrokeOpacity(1f),
+            PropertyFactory.circleStrokeColor(MapMarkerColors.SelectionVector.toArgb()),
         ).apply { setFilter(selectedPoleFilter(NO_SELECTION_SENTINEL)) }
 
 private fun selectedPoleFilter(selectedPoleId: String): Expression =
@@ -1054,36 +1009,6 @@ private fun updateSelectedPoleStyle(
     (style.getLayer(POLES_SELECTED_HALO_LAYER_ID) as? CircleLayer)?.setFilter(selectedPoleFilter(id))
 }
 
-// Status badge (Icon Cot Den Map design, 2026-11-04) — dim/out/unknown only, normal has none
-// (see the match's default: "unknown" covers both the literal unknown status and any other
-// value, same fallback pattern as buildPoleGlowCircleLayer above). Sits at the pin's top-right
-// corner, offset computed from the pin's new bottom anchor up to the white circle's top-right
-// edge — approximate, tune after a real-device check.
-private fun buildStatusBadgeLayer(): SymbolLayer =
-    SymbolLayer(POLES_STATUS_BADGE_LAYER_ID, POLES_SOURCE_ID)
-        .withProperties(
-            PropertyFactory.iconImage(
-                Expression.match(
-                    Expression.get("fixture_status"),
-                    Expression.literal(MARKER_BADGE_UNKNOWN_ICON_ID),
-                    Expression.stop("dim", Expression.literal(MARKER_BADGE_DIM_ICON_ID)),
-                    Expression.stop("out", Expression.literal(MARKER_BADGE_OUT_ICON_ID)),
-                ),
-            ),
-            PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(10f, -26f)),
-            PropertyFactory.iconAllowOverlap(true),
-            PropertyFactory.iconIgnorePlacement(true),
-        ).apply {
-            setFilter(
-                Expression.all(
-                    Expression.not(Expression.has("point_count")),
-                    Expression.neq(Expression.get("fixture_status"), Expression.literal("normal")),
-                ),
-            )
-            minZoom = BADGE_MIN_ZOOM
-        }
-
 // "Near sensitive area" badge (F12, near_sensitive_poi) — bottom-right corner of the pin's white
 // circle (moved from top-right in the old center-anchored dot design, since the new status badge
 // now takes that corner). IoT badge goes bottom-left so a pole with both badges doesn't overlap.
@@ -1094,8 +1019,8 @@ private fun buildPoiBadgeLayer(): SymbolLayer =
     SymbolLayer(POLES_POI_BADGE_LAYER_ID, POLES_SOURCE_ID)
         .withProperties(
             PropertyFactory.iconImage(POI_BADGE_ICON_ID),
-            PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(10f, -12f)),
+            PropertyFactory.iconSize(1f),
+            PropertyFactory.iconOffset(arrayOf(10f, -10f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {
@@ -1114,7 +1039,7 @@ private fun buildIotBadgeLayer(): SymbolLayer =
         .withProperties(
             PropertyFactory.iconImage(IOT_BADGE_ICON_ID),
             PropertyFactory.iconSize(0.7f),
-            PropertyFactory.iconOffset(arrayOf(-10f, -12f)),
+            PropertyFactory.iconOffset(arrayOf(-10f, 10f)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply {

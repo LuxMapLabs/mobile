@@ -11,7 +11,6 @@ object MapMarkerColors {
     val PoiBadge = Color(0xFFF59E0B)
     val Edge = Color(0xFF0F172A)
     val SelectionVector = Color(0xFF1F3864)
-    val SelectionSatellite = Color(0xFF9DB7E0)
     val RouteNormal = Color(0xFF3E86C9)
     val RouteFault = Color(0xFFD64545)
 }
