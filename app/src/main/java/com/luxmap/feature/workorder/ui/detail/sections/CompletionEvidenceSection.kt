@@ -58,7 +58,7 @@ internal fun CompletionEvidenceSection(
                             "synced" -> "Đã đồng bộ"
                             "pending" -> "Chờ đồng bộ"
                             "syncing" -> "Đang tải lên"
-                            "retryable_error" -> "Tải lỗi · có thể thử lại"
+                            "retryable_error" -> "Tải lỗi. Bạn có thể thử lại."
                             "replaceable_error" -> "Cần thay ảnh"
                             "failed" -> "Không tải được ảnh"
                             "conflict" -> "Xung đột đồng bộ"

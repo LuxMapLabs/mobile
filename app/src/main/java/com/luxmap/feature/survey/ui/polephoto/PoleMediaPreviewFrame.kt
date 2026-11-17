@@ -7,13 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,8 +30,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import com.luxmap.core.theme.LuxTheme
-import com.luxmap.core.theme.PrimaryButtonHeight
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.PrimaryButton
 
@@ -96,33 +92,21 @@ fun PoleMediaPreviewFrame(
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg)) {
             val stackActions =
                 keepRetakeLabelOnOneLine && !retakeLabelFitsHalfWidth(retakeLabel, maxWidth)
-            val retake: @Composable (Modifier) -> Unit = {
-                LuxSecondaryButton(text = retakeLabel, onClick = onRetake, enabled = !isSaving, modifier = it)
-            }
-            val confirm: @Composable (Modifier) -> Unit = {
-                PrimaryButton(
-                    text = if (isSaving) "Đang lưu…" else confirmLabel,
-                    onClick = onConfirm,
-                    enabled = confirmEnabled && !isSaving,
-                    isLoading = isSaving,
-                    modifier = it,
-                )
-            }
-            if (stackActions) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    val actionModifier = Modifier.fillMaxWidth().heightIn(min = PrimaryButtonHeight)
-                    retake(actionModifier)
-                    confirm(actionModifier)
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    retake(Modifier.weight(1f).fillMaxHeight())
-                    confirm(Modifier.weight(1f).fillMaxHeight())
-                }
-            }
+            LuxActionPair(
+                stackActions = stackActions,
+                secondary = {
+                    LuxSecondaryButton(text = retakeLabel, onClick = onRetake, enabled = !isSaving, modifier = it)
+                },
+                primary = {
+                    PrimaryButton(
+                        text = if (isSaving) "Đang lưu…" else confirmLabel,
+                        onClick = onConfirm,
+                        enabled = confirmEnabled && !isSaving,
+                        isLoading = isSaving,
+                        modifier = it,
+                    )
+                },
+            )
         }
     }
 }

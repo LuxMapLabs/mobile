@@ -132,12 +132,12 @@ private fun LuxBannerPreview() {
             )
             LuxBanner(
                 tone = LuxBannerTone.INFO,
-                message = "Đang xem dữ liệu đã lưu · cập nhật lúc 21:45",
+                message = "Đang xem dữ liệu đã lưu, cập nhật lúc 21:45",
                 actionLabel = "Tải lại",
                 onAction = {},
             )
             LuxBanner(tone = LuxBannerTone.SUCCESS, message = "Đã lưu trên thiết bị — sẽ đồng bộ khi có mạng")
-            LuxBanner(tone = LuxBannerTone.NEUTRAL, message = "Đã gửi yêu cầu hủy · chờ Kỹ sư bảo trì duyệt")
+            LuxBanner(tone = LuxBannerTone.NEUTRAL, message = "Đã gửi yêu cầu hủy, chờ Kỹ sư bảo trì duyệt")
         }
     }
 }

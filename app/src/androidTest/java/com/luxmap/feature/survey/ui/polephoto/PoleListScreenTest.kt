@@ -1,5 +1,8 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.SyncStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -32,6 +36,29 @@ private fun pole(
 
 class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun survey_feedback_is_displayed_above_the_bottom_action() {
+        val host = SnackbarHostState()
+        val message = "Đã hoàn tất khảo sát"
+        composeRule.setContent {
+            LuxMapTheme(forceDark = true) {
+                LaunchedEffect(host) {
+                    host.showSnackbar(message, duration = SnackbarDuration.Indefinite)
+                }
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole(syncStatus = SyncStatus.DONE))),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                    snackbarHostState = host,
+                )
+            }
+        }
+        val feedback = composeRule.onNodeWithText(message).fetchSemanticsNode()
+        val action = composeRule.onNode(hasText("Hoàn tất") and hasClickAction()).fetchSemanticsNode()
+        assertTrue(feedback.boundsInRoot.bottom <= action.boundsInRoot.top)
+    }
 
     @Test
     fun the_top_bar_shows_the_title_and_the_work_order() {
@@ -266,6 +293,29 @@ class PoleListScreenTest {
     // away in the same tap, with no confirmation and no way to tell afterward it worked. Now it
     // only opens a confirm sheet - onComplete fires after the user confirms there.
     @Test
+    fun completion_is_disabled_for_a_pole_with_only_an_ai_result() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)
+                                        .copy(aiVerdict = PoleAiVerdict.ON),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithText("1 cột có kết quả chưa xác nhận").assertExists()
+        composeRule.onNodeWithText("Hoàn tất").assertIsNotEnabled()
+    }
+
+    @Test
     fun success_state_tapping_hoan_tat_opens_a_confirm_sheet_without_completing_yet() {
         var completed = false
         composeRule.setContent {
@@ -276,7 +326,9 @@ class PoleListScreenTest {
                         PoleListUiState.Success(
                             poles =
                                 listOf(
-                                    pole(poleId = "POLE-1", serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE),
+                                    pole(poleId = "POLE-1", serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)
+                                        .copy(isConfirmed = true),
+                                    pole(poleId = "POLE-2"),
                                 ),
                         ),
                     onCapturePole = { _, _ -> },
@@ -287,7 +339,7 @@ class PoleListScreenTest {
         }
         composeRule.onNodeWithText("Hoàn tất").performClick()
         composeRule.onNodeWithText("Hoàn tất khảo sát tuyến?").assertExists()
-        composeRule.onNodeWithText("1 cột báo lỗi, 0 cột còn lại được tính là bình thường.").assertExists()
+        composeRule.onNodeWithText("Đã xác nhận kết quả của 1 cột. Gửi khảo sát để duyệt?").assertExists()
         assertEquals(false, completed)
     }
 
@@ -298,7 +350,7 @@ class PoleListScreenTest {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole())),
+                    state = PoleListUiState.Success(poles = listOf(pole().copy(isConfirmed = true))),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                     onComplete = { completed = true },
@@ -318,7 +370,7 @@ class PoleListScreenTest {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole())),
+                    state = PoleListUiState.Success(poles = listOf(pole().copy(isConfirmed = true))),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                     onComplete = { completed = true },

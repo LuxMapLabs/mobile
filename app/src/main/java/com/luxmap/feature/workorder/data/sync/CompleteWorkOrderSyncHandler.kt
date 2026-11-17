@@ -47,6 +47,17 @@ class CompleteWorkOrderSyncHandler
                 return SyncOpResult.Failed("Evidence upload failed: ${failed.key}")
             }
             if (evidenceStates.values.any { it != "done" }) return SyncOpResult.WaitingForDependency
+            val reviewStates =
+                payload.poleReviewClientOpIds.orEmpty().associateWith {
+                    dao.submissionOperation(it, "submit_pole_photo_review")?.status
+                }
+            val blockedReview =
+                reviewStates.entries.firstOrNull { it.value == null || it.value in terminalReviewErrors }
+            if (blockedReview != null) {
+                dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                return SyncOpResult.Failed("Pole review failed: ${blockedReview.key}")
+            }
+            if (reviewStates.values.any { it != "done" }) return SyncOpResult.WaitingForDependency
             val outcomes = completion.faultOutcomesJson?.let { Json.decodeFromString<List<FaultOutcome>>(it) }
 
             return try {
@@ -78,5 +89,9 @@ class CompleteWorkOrderSyncHandler
             } catch (e: IOException) {
                 SyncOpResult.RetryLater
             }
+        }
+
+        private companion object {
+            val terminalReviewErrors = setOf("failed", "conflict")
         }
     }

@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.net.Uri
 import android.view.LayoutInflater
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -85,6 +86,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
@@ -99,9 +101,9 @@ import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
+import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
-import com.luxmap.core.ui.components.TopSlideToast
-import com.luxmap.core.ui.components.TopToastState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -118,9 +120,13 @@ fun PolePhotoResultScreen(
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
     onRequestAuthorizationHeader: suspend () -> String? = { null },
     isCompleted: Boolean = false,
+    onWithdrawResult: (suspend () -> Unit)? = null,
 ) {
-    val toastState = remember { TopToastState() }
+    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var confirmWithdrawal by rememberSaveable { mutableStateOf(false) }
+    var withdrawing by remember { mutableStateOf(false) }
+    BackHandler(enabled = withdrawing) {}
     val reviewable = state as? PolePhotoResultUiState.Success
     val showFooter = reviewable != null && reviewable.decision == null && !isCompleted
     val draft = if (reviewable != null && showFooter) rememberReviewDraft(poleId, reviewable) else null
@@ -129,78 +135,106 @@ fun PolePhotoResultScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             LuxChildTopBar(
                 title = "Kết quả AI",
-                onBack = onBack,
-                subtitle = if (position > 0) "Cột $position · $poleId" else poleId,
+                onBack = { if (!withdrawing) onBack() },
+                subtitle = if (position > 0) "Cột $position ($poleId)" else poleId,
             )
 
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-                        .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
-            ) {
-                when (state) {
-                    is PolePhotoResultUiState.Loading ->
-                        LuxLoadingRegion(description = "Đang tải kết quả AI") {
-                            LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
-                            LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
-                            LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
-                        }
+            Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
+                            .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
+                ) {
+                    when (state) {
+                        is PolePhotoResultUiState.Loading ->
+                            LuxLoadingRegion(description = "Đang tải kết quả AI") {
+                                LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
+                                LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
+                                LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
+                            }
 
-                    is PolePhotoResultUiState.Success ->
-                        PolePhotoResultBody(
-                            poleId,
-                            state,
-                            if (isCompleted) null else onRetake,
-                            onRequestAuthorizationHeader,
-                        ) {
-                            if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
-                        }
+                        is PolePhotoResultUiState.Success ->
+                            PolePhotoResultBody(
+                                poleId,
+                                state,
+                                if (isCompleted || withdrawing) null else onRetake,
+                                onRequestAuthorizationHeader,
+                            ) {
+                                if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
+                            }
 
-                    is PolePhotoResultUiState.Empty ->
-                        LuxEmptyState(
-                            title = "AI chưa phân loại được ảnh này",
-                            message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                            icon = Icons.Filled.SmartToy,
-                        )
+                        is PolePhotoResultUiState.Empty ->
+                            LuxEmptyState(
+                                title = "AI chưa phân loại được ảnh này",
+                                message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                                icon = Icons.Filled.SmartToy,
+                            )
 
-                    is PolePhotoResultUiState.Error ->
-                        LuxErrorState(
-                            onRetry = onRetry,
-                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
-                            title = "Không tải được kết quả AI",
-                            message =
-                                if (state.isNetworkError) {
-                                    "Kiểm tra kết nối rồi thử lại."
-                                } else {
-                                    "Vui lòng thử lại sau ít phút."
-                                },
-                        )
+                        is PolePhotoResultUiState.Error ->
+                            LuxErrorState(
+                                onRetry = onRetry,
+                                kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                                title = "Không tải được kết quả AI",
+                                message =
+                                    if (state.isNetworkError) {
+                                        "Kiểm tra kết nối rồi thử lại."
+                                    } else {
+                                        "Vui lòng thử lại sau ít phút."
+                                    },
+                            )
+                    }
+
+                    Spacer(Modifier.height(Spacing.lg))
                 }
-
-                Spacer(Modifier.height(Spacing.lg))
+                LuxSnackbarHost(
+                    state = snackbarHostState,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
+                )
             }
 
             if (draft != null) {
                 ReviewSubmitBar(
                     draft = draft,
+                    withdrawing = withdrawing,
+                    onCancel = onWithdrawResult?.let { { confirmWithdrawal = true } },
                     onSubmit = { finalCvState, reviewNote ->
-                        scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
+                        scope.launch { snackbarHostState.showSnackbar("Đã lưu, sẽ gửi khi Hoàn tất") }
                         onSubmitReview(finalCvState, reviewNote)
                     },
                 )
             }
         }
-        TopSlideToast(
-            state = toastState,
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
+    }
+    if (confirmWithdrawal && onWithdrawResult != null) {
+        LuxConfirmDialog(
+            title = "Hủy kết quả khảo sát cột này?",
+            message = "Ảnh hoặc video và kết quả AI hiện tại sẽ bị rút khỏi lượt khảo sát. Bạn có thể ghi nhận lại.",
+            confirmLabel = "Hủy kết quả",
+            dismissLabel = "Giữ lại",
+            destructive = true,
+            onDismiss = { confirmWithdrawal = false },
+            onConfirm = {
+                confirmWithdrawal = false
+                withdrawing = true
+                scope.launch {
+                    try {
+                        onWithdrawResult()
+                        onBack()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        launch { snackbarHostState.showSnackbar("Không hủy được kết quả. Vui lòng thử lại.") }
+                    } finally {
+                        withdrawing = false
+                    }
+                }
+            },
         )
     }
 }
@@ -242,6 +276,7 @@ fun PolePhotoResultRoute(
         },
         onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
         isCompleted = isCompleted,
+        onWithdrawResult = { viewModel.withdrawResult(photoId) },
     )
 }
 
@@ -541,17 +576,38 @@ private fun ReviewCard(
 @Composable
 private fun ReviewSubmitBar(
     draft: ReviewDraft,
+    withdrawing: Boolean,
+    onCancel: (() -> Unit)?,
     onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            PrimaryButton(
-                text = reviewActionLabel(draft.selected, draft.aiCvState),
-                onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
-                enabled = draft.canSubmit,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            )
+            val padding = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+            val confirm: @Composable (Modifier) -> Unit = { modifier ->
+                PrimaryButton(
+                    text = "Xác nhận",
+                    onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
+                    enabled = draft.canSubmit && !withdrawing,
+                    modifier = modifier,
+                )
+            }
+            if (onCancel == null) {
+                confirm(padding.fillMaxWidth())
+            } else {
+                LuxActionPair(
+                    modifier = padding,
+                    secondary = { modifier ->
+                        LuxSecondaryButton(
+                            text = if (withdrawing) "Đang hủy…" else "Hủy",
+                            onClick = onCancel,
+                            enabled = !withdrawing,
+                            modifier = modifier,
+                        )
+                    },
+                    primary = confirm,
+                )
+            }
         }
     }
 }

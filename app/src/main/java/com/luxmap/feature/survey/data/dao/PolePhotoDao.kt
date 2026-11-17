@@ -13,14 +13,35 @@ interface PolePhotoDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(photo: LocalPolePhotoEntity)
 
-    @Query("SELECT * FROM local_pole_photo WHERE workOrderId = :workOrderId ORDER BY capturedAt DESC")
+    @Query("SELECT * FROM local_pole_photo WHERE workOrderId = :workOrderId ORDER BY capturedAt DESC, rowid DESC")
     fun observeByWorkOrder(workOrderId: String): Flow<List<LocalPolePhotoEntity>>
 
     @Query("SELECT * FROM local_pole_photo WHERE photoId = :photoId LIMIT 1")
     suspend fun byId(photoId: String): LocalPolePhotoEntity?
 
+    @Query("DELETE FROM local_pole_photo WHERE photoId = :photoId")
+    suspend fun deleteByPolePhotoId(photoId: String)
+
     @Query("SELECT * FROM local_pole_photo WHERE serverPhotoId = :serverPhotoId LIMIT 1")
     suspend fun byServerPhotoId(serverPhotoId: String): LocalPolePhotoEntity?
+
+    @Query("DELETE FROM local_pole_photo WHERE workOrderId = :workOrderId AND serverPhotoId = :serverPhotoId")
+    suspend fun deleteByServerPhotoId(
+        workOrderId: String,
+        serverPhotoId: String,
+    )
+
+    @Query(
+        "SELECT * FROM local_pole_photo WHERE workOrderId = :workOrderId AND poleId = :poleId " +
+            "ORDER BY capturedAt DESC, rowid DESC",
+    )
+    suspend fun byPole(
+        workOrderId: String,
+        poleId: String,
+    ): List<LocalPolePhotoEntity>
+
+    @Query("DELETE FROM local_pole_photo WHERE photoId IN (:photoIds)")
+    suspend fun deleteByIds(photoIds: List<String>)
 
     @Query("UPDATE local_pole_photo SET serverPhotoId = :serverPhotoId WHERE photoId = :photoId")
     suspend fun updateServerPhotoId(

@@ -77,7 +77,7 @@ class HomeLargeFontTest {
     @Test
     fun selector_and_card_keep_48dp_targets_at_large_font_on_a_narrow_screen() {
         show()
-        composeRule.onNodeWithText("Sửa chữa · 1").assertTouchTargetIsAtLeast(48.dp)
+        composeRule.onNodeWithText("Sửa chữa (1)").assertTouchTargetIsAtLeast(48.dp)
         composeRule.onNode(hasClickAction() and hasText("WO-1042", substring = true)).assertTouchTargetIsAtLeast(48.dp)
     }
 
@@ -108,11 +108,11 @@ class HomeLargeFontTest {
     fun code_sync_badge_and_due_date_stay_fully_visible_at_large_font() {
         show()
         composeRule
-            .onNodeWithText("Sửa chữa · WO-1042", useUnmergedTree = true)
+            .onNodeWithText("Sửa chữa WO-1042", useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
         composeRule
-            .onNodeWithText("Đã nộp · chờ đồng bộ", useUnmergedTree = true)
+            .onNodeWithText("Đã nộp, chờ đồng bộ", useUnmergedTree = true)
             .performScrollTo()
             .assertIsDisplayed()
         composeRule

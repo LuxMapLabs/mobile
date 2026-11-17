@@ -14,7 +14,9 @@ interface SyncQueueDao {
     // Evidence uploads can resume after a worker interruption because the API deduplicates their client operation IDs.
     @Query(
         "SELECT * FROM sync_queue WHERE status = 'queued' OR " +
-            "(status = 'syncing' AND opType = 'upload_work_order_evidence') ORDER BY createdAt ASC, id ASC",
+            "(status = 'syncing' AND opType IN (" +
+            "'upload_work_order_evidence', 'upload_pole_photo', 'upload_pole_video')) " +
+            "ORDER BY createdAt ASC, id ASC",
     )
     suspend fun queuedRows(): List<SyncQueueEntity>
 

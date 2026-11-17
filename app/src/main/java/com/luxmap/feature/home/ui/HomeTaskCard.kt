@@ -105,7 +105,7 @@ private fun HomeTaskBadgeView(badge: HomeTaskBadge) {
     when (badge) {
         is HomeTaskBadge.Sync -> {
             val status = SYNC_STATUS.getValue(badge.state)
-            val text = if (badge.state == CompletionSyncState.PENDING) "Đã nộp · chờ đồng bộ" else status.label()
+            val text = if (badge.state == CompletionSyncState.PENDING) "Đã nộp, chờ đồng bộ" else status.label()
             StatusBadge(text = text, colors = status.badgeColors(), icon = status.icon())
         }
         HomeTaskBadge.Overdue ->
@@ -165,7 +165,7 @@ fun HomeTaskCard(
                         modifier = Modifier.size(20.dp),
                     )
                     Text(
-                        text = "${kind.label()} · ${item.workOrderId}",
+                        text = "${kind.label()} ${item.workOrderId}",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -180,7 +180,7 @@ fun HomeTaskCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (item.faultCount > 0) "${item.faultCount} sự cố · ${item.communeId}" else item.communeId,
+                text = if (item.faultCount > 0) "${item.faultCount} sự cố tại ${item.communeId}" else item.communeId,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

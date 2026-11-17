@@ -383,7 +383,7 @@ class WorkOrderDetailScreenTest {
     fun the_top_bar_shows_only_the_kind_and_the_card_holds_title_and_full_code() {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()))
         composeRule.onNodeWithText("Lệnh sửa chữa").assertExists()
-        composeRule.onNodeWithText("Sửa chữa · WO-1042").assertDoesNotExist()
+        composeRule.onNodeWithText("Sửa chữa WO-1042").assertDoesNotExist()
         composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
         composeRule.onNodeWithText("Mã lệnh").assertExists()
         composeRule.onNodeWithText("WO-1042").assertExists()
@@ -574,7 +574,7 @@ class WorkOrderDetailScreenTest {
                 ),
             onRetryAttachment = { retriedId = it },
         )
-        composeRule.onNodeWithText("Tải lỗi · chạm để thử lại", substring = true).performClick()
+        composeRule.onNodeWithText("Tải lỗi. Chạm để thử lại.", substring = true).performClick()
         assertEquals("A-1", retriedId)
     }
 

@@ -155,19 +155,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 BottomNavBar(
                     items = bottomNavItems,
                     currentRoute = currentRoute,
-                    onItemSelected = { item ->
-                        // Home is the root of the main area (Login is removed from the back stack
-                        // after sign-in), so each tab keeps its own state when you come back.
-                        if (item.route != currentRoute) {
-                            val target =
-                                if (item.route == Routes.Survey.route) Routes.Survey.createRoute() else item.route
-                            navController.navigate(target) {
-                                popUpTo(Routes.Home.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    },
+                    onItemSelected = { item -> navController.navigateToBottomTab(item.route) },
                 )
             }
         },

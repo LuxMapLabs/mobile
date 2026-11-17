@@ -26,7 +26,7 @@ class SubmitPolePhotoReviewSyncHandler
             onProgress: suspend (Long, Long) -> Unit,
         ): SyncOpResult {
             val payload = Json.decodeFromString<PolePhotoSyncPayload>(payloadJson)
-            val photo = dao.byId(payload.photoId) ?: return SyncOpResult.Failed("Local pole photo row missing")
+            val photo = dao.byId(payload.photoId) ?: return SyncOpResult.Done
             val serverPhotoId =
                 photo.serverPhotoId ?: return SyncOpResult.Failed("Local pole photo missing server photo id")
             val draftFinalCvState = photo.draftFinalCvState ?: return SyncOpResult.Done

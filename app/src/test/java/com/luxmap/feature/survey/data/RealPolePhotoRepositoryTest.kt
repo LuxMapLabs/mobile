@@ -280,7 +280,7 @@ class RealPolePhotoRepositoryTest {
         }
 
     @Test
-    fun `enqueuePendingReviews enqueues one op per photo with a draft, using a review-suffixed clientOpId`() =
+    fun `enqueuePendingReviews sends only the latest draft per pole`() =
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
@@ -290,7 +290,7 @@ class RealPolePhotoRepositoryTest {
                 flowOf(
                     listOf(
                         localPhoto(photoId = "PHOTO-1").copy(draftFinalCvState = "off"),
-                        localPhoto(photoId = "PHOTO-2"),
+                        localPhoto(photoId = "PHOTO-2").copy(draftFinalCvState = "on"),
                     ),
                 )
             val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
@@ -305,6 +305,7 @@ class RealPolePhotoRepositoryTest {
                     clientOpId = "PHOTO-1:review",
                 )
             }
+            coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), "PHOTO-2:review") }
         }
 
     @Test

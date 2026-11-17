@@ -52,13 +52,17 @@ fun LuxConfirmDialog(
             )
         },
         text = { Text(text = message, style = MaterialTheme.typography.bodyLarge) },
-        dismissButton = { LuxTextButton(text = dismissLabel, onClick = onDismiss) },
         confirmButton = {
-            if (destructive) {
-                LuxDestructiveButton(text = confirmLabel, onClick = onConfirm)
-            } else {
-                LuxTextButton(text = confirmLabel, onClick = onConfirm)
-            }
+            LuxActionPair(
+                secondary = { LuxTextButton(text = dismissLabel, onClick = onDismiss, modifier = it) },
+                primary = {
+                    if (destructive) {
+                        LuxDestructiveButton(text = confirmLabel, onClick = onConfirm, modifier = it)
+                    } else {
+                        LuxTextButton(text = confirmLabel, onClick = onConfirm, modifier = it)
+                    }
+                },
+            )
         },
     )
 }

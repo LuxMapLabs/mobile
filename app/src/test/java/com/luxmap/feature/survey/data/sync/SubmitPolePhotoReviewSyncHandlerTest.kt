@@ -113,7 +113,7 @@ class SubmitPolePhotoReviewSyncHandlerTest {
         }
 
     @Test
-    fun `a missing local row returns Failed`() =
+    fun `a missing local row skips withdrawn media`() =
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
@@ -122,7 +122,7 @@ class SubmitPolePhotoReviewSyncHandlerTest {
 
             val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
 
-            assertTrue(result is SyncOpResult.Failed)
+            assertTrue(result is SyncOpResult.Done)
         }
 
     @Test

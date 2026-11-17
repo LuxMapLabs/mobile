@@ -10,6 +10,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
@@ -59,6 +60,22 @@ private fun detailDto(workOrderId: String = "WO-1") =
     )
 
 class CompleteWorkOrderSyncHandlerTest {
+    @Test
+    fun `survey completion waits for the latest pole review to sync`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>()
+            coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
+            coEvery { dao.submissionOperation("PH-1:review", "submit_pole_photo_review") } returns
+                mockk { every { status } returns "queued" }
+            val payload = CompletionSyncPayload("WO-1", poleReviewClientOpIds = listOf("PH-1:review"))
+
+            val result = CompleteWorkOrderSyncHandler(api, dao, mockk()).handle(Json.encodeToString(payload))
+
+            assertEquals(SyncOpResult.WaitingForDependency, result)
+            coVerify(exactly = 0) { api.complete(any(), any()) }
+        }
+
     @Test
     fun `completion waits for the older photo when the newer photo has already synced`() =
         runTest {

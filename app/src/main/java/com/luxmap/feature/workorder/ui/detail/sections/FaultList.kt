@@ -86,7 +86,7 @@ private fun FaultItem(
 ) {
     LuxListItem(
         headline = faultTypeLabel(fault.faultType),
-        supporting = listOfNotNull(fault.poleId, fault.faultId).joinToString(" · "),
+        supporting = listOfNotNull(fault.poleId, fault.faultId).joinToString("\n"),
         leadingIcon = faultTypeIcon(fault.faultType),
         trailing = {
             Row(

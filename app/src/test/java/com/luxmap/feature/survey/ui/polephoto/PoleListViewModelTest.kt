@@ -120,7 +120,7 @@ class PoleListViewModelTest {
         }
 
     @Test
-    fun `onComplete submits a completion reporting how many poles were captured`() =
+    fun `onComplete blocks when a pole has an unconfirmed AI result`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -136,9 +136,14 @@ class PoleListViewModelTest {
                     ),
                 )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
-                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
-            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
-                flowOf(mapOf("PH-POLE-1" to "done"))
+                flowOf(
+                    listOf(
+                        photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on"),
+                        photo("POLE-2", serverPhotoId = "SERVER-PH-POLE-2", aiStatus = "available", cvState = "off"),
+                    ),
+                )
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1", "PH-POLE-2")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done", "PH-POLE-2" to "done"))
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
             coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 0
             val vm =
@@ -157,21 +162,14 @@ class PoleListViewModelTest {
             vm.onComplete()
             dispatcher.scheduler.advanceUntilIdle()
 
-            coVerify {
-                completionRepository.submitCompletion(
-                    workOrderId = WORK_ORDER_ID,
-                    taskKind = "survey",
-                    reportNote = "Đã khảo sát 1/2 cột đèn bằng ảnh chụp.",
-                    materialsUsed = null,
-                    faultOutcomes = null,
-                )
-            }
+            coVerify(exactly = 0) { polePhotoRepository.enqueuePendingReviews(any()) }
+            coVerify(exactly = 0) { completionRepository.submitCompletion(any(), any(), any(), any(), any()) }
         }
 
     // Found on a real device 2026-10-29: tapping "Hoan tat" gave no feedback at all. This event
     // lets the Route show a toast right on this screen instead of navigating away silently.
     @Test
-    fun `onComplete emits surveyCompleted after a successful submit`() =
+    fun `onComplete submits when the reviewed pole is confirmed and another pole was skipped`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -179,12 +177,15 @@ class PoleListViewModelTest {
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(
                     PoleListResult(
-                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        listOf(
+                            PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
+                            PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "normal"),
+                        ),
                         isStale = false,
                     ),
                 )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
-                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
+                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
                 flowOf(mapOf("PH-POLE-1" to "done"))
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -202,6 +203,15 @@ class PoleListViewModelTest {
             vm.surveyCompleted.test {
                 vm.onComplete()
                 awaitItem()
+            }
+            coVerify {
+                completionRepository.submitCompletion(
+                    workOrderId = WORK_ORDER_ID,
+                    taskKind = "survey",
+                    reportNote = "Đã xác nhận kết quả khảo sát 1 cột đèn.",
+                    materialsUsed = null,
+                    faultOutcomes = null,
+                )
             }
         }
 
@@ -252,7 +262,7 @@ class PoleListViewModelTest {
         }
 
     @Test
-    fun `onComplete does nothing when no pole has been captured yet`() =
+    fun `onComplete submits when no pole needed a photo`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -267,6 +277,7 @@ class PoleListViewModelTest {
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 0
             val vm =
                 PoleListViewModel(
                     savedStateHandle(),
@@ -283,7 +294,15 @@ class PoleListViewModelTest {
             vm.onComplete()
             dispatcher.scheduler.advanceUntilIdle()
 
-            coVerify(exactly = 0) { completionRepository.submitCompletion(any(), any(), any(), any(), any()) }
+            coVerify(exactly = 1) {
+                completionRepository.submitCompletion(
+                    workOrderId = WORK_ORDER_ID,
+                    taskKind = "survey",
+                    reportNote = "Đã xác nhận kết quả khảo sát 0 cột đèn.",
+                    materialsUsed = null,
+                    faultOutcomes = null,
+                )
+            }
         }
 
     @Test
@@ -600,7 +619,7 @@ class PoleListViewModelTest {
                     ),
                 )
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
-                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
+                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
                 flowOf(mapOf("PH-POLE-1" to "done"))
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)

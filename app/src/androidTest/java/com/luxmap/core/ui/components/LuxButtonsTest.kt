@@ -1,6 +1,10 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -11,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LuxMapTheme
 import org.junit.Assert.assertEquals
@@ -40,6 +45,42 @@ class LuxButtonsTest {
                 .assertHasClickAction()
                 .assertIsEnabled()
                 .assertHeightIsAtLeast(48.dp)
+        }
+    }
+
+    @Test
+    fun paired_buttons_match_in_width_and_height() {
+        showActionPair(fontScale = 1f)
+        val secondary = composeRule.onNodeWithText("Kiểm tra lại").fetchSemanticsNode().boundsInRoot
+        val primary = composeRule.onNodeWithText("Nộp báo cáo").fetchSemanticsNode().boundsInRoot
+        assertEquals(secondary.top, primary.top, 1f)
+        assertEquals(secondary.height, primary.height, 1f)
+        assertEquals(secondary.width, primary.width, 1f)
+        assertTrue(secondary.right < primary.left)
+    }
+
+    @Test
+    fun paired_buttons_stack_at_large_font() {
+        showActionPair(fontScale = 2f)
+        val secondary = composeRule.onNodeWithText("Kiểm tra lại").fetchSemanticsNode().boundsInRoot
+        val primary = composeRule.onNodeWithText("Nộp báo cáo").fetchSemanticsNode().boundsInRoot
+        assertEquals(secondary.left, primary.left, 1f)
+        assertEquals(secondary.width, primary.width, 1f)
+        assertTrue(secondary.bottom < primary.top)
+    }
+
+    private fun showActionPair(fontScale: Float) {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
+                LuxMapTheme {
+                    LuxActionPair(
+                        modifier = Modifier.width(320.dp),
+                        secondary = { LuxSecondaryButton(text = "Kiểm tra lại", onClick = {}, modifier = it) },
+                        primary = { PrimaryButton(text = "Nộp báo cáo", onClick = {}, modifier = it) },
+                    )
+                }
+            }
         }
     }
 

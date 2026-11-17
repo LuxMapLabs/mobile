@@ -99,32 +99,36 @@ fun CancelRequestSheet(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text("Quay lại")
-                }
-                Button(
-                    onClick = {
-                        val reason = selectedReason ?: return@Button
-                        onSend(if (note.isBlank()) reason else "$reason - ${note.trim()}")
-                    },
-                    enabled = selectedReason != null && !isSubmitting,
-                    modifier = Modifier.weight(1.5f).heightIn(min = Dimens.minTouchTarget),
-                    shape = RoundedCornerShape(Radius.control),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = Color.White,
-                        ),
-                ) {
-                    Text(if (isSubmitting) "Đang gửi..." else "Gửi yêu cầu")
-                }
-            }
+            LuxActionPair(
+                secondary = { actionModifier ->
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                    ) {
+                        Text("Quay lại")
+                    }
+                },
+                primary = { actionModifier ->
+                    Button(
+                        onClick = {
+                            val reason = selectedReason ?: return@Button
+                            onSend(if (note.isBlank()) reason else "$reason - ${note.trim()}")
+                        },
+                        enabled = selectedReason != null && !isSubmitting,
+                        modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
+                        shape = RoundedCornerShape(Radius.control),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = Color.White,
+                            ),
+                    ) {
+                        Text(if (isSubmitting) "Đang gửi..." else "Gửi yêu cầu")
+                    }
+                },
+            )
         }
     }
 }

@@ -39,6 +39,11 @@ interface PolePhotoRepository {
     // immediately (offline-first) before/instead of waiting on fetchResult.
     suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity?
 
+    suspend fun withdrawResult(
+        workOrderId: String,
+        serverPhotoId: String,
+    )
+
     // Saves the Field Engineer's correction/agreement on cvState locally only — nothing is sent
     // to the server here. See RealPolePhotoRepository.enqueuePendingReviews for when it is sent.
     suspend fun saveDraftReview(

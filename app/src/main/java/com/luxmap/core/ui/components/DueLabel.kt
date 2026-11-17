@@ -23,7 +23,7 @@ fun dueDateLabel(
         parsed == today -> DueLabel("Hạn hôm nay", isToday = true, isOverdue = false)
         parsed.isBefore(today) -> {
             val daysOverdue = ChronoUnit.DAYS.between(parsed, today)
-            DueLabel("Quá hạn $daysOverdue ngày · hạn $formattedDate", isToday = false, isOverdue = true)
+            DueLabel("Quá hạn $daysOverdue ngày, hạn $formattedDate", isToday = false, isOverdue = true)
         }
         else -> DueLabel("Hạn $formattedDate", isToday = false, isOverdue = false)
     }

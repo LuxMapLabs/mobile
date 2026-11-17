@@ -11,18 +11,18 @@ class ProfileTextTest {
 
     @Test
     fun `pending and errors with a last sync`() {
-        assertEquals("Chờ 2 · Lỗi 1 · $last", profileSyncSummary(2, 1, at))
+        assertEquals("Chờ 2\nLỗi 1\n$last", profileSyncSummary(2, 1, at))
     }
 
     @Test
     fun `zero counts are left out`() {
-        assertEquals("Chờ 2 · $last", profileSyncSummary(2, 0, at))
-        assertEquals("Lỗi 1 · $last", profileSyncSummary(0, 1, at))
+        assertEquals("Chờ 2\n$last", profileSyncSummary(2, 0, at))
+        assertEquals("Lỗi 1\n$last", profileSyncSummary(0, 1, at))
     }
 
     @Test
     fun `nothing left means synced`() {
-        assertEquals("Đã đồng bộ · $last", profileSyncSummary(0, 0, at))
+        assertEquals("Đã đồng bộ\n$last", profileSyncSummary(0, 0, at))
     }
 
     @Test

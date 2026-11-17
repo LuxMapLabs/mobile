@@ -121,7 +121,7 @@ class HomeScreenTest {
             onOpenWorkOrder = { opened = it },
         )
         composeTestRule.onNodeWithText("Sửa đèn chợ", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithText("3 sự cố · COM-001", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("3 sự cố tại COM-001", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Làm: 17/11/2026", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Hạn 01/01/2030", useUnmergedTree = true).assertExists()
         composeTestRule.onNode(hasClickAction() and hasText("WO-7", substring = true)).performClick()
@@ -166,7 +166,7 @@ class HomeScreenTest {
                         ),
                 ),
         )
-        composeTestRule.onNodeWithText("Đã nộp · chờ đồng bộ", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Đã nộp, chờ đồng bộ", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Đồng bộ lỗi", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Xung đột", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Đang thực hiện", useUnmergedTree = true).assertExists()
@@ -176,11 +176,11 @@ class HomeScreenTest {
     fun the_kind_selector_is_a_radio_group_with_counts() {
         setContent(uiState = successWith(item("R1"), item("I1", kind = "inspection")))
         composeTestRule
-            .onNodeWithText("Sửa chữa · 1")
+            .onNodeWithText("Sửa chữa (1)")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
             .assertIsSelected()
-        composeTestRule.onNodeWithText("Kiểm tra · 1").assertIsNotSelected().performClick()
-        composeTestRule.onNodeWithText("Kiểm tra · 1").assertIsSelected()
+        composeTestRule.onNodeWithText("Kiểm tra (1)").assertIsNotSelected().performClick()
+        composeTestRule.onNodeWithText("Kiểm tra (1)").assertIsSelected()
     }
 
     @Test
@@ -234,7 +234,7 @@ class HomeScreenTest {
     @Test
     fun an_empty_tab_shows_its_own_message() {
         setContent(uiState = successWith(item("R1")))
-        composeTestRule.onNodeWithText("Kiểm tra · 0").performClick()
+        composeTestRule.onNodeWithText("Kiểm tra (0)").performClick()
         composeTestRule.onNodeWithText("Không có nhiệm vụ kiểm tra").assertExists()
     }
 }

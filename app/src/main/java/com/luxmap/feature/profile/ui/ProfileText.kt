@@ -16,8 +16,8 @@ fun profileSyncSummary(
     val last = lastSyncedAt?.let { "Lần cuối ${DateFormatUtils.formatInstant(it)}" }
     return when {
         parts.isEmpty() && last == null -> "Chưa đồng bộ lần nào"
-        parts.isEmpty() -> "Đã đồng bộ · $last"
-        last == null -> parts.joinToString(" · ")
-        else -> (parts + last).joinToString(" · ")
+        parts.isEmpty() -> "Đã đồng bộ\n$last"
+        last == null -> parts.joinToString("\n")
+        else -> (parts + last).joinToString("\n")
     }
 }

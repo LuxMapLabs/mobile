@@ -14,6 +14,7 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Multipart
@@ -110,6 +111,20 @@ interface WorkOrdersApi {
         @Path("id") id: String,
         @Path("photo_id") photoId: String,
     ): PolePhotoItemDto
+
+    @GET("api/v1/work-orders/{id}/pole-photos")
+    suspend fun listPolePhotos(
+        @Path("id") id: String,
+        @Query("pole_id") poleId: String,
+        @Query("page") page: Int,
+        @Query("page_size") pageSize: Int,
+    ): PagedResultDto<PolePhotoItemDto>
+
+    @DELETE("api/v1/work-orders/{id}/pole-photos/{photo_id}")
+    suspend fun withdrawPolePhoto(
+        @Path("id") id: String,
+        @Path("photo_id") photoId: String,
+    )
 
     // Field Engineer corrects/confirms cvState before a Manager decides - added 2026-10-20
     // (ticket PHOTO-REVIEW). See docs/contract-drift.md "PATCH .../review".
