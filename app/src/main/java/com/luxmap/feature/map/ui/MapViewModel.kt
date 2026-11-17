@@ -69,7 +69,11 @@ class MapViewModel
                                 )
                         }.collect { (dataset, filter) ->
                             _uiState.value =
-                                if (dataset.poles.isEmpty()) {
+                                if (dataset.poles.isEmpty() &&
+                                    dataset.segments.isEmpty() &&
+                                    dataset.cabinets.isEmpty() &&
+                                    dataset.communes.isEmpty()
+                                ) {
                                     MapUiState.Empty
                                 } else {
                                     MapUiState.Success(

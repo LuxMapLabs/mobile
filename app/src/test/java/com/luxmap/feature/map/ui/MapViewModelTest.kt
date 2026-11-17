@@ -6,6 +6,7 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.feature.map.data.CabinetMarker
 import com.luxmap.feature.map.data.CabinetTopology
 import com.luxmap.feature.map.data.CabinetTopologyException
+import com.luxmap.feature.map.data.CommuneOutline
 import com.luxmap.feature.map.data.GisMapDataset
 import com.luxmap.feature.map.data.MapRepository
 import com.luxmap.feature.map.data.PoleMarker
@@ -78,7 +79,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `emits Empty when the dataset has no poles`() =
+    fun `emits Empty when all map layers are empty`() =
         runTest {
             val repository = mockk<MapRepository>()
             every { repository.observeGisMapDataset() } returns
@@ -88,6 +89,41 @@ class MapViewModelTest {
             viewModel.uiState.test {
                 assertEquals(MapUiState.Loading, awaitItem())
                 assertEquals(MapUiState.Empty, awaitItem())
+            }
+        }
+
+    @Test
+    fun `cabinet search still works in a dataset without poles`() =
+        runTest {
+            val cabinet = cabinet("CAB-A")
+            val dataset = GisMapDataset(poles = emptyList(), segments = emptyList(), cabinets = listOf(cabinet))
+            val repository = mockk<MapRepository>()
+            every { repository.observeGisMapDataset() } returns flowOf(dataset)
+            val viewModel = MapViewModel(repository, fakeConnectivityObserver())
+
+            viewModel.searchResults.test {
+                assertEquals(MapSearchResults(), awaitItem())
+                viewModel.setSearchQuery("CAB-A")
+                assertEquals(MapSearchResults(cabinets = listOf(cabinet)), awaitItem())
+            }
+        }
+
+    @Test
+    fun `emits Success when the commune layer is the only layer with data`() =
+        runTest {
+            val dataset =
+                GisMapDataset(
+                    poles = emptyList(),
+                    segments = emptyList(),
+                    communes = listOf(CommuneOutline("COM-1", "Xã 1", emptyList())),
+                )
+            val repository = mockk<MapRepository>()
+            every { repository.observeGisMapDataset() } returns flowOf(dataset)
+            val viewModel = MapViewModel(repository, fakeConnectivityObserver())
+
+            viewModel.uiState.test {
+                assertEquals(MapUiState.Loading, awaitItem())
+                assertEquals(MapUiState.Success(dataset = dataset, filteredDataset = dataset), awaitItem())
             }
         }
 

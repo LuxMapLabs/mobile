@@ -18,7 +18,7 @@ private const val COMMUNES_SOURCE_ID = "communes-source"
 private const val COMMUNES_FILL_LAYER_ID = "communes-fill-layer"
 private const val COMMUNES_LINE_LAYER_ID = "communes-line-layer"
 private const val TOPOLOGY_SOURCE_ID = "topology-source"
-private const val TOPOLOGY_LINE_LAYER_ID = "topology-line-layer"
+internal const val TOPOLOGY_LINE_LAYER_ID = "topology-line-layer"
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val DIMMED_POLE_OPACITY = 0.35f
 
@@ -48,10 +48,7 @@ internal fun setTopologyGeoJson(
     (style.getSource(TOPOLOGY_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(topologyGeoJson ?: EMPTY_FEATURE_COLLECTION)
 }
 
-internal fun addTopologyLayer(
-    style: Style,
-    belowLayerId: String?,
-) {
+internal fun addTopologyLayers(style: Style) {
     val layer =
         LineLayer(TOPOLOGY_LINE_LAYER_ID, TOPOLOGY_SOURCE_ID).withProperties(
             PropertyFactory.lineWidth(3f),
@@ -65,19 +62,14 @@ internal fun addTopologyLayer(
                 PropertyFactory.lineDasharray(arrayOf(2f, 2f)),
             ).apply { setFilter(Expression.eq(Expression.get("power"), Expression.literal("off"))) }
     layer.setFilter(Expression.neq(Expression.get("power"), Expression.literal("off")))
-    if (belowLayerId != null && style.getLayer(belowLayerId) != null) {
-        style.addLayerBelow(layer, belowLayerId)
-        style.addLayerBelow(dashed, belowLayerId)
-    } else {
-        style.addLayer(layer)
-        style.addLayer(dashed)
-    }
+    style.addLayer(layer)
+    style.addLayer(dashed)
 }
 
 internal fun showCommuneLayers(
     style: Style,
     show: Boolean,
-    belowLayerId: String?,
+    belowLayerId: String,
 ) {
     val present = style.getLayer(COMMUNES_LINE_LAYER_ID) != null
     if (show && !present) {
@@ -91,14 +83,8 @@ internal fun showCommuneLayers(
                 PropertyFactory.lineWidth(2f),
                 PropertyFactory.lineColor(MapMarkerColors.CommuneOutline.toArgb()),
             )
-        val below = belowLayerId?.takeIf { style.getLayer(it) != null }
-        if (below != null) {
-            style.addLayerBelow(fill, below)
-            style.addLayerBelow(line, below)
-        } else {
-            style.addLayer(fill)
-            style.addLayer(line)
-        }
+        style.addLayerBelow(fill, belowLayerId)
+        style.addLayerBelow(line, belowLayerId)
     } else if (!show && present) {
         style.removeLayer(COMMUNES_LINE_LAYER_ID)
         style.removeLayer(COMMUNES_FILL_LAYER_ID)
