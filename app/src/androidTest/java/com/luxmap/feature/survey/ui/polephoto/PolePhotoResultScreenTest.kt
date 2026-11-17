@@ -1,9 +1,14 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -11,6 +16,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -491,5 +497,44 @@ class PolePhotoResultScreenTest {
         composeRule.onNodeWithText("Đồng ý với AI").assertDoesNotExist()
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
         composeRule.onNodeWithText("Chụp lại cột này").assertDoesNotExist()
+    }
+
+    @Test
+    fun tapping_the_photo_is_labelled_for_talkback() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("photo_preview")
+            .assert(
+                SemanticsMatcher(
+                    "zoom label",
+                ) { it.config.getOrNull(SemanticsActions.OnClick)?.label == "Phóng to ảnh" },
+            )
+    }
+
+    @Test
+    fun a_fresh_server_label_replaces_an_untouched_draft_seed() {
+        var state by mutableStateOf<PolePhotoResultUiState>(
+            successState(cvState = "on").copy(finalCvState = "on", isStale = true),
+        )
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(poleId = "P-0103", position = 3, state = state, onBack = {}, onRetry = {})
+            }
+        }
+        choice("Đèn sáng").performScrollTo().assertIsSelected()
+        state = successState(cvState = "on").copy(finalCvState = "off", reviewNote = "Đèn tắt thật")
+        composeRule.waitForIdle()
+        choice("Đèn tắt").performScrollTo().assertIsSelected()
+        composeRule.onNode(hasText("Lưu nhãn đã sửa") and hasClickAction()).assertIsNotEnabled()
     }
 }

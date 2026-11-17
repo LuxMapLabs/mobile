@@ -457,10 +457,10 @@ private fun rememberReviewDraft(
     val baselineCvState = state.draftFinalCvState ?: state.finalCvState
     val baselineNote = state.draftReviewNote ?: state.reviewNote
     val selected =
-        rememberSaveable(poleId) {
+        rememberSaveable(poleId, baselineCvState, baselineNote) {
             mutableStateOf(baselineCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
         }
-    val note = rememberSaveable(poleId) { mutableStateOf(baselineNote.orEmpty()) }
+    val note = rememberSaveable(poleId, baselineCvState, baselineNote) { mutableStateOf(baselineNote.orEmpty()) }
     return ReviewDraft(state.cvState, baselineCvState, baselineNote, selected, note)
 }
 
@@ -474,7 +474,11 @@ private fun ReviewCard(
         LuxCard {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 LuxSegmented(
-                    segments = listOf(LuxSegment("on", "Đèn sáng"), LuxSegment("off", "Đèn tắt")),
+                    segments =
+                        listOf(
+                            LuxSegment("on", "Đèn sáng", Icons.Filled.Lightbulb),
+                            LuxSegment("off", "Đèn tắt", Icons.Outlined.Lightbulb),
+                        ),
                     selected = draft.selected,
                     onSelect = { draft.selected = it },
                 )
@@ -548,7 +552,15 @@ private fun PolePhotoPreview(
                 .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-                .then(if (isVideo) Modifier else Modifier.clickable { viewing = true }.testTag("photo_preview")),
+                .then(
+                    if (isVideo) {
+                        Modifier
+                    } else {
+                        Modifier.clickable(onClickLabel = "Phóng to ảnh", role = Role.Image) {
+                            viewing = true
+                        }.testTag("photo_preview")
+                    },
+                ),
     ) {
         if (isVideo) {
             VideoPlayer(

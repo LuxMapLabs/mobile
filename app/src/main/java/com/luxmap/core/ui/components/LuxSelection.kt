@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -30,7 +31,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
 
-data class LuxSegment<T>(val value: T, val label: String)
+data class LuxSegment<T>(val value: T, val label: String, val icon: ImageVector? = null)
 
 private val ChipIconSize = 18.dp
 
@@ -68,6 +69,21 @@ fun <T> LuxSegmented(
                     ),
                 modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
                 label = { Text(text = segment.label, style = labelStyle, maxLines = 2) },
+                icon = {
+                    SegmentedButtonDefaults.Icon(
+                        active = segment.value == selected,
+                        inactiveContent =
+                            segment.icon?.let { icon ->
+                                {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
+                                    )
+                                }
+                            },
+                    )
+                },
             )
         }
     }
