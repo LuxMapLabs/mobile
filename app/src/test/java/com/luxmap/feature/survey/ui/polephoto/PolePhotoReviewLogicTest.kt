@@ -6,6 +6,16 @@ import org.junit.Test
 
 class PolePhotoReviewLogicTest {
     @Test
+    fun `replacement labels follow the stored origin and media type`() {
+        val gallery = mediaCaptureSource("/data/gallery-sample.mp4")
+        val camera = mediaCaptureSource("/data/legacy-sample.jpg")
+        assertEquals("Chọn ảnh khác", mediaReplacementLabel("photo", gallery))
+        assertEquals("Chọn video khác", mediaReplacementLabel("video", gallery))
+        assertEquals("Chụp lại", mediaReplacementLabel("photo", camera))
+        assertEquals("Quay lại", mediaReplacementLabel("video", camera))
+    }
+
+    @Test
     fun `confidence at or above 85 percent is high`() {
         assertEquals(ConfidenceBand.HIGH, confidenceBand(0.85))
         assertEquals(ConfidenceBand.HIGH, confidenceBand(0.99))
@@ -82,7 +92,7 @@ class PolePhotoReviewLogicTest {
     @Test
     fun `source line asks for a choice when ai was inconclusive`() {
         assertEquals(
-            "AI không rõ ràng · cần bạn chọn nhãn",
+            "AI: Không xác định",
             verdictSourceText(cvState = "inconclusive", reviewedCvState = null),
         )
     }
@@ -90,7 +100,7 @@ class PolePhotoReviewLogicTest {
     @Test
     fun `source line after overriding an inconclusive ai does not claim ai judged`() {
         assertEquals(
-            "Bạn đã chọn nhãn · AI không kết luận",
+            "Bạn đã xác nhận · AI: Không xác định",
             verdictSourceText(cvState = "inconclusive", reviewedCvState = "on"),
         )
     }

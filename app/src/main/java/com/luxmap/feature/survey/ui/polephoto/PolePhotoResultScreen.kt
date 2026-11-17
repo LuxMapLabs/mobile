@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
@@ -210,7 +209,7 @@ fun PolePhotoResultScreen(
 fun PolePhotoResultRoute(
     photoId: String,
     onBack: () -> Unit,
-    onRetake: (poleId: String) -> Unit,
+    onRetake: (poleId: String, mediaType: String, source: String) -> Unit,
     viewModel: PoleListViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -232,8 +231,11 @@ fun PolePhotoResultRoute(
         },
         onRetry = { viewModel.onViewAiResult(photoId) },
         onRetake = {
-            viewModel.onDismissAiResult()
-            pole?.poleId?.let(onRetake)
+            val result = aiResultState as? PolePhotoResultUiState.Success
+            if (pole != null && result != null) {
+                viewModel.onDismissAiResult()
+                onRetake(pole.poleId, result.mediaType, mediaCaptureSource(result.filePath))
+            }
         },
         onSubmitReview = { finalCvState, reviewNote ->
             viewModel.onSubmitReview(photoId, finalCvState, reviewNote)
@@ -365,6 +367,8 @@ private fun TechnicalDetails(
 ) {
     var expanded by rememberSaveable(poleId) { mutableStateOf(false) }
     var confirmRetake by remember { mutableStateOf(false) }
+    val replacementLabel = mediaReplacementLabel(state.mediaType, mediaCaptureSource(state.filePath))
+    val mediaName = if (state.mediaType == "video") "Video" else "Ảnh"
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -395,7 +399,11 @@ private fun TechnicalDetails(
                     DetailRow("Đã review lúc", DateFormatUtils.formatInstant(state.reviewedAt))
                 }
                 if (state.decision == null && onRetake != null) {
-                    RetakeButton(onClick = { confirmRetake = true }, modifier = Modifier.fillMaxWidth())
+                    LuxSecondaryButton(
+                        text = replacementLabel,
+                        onClick = { confirmRetake = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -403,9 +411,9 @@ private fun TechnicalDetails(
 
     if (confirmRetake) {
         LuxConfirmDialog(
-            title = "Chụp lại cột này?",
-            message = "Ảnh hiện tại sẽ được thay bằng ảnh mới.",
-            confirmLabel = "Chụp lại",
+            title = "$replacementLabel?",
+            message = "$mediaName mới sẽ thay cho tệp hiện tại sau khi bạn xác nhận.",
+            confirmLabel = "Tiếp tục",
             onConfirm = {
                 confirmRetake = false
                 onRetake?.invoke()
@@ -473,6 +481,14 @@ private fun ReviewCard(
         LuxSectionHeader(title = "Kỹ sư xác nhận nhãn")
         LuxCard {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                if (draft.aiCvState != "on" && draft.aiCvState != "off") {
+                    Text(
+                        text =
+                            "Nếu thấy rõ trạng thái đèn, hãy chọn Đèn sáng hoặc Đèn tắt và nhập ghi chú. " +
+                                "Nếu chưa rõ, hãy dùng ảnh hoặc video khác.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 LuxSegmented(
                     segments =
                         listOf(
@@ -499,7 +515,12 @@ private fun ReviewCard(
                     )
                     if (draft.note.isBlank()) {
                         Text(
-                            text = "Cần ghi chú vì khác với nhận định của AI",
+                            text =
+                                if (draft.aiCvState == "on" || draft.aiCvState == "off") {
+                                    "Cần ghi chú vì khác với nhận định của AI"
+                                } else {
+                                    "Ghi rõ căn cứ bạn dùng để xác định trạng thái đèn"
+                                },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -756,17 +777,4 @@ private fun PolePhotoDecisionCard(state: PolePhotoResultUiState.Success) {
             state.decidedAt?.let { "Lúc ${DateFormatUtils.formatInstant(it)}" },
         ).joinToString("\n")
     LuxBanner(title = title, message = message, tone = tone)
-}
-
-@Composable
-private fun RetakeButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LuxSecondaryButton(
-        text = "Chụp lại cột này",
-        onClick = onClick,
-        modifier = modifier,
-        leadingIcon = Icons.Filled.PhotoCamera,
-    )
 }

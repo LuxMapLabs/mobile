@@ -514,7 +514,7 @@ private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
     when (this) {
         PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Filled.Lightbulb)
         PoleAiVerdict.OFF -> Triple(AssetCondition.OUT, "Đèn tắt", Icons.Outlined.Lightbulb)
-        PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "AI không kết luận", Icons.Filled.Help)
+        PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "Không xác định", Icons.Filled.Help)
     }
 
 @Composable

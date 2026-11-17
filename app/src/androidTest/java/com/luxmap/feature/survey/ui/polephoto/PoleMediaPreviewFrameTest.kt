@@ -1,6 +1,12 @@
 package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -8,6 +14,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.espresso.Espresso
 import com.luxmap.core.theme.LuxMapTheme
@@ -51,6 +60,42 @@ class PoleMediaPreviewFrameTest {
         composeRule.onNodeWithText("Chụp lại").assertIsNotEnabled()
         composeRule.onNode(hasText("Đang lưu…") and hasClickAction()).assertIsNotEnabled()
         composeRule.onNodeWithText("POLE-0047").assertExists()
+    }
+
+    @Test
+    fun preview_actions_have_equal_size() {
+        show()
+        val retake = composeRule.onNode(hasText("Chụp lại") and hasClickAction()).fetchSemanticsNode()
+        val confirm = composeRule.onNode(hasText("Dùng ảnh này") and hasClickAction()).fetchSemanticsNode()
+        assertEquals(retake.size.height, confirm.size.height)
+        assertEquals(retake.size.width.toDouble(), confirm.size.width.toDouble(), 1.0)
+    }
+
+    @Test
+    fun choose_another_video_stays_on_one_line_on_a_narrow_screen_at_large_font() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 2f)) {
+                LuxMapTheme {
+                    Box(Modifier.width(320.dp)) {
+                        PoleMediaPreviewFrame(
+                            poleId = "POLE-0047",
+                            isSaving = false,
+                            retakeLabel = "Chọn video khác",
+                            confirmLabel = "Dùng video này",
+                            onClose = {},
+                            onRetake = {},
+                            onConfirm = {},
+                            keepRetakeLabelOnOneLine = true,
+                        ) {}
+                    }
+                }
+            }
+        }
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule.onNodeWithText("Chọn video khác", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(1, layouts.single().lineCount)
     }
 
     @Test

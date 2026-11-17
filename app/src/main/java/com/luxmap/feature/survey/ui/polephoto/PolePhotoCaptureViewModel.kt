@@ -21,12 +21,14 @@ class PolePhotoCaptureViewModel
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val poleId: String = checkNotNull(savedStateHandle[POLE_ID_ARG])
+        private val source: String? = savedStateHandle["source"]
         private val photoFileName: String = UUID.randomUUID().toString()
 
         fun outputFile(filesDir: File): File {
             val dir = File(filesDir, "pole-photos/$workOrderId")
             dir.mkdirs()
-            return File(dir, "$photoFileName.jpg")
+            val prefix = if (source.equals("gallery", ignoreCase = true)) GALLERY_MEDIA_PREFIX else ""
+            return File(dir, "$prefix$photoFileName.jpg")
         }
 
         fun onPhotoCaptured(

@@ -192,6 +192,7 @@ fun PoleVideoCaptureRoute(
                 poleId = poleId,
                 isSaving = isSaving,
                 retakeLabel = if (source == PoleVideoCaptureSource.GALLERY) "Chọn video khác" else "Quay lại",
+                keepRetakeLabelOnOneLine = source == PoleVideoCaptureSource.GALLERY,
                 onConfirm = {
                     isSaving = true
                     viewModel.onVideoCaptured(fileToPreview, onDone)
@@ -222,6 +223,7 @@ private fun PoleVideoPreview(
     poleId: String,
     isSaving: Boolean,
     retakeLabel: String,
+    keepRetakeLabelOnOneLine: Boolean,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
     onClose: () -> Unit,
@@ -253,6 +255,7 @@ private fun PoleVideoPreview(
         poleId = poleId,
         isSaving = isSaving,
         retakeLabel = retakeLabel,
+        keepRetakeLabelOnOneLine = keepRetakeLabelOnOneLine,
         confirmLabel = "Dùng video này",
         onClose = onClose,
         onRetake = onRetake,
