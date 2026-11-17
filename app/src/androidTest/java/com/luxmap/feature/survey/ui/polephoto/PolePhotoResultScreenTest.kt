@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.luxmap.core.theme.LuxMapTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
@@ -56,7 +57,7 @@ class PolePhotoResultScreenTest {
     }
 
     @Test
-    fun header_shows_the_pole_id_and_the_position_badge_in_every_state() {
+    fun top_bar_shows_title_and_pole_in_every_state() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultScreen(
@@ -68,8 +69,26 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("P-0103").assertExists()
-        composeRule.onNodeWithText("#3").assertExists()
+        composeRule.onNodeWithText("Kết quả AI").assertExists()
+        composeRule.onNodeWithText("Cột 3 · P-0103").assertExists()
+    }
+
+    @Test
+    fun the_manager_decision_is_a_banner_above_the_photo() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(decision = "confirm", decisionNote = "Đúng hiện trạng"),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+        val banner = composeRule.onNodeWithText("Kỹ sư bảo trì đã xác nhận", substring = true).fetchSemanticsNode()
+        val photo = composeRule.onNodeWithTag("photo_preview").fetchSemanticsNode()
+        assertTrue(banner.boundsInRoot.top < photo.boundsInRoot.top)
     }
 
     @Test
@@ -231,7 +250,8 @@ class PolePhotoResultScreenTest {
             }
         }
         composeRule.onNodeWithText("Kỹ sư bảo trì đã xác nhận").assertExists()
-        composeRule.onNodeWithText("Đã kiểm tra thực tế").assertExists()
+        composeRule.onNodeWithText("Đã kiểm tra thực tế", substring = true).assertExists()
+        composeRule.onNodeWithText("Lúc ", substring = true).assertExists()
     }
 
     @Test

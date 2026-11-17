@@ -25,17 +25,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -63,7 +59,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -84,16 +79,18 @@ import com.luxmap.R
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
-import com.luxmap.core.theme.BrandHeroGradient
-import com.luxmap.core.theme.Dark950
 import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.OverlineTextStyle
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.MessageState
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.TopSlideToast
@@ -104,7 +101,6 @@ import java.io.File
 private const val PHOTO_HEIGHT_FRACTION = 0.45f
 private val StatePlaceholderHeight = 160.dp
 private val SkeletonBlockHeight = 60.dp
-private val HeaderBadgeSize = 44.dp
 
 @Composable
 fun PolePhotoResultScreen(
@@ -124,7 +120,11 @@ fun PolePhotoResultScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PolePhotoResultHeader(poleId = poleId, position = position, onBack = onBack)
+            LuxChildTopBar(
+                title = "Kết quả AI",
+                onBack = onBack,
+                subtitle = if (position > 0) "Cột $position · $poleId" else poleId,
+            )
 
             Column(
                 modifier =
@@ -231,41 +231,6 @@ fun PolePhotoResultRoute(
 }
 
 @Composable
-private fun PolePhotoResultHeader(
-    poleId: String,
-    position: Int,
-    onBack: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(HeaderBadgeSize)
-                    .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(Radius.control)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "#$position", style = MaterialTheme.typography.labelLarge, color = Color.White)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = Color.White.copy(alpha = 0.75f))
-            Text(text = poleId, style = MaterialTheme.typography.titleMedium, color = Color.White)
-        }
-    }
-}
-
-@Composable
 private fun photoHeight() = (LocalConfiguration.current.screenHeightDp * PHOTO_HEIGHT_FRACTION).dp
 
 @Composable
@@ -307,9 +272,9 @@ private fun PolePhotoResultBody(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
         if (state.isStale) {
-            InlineBanner(
+            LuxBanner(
                 message = "Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất",
-                tone = InlineBannerTone.OFFLINE,
+                tone = LuxBannerTone.INFO,
             )
         }
 
@@ -343,66 +308,64 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
     val colors = cvStateColors(effective)
     val band = confidenceBand(state.confidence)
     val aiConclusive = state.cvState == "on" || state.cvState == "off"
-    val bandCondition =
+    val bandColors =
         when (band) {
-            ConfidenceBand.HIGH -> AssetCondition.NORMAL
-            ConfidenceBand.MEDIUM -> AssetCondition.DIM
-            ConfidenceBand.LOW -> AssetCondition.OUT
+            ConfidenceBand.HIGH -> BadgeColors(LuxTheme.colors.successContainer, LuxTheme.colors.success)
+            ConfidenceBand.MEDIUM -> BadgeColors(LuxTheme.colors.warningContainer, LuxTheme.colors.warning)
+            ConfidenceBand.LOW -> BadgeColors(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
         }
-    val bandColors = bandCondition.badgeColors()
     val confidenceText = confidenceLabel(state.confidence)
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(text = "KẾT LUẬN", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Box(
-                modifier = Modifier.size(56.dp).background(colors.background, RoundedCornerShape(Radius.control)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
-            }
-            Text(
-                text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.testTag("ai_verdict_label"),
-            )
-        }
-        Text(
-            text = verdictSourceText(state.cvState, reviewed),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (aiConclusive && confidenceText != null) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(bandColors.background, RoundedCornerShape(Radius.chip))
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                if (band != ConfidenceBand.HIGH) {
-                    Icon(
-                        imageVector = Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = bandColors.text,
-                        modifier = Modifier.size(16.dp),
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        LuxSectionHeader(title = "Kết luận")
+        LuxCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Box(
+                        modifier = Modifier.size(56.dp).background(colors.background, MaterialTheme.shapes.medium),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
+                    }
+                    Text(
+                        text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.testTag("ai_verdict_label"),
                     )
                 }
                 Text(
-                    text = confidenceText,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = bandColors.text,
+                    text = verdictSourceText(state.cvState, reviewed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (aiConclusive && confidenceText != null) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(bandColors.background, MaterialTheme.shapes.small)
+                                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        if (band != ConfidenceBand.HIGH) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = bandColors.text,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        Text(
+                            text = confidenceText,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = bandColors.text,
+                        )
+                    }
+                }
             }
         }
     }
@@ -644,8 +607,9 @@ private fun PolePhotoPreview(
             Modifier
                 .fillMaxWidth()
                 .height(photoHeight())
-                .clip(RoundedCornerShape(Radius.card))
-                .background(Dark950)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 .then(if (isVideo) Modifier else Modifier.clickable { viewing = true }.testTag("photo_preview")),
     ) {
         if (isVideo) {
@@ -672,7 +636,7 @@ private fun PolePhotoPreview(
                     Modifier
                         .align(Alignment.BottomStart)
                         .padding(Spacing.sm)
-                        .background(pillColors.background, RoundedCornerShape(Radius.chip))
+                        .background(pillColors.background, MaterialTheme.shapes.extraSmall)
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             )
         }
@@ -691,7 +655,7 @@ private fun PhotoViewerDialog(
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(modifier = Modifier.fillMaxSize().background(Dark950).testTag("photo_viewer")) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).testTag("photo_viewer")) {
             AsyncImage(
                 model = File(filePath),
                 contentDescription = "Ảnh cột đèn phóng to",
@@ -828,69 +792,20 @@ private fun VideoPlayer(
     )
 }
 
-private data class DecisionTone(
-    val background: Color,
-    val border: Color,
-    val foreground: Color,
-    val icon: ImageVector,
-    val title: String,
-)
-
-private fun decisionTone(decision: String?): DecisionTone =
-    when (decision) {
-        "confirm" ->
-            DecisionTone(
-                background = Color(0xFFF0FAF6),
-                border = Color(0xFFBFE6D6),
-                foreground = Color(0xFF1E6B5C),
-                icon = Icons.Filled.Verified,
-                title = "Kỹ sư bảo trì đã xác nhận",
-            )
-        "reject" ->
-            DecisionTone(
-                background = Color(0xFFFEF2F2),
-                border = Color(0xFFFECACA),
-                foreground = Color(0xFF991B1B),
-                icon = Icons.Filled.Block,
-                title = "Kỹ sư bảo trì đã từ chối",
-            )
-        else ->
-            DecisionTone(
-                background = Color(0xFFF8FAFC),
-                border = Color(0xFFE2E8F0),
-                foreground = Color(0xFF64748B),
-                icon = Icons.Filled.HourglassEmpty,
-                title = "Chưa có quyết định từ Kỹ sư bảo trì",
-            )
-    }
-
 @Composable
 private fun PolePhotoDecisionCard(state: PolePhotoResultUiState.Success) {
-    val tone = decisionTone(state.decision)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(tone.background, RoundedCornerShape(Radius.card))
-                .border(1.dp, tone.border, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Icon(imageVector = tone.icon, contentDescription = null, tint = tone.foreground)
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = tone.title, style = MaterialTheme.typography.titleSmall, color = tone.foreground)
-            if (!state.decisionNote.isNullOrBlank()) {
-                Text(text = state.decisionNote, style = MaterialTheme.typography.bodyMedium, color = tone.foreground)
-            }
-            if (state.decision != null) {
-                Text(
-                    text = "Lúc ${DateFormatUtils.formatInstant(state.decidedAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tone.foreground,
-                )
-            }
+    val (title, tone) =
+        when (state.decision) {
+            "confirm" -> "Kỹ sư bảo trì đã xác nhận" to LuxBannerTone.SUCCESS
+            "reject" -> "Kỹ sư bảo trì đã từ chối" to LuxBannerTone.ERROR
+            else -> "Chưa có quyết định từ Kỹ sư bảo trì" to LuxBannerTone.INFO
         }
-    }
+    val message =
+        listOfNotNull(
+            state.decisionNote?.takeIf { it.isNotBlank() },
+            state.decidedAt?.let { "Lúc ${DateFormatUtils.formatInstant(it)}" },
+        ).joinToString("\n")
+    LuxBanner(title = title, message = message, tone = tone)
 }
 
 @Composable
