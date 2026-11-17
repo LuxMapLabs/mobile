@@ -471,4 +471,25 @@ class PolePhotoResultScreenTest {
         composeRule.onNodeWithText("Đồng ý với AI").assertIsDisplayed()
         composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertIsNotDisplayed()
     }
+
+    @Test
+    fun a_completed_survey_shows_the_result_read_only() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(cvState = "on"),
+                    onBack = {},
+                    onRetry = {},
+                    isCompleted = true,
+                )
+            }
+        }
+        composeRule.onNodeWithTag("ai_verdict_label").assertExists()
+        composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertDoesNotExist()
+        composeRule.onNodeWithText("Đồng ý với AI").assertDoesNotExist()
+        composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
+        composeRule.onNodeWithText("Chụp lại cột này").assertDoesNotExist()
+    }
 }

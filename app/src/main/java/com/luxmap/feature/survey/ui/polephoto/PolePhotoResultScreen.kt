@@ -118,11 +118,12 @@ fun PolePhotoResultScreen(
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
     onRequestAuthorizationHeader: suspend () -> String? = { null },
+    isCompleted: Boolean = false,
 ) {
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     val reviewable = state as? PolePhotoResultUiState.Success
-    val showFooter = reviewable != null && reviewable.decision == null
+    val showFooter = reviewable != null && reviewable.decision == null && !isCompleted
     val draft = if (reviewable != null && showFooter) rememberReviewDraft(poleId, reviewable) else null
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -151,7 +152,12 @@ fun PolePhotoResultScreen(
                         }
 
                     is PolePhotoResultUiState.Success ->
-                        PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader) {
+                        PolePhotoResultBody(
+                            poleId,
+                            state,
+                            if (isCompleted) null else onRetake,
+                            onRequestAuthorizationHeader,
+                        ) {
                             if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
                         }
 
@@ -215,6 +221,7 @@ fun PolePhotoResultRoute(
         viewModel.onViewAiResult(photoId)
     }
 
+    val isCompleted = (uiState as? PoleListUiState.Success)?.isCompleted ?: false
     PolePhotoResultScreen(
         poleId = pole?.poleId.orEmpty(),
         position = pole?.position ?: 0,
@@ -232,6 +239,7 @@ fun PolePhotoResultRoute(
             viewModel.onSubmitReview(photoId, finalCvState, reviewNote)
         },
         onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
+        isCompleted = isCompleted,
     )
 }
 
@@ -242,7 +250,7 @@ private fun photoHeight() = (LocalConfiguration.current.screenHeightDp * PHOTO_H
 private fun PolePhotoResultBody(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onRetake: () -> Unit,
+    onRetake: (() -> Unit)?,
     onRequestAuthorizationHeader: suspend () -> String?,
     reviewCard: @Composable () -> Unit,
 ) {
@@ -353,7 +361,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
 private fun TechnicalDetails(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onRetake: () -> Unit,
+    onRetake: (() -> Unit)?,
 ) {
     var expanded by rememberSaveable(poleId) { mutableStateOf(false) }
     var confirmRetake by remember { mutableStateOf(false) }
@@ -386,7 +394,7 @@ private fun TechnicalDetails(
                 if (state.reviewedBy != null) {
                     DetailRow("Đã review lúc", DateFormatUtils.formatInstant(state.reviewedAt))
                 }
-                if (state.decision == null) {
+                if (state.decision == null && onRetake != null) {
                     RetakeButton(onClick = { confirmRetake = true }, modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -400,7 +408,7 @@ private fun TechnicalDetails(
             confirmLabel = "Chụp lại",
             onConfirm = {
                 confirmRetake = false
-                onRetake()
+                onRetake?.invoke()
             },
             onDismiss = { confirmRetake = false },
             dismissLabel = "Hủy",
