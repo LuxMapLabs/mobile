@@ -191,4 +191,19 @@ class PolePhotoDaoTest {
             assertEquals("off", row?.draftFinalCvState)
             assertEquals("Thấy đèn tắt khi kiểm tra", row?.draftReviewNote)
         }
+
+    @Test
+    fun updateUploadAiResultWritesTheAiFieldsAndKeepsTheDraftReview() =
+        runTest {
+            dao.insert(photo("PH-1").copy(draftFinalCvState = "on", draftReviewNote = "thấy sáng"))
+            dao.updateUploadAiResult("PH-1", "available", "off", 0.9, "cv-1", Instant.parse("2026-11-17T03:00:00Z"))
+
+            val row = dao.byId("PH-1")!!
+            assertEquals("available", row.aiStatus)
+            assertEquals("off", row.cvState)
+            assertEquals(0.9, row.confidence!!, 0.0)
+            assertEquals("cv-1", row.modelVersion)
+            assertEquals("on", row.draftFinalCvState)
+            assertEquals("thấy sáng", row.draftReviewNote)
+        }
 }

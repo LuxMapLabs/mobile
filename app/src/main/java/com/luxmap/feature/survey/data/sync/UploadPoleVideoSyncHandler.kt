@@ -13,6 +13,7 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
+import java.time.Instant
 import javax.inject.Inject
 
 class UploadPoleVideoSyncHandler
@@ -44,6 +45,16 @@ class UploadPoleVideoSyncHandler
                         body = file.asRequestBody("video/mp4".toMediaType()),
                     )
                 dao.updateServerPhotoId(photo.photoId, response.photoId)
+                response.aiStatus?.let { aiStatus ->
+                    dao.updateUploadAiResult(
+                        photoId = photo.photoId,
+                        aiStatus = aiStatus,
+                        cvState = response.cvState,
+                        confidence = response.confidence,
+                        modelVersion = response.modelVersion,
+                        analyzedAt = response.analyzedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+                    )
+                }
                 file.delete()
                 SyncOpResult.Done
             } catch (e: HttpException) {

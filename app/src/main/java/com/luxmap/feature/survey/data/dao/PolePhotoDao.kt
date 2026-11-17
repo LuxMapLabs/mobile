@@ -28,6 +28,26 @@ interface PolePhotoDao {
         serverPhotoId: String,
     )
 
+    @Query(
+        """
+        UPDATE local_pole_photo SET
+            aiStatus = :aiStatus,
+            cvState = :cvState,
+            confidence = :confidence,
+            modelVersion = :modelVersion,
+            analyzedAt = :analyzedAt
+        WHERE photoId = :photoId
+        """,
+    )
+    suspend fun updateUploadAiResult(
+        photoId: String,
+        aiStatus: String,
+        cvState: String?,
+        confidence: Double?,
+        modelVersion: String?,
+        analyzedAt: Instant?,
+    )
+
     // Writes the full server PolePhotoItem snapshot into Room. Used both after fetching the AI
     // result (GET) and after a review (PATCH .../review) - both return the same full item shape.
     @Query(

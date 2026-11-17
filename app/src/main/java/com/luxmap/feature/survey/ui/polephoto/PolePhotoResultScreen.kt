@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.net.Uri
 import android.view.LayoutInflater
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,41 +15,35 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,12 +56,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -84,17 +82,24 @@ import com.luxmap.R
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.BadgeColors
-import com.luxmap.core.theme.BrandHeroGradient
-import com.luxmap.core.theme.Dark950
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.OverlineTextStyle
-import com.luxmap.core.theme.Radius
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
-import com.luxmap.core.ui.components.InlineBanner
-import com.luxmap.core.ui.components.InlineBannerTone
-import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSecondaryButton
+import com.luxmap.core.ui.components.LuxSectionHeader
+import com.luxmap.core.ui.components.LuxSegment
+import com.luxmap.core.ui.components.LuxSegmented
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
@@ -102,9 +107,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private const val PHOTO_HEIGHT_FRACTION = 0.45f
-private val StatePlaceholderHeight = 160.dp
-private val SkeletonBlockHeight = 60.dp
-private val HeaderBadgeSize = 44.dp
 
 @Composable
 fun PolePhotoResultScreen(
@@ -116,15 +118,21 @@ fun PolePhotoResultScreen(
     onRetake: () -> Unit = {},
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
     onRequestAuthorizationHeader: suspend () -> String? = { null },
+    isCompleted: Boolean = false,
 ) {
     val toastState = remember { TopToastState() }
     val scope = rememberCoroutineScope()
     val reviewable = state as? PolePhotoResultUiState.Success
-    val showFooter = reviewable != null && reviewable.decision == null
+    val showFooter = reviewable != null && reviewable.decision == null && !isCompleted
+    val draft = if (reviewable != null && showFooter) rememberReviewDraft(poleId, reviewable) else null
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            PolePhotoResultHeader(poleId = poleId, position = position, onBack = onBack)
+            LuxChildTopBar(
+                title = "Kết quả AI",
+                onBack = onBack,
+                subtitle = if (position > 0) "Cột $position · $poleId" else poleId,
+            )
 
             Column(
                 modifier =
@@ -136,47 +144,50 @@ fun PolePhotoResultScreen(
                         .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
             ) {
                 when (state) {
-                    is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
+                    is PolePhotoResultUiState.Loading ->
+                        LuxLoadingRegion(description = "Đang tải kết quả AI") {
+                            LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
+                            LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
+                            LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
+                        }
 
                     is PolePhotoResultUiState.Success ->
-                        PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader)
-
-                    // heightIn (not a fixed height) - MessageState's action button (Error) makes this
-                    // content taller than the skeleton needs, and a fixed height here clipped
-                    // the button outside the touchable area.
-                    // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
-                    // A real "AI model failed" result (ai_status = "unavailable") now renders as
-                    // Success with cvState = null instead, so review stays possible.
-                    is PolePhotoResultUiState.Empty ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.SmartToy,
-                                iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                                title = "AI chưa phân loại được ảnh này",
-                                subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                                action = {},
-                            )
+                        PolePhotoResultBody(
+                            poleId,
+                            state,
+                            if (isCompleted) null else onRetake,
+                            onRequestAuthorizationHeader,
+                        ) {
+                            if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
                         }
+
+                    is PolePhotoResultUiState.Empty ->
+                        LuxEmptyState(
+                            title = "AI chưa phân loại được ảnh này",
+                            message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                            icon = Icons.Filled.SmartToy,
+                        )
 
                     is PolePhotoResultUiState.Error ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.CloudOff,
-                                iconColors = SyncStatus.FAILED.badgeColors(),
-                                title = "Không tải được kết quả AI",
-                                subtitle = state.message,
-                                action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
-                            )
-                        }
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            title = "Không tải được kết quả AI",
+                            message =
+                                if (state.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
+                        )
                 }
 
                 Spacer(Modifier.height(Spacing.lg))
             }
 
-            if (reviewable != null && showFooter) {
-                ReviewFooter(
-                    poleId = poleId,
-                    state = reviewable,
+            if (draft != null) {
+                ReviewSubmitBar(
+                    draft = draft,
                     onSubmit = { finalCvState, reviewNote ->
                         scope.launch { toastState.show("Đã lưu, sẽ gửi khi Hoàn tất") }
                         onSubmitReview(finalCvState, reviewNote)
@@ -210,6 +221,7 @@ fun PolePhotoResultRoute(
         viewModel.onViewAiResult(photoId)
     }
 
+    val isCompleted = (uiState as? PoleListUiState.Success)?.isCompleted ?: false
     PolePhotoResultScreen(
         poleId = pole?.poleId.orEmpty(),
         position = pole?.position ?: 0,
@@ -227,89 +239,26 @@ fun PolePhotoResultRoute(
             viewModel.onSubmitReview(photoId, finalCvState, reviewNote)
         },
         onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
+        isCompleted = isCompleted,
     )
-}
-
-@Composable
-private fun PolePhotoResultHeader(
-    poleId: String,
-    position: Int,
-    onBack: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(BrandHeroGradient)
-                .statusBarsPadding()
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại", tint = Color.White)
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(HeaderBadgeSize)
-                    .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(Radius.control)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(text = "#$position", style = MaterialTheme.typography.labelLarge, color = Color.White)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = "KẾT QUẢ AI", style = OverlineTextStyle, color = Color.White.copy(alpha = 0.75f))
-            Text(text = poleId, style = MaterialTheme.typography.titleMedium, color = Color.White)
-        }
-    }
 }
 
 @Composable
 private fun photoHeight() = (LocalConfiguration.current.screenHeightDp * PHOTO_HEIGHT_FRACTION).dp
 
 @Composable
-private fun PolePhotoResultSkeleton() {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("pole_photo_result_loading"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(photoHeight())
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(SkeletonBlockHeight + Spacing.lg)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(Dimens.minTouchTarget)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-    }
-}
-
-@Composable
 private fun PolePhotoResultBody(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onRetake: () -> Unit,
+    onRetake: (() -> Unit)?,
     onRequestAuthorizationHeader: suspend () -> String?,
+    reviewCard: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         if (state.isStale) {
-            InlineBanner(
+            LuxBanner(
                 message = "Đang xem kết quả đã lưu trên máy, có thể chưa phải bản mới nhất",
-                tone = InlineBannerTone.OFFLINE,
+                tone = LuxBannerTone.INFO,
             )
         }
 
@@ -320,6 +269,8 @@ private fun PolePhotoResultBody(
         PolePhotoPreview(state, onRequestAuthorizationHeader)
 
         ConclusionCard(state)
+
+        reviewCard()
 
         TechnicalDetails(poleId = poleId, state = state, onRetake = onRetake)
     }
@@ -343,66 +294,64 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
     val colors = cvStateColors(effective)
     val band = confidenceBand(state.confidence)
     val aiConclusive = state.cvState == "on" || state.cvState == "off"
-    val bandCondition =
+    val bandColors =
         when (band) {
-            ConfidenceBand.HIGH -> AssetCondition.NORMAL
-            ConfidenceBand.MEDIUM -> AssetCondition.DIM
-            ConfidenceBand.LOW -> AssetCondition.OUT
+            ConfidenceBand.HIGH -> BadgeColors(LuxTheme.colors.successContainer, LuxTheme.colors.success)
+            ConfidenceBand.MEDIUM -> BadgeColors(LuxTheme.colors.warningContainer, LuxTheme.colors.warning)
+            ConfidenceBand.LOW -> BadgeColors(MaterialTheme.colorScheme.errorContainer, MaterialTheme.colorScheme.error)
         }
-    val bandColors = bandCondition.badgeColors()
     val confidenceText = confidenceLabel(state.confidence)
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(text = "KẾT LUẬN", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Box(
-                modifier = Modifier.size(56.dp).background(colors.background, RoundedCornerShape(Radius.control)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
-            }
-            Text(
-                text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.testTag("ai_verdict_label"),
-            )
-        }
-        Text(
-            text = verdictSourceText(state.cvState, reviewed),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (aiConclusive && confidenceText != null) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(bandColors.background, RoundedCornerShape(Radius.chip))
-                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                if (band != ConfidenceBand.HIGH) {
-                    Icon(
-                        imageVector = Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = bandColors.text,
-                        modifier = Modifier.size(16.dp),
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        LuxSectionHeader(title = "Kết luận")
+        LuxCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    Box(
+                        modifier = Modifier.size(56.dp).background(colors.background, MaterialTheme.shapes.medium),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
+                    }
+                    Text(
+                        text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.testTag("ai_verdict_label"),
                     )
                 }
                 Text(
-                    text = confidenceText,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = bandColors.text,
+                    text = verdictSourceText(state.cvState, reviewed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (aiConclusive && confidenceText != null) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(bandColors.background, MaterialTheme.shapes.small)
+                                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        if (band != ConfidenceBand.HIGH) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = bandColors.text,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                        Text(
+                            text = confidenceText,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = bandColors.text,
+                        )
+                    }
+                }
             }
         }
     }
@@ -412,7 +361,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
 private fun TechnicalDetails(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onRetake: () -> Unit,
+    onRetake: (() -> Unit)?,
 ) {
     var expanded by rememberSaveable(poleId) { mutableStateOf(false) }
     var confirmRetake by remember { mutableStateOf(false) }
@@ -423,20 +372,20 @@ private fun TechnicalDetails(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = Dimens.minTouchTarget)
-                    .clickable { expanded = !expanded }
+                    .clickable(role = Role.Button) { expanded = !expanded }
+                    .semantics { stateDescription = if (expanded) "Đang mở" else "Đang đóng" }
                     .testTag("details_toggle"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "Chi tiết kỹ thuật",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (expanded) {
@@ -445,7 +394,7 @@ private fun TechnicalDetails(
                 if (state.reviewedBy != null) {
                     DetailRow("Đã review lúc", DateFormatUtils.formatInstant(state.reviewedAt))
                 }
-                if (state.decision == null) {
+                if (state.decision == null && onRetake != null) {
                     RetakeButton(onClick = { confirmRetake = true }, modifier = Modifier.fillMaxWidth())
                 }
             }
@@ -453,19 +402,17 @@ private fun TechnicalDetails(
     }
 
     if (confirmRetake) {
-        AlertDialog(
-            onDismissRequest = { confirmRetake = false },
-            title = { Text("Chụp lại cột này?") },
-            text = { Text("Ảnh hiện tại sẽ được thay bằng ảnh mới.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmRetake = false
-                        onRetake()
-                    },
-                ) { Text("Chụp lại") }
+        LuxConfirmDialog(
+            title = "Chụp lại cột này?",
+            message = "Ảnh hiện tại sẽ được thay bằng ảnh mới.",
+            confirmLabel = "Chụp lại",
+            onConfirm = {
+                confirmRetake = false
+                onRetake?.invoke()
             },
-            dismissButton = { TextButton(onClick = { confirmRetake = false }) { Text("Hủy") } },
+            onDismiss = { confirmRetake = false },
+            dismissLabel = "Hủy",
+            destructive = true,
         )
     }
 }
@@ -486,147 +433,105 @@ private fun DetailRow(
     }
 }
 
+@Stable
+private class ReviewDraft(
+    val aiCvState: String?,
+    val baselineCvState: String?,
+    val baselineNote: String?,
+    selectedState: MutableState<String?>,
+    noteState: MutableState<String>,
+) {
+    var selected by selectedState
+    var note by noteState
+    val noteRequired: Boolean get() = selected != null && selected != aiCvState
+    val normalizedNote: String? get() = note.trim().ifBlank { null }
+    val hasChange: Boolean get() = selected != baselineCvState || normalizedNote != baselineNote
+    val canSubmit: Boolean get() = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
+}
+
 @Composable
-private fun ReviewFooter(
+private fun rememberReviewDraft(
     poleId: String,
     state: PolePhotoResultUiState.Success,
-    onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
-) {
+): ReviewDraft {
     val baselineCvState = state.draftFinalCvState ?: state.finalCvState
     val baselineNote = state.draftReviewNote ?: state.reviewNote
-    var selected by
-        rememberSaveable(poleId) {
+    val selected =
+        rememberSaveable(poleId, baselineCvState, baselineNote) {
             mutableStateOf(baselineCvState ?: state.cvState?.takeIf { it == "on" || it == "off" })
         }
-    var note by rememberSaveable(poleId) { mutableStateOf(baselineNote.orEmpty()) }
-    // Required whenever the chosen label differs from the AI's own cvState, including when
-    // cvState is "inconclusive" or null (server rule, see docs/contract-drift.md "PATCH
-    // .../review" - review_note is mandatory even when AI never reached on/off or failed
-    // outright, not only when it disagrees).
-    val noteRequired = selected != null && selected != state.cvState
-    val normalizedNote = note.trim().ifBlank { null }
-    val hasChange = selected != baselineCvState || normalizedNote != baselineNote
-    val canSubmit = selected != null && (!noteRequired || note.isNotBlank()) && hasChange
+    val note = rememberSaveable(poleId, baselineCvState, baselineNote) { mutableStateOf(baselineNote.orEmpty()) }
+    return ReviewDraft(state.cvState, baselineCvState, baselineNote, selected, note)
+}
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Text(
-            text = "KỸ SƯ XÁC NHẬN NHÃN",
-            style = OverlineTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        ReviewChoiceSegment(selected = selected, onSelected = { selected = it })
-
-        if (noteRequired) {
-            OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("Ghi chú") },
-                isError = note.isBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (note.isBlank()) {
-                Text(
-                    text = "Cần ghi chú vì khác với nhận định của AI",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+@Composable
+private fun ReviewCard(
+    draft: ReviewDraft,
+    hasSavedDraft: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        LuxSectionHeader(title = "Kỹ sư xác nhận nhãn")
+        LuxCard {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                LuxSegmented(
+                    segments =
+                        listOf(
+                            LuxSegment("on", "Đèn sáng", Icons.Filled.Lightbulb),
+                            LuxSegment("off", "Đèn tắt", Icons.Outlined.Lightbulb),
+                        ),
+                    selected = draft.selected,
+                    onSelect = { draft.selected = it },
                 )
+                if (draft.noteRequired) {
+                    OutlinedTextField(
+                        value = draft.note,
+                        onValueChange = { draft.note = it },
+                        label = {
+                            Text(
+                                buildAnnotatedString {
+                                    append("Ghi chú ")
+                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.error)) { append("*") }
+                                },
+                            )
+                        },
+                        isError = draft.note.isBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (draft.note.isBlank()) {
+                        Text(
+                            text = "Cần ghi chú vì khác với nhận định của AI",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                if (hasSavedDraft && !draft.hasChange) {
+                    Text(
+                        text = "Đã lưu, sẽ gửi khi Hoàn tất",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
-
-        if (state.draftFinalCvState != null && !hasChange) {
-            Text(
-                text = "Đã lưu, sẽ gửi khi Hoàn tất",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        PrimaryButton(
-            text = reviewActionLabel(selected, state.cvState),
-            onClick = { selected?.let { onSubmit(it, normalizedNote) } },
-            enabled = canSubmit,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 
 @Composable
-private fun ReviewChoiceSegment(
-    selected: String?,
-    onSelected: (String) -> Unit,
+private fun ReviewSubmitBar(
+    draft: ReviewDraft,
+    onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        listOf("on" to "Đèn sáng", "off" to "Đèn tắt").forEach { (value, label) ->
-            ReviewChoiceCard(
-                value = value,
-                label = label,
-                isSelected = selected == value,
-                onClick = { onSelected(value) },
-                modifier = Modifier.weight(1f),
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            PrimaryButton(
+                text = reviewActionLabel(draft.selected, draft.aiCvState),
+                onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
+                enabled = draft.canSubmit,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             )
         }
-    }
-}
-
-@Composable
-private fun ReviewChoiceCard(
-    value: String,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = cvStateColors(value)
-    val shape = RoundedCornerShape(Radius.chip)
-    Row(
-        modifier =
-            modifier
-                .heightIn(min = Dimens.minTouchTarget)
-                // clip must come before clickable, otherwise the tap ripple draws as a full
-                // rectangle instead of following this card's rounded corners (found on a real
-                // device, 2026-10-29).
-                .clip(shape)
-                .background(if (isSelected) colors.background else MaterialTheme.colorScheme.surfaceVariant, shape)
-                .border(if (isSelected) 2.dp else 0.dp, colors.text, shape)
-                .clickable(onClick = onClick)
-                .testTag("review_choice_$value")
-                .padding(Spacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .background(
-                        if (isSelected) colors.text else colors.background,
-                        RoundedCornerShape(Dimens.radiusSmall),
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = if (value == "on") Icons.Filled.Lightbulb else Icons.Outlined.Lightbulb,
-                contentDescription = null,
-                tint = if (isSelected) Color.White else colors.text,
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (isSelected) colors.text else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
     }
 }
 
@@ -644,9 +549,18 @@ private fun PolePhotoPreview(
             Modifier
                 .fillMaxWidth()
                 .height(photoHeight())
-                .clip(RoundedCornerShape(Radius.card))
-                .background(Dark950)
-                .then(if (isVideo) Modifier else Modifier.clickable { viewing = true }.testTag("photo_preview")),
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
+                .then(
+                    if (isVideo) {
+                        Modifier
+                    } else {
+                        Modifier.clickable(onClickLabel = "Phóng to ảnh", role = Role.Image) {
+                            viewing = true
+                        }.testTag("photo_preview")
+                    },
+                ),
     ) {
         if (isVideo) {
             VideoPlayer(
@@ -672,7 +586,7 @@ private fun PolePhotoPreview(
                     Modifier
                         .align(Alignment.BottomStart)
                         .padding(Spacing.sm)
-                        .background(pillColors.background, RoundedCornerShape(Radius.chip))
+                        .background(pillColors.background, MaterialTheme.shapes.extraSmall)
                         .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
             )
         }
@@ -691,7 +605,7 @@ private fun PhotoViewerDialog(
     var offsetX by remember { mutableStateOf(0f) }
     var offsetY by remember { mutableStateOf(0f) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Box(modifier = Modifier.fillMaxSize().background(Dark950).testTag("photo_viewer")) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).testTag("photo_viewer")) {
             AsyncImage(
                 model = File(filePath),
                 contentDescription = "Ảnh cột đèn phóng to",
@@ -731,7 +645,7 @@ private fun VideoPreviewPlaceholder() {
         modifier =
             Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(Radius.card))
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center,
     ) {
@@ -824,73 +738,24 @@ private fun VideoPlayer(
             (LayoutInflater.from(viewContext).inflate(R.layout.view_player_texture, null) as PlayerView)
                 .apply { this.player = player }
         },
-        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(Radius.card)),
+        modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.medium),
     )
 }
 
-private data class DecisionTone(
-    val background: Color,
-    val border: Color,
-    val foreground: Color,
-    val icon: ImageVector,
-    val title: String,
-)
-
-private fun decisionTone(decision: String?): DecisionTone =
-    when (decision) {
-        "confirm" ->
-            DecisionTone(
-                background = Color(0xFFF0FAF6),
-                border = Color(0xFFBFE6D6),
-                foreground = Color(0xFF1E6B5C),
-                icon = Icons.Filled.Verified,
-                title = "Kỹ sư bảo trì đã xác nhận",
-            )
-        "reject" ->
-            DecisionTone(
-                background = Color(0xFFFEF2F2),
-                border = Color(0xFFFECACA),
-                foreground = Color(0xFF991B1B),
-                icon = Icons.Filled.Block,
-                title = "Kỹ sư bảo trì đã từ chối",
-            )
-        else ->
-            DecisionTone(
-                background = Color(0xFFF8FAFC),
-                border = Color(0xFFE2E8F0),
-                foreground = Color(0xFF64748B),
-                icon = Icons.Filled.HourglassEmpty,
-                title = "Chưa có quyết định từ Kỹ sư bảo trì",
-            )
-    }
-
 @Composable
 private fun PolePhotoDecisionCard(state: PolePhotoResultUiState.Success) {
-    val tone = decisionTone(state.decision)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(tone.background, RoundedCornerShape(Radius.card))
-                .border(1.dp, tone.border, RoundedCornerShape(Radius.card))
-                .padding(Spacing.md),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Icon(imageVector = tone.icon, contentDescription = null, tint = tone.foreground)
-        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Text(text = tone.title, style = MaterialTheme.typography.titleSmall, color = tone.foreground)
-            if (!state.decisionNote.isNullOrBlank()) {
-                Text(text = state.decisionNote, style = MaterialTheme.typography.bodyMedium, color = tone.foreground)
-            }
-            if (state.decision != null) {
-                Text(
-                    text = "Lúc ${DateFormatUtils.formatInstant(state.decidedAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = tone.foreground,
-                )
-            }
+    val (title, tone) =
+        when (state.decision) {
+            "confirm" -> "Kỹ sư bảo trì đã xác nhận" to LuxBannerTone.SUCCESS
+            "reject" -> "Kỹ sư bảo trì đã từ chối" to LuxBannerTone.ERROR
+            else -> "Chưa có quyết định từ Kỹ sư bảo trì" to LuxBannerTone.INFO
         }
-    }
+    val message =
+        listOfNotNull(
+            state.decisionNote?.takeIf { it.isNotBlank() },
+            state.decidedAt?.let { "Lúc ${DateFormatUtils.formatInstant(it)}" },
+        ).joinToString("\n")
+    LuxBanner(title = title, message = message, tone = tone)
 }
 
 @Composable
@@ -898,15 +763,10 @@ private fun RetakeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
+    LuxSecondaryButton(
+        text = "Chụp lại cột này",
         onClick = onClick,
-        modifier = modifier.heightIn(min = Dimens.minTouchTarget),
-        shape = RoundedCornerShape(Radius.control),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-    ) {
-        Icon(imageVector = Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(Spacing.sm))
-        Text(text = "Chụp lại cột này")
-    }
+        modifier = modifier,
+        leadingIcon = Icons.Filled.PhotoCamera,
+    )
 }

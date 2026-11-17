@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -76,7 +77,10 @@ class PoleListViewModel
                     },
                     onFailure = { e ->
                         _aiResultState.value =
-                            cached ?: PolePhotoResultUiState.Error(e.message ?: "Không tải được kết quả AI")
+                            cached ?: PolePhotoResultUiState.Error(
+                                message = e.message ?: "Không tải được kết quả AI",
+                                isNetworkError = e is IOException,
+                            )
                     },
                 )
             }
@@ -163,6 +167,7 @@ class PoleListViewModel
             val status: String?,
             val hasPendingReview: Boolean,
             val hasPendingDecision: Boolean,
+            val aiVerdict: PoleAiVerdict?,
         )
 
         private fun load() {
@@ -189,6 +194,13 @@ class PoleListViewModel
                                                     hasPendingReview = photo.draftFinalCvState != null,
                                                     hasPendingDecision =
                                                         photo.reviewedBy != null && photo.decision == null,
+                                                    aiVerdict =
+                                                        poleAiVerdict(
+                                                            photo.aiStatus,
+                                                            photo.cvState,
+                                                            photo.finalCvState,
+                                                            photo.draftFinalCvState,
+                                                        ),
                                                 )
                                             }
                                         }
@@ -209,17 +221,22 @@ class PoleListViewModel
                                             syncStatus = info?.status?.let(::toSyncStatus),
                                             hasPendingReview = info?.hasPendingReview ?: false,
                                             hasPendingDecision = info?.hasPendingDecision ?: false,
+                                            aiVerdict = info?.aiVerdict,
                                         )
                                     },
                                 isStale = result.isStale,
                                 isCompleted = completion != null,
                             )
                         }
-                            .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi") }
+                            .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi", e is IOException) }
                             .collect { _uiState.value = it }
                     },
                     onFailure = { e ->
-                        _uiState.value = PoleListUiState.Error(e.message ?: "Không tải được danh sách cột")
+                        _uiState.value =
+                            PoleListUiState.Error(
+                                message = e.message ?: "Không tải được danh sách cột",
+                                isNetworkError = e is IOException,
+                            )
                     },
                 )
             }

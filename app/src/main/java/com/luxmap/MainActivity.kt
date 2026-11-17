@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.ui.clearFocusOnTapOutside
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.navigation.NavGraph
 import dagger.hilt.android.AndroidEntryPoint
@@ -39,7 +40,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             LuxMapTheme {
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().clearFocusOnTapOutside(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
                     NavGraph()

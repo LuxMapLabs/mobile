@@ -14,6 +14,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.io.File
 import java.io.IOException
+import java.time.Instant
 import javax.inject.Inject
 
 class UploadPolePhotoSyncHandler
@@ -52,6 +53,16 @@ class UploadPolePhotoSyncHandler
                 // Server assigns its own photo_id (WorkOrderPolePhotoService.cs), different from
                 // client_op_id above - must be saved to look up the AI result later.
                 dao.updateServerPhotoId(photo.photoId, response.photoId)
+                response.aiStatus?.let { aiStatus ->
+                    dao.updateUploadAiResult(
+                        photoId = photo.photoId,
+                        aiStatus = aiStatus,
+                        cvState = response.cvState,
+                        confidence = response.confidence,
+                        modelVersion = response.modelVersion,
+                        analyzedAt = response.analyzedAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
+                    )
+                }
                 SyncOpResult.Done
             } catch (e: HttpException) {
                 when (e.code()) {

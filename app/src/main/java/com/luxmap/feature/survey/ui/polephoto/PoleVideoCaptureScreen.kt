@@ -8,44 +8,18 @@ import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,10 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -70,25 +41,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.luxmap.core.theme.Blue500
-import com.luxmap.core.theme.LabelTextStyle
 import com.luxmap.core.theme.LuxMapTheme
-import com.luxmap.core.theme.Navy900
-import com.luxmap.core.theme.PrimaryButtonHeight
-import com.luxmap.core.theme.Radius
-import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val PoleVideoPreviewBackground = Color(0xFF0B1526)
-private val PoleVideoConfirmSavingColor = Color(0xFF3B5A8A)
-
-// Horizontal padding trimmed to xs (not sm) - "Chọn video khác" (gallery retake label) needs
-// every spare dp to stay on one line at this button width, same reason the icon is 18dp here
-// instead of the usual 20dp.
-private val PoleVideoButtonContentPadding = PaddingValues(horizontal = Spacing.xs, vertical = Spacing.md)
 private const val MAX_DURATION_LIMIT_SECONDS = 30
 
 // MediaStore.ACTION_VIDEO_CAPTURE via a custom contract, because the stock
@@ -172,10 +131,6 @@ fun PoleVideoCaptureRoute(
         onDone()
     }
 
-    if (previewFile != null) {
-        BackHandler { closePreview() }
-    }
-
     fun launchCamera() {
         val file = viewModel.outputFile(context.filesDir)
         pendingFile = file
@@ -252,8 +207,10 @@ fun PoleVideoCaptureRoute(
                 onClose = ::closePreview,
             )
         } else {
-            Box(modifier = Modifier.fillMaxSize().background(PoleVideoPreviewBackground)) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                LuxLoadingRegion(description = "Đang mở camera", modifier = Modifier.align(Alignment.Center)) {
+                    CircularProgressIndicator()
+                }
             }
         }
     }
@@ -292,142 +249,34 @@ private fun PoleVideoPreview(
         onDispose { player.release() }
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(PoleVideoPreviewBackground)) {
-        Column(
+    PoleMediaPreviewFrame(
+        poleId = poleId,
+        isSaving = isSaving,
+        retakeLabel = retakeLabel,
+        confirmLabel = "Dùng video này",
+        onClose = onClose,
+        onRetake = onRetake,
+        onConfirm = onConfirm,
+        confirmEnabled = isValidForUpload,
+        warning =
+            if (isReady && !isValidForUpload) {
+                if (!isValidDuration) {
+                    "Clip quá ngắn hoặc quá dài (cần 3-30 giây), vui lòng quay lại"
+                } else {
+                    "Clip quá nặng (tối đa 100MB), vui lòng quay lại với video ngắn hơn"
+                }
+            } else {
+                null
+            },
+    ) {
+        AndroidView(
+            factory = { viewContext -> PlayerView(viewContext).apply { this.player = player } },
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(listOf(Navy900, PoleVideoPreviewBackground)))
-                    .statusBarsPadding()
-                    .padding(horizontal = Spacing.lg)
-                    .padding(top = Spacing.xs, bottom = Spacing.md),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(44.dp)
-                            .alpha(if (isSaving) 0.4f else 1f)
-                            .clickable(enabled = !isSaving, onClick = onClose)
-                            .background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(Radius.control)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng", tint = Color.White)
-                }
-                Column {
-                    Text(text = "ID cột đèn", style = LabelTextStyle, color = Color.White.copy(alpha = 0.7f))
-                    Text(text = poleId, style = MaterialTheme.typography.titleLarge, color = Color.White)
-                }
-            }
-        }
-        Box(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(Spacing.lg),
-            contentAlignment = Alignment.Center,
-        ) {
-            AndroidView(
-                factory = { viewContext -> PlayerView(viewContext).apply { this.player = player } },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3f / 4f)
-                        .clip(RoundedCornerShape(Radius.block)),
-            )
-        }
-        if (isReady && !isValidForUpload) {
-            Text(
-                text =
-                    if (!isValidDuration) {
-                        "Clip quá ngắn hoặc quá dài (cần 3-30 giây), vui lòng quay lại"
-                    } else {
-                        "Clip quá nặng (tối đa 100MB), vui lòng quay lại với video ngắn hơn"
-                    },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
-            )
-        }
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg)
-                    // Without this, each button only measures as tall as its own text needs -
-                    // "Chọn video khác" (gallery source) wraps to 2 lines while "Dùng video này"
-                    // fits on 1, leaving the two buttons visibly different heights.
-                    // IntrinsicSize.Min + fillMaxHeight below stretches both to match the taller
-                    // one.
-                    .height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-        ) {
-            RetakeButton(
-                label = retakeLabel,
-                enabled = !isSaving,
-                onClick = onRetake,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-            )
-            ConfirmButton(
-                isSaving = isSaving,
-                enabled = isValidForUpload,
-                onClick = onConfirm,
-                modifier = Modifier.weight(1f).fillMaxHeight(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun RetakeButton(
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.heightIn(min = PrimaryButtonHeight).alpha(if (enabled) 1f else 0.4f),
-        shape = RoundedCornerShape(Radius.control),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White, disabledContentColor = Color.White),
-        contentPadding = PoleVideoButtonContentPadding,
-    ) {
-        Icon(imageVector = Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(Spacing.xs))
-        Text(label, maxLines = 1)
-    }
-}
-
-@Composable
-private fun ConfirmButton(
-    isSaving: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Button(
-        onClick = onClick,
-        enabled = enabled && !isSaving,
-        modifier = modifier.heightIn(min = PrimaryButtonHeight),
-        shape = RoundedCornerShape(Radius.control),
-        colors =
-            ButtonDefaults.buttonColors(
-                containerColor = Blue500,
-                contentColor = Color.White,
-                disabledContainerColor = PoleVideoConfirmSavingColor,
-                disabledContentColor = Color.White,
-            ),
-        contentPadding = PoleVideoButtonContentPadding,
-    ) {
-        if (isSaving) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-        } else {
-            Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(Spacing.xs))
-        Text(if (isSaving) "Đang lưu…" else "Dùng video này", maxLines = 1)
+                    .aspectRatio(3f / 4f)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
+        )
     }
 }

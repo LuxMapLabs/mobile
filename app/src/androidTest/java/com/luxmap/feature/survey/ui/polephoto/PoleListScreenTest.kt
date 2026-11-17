@@ -1,6 +1,16 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -24,34 +34,49 @@ class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun loading_state_shows_the_hero_header() {
+    fun the_top_bar_shows_the_title_and_the_work_order() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Loading,
+                    state = PoleListUiState.Success(poles = listOf(pole())),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("Chụp ảnh cột đèn").assertExists()
+        composeRule.onNodeWithText("WO-1").assertExists()
     }
 
     @Test
-    fun success_state_shows_each_pole_with_its_condition_badge() {
+    fun a_pole_shows_the_verdict_of_its_photo_not_the_system_status() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1", fixtureStatus = "dim"))),
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(
+                                        poleId = "POLE-1",
+                                        fixtureStatus = "dim",
+                                        syncStatus = SyncStatus.DONE,
+                                        serverPhotoId = "S-1",
+                                    )
+                                        .copy(aiVerdict = PoleAiVerdict.OFF),
+                                    pole(poleId = "POLE-2", position = 2, fixtureStatus = "dim"),
+                                ),
+                        ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("POLE-1").assertExists()
-        composeRule.onNodeWithText("Đèn mờ").assertExists()
+        composeRule.onNodeWithText("Đèn tắt").assertExists()
+        composeRule.onNodeWithText("Đèn mờ").assertDoesNotExist()
     }
 
     @Test
@@ -153,42 +178,72 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun success_state_tapping_the_ai_result_icon_calls_onViewAiResult_with_the_server_photo_id() {
-        var viewedServerPhotoId: String? = null
+    fun tapping_a_pole_with_an_ai_result_opens_it() {
+        var viewed: String? = null
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
-                            poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.DONE)),
+                            poles = listOf(pole(serverPhotoId = "PH-9", syncStatus = SyncStatus.DONE)),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
-                    onViewAiResult = { viewedServerPhotoId = it },
+                    onViewAiResult = { viewed = it },
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Xem kết quả AI").performClick()
-        assertEquals("SERVER-PH-1", viewedServerPhotoId)
+        composeRule
+            .onNode(hasText("POLE-1", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .performClick()
+        assertEquals("PH-9", viewed)
+        composeRule.onNodeWithTag("pole_chevron_POLE-1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Báo lỗi cột").assertDoesNotExist()
     }
 
     @Test
-    fun success_state_hides_the_ai_result_icon_when_the_photo_has_not_finished_syncing() {
+    fun a_sync_error_hides_the_review_badge() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
-                            poles = listOf(pole(serverPhotoId = "SERVER-PH-1", syncStatus = SyncStatus.SYNCING)),
+                            poles = listOf(pole(syncStatus = SyncStatus.FAILED).copy(hasPendingReview = true)),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
-        composeRule.onNodeWithContentDescription("Xem kết quả AI").assertDoesNotExist()
+        composeRule.onNodeWithText("Đồng bộ lỗi").assertExists()
+        composeRule.onNodeWithText("Đã xác nhận").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_completed_survey_keeps_ai_rows_clickable_but_not_the_others() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "PH-9", syncStatus = SyncStatus.DONE),
+                                    pole(poleId = "POLE-2", position = 2),
+                                ),
+                            isCompleted = true,
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNode(hasText("POLE-1", substring = true) and hasClickAction()).assertExists()
+        composeRule.onNode(hasText("POLE-2", substring = true) and hasClickAction()).assertDoesNotExist()
     }
 
     @Test
@@ -336,22 +391,39 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message_and_retry_calls_onRetry() {
-        var retried = false
+    fun a_network_error_uses_screen_copy_and_retries() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Error("network down"),
+                    state = PoleListUiState.Error("java.net.UnknownHostException", isNetworkError = true),
                     onCapturePole = { _, _ -> },
                     onBack = {},
-                    onRetry = { retried = true },
+                    onRetry = { retries++ },
                 )
             }
         }
-        composeRule.onNodeWithText("network down").assertExists()
+        composeRule.onNodeWithText("Không tải được danh sách cột").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
-        assertEquals(true, retried)
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun loading_is_one_announced_region() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Loading,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Đang tải danh sách cột").assertExists()
     }
 
     @Test
@@ -416,5 +488,38 @@ class PoleListScreenTest {
         composeRule.onNodeWithText("POLE-1").performClick()
         composeRule.onNodeWithText("Chọn từ thư viện").performClick()
         assertEquals(PolePhotoCaptureSource.GALLERY, capturedSource)
+    }
+
+    @Test
+    fun report_rows_are_buttons_and_a_captured_row_says_it_will_retake() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(),
+                                    pole(poleId = "POLE-2", position = 2, syncStatus = SyncStatus.QUEUED_ONLINE),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+
+        fun clickLabel(label: String) =
+            SemanticsMatcher("click label $label") { it.config.getOrNull(SemanticsActions.OnClick)?.label == label }
+        composeRule
+            .onNode(hasText("POLE-1", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(clickLabel("Chụp ảnh cột"))
+        composeRule
+            .onNode(hasText("POLE-2", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(clickLabel("Chụp lại cột"))
+        composeRule.onNodeWithTag("pole_retake_POLE-2", useUnmergedTree = true).assertExists()
     }
 }

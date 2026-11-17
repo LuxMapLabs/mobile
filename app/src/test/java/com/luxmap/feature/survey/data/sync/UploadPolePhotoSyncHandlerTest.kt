@@ -121,4 +121,63 @@ class UploadPolePhotoSyncHandlerTest {
 
             assertTrue(result is SyncOpResult.Failed)
         }
+
+    @Test
+    fun `an upload response with an ai result is written to room right away`() =
+        runTest {
+            val tempFile = File.createTempFile("pole-photo", ".tmp").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
+            coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
+                PolePhotoUploadResponseDto(
+                    photoId = "PPH-000001",
+                    aiStatus = "available",
+                    cvState = "off",
+                    confidence = 0.91,
+                    modelVersion = "cv-1",
+                    analyzedAt = "2026-11-17T03:00:00Z",
+                )
+            coJustRun { dao.updateServerPhotoId("PHOTO-1", "PPH-000001") }
+            coJustRun { dao.updateUploadAiResult(any(), any(), any(), any(), any(), any()) }
+            val handler = UploadPolePhotoSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
+
+            assertTrue(result is SyncOpResult.Done)
+            coVerify {
+                dao.updateUploadAiResult(
+                    "PHOTO-1",
+                    "available",
+                    "off",
+                    0.91,
+                    "cv-1",
+                    Instant.parse("2026-11-17T03:00:00Z"),
+                )
+            }
+        }
+
+    @Test
+    fun `a malformed analyzed_at still finishes the upload`() =
+        runTest {
+            val tempFile = File.createTempFile("pole", ".tmp").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
+            coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
+                PolePhotoUploadResponseDto(
+                    photoId = "PPH-000001",
+                    aiStatus = "available",
+                    cvState = "on",
+                    analyzedAt = "yesterday",
+                )
+            coJustRun { dao.updateServerPhotoId("PHOTO-1", "PPH-000001") }
+            coJustRun { dao.updateUploadAiResult(any(), any(), any(), any(), any(), any()) }
+            val handler = UploadPolePhotoSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
+
+            assertTrue(result is SyncOpResult.Done)
+            coVerify { dao.updateUploadAiResult("PHOTO-1", "available", "on", null, null, null) }
+        }
 }
