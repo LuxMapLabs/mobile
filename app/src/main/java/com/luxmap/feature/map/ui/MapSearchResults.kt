@@ -1,5 +1,6 @@
 package com.luxmap.feature.map.ui
 
+import com.luxmap.feature.map.data.CabinetMarker
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
 
@@ -9,4 +10,5 @@ import com.luxmap.feature.map.data.RoadSegmentLine
 data class MapSearchResults(
     val poles: List<PoleMarker> = emptyList(),
     val segments: List<RoadSegmentLine> = emptyList(),
+    val cabinets: List<CabinetMarker> = emptyList(),
 )

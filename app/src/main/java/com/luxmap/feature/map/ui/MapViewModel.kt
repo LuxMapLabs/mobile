@@ -7,6 +7,7 @@ import com.luxmap.core.theme.AssetCondition
 import com.luxmap.feature.map.data.GisMapDataset
 import com.luxmap.feature.map.data.MapRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -107,6 +108,36 @@ class MapViewModel
             _searchQuery.value = query
         }
 
+        private val _cabinetSelection = MutableStateFlow<CabinetSelection?>(null)
+        val cabinetSelection: StateFlow<CabinetSelection?> = _cabinetSelection.asStateFlow()
+
+        private var topologyJob: Job? = null
+
+        fun selectCabinet(cabinetId: String) {
+            val cabinet =
+                (_uiState.value as? MapUiState.Success)?.dataset?.cabinets?.firstOrNull { it.cabinetId == cabinetId }
+                    ?: return
+            topologyJob?.cancel()
+            _cabinetSelection.value = CabinetSelection(cabinet, TopologyState.Loading)
+            topologyJob =
+                viewModelScope.launch {
+                    val topology =
+                        try {
+                            TopologyState.Loaded(repository.cabinetTopology(cabinetId))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            TopologyState.Error(e.topologyErrorText())
+                        }
+                    _cabinetSelection.value = CabinetSelection(cabinet, topology)
+                }
+        }
+
+        fun clearCabinet() {
+            topologyJob?.cancel()
+            _cabinetSelection.value = null
+        }
+
         private companion object {
             const val STOP_TIMEOUT_MS = 5_000L
         }
@@ -121,6 +152,10 @@ private fun GisMapDataset.matching(query: String): MapSearchResults =
         segments =
             segments.filter {
                 it.name.contains(query, ignoreCase = true) || it.segmentId.contains(query, ignoreCase = true)
+            },
+        cabinets =
+            cabinets.filter {
+                it.name.contains(query, ignoreCase = true) || it.cabinetId.contains(query, ignoreCase = true)
             },
     )
 
