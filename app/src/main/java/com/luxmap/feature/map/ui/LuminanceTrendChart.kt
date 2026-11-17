@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,13 +21,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.luxmap.core.theme.Amber500
+import com.luxmap.core.map.MapMarkerColors
+import com.luxmap.core.map.markerFill
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Gray500
-import com.luxmap.core.theme.Rose600
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.Success600
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleLuminancePoint
 
@@ -50,8 +46,8 @@ fun LuminanceTrendCard(
         modifier =
             modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 .padding(Spacing.lg),
     ) {
         Text(text = "Xu hướng độ sáng", style = MaterialTheme.typography.titleMedium)
@@ -116,7 +112,7 @@ private fun LuminanceTrendChart(
             pathEffect = dashEffect,
         )
         drawLine(
-            color = Amber500,
+            color = MapMarkerColors.Dim,
             start = Offset(0f, yFor(THRESHOLD_PERCENT)),
             end = Offset(size.width, yFor(THRESHOLD_PERCENT)),
             strokeWidth = GRID_LINE_WIDTH.toPx(),
@@ -156,13 +152,7 @@ private fun trendCaption(history: List<PoleLuminancePoint>): String {
     }
 }
 
-private fun AssetCondition.trendColor(): Color =
-    when (this) {
-        AssetCondition.NORMAL -> Success600
-        AssetCondition.DIM -> Amber500
-        AssetCondition.OUT -> Rose600
-        AssetCondition.UNKNOWN -> Gray500
-    }
+private fun AssetCondition.trendColor(): Color = markerFill()
 
 private val GridLineColor = Color(0xFFCBD5E1)
 private val CHART_HEIGHT = 96.dp

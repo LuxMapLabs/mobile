@@ -1,11 +1,16 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
 import com.luxmap.feature.map.data.PoleDetail
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -80,5 +85,27 @@ class PoleDetailScreenTest {
         composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
         assertEquals(1, retries)
+    }
+
+    @Test
+    fun iot_status_is_vietnamese_and_navigate_keeps_a_48dp_target() {
+        var navigated = 0
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleDetailScreen(
+                    uiState = PoleDetailUiState.Success(detail()),
+                    onBack = {},
+                    onNavigateToPole = { _, _ -> navigated++ },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Trực tuyến", substring = true).performScrollTo().assertExists()
+        composeRule.onNodeWithText("Online", substring = true).assertDoesNotExist()
+        composeRule
+            .onNode(hasText("Đường đi") and hasClickAction())
+            .performScrollTo()
+            .assertTouchTargetIsAtLeast(48.dp)
+            .performClick()
+        assertEquals(1, navigated)
     }
 }

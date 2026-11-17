@@ -1,6 +1,5 @@
 package com.luxmap.feature.map.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -8,7 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,10 +17,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,15 +49,18 @@ import coil.compose.AsyncImage
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.Dimens
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
 import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.map.data.PoleDetail
@@ -180,8 +181,9 @@ private fun PoleHeaderSection(detail: PoleDetail) {
         )
         Spacer(Modifier.height(Spacing.sm))
         StatusBadge(
-            text = detail.fixtureStatus.label().uppercase(),
+            text = detail.fixtureStatus.mapLabel(),
             colors = detail.fixtureStatus.badgeColors(),
+            icon = Icons.Filled.Lightbulb,
         )
         if (detail.determinedAt != null) {
             Spacer(Modifier.height(Spacing.sm))
@@ -221,28 +223,11 @@ private fun PriorityAlertCard(detail: PoleDetail) {
         }
         AssetCondition.NORMAL, AssetCondition.UNKNOWN -> return
     }
-    val colors = detail.fixtureStatus.badgeColors()
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(colors.background, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, colors.text.copy(alpha = 0.35f), RoundedCornerShape(Dimens.radiusMedium))
-                .padding(Spacing.lg),
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = null,
-                tint = colors.text,
-                modifier = Modifier.size(24.dp),
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            Text(text = title, style = MaterialTheme.typography.labelLarge, color = colors.text)
-        }
-        Spacer(Modifier.height(Spacing.sm))
-        Text(text = body, style = MaterialTheme.typography.bodyMedium, color = colors.text)
-    }
+    LuxBanner(
+        title = title,
+        message = body,
+        tone = if (detail.fixtureStatus == AssetCondition.OUT) LuxBannerTone.ERROR else LuxBannerTone.WARNING,
+    )
 }
 
 // baseline_ratio of the latest luminance point — same value the trend chart's endpoint dot
@@ -269,28 +254,13 @@ private fun NavigateToPoleButton(
 ) {
     val lat = detail.lat
     val lng = detail.lng
-    SecondaryOutlinedButton(
-        text = "Chỉ đường",
+    LuxSecondaryButton(
+        text = "Đường đi",
         onClick = { if (lat != null && lng != null) onNavigateToPole(lat, lng) },
         enabled = lat != null && lng != null,
+        leadingIcon = Icons.Filled.Directions,
+        modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@Composable
-private fun SecondaryOutlinedButton(
-    text: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-        shape = RoundedCornerShape(Dimens.radiusMedium),
-        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
-    ) {
-        Text(text = text, color = MaterialTheme.colorScheme.primary)
-    }
 }
 
 // Design System v3.0.1 "Thông tin nhanh" — exactly these 5 rows (no fixture_type/"Loại đèn"
@@ -302,8 +272,8 @@ private fun FixtureInfoSection(detail: PoleDetail) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 .padding(Spacing.lg),
     ) {
         Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
@@ -351,7 +321,7 @@ private fun FixtureInfoSection(detail: PoleDetail) {
 
 private fun String.toIotStatusLabel(): String =
     when (this) {
-        "online" -> "Online"
+        "online" -> "Trực tuyến"
         "offline" -> "Mất kết nối"
         else -> this
     }
@@ -412,24 +382,25 @@ private fun OpenFaultsSection(faults: List<PoleDetailFault>) {
 private fun FaultCard(fault: PoleDetailFault) {
     // Reuse OUT's badge colors for the icon circle — a fault card is always in the "something's
     // wrong" tone regardless of the pole's overall fixture_status.
-    val colors = AssetCondition.OUT.badgeColors()
+    val iconBackground = MaterialTheme.colorScheme.errorContainer
+    val iconTint = MaterialTheme.colorScheme.error
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Dimens.radiusMedium))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Dimens.radiusMedium))
+                .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
                 .padding(Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(FAULT_ICON_SIZE).background(colors.background, CircleShape),
+            modifier = Modifier.size(FAULT_ICON_SIZE).background(iconBackground, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Filled.Warning,
                 contentDescription = null,
-                tint = colors.text,
+                tint = iconTint,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -493,7 +464,7 @@ private fun RecentFramesSection(frames: List<PoleDetailFrame>) {
 
 @Composable
 private fun FrameThumbnail(frame: PoleDetailFrame) {
-    Box(modifier = Modifier.size(FRAME_THUMBNAIL_SIZE).clip(RoundedCornerShape(Dimens.radiusSmall))) {
+    Box(modifier = Modifier.size(FRAME_THUMBNAIL_SIZE).clip(MaterialTheme.shapes.small)) {
         // Not tappable yet — whether tapping should open a full-size image needs BE-20's real
         // thumbnail_url behavior confirmed first (see FM-27 note).
         AsyncImage(
@@ -507,7 +478,7 @@ private fun FrameThumbnail(frame: PoleDetailFrame) {
                 Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(FrameDateOverlayColor)
+                    .background(LuxTheme.colors.overlayOnMedia)
                     .padding(horizontal = Spacing.xs, vertical = 4.dp),
         ) {
             Text(
@@ -521,7 +492,6 @@ private fun FrameThumbnail(frame: PoleDetailFrame) {
 
 private val FRAME_THUMBNAIL_SIZE = 96.dp
 private val FAULT_ICON_SIZE = 36.dp
-private val FrameDateOverlayColor = Color.Black.copy(alpha = 0.55f)
 
 // 3 variants match the 3 real mock-pole-detail-POLE-*.json files 1:1 (same poleId, values,
 // history) so these previews show exactly what the app renders for those poles on-device.
