@@ -15,6 +15,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import kotlinx.coroutines.launch
 import java.io.File
@@ -49,6 +51,7 @@ fun PolePhotoCaptureRoute(
     var previewFile by remember { mutableStateOf<File?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+    val locationMissing by viewModel.locationMissing.collectAsState()
 
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -100,7 +103,7 @@ fun PolePhotoCaptureRoute(
     // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
     // device) deny the ACTION_IMAGE_CAPTURE intent with a SecurityException, crashing the whole
     // process, when the calling app does not hold this permission itself. ACCESS_FINE_LOCATION
-    // stays best-effort like before (missing GPS is not fatal, just means lat/lng 0,0).
+    // is requested here too; without a GPS fix the photo is held for a retry instead of saved.
     val permissionsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             if (result[Manifest.permission.CAMERA] == true) {
@@ -114,6 +117,22 @@ fun PolePhotoCaptureRoute(
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             launchGalleryPicker()
         }
+
+    val retryLocationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            previewFile?.let { viewModel.onPhotoCaptured(it, onDone) }
+        }
+
+    fun retryLocation() {
+        val file = previewFile ?: return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.onPhotoCaptured(file, onDone)
+        } else {
+            retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
 
     LaunchedEffect(Unit) {
         when (source) {
@@ -151,7 +170,7 @@ fun PolePhotoCaptureRoute(
             PolePhotoPreview(
                 file = fileToPreview,
                 poleId = poleId,
-                isSaving = isSaving,
+                isSaving = isSaving && !locationMissing,
                 retakeLabel = if (source == PolePhotoCaptureSource.GALLERY) "Chọn ảnh khác" else "Chụp lại",
                 onConfirm = {
                     isSaving = true
@@ -167,6 +186,16 @@ fun PolePhotoCaptureRoute(
                 },
                 onClose = ::closePreview,
             )
+            if (locationMissing) {
+                LuxConfirmDialog(
+                    title = "Chưa lấy được vị trí",
+                    message = "Ảnh cột cần vị trí GPS thật. Bật định vị rồi thử lại, hoặc bỏ ảnh này.",
+                    confirmLabel = "Thử lại",
+                    onConfirm = ::retryLocation,
+                    onDismiss = ::closePreview,
+                    dismissLabel = "Bỏ ảnh",
+                )
+            }
         } else {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 LuxLoadingRegion(description = "Đang mở camera", modifier = Modifier.align(Alignment.Center)) {

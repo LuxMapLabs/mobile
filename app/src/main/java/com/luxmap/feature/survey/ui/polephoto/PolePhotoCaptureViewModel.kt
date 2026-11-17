@@ -6,7 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.luxmap.core.location.LocationTracker
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.UUID
 import javax.inject.Inject
@@ -23,6 +27,8 @@ class PolePhotoCaptureViewModel
         private val poleId: String = checkNotNull(savedStateHandle[POLE_ID_ARG])
         private val source: String? = savedStateHandle["source"]
         private val photoFileName: String = UUID.randomUUID().toString()
+        private val _locationMissing = MutableStateFlow(false)
+        val locationMissing: StateFlow<Boolean> = _locationMissing.asStateFlow()
 
         fun outputFile(filesDir: File): File {
             val dir = File(filesDir, "pole-photos/$workOrderId")
@@ -35,15 +41,20 @@ class PolePhotoCaptureViewModel
             file: File,
             onDone: () -> Unit,
         ) {
+            _locationMissing.value = false
             viewModelScope.launch {
-                val location = locationTracker.getCurrentLocation()
+                val location = withTimeoutOrNull(LOCATION_TIMEOUT_MS) { locationTracker.getCurrentLocation() }
+                if (location == null) {
+                    _locationMissing.value = true
+                    return@launch
+                }
                 runCatching {
                     repository.capture(
                         workOrderId = workOrderId,
                         poleId = poleId,
                         filePath = file.absolutePath,
-                        lat = location?.latitude ?: 0.0,
-                        lng = location?.longitude ?: 0.0,
+                        lat = location.latitude,
+                        lng = location.longitude,
                     )
                 }
                 onDone()
@@ -53,5 +64,6 @@ class PolePhotoCaptureViewModel
         companion object {
             const val WORK_ORDER_ID_ARG = "workOrderId"
             const val POLE_ID_ARG = "poleId"
+            private const val LOCATION_TIMEOUT_MS = 10_000L
         }
     }

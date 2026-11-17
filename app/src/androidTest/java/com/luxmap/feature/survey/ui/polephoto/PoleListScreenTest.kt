@@ -291,7 +291,7 @@ class PoleListScreenTest {
 
     // Found on a real device 2026-10-29: tapping "Hoan tat" used to call onComplete and navigate
     // away in the same tap, with no confirmation and no way to tell afterward it worked. Now it
-    // only opens a confirm sheet - onComplete fires after the user confirms there.
+    // only opens a confirmation dialog - onComplete fires after the user confirms there.
     @Test
     fun completion_is_disabled_for_a_pole_with_only_an_ai_result() {
         composeRule.setContent {
@@ -316,7 +316,7 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun success_state_tapping_hoan_tat_opens_a_confirm_sheet_without_completing_yet() {
+    fun success_state_tapping_hoan_tat_opens_a_confirm_dialog_without_completing_yet() {
         var completed = false
         composeRule.setContent {
             LuxMapTheme {
@@ -344,7 +344,7 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun confirm_sheet_tapping_kiem_tra_lai_dismisses_without_completing() {
+    fun confirm_dialog_tapping_kiem_tra_lai_dismisses_without_completing() {
         var completed = false
         composeRule.setContent {
             LuxMapTheme {
@@ -364,7 +364,7 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun confirm_sheet_confirming_calls_onComplete() {
+    fun confirm_dialog_confirming_calls_onComplete() {
         var completed = false
         composeRule.setContent {
             LuxMapTheme {
@@ -378,7 +378,7 @@ class PoleListScreenTest {
             }
         }
         composeRule.onNodeWithText("Hoàn tất").performClick()
-        // The sheet's confirm button also reads "Hoan tat", same as the bottom bar button behind
+        // The dialog's confirm button also reads "Hoan tat", same as the bottom bar button behind
         // it - testTag disambiguates instead of relying on text/position.
         composeRule.onNodeWithTag("confirm_survey_complete").performClick()
         assertEquals(true, completed)

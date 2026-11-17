@@ -57,7 +57,8 @@ internal fun workOrderCtaState(
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val scheduleWindow = workOrderScheduleWindow(detail.scheduledDate, today)
-    val canSubmitNow = state.canSubmit() && !state.isSubmitting && !scheduleWindow.isOverdueToComplete
+    val submitLock = scheduleSubmitLock(scheduleWindow)
+    val canSubmitNow = state.canSubmit() && !state.isSubmitting && submitLock == null
     return when {
         "start" in detail.allowedActions && scheduleWindow.canActOnSchedule &&
             detail.cancellationRequestStatus == "pending" ->
@@ -112,18 +113,8 @@ internal fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Check else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        "Đã khoá do quá hạn"
-                    } else {
-                        missingRequirementsHint(repairRequirements(state))
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
+                hint = submitLock?.first ?: missingRequirementsHint(repairRequirements(state)),
+                hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 requiresConfirmation = true,
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.INSPECTION -> {
@@ -134,18 +125,8 @@ internal fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint =
-                    when {
-                        scheduleWindow.isOverdueToComplete -> "Đã khoá do quá hạn"
-                        missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
-                        else -> null
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
+                hint = submitLock?.first ?: if (missingCount > 0) "Còn $missingCount sự cố chưa có kết quả" else null,
+                hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
                 progressSegments = detail.faults.map { state.faultOutcomes.containsKey(it.faultId) },
                 requiresConfirmation = true,
@@ -159,18 +140,8 @@ internal fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint =
-                    when {
-                        scheduleWindow.isOverdueToComplete -> "Đã khoá do quá hạn"
-                        missing > 0 -> "Còn $missing cột chưa chụp"
-                        else -> null
-                    },
-                hintColor =
-                    if (scheduleWindow.isOverdueToComplete) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        LuxTheme.colors.dueToday
-                    },
+                hint = submitLock?.first ?: if (missing > 0) "Còn $missing cột chưa chụp" else null,
+                hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 requiresConfirmation = true,
             )
         }
@@ -186,6 +157,16 @@ internal fun workOrderCtaState(
         else -> null
     }
 }
+
+@Composable
+private fun scheduleSubmitLock(window: WorkOrderScheduleWindow): Pair<String, Color>? =
+    when {
+        window.isOverdueToComplete -> "Đã khoá do quá hạn" to MaterialTheme.colorScheme.error
+        window.submitOpensOn != null ->
+            "Nộp được từ " + DateFormatUtils.formatPlainDate(window.submitOpensOn.toString()) to
+                MaterialTheme.colorScheme.onSurfaceVariant
+        else -> null
+    }
 
 // Same 2 requirements RequirementList shows in the "Nghiệm thu" card, reused here to build the
 // "Cần ..." lock hint instead of duplicating the wording in 2 places.

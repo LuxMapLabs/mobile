@@ -13,14 +13,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -33,8 +31,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import java.io.File
 
 @Composable
@@ -149,45 +147,32 @@ fun EvidenceCaptureRoute(
     }
 
     if (state.awaitingLocation > 0 && !state.busy) {
-        AlertDialog(
-            onDismissRequest = viewModel::skipPhotosWithoutLocation,
-            title = { Text("Ảnh thiếu vị trí") },
-            text = {
-                Text(
-                    if (state.locationUnavailable) {
-                        "Chưa lấy được vị trí hiện tại. Bật định vị hoặc bỏ qua các ảnh này."
-                    } else {
-                        "Không đọc được GPS của ${state.awaitingLocation} ảnh. Dùng vị trí hiện tại để đính kèm?"
-                    },
-                )
-            },
-            confirmButton = {
-                LuxActionPair(
-                    secondary = {
-                        TextButton(onClick = viewModel::skipPhotosWithoutLocation, modifier = it) {
-                            Text("Bỏ qua ảnh này")
-                        }
-                    },
-                    primary = { actionModifier ->
-                        TextButton(
-                            onClick = {
-                                val granted =
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                                if (granted == PackageManager.PERMISSION_GRANTED) {
-                                    viewModel.useCurrentLocation()
-                                } else {
-                                    locationPermission.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION,
-                                        ),
-                                    )
-                                }
-                            },
-                            modifier = actionModifier,
-                        ) { Text("Dùng vị trí hiện tại") }
-                    },
-                )
+        LuxConfirmDialog(
+            title = "Ảnh thiếu vị trí",
+            message =
+                if (state.locationUnavailable) {
+                    "Chưa lấy được vị trí hiện tại. Bật định vị hoặc bỏ qua các ảnh này."
+                } else if (state.awaitingFromCamera) {
+                    "Chưa lấy được vị trí cho ảnh vừa chụp. Bật định vị rồi thử lấy lại vị trí hiện tại."
+                } else {
+                    "Không đọc được GPS của ${state.awaitingLocation} ảnh. Dùng vị trí hiện tại để đính kèm?"
+                },
+            dismissLabel = "Bỏ qua ảnh này",
+            confirmLabel = "Dùng vị trí hiện tại",
+            onDismiss = viewModel::skipPhotosWithoutLocation,
+            onConfirm = {
+                val granted =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                if (granted == PackageManager.PERMISSION_GRANTED) {
+                    viewModel.useCurrentLocation()
+                } else {
+                    locationPermission.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                        ),
+                    )
+                }
             },
         )
     }

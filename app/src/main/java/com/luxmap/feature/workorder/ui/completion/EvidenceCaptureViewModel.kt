@@ -26,6 +26,7 @@ internal data class EvidenceCaptureState(
     val awaitingLocation: Int = 0,
     val usedImportTime: Int = 0,
     val locationUnavailable: Boolean = false,
+    val awaitingFromCamera: Boolean = false,
 )
 
 @HiltViewModel
@@ -66,13 +67,24 @@ class EvidenceCaptureViewModel
             _state.value = EvidenceCaptureState(busy = true)
             viewModelScope.launch {
                 val capturedAt = Instant.now()
+                var located = false
                 val saved =
                     saveFile(file) {
                         val location = withTimeoutOrNull(10_000L) { locationTracker.getCurrentLocation() }
-                        persist(file, capturedAt, (location?.latitude ?: 0.0) to (location?.longitude ?: 0.0))
+                        if (location == null) {
+                            missingLocation += GalleryEvidence(file, capturedAt, null, capturedAt)
+                        } else {
+                            persist(file, capturedAt, location.latitude to location.longitude)
+                            located = true
+                        }
                     }
-                _state.value = EvidenceCaptureState(failed = if (saved) 0 else 1)
-                if (saved) onDone()
+                _state.value =
+                    EvidenceCaptureState(
+                        failed = if (saved) 0 else 1,
+                        awaitingLocation = missingLocation.size,
+                        awaitingFromCamera = missingLocation.isNotEmpty(),
+                    )
+                if (saved && located) onDone()
             }
         }
 
@@ -115,7 +127,12 @@ class EvidenceCaptureViewModel
                     return@launch
                 }
                 val coordinates = location.latitude to location.longitude
-                var result = previous.copy(awaitingLocation = 0, locationUnavailable = false)
+                var result =
+                    previous.copy(
+                        awaitingLocation = 0,
+                        locationUnavailable = false,
+                        awaitingFromCamera = false,
+                    )
                 val iterator = missingLocation.iterator()
                 while (iterator.hasNext()) {
                     val photo = iterator.next()
@@ -140,6 +157,7 @@ class EvidenceCaptureViewModel
                     awaitingLocation = 0,
                     failed = previous.failed + previous.awaitingLocation,
                     locationUnavailable = false,
+                    awaitingFromCamera = false,
                 )
         }
 
