@@ -13,6 +13,11 @@ object MapMarkerColors {
     val SelectionVector = Color(0xFF1F3864)
     val RouteNormal = Color(0xFF3E86C9)
     val RouteFault = Color(0xFFD64545)
+    val CabinetNormal = Color(0xFF4F46E5)
+    val CabinetFault = Color(0xFFE11D48)
+    val FeederPowered = Color(0xFF4F46E5)
+    val FeederUnpowered = Color(0xFFE11D48)
+    val CommuneOutline = Color(0xFF1F3864)
 }
 
 fun AssetCondition.markerFill(): Color =

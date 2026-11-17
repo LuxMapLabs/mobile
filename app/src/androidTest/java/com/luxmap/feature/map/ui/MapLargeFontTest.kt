@@ -12,12 +12,17 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
+import com.luxmap.feature.map.data.CabinetFeeder
+import com.luxmap.feature.map.data.CabinetMarker
+import com.luxmap.feature.map.data.FeederMode
+import com.luxmap.feature.map.data.FeederPower
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleMarker
 import org.junit.Rule
@@ -113,5 +118,38 @@ class MapLargeFontTest {
             .onNode(hasText("Đường đi") and hasClickAction())
             .performScrollTo()
             .assertTouchTargetIsAtLeast(48.dp)
+    }
+
+    @Test
+    fun the_cabinet_sheet_stays_readable_at_large_font() {
+        large {
+            CabinetQuickViewBottomSheet(
+                selection =
+                    CabinetSelection(
+                        cabinet =
+                            CabinetMarker(
+                                cabinetId = "CAB-XA-PHUOC-HIEP-01",
+                                name = "Tủ điều khiển chợ Phước Hiệp",
+                                communeId = "COM-1",
+                                lat = 10.8,
+                                lng = 106.7,
+                                feeders =
+                                    listOf(
+                                        CabinetFeeder("FEEDER-01", 1, FeederMode.AUTO, FeederPower.ON),
+                                        CabinetFeeder("FEEDER-02", 2, FeederMode.OFF, FeederPower.OFF),
+                                    ),
+                                iotNodeCount = 1,
+                            ),
+                        topology = TopologyState.Error("Có cột chưa gắn tuyến, chưa vẽ được sơ đồ"),
+                    ),
+                communeName = "Phước Hiệp",
+                onDismiss = {},
+                onNavigate = {},
+            )
+        }
+        composeRule.onNodeWithText("Lộ FEEDER-02").assertExists()
+        composeRule.onNodeWithText("Mất nguồn").assertExists()
+        composeRule.onNode(hasText("Đường đi") and hasClickAction()).performScrollTo().assertTouchTargetIsAtLeast(48.dp)
+        composeRule.onNodeWithContentDescription("Đóng").assertTouchTargetIsAtLeast(48.dp)
     }
 }

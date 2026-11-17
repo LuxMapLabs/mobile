@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
+import com.luxmap.feature.map.data.CabinetMarker
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -99,10 +100,14 @@ class MapChromeTest {
             "Hỏng/Tắt",
             "Chưa quét",
             "Gần trường, cầu",
-            "Có thiết bị IoT",
             "Tuyến bình thường",
             "Tuyến đang có sự cố",
+            "Tủ điện điều khiển",
+            "Sơ đồ cấp nguồn (Tủ → Cột)",
+            "Lộ ngắt điện / Mất nguồn",
+            "Ranh giới xã",
         ).forEach { composeRule.onNodeWithText(it).assertExists() }
+        composeRule.onNodeWithText("Có thiết bị IoT").assertDoesNotExist()
         composeRule
             .onNode(hasText("Chú giải") and hasClickAction())
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Đang mở"))
@@ -111,6 +116,7 @@ class MapChromeTest {
     @Test
     fun layer_rows_are_switches() {
         var fixtures: Boolean? = null
+        var cabinets: Boolean? = null
         composeRule.setContent {
             LuxMapTheme {
                 MapLayerToggle(
@@ -118,6 +124,10 @@ class MapChromeTest {
                     onShowFixturesChange = { fixtures = it },
                     showRoadSegments = false,
                     onShowRoadSegmentsChange = {},
+                    showCabinets = true,
+                    onShowCabinetsChange = { cabinets = it },
+                    showCommunes = false,
+                    onShowCommunesChange = {},
                 )
             }
         }
@@ -128,6 +138,15 @@ class MapChromeTest {
         assertEquals(false, fixtures)
         composeRule
             .onNode(hasText("Tuyến đường") and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+            .assertIsOff()
+        composeRule
+            .onNode(hasText("Tủ điện") and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
+            .performClick()
+        assertEquals(false, cabinets)
+        composeRule
+            .onNode(hasText("Ranh giới xã") and hasClickAction())
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Switch))
             .assertIsOff()
     }
@@ -182,5 +201,29 @@ class MapChromeTest {
                 useUnmergedTree = true,
             ).assertExists()
         }
+    }
+
+    @Test
+    fun search_lists_cabinets_and_opens_one() {
+        var opened: String? = null
+        composeRule.setContent {
+            LuxMapTheme {
+                MapSearchResultsList(
+                    results =
+                        MapSearchResults(
+                            cabinets =
+                                listOf(
+                                    CabinetMarker("CAB-1", "Tủ chợ Phước Hiệp", "COM-1", 10.8, 106.7, emptyList(), 0),
+                                ),
+                        ),
+                    onPoleClick = {},
+                    onSegmentClick = {},
+                    onCabinetClick = { opened = it.cabinetId },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Tủ điện").assertExists()
+        composeRule.onNode(hasText("Tủ chợ Phước Hiệp") and hasClickAction()).performClick()
+        assertEquals("CAB-1", opened)
     }
 }

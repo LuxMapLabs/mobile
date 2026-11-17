@@ -1,6 +1,7 @@
 package com.luxmap.feature.map.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,12 +28,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.luxmap.R
+import com.luxmap.core.map.MapMarkerColors
 import com.luxmap.core.map.routeColor
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
@@ -71,9 +76,16 @@ fun MapLegend(modifier: Modifier = Modifier) {
                 ) {
                     MAP_STATUS_ORDER.forEach { IconLegendRow(it.markerIconResId(), it.mapLabel()) }
                     IconLegendRow(R.drawable.ic_poi_badge, "Gần trường, cầu")
-                    IconLegendRow(R.drawable.ic_iot_badge, "Có thiết bị IoT")
                     RouteLegendRow(hasActiveSegmentFault = false, label = "Tuyến bình thường")
                     RouteLegendRow(hasActiveSegmentFault = true, label = "Tuyến đang có sự cố")
+                    IconLegendRow(R.drawable.ic_cabinet_normal, "Tủ điện điều khiển")
+                    LineLegendRow(color = MapMarkerColors.FeederPowered, label = "Sơ đồ cấp nguồn (Tủ → Cột)")
+                    LineLegendRow(
+                        color = MapMarkerColors.FeederUnpowered,
+                        label = "Lộ ngắt điện / Mất nguồn",
+                        dashed = true,
+                    )
+                    LineLegendRow(color = MapMarkerColors.CommuneOutline, label = "Ranh giới xã")
                 }
             }
         }
@@ -106,6 +118,26 @@ private fun RouteLegendRow(
                         .width(LEGEND_ICON_SIZE)
                         .height(4.dp)
                         .background(routeColor(hasActiveSegmentFault)),
+            )
+        }
+        Text(text = label, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun LineLegendRow(
+    color: Color,
+    label: String,
+    dashed: Boolean = false,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Canvas(modifier = Modifier.size(LEGEND_ICON_SIZE)) {
+            drawLine(
+                color = color,
+                start = Offset(0f, size.height / 2),
+                end = Offset(size.width, size.height / 2),
+                strokeWidth = 3.dp.toPx(),
+                pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())) else null,
             )
         }
         Text(text = label, style = MaterialTheme.typography.labelMedium)

@@ -1,6 +1,6 @@
 # Đề xuất redesign: Bản đồ (F12) và Chi tiết cột
 
-> **Trạng thái:** **ĐỢT 1 ĐÃ CODE XONG** trên nhánh `style/redesign-map-vnext` (2026-11-17). Đợt 2 (tủ điện, sơ đồ cấp nguồn, ranh giới xã) chưa làm. Còn nợ kiểm tra tay (marker trên nền vector, chạm 2 cột sát nhau, Light/Night Field, 200%).
+> **Trạng thái:** **ĐỢT 1 VÀ ĐỢT 2 ĐÃ CODE XONG** — đợt 1 trên `style/redesign-map-vnext` (PR #165), đợt 2 (tủ điện, sơ đồ cấp nguồn, ranh giới xã) trên `feat/map-cabinets-communes` (2026-11-17). Còn nợ kiểm tra tay (marker trên nền vector, chạm 2 cột sát nhau, chạm tủ cạnh cột, sơ đồ + làm mờ cột, Light/Night Field, 200%).
 > **Màn:** `feature/map/ui/` — `MapScreen.kt` (1267 dòng), `PoleDetailScreen.kt` (683), `PoleQuickViewBottomSheet.kt`, `RoadSegmentQuickViewBottomSheet.kt`, `MapSearchBar.kt`, `MapKpiChipRow.kt`, `MapLegend.kt`, `MapLayerToggle.kt`, `MapStatusFilterRow.kt`; marker ở `core/map/` (`MapLibreConfig.kt`, `MapMarkerIcons.kt`) và `res/drawable/ic_marker_*.xml`, `ic_*_badge.xml`.
 > **Căn cứ:** `docs/design-system/vNext/GIS_MAP_GUIDELINES.md`, `AUDIT_REPORT.md` (mục 6.7, 8), bản đồ web `luxmap-web/src/pages/gis-map` + `utils/gis-map/markerUtils.ts` (đọc 2026-11-17), `luxmap_backend` `MapController.cs` / `MapProperties.cs` / `CabinetTopologyService.cs` (nhánh `dev`, đọc 2026-11-17).
 

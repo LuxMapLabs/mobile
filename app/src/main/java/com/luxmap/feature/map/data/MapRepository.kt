@@ -8,4 +8,6 @@ import kotlinx.coroutines.flow.Flow
 // extra param added yet at this prototype step (see plan FM-06).
 interface MapRepository {
     fun observeGisMapDataset(): Flow<GisMapDataset>
+
+    suspend fun cabinetTopology(cabinetId: String): CabinetTopology
 }
