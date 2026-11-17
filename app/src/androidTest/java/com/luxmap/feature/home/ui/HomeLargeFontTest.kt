@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LuxMapTheme
@@ -27,7 +30,10 @@ import org.junit.Test
 class HomeLargeFontTest {
     @get:Rule val composeRule = createComposeRule()
 
-    private fun show() {
+    private fun show(
+        username: String = "kysu1",
+        fontScale: Float = 1.5f,
+    ) {
         val item =
             WorkOrderSummaryItem(
                 workOrderId = "WO-1042",
@@ -47,7 +53,7 @@ class HomeLargeFontTest {
             )
         composeRule.setContent {
             val density = LocalDensity.current
-            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                 LuxMapTheme {
                     Box(modifier = Modifier.width(360.dp)) {
                         HomeScreen(
@@ -56,7 +62,7 @@ class HomeLargeFontTest {
                                     data = data,
                                     completionSyncStates = mapOf("WO-1042" to CompletionSyncState.PENDING),
                                 ),
-                            username = "kysu1",
+                            username = username,
                             onOpenWorkOrder = {},
                             onRetry = {},
                             unreadNotificationCount = 0,
@@ -77,13 +83,15 @@ class HomeLargeFontTest {
 
     @Test
     fun the_top_bar_greeting_is_not_clipped_or_overlapping_the_content_at_large_font() {
-        show()
-        val greeting =
-            composeRule.onNodeWithText(
-                "Xin chào, kysu1",
-                substring = true,
-                useUnmergedTree = true,
-            ).fetchSemanticsNode()
+        val email = "long.field.operator@example.com"
+        show(username = email, fontScale = 2f)
+        val greetingNode = composeRule.onNodeWithText("Xin chào, $email", substring = true, useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        greetingNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val layout = layouts.single()
+        assertTrue("greeting should wrap", layout.lineCount > 1)
+        assertTrue("greeting text exceeds its layout", !layout.didOverflowHeight)
+        val greeting = greetingNode.fetchSemanticsNode()
         val stats = composeRule.onNodeWithText("Tổng", useUnmergedTree = true).fetchSemanticsNode()
         val greetingBottom = greeting.positionInRoot.y + greeting.size.height
         assertTrue(
