@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
@@ -56,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -69,16 +67,15 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
 import com.luxmap.core.theme.label
-import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
 import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
-import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
@@ -248,8 +245,12 @@ fun PoleListScreen(
     }
 
     if (showCompleteConfirm && state is PoleListUiState.Success && state.canComplete) {
-        CompleteSurveyConfirmSheet(
-            confirmedCount = state.confirmedCount,
+        LuxConfirmDialog(
+            title = "Hoàn tất khảo sát tuyến?",
+            message = "Đã xác nhận kết quả của ${state.confirmedCount} cột. Gửi khảo sát để duyệt?",
+            confirmLabel = "Hoàn tất",
+            dismissLabel = "Kiểm tra lại",
+            confirmModifier = Modifier.testTag("confirm_survey_complete"),
             onDismiss = { showCompleteConfirm = false },
             onConfirm = {
                 showCompleteConfirm = false
@@ -373,51 +374,6 @@ private fun PoleListBottomBar(
                     enabled = canComplete,
                 )
             }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CompleteSurveyConfirmSheet(
-    confirmedCount: Int,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Box(
-                modifier =
-                    Modifier.size(
-                        56.dp,
-                    ).background(LuxTheme.colors.successContainer, MaterialTheme.shapes.medium),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(imageVector = Icons.Filled.Check, contentDescription = null, tint = LuxTheme.colors.success)
-            }
-            Text(text = "Hoàn tất khảo sát tuyến?", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "Đã xác nhận kết quả của $confirmedCount cột. Gửi khảo sát để duyệt?",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            LuxActionPair(
-                secondary = { actionModifier ->
-                    LuxSecondaryButton(text = "Kiểm tra lại", onClick = onDismiss, modifier = actionModifier)
-                },
-                primary = { actionModifier ->
-                    PrimaryButton(
-                        text = "Hoàn tất",
-                        onClick = onConfirm,
-                        modifier = actionModifier.testTag("confirm_survey_complete"),
-                    )
-                },
-            )
         }
     }
 }

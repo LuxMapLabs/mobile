@@ -7,15 +7,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -24,6 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import kotlinx.coroutines.launch
@@ -37,34 +43,54 @@ fun LuxConfirmDialog(
     onDismiss: () -> Unit,
     dismissLabel: String = "Huỷ",
     destructive: Boolean = false,
+    confirmModifier: Modifier = Modifier,
 ) {
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        shape = MaterialTheme.shapes.large,
-        containerColor = LuxTheme.colors.cardContainer,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        title = {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
-            )
-        },
-        text = { Text(text = message, style = MaterialTheme.typography.bodyLarge) },
-        confirmButton = {
-            LuxActionPair(
-                secondary = { LuxTextButton(text = dismissLabel, onClick = onDismiss, modifier = it) },
-                primary = {
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).widthIn(max = 400.dp),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = LuxTheme.colors.dialogContainer,
+            tonalElevation = 0.dp,
+        ) {
+            Column(
+                modifier = Modifier.padding(Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    val actionModifier = Modifier.fillMaxWidth()
                     if (destructive) {
-                        LuxDestructiveButton(text = confirmLabel, onClick = onConfirm, modifier = it)
+                        LuxDestructiveButton(
+                            text = confirmLabel,
+                            onClick = onConfirm,
+                            modifier = actionModifier.then(confirmModifier),
+                        )
                     } else {
-                        LuxTextButton(text = confirmLabel, onClick = onConfirm, modifier = it)
+                        PrimaryButton(
+                            text = confirmLabel,
+                            onClick = onConfirm,
+                            modifier = actionModifier.then(confirmModifier),
+                        )
                     }
-                },
-            )
-        },
-    )
+                    LuxTextButton(text = dismissLabel, onClick = onDismiss, modifier = actionModifier)
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +98,7 @@ fun LuxConfirmDialog(
 fun LuxBottomSheet(
     title: String,
     onDismiss: () -> Unit,
+    contentModifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,7 +130,12 @@ fun LuxBottomSheet(
                 }
             }
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .then(contentModifier)
+                        .padding(horizontal = Spacing.lg),
                 verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 content = content,
             )
