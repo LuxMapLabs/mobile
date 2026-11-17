@@ -1,5 +1,13 @@
 package com.luxmap.feature.notification.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,10 +22,11 @@ private fun row(
     type: String = "work_order_assigned",
     entityType: String = "work_order",
     isRead: Boolean = false,
+    title: String = "Bạn được giao phiếu WO-1001",
 ) = NotificationListRowState(
     id,
     type,
-    "Bạn được giao phiếu WO-1001",
+    title,
     "WO-1001 — Thay bóng đèn.",
     entityType,
     "WO-1001",
@@ -160,5 +169,63 @@ class NotificationListScreenTest {
             }
         }
         composeRule.onNodeWithTag("notification_list_more_footer").assertDoesNotExist()
+    }
+
+    @Test
+    fun mark_all_read_is_hidden_when_everything_is_read() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(state = NotificationListUiState.Success(listOf(row(isRead = true))), onBack = {})
+            }
+        }
+        composeRule.onNodeWithText("Đọc tất cả").assertDoesNotExist()
+        composeRule.onNodeWithText("Thông báo").assertExists()
+    }
+
+    @Test
+    fun the_filter_is_a_radio_group_with_counts() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(row(isRead = false), row(id = "NTF-2", isRead = true)),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule
+            .onNodeWithText("Tất cả · 2")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
+            .assertIsSelected()
+        composeRule.onNodeWithText("Chưa đọc · 1").assertIsNotSelected()
+    }
+
+    @Test
+    fun only_work_order_rows_are_buttons_with_a_chevron_and_unread_is_announced() {
+        composeRule.setContent {
+            LuxMapTheme {
+                NotificationListScreen(
+                    state =
+                        NotificationListUiState.Success(
+                            listOf(
+                                row(id = "WO-ROW", entityType = "work_order", title = "Giao lệnh mới"),
+                                row(id = "FAULT-ROW", entityType = "fault", title = "Sự cố mới"),
+                            ),
+                        ),
+                    onBack = {},
+                )
+            }
+        }
+        composeRule
+            .onNode(hasText("Giao lệnh mới", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "chưa đọc"))
+        composeRule.onNodeWithTag("notification_chevron_WO-ROW", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("notification_chevron_FAULT-ROW", useUnmergedTree = true).assertDoesNotExist()
+        composeRule
+            .onNode(hasText("Sự cố mới", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Role))
     }
 }
