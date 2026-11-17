@@ -14,20 +14,20 @@
 
 - Branch `style/redesign-map-vnext` (from `dev` 339ce48, spec commit `34e10aa`). Never commit to `main`.
 - Commits ≤ 400 changed lines, `type(map): description`, English, lowercase, imperative. **No Claude attribution.** No new code comments.
-- No API, DTO, repository, Room, sync or navigation change. Keep: KPI total counts (FM-36), clustering, segment colors by `has_active_segment_fault`, location/permission handling, vector default + satellite option, every existing action.
+- No API, DTO, repository, Room, sync or navigation change. Keep: KPI total counts (FM-36), clustering, segment colors by `has_active_segment_fault`, location/permission handling, every existing action. **Vector basemap only (M5):** remove the satellite basemap, its FAB, `MAP_STYLE_URL`, `SATELLITE_MAX_ZOOM` and the `MAPTILER_API_KEY` BuildConfig field.
 - Only theme tokens in `feature/map/ui/`: no `Success600`, `Rose600`, `Amber500`, `Gray500`, `Blue*`, `Navy*`, `Color(0x…)`, `Radius.*`, legacy `*TextStyle`, `MessageState`. **Exception:** map marker/line colors live only in `core/map/MapMarkerColors.kt` and are referenced from map layers, legend and chart.
-- Marker colors (exact, from web `markerUtils.ts`): normal `#10B981`, dim `#F59E0B`, out `#F43F5E`, unknown `#64748B`; POI badge `#F59E0B` + white star; marker edge `#0F172A`; selection ring vector `#1F3864`, satellite `#9DB7E0`.
+- Marker colors (exact, from web `markerUtils.ts`): normal `#10B981`, dim `#F59E0B`, out `#F43F5E`, unknown `#64748B`; POI badge `#F59E0B` + white star; marker edge `#0F172A`; selection ring `#1F3864`.
 - Touch targets ≥ 48dp; margin 16dp.
-- Copy (exact): legend title `Chú giải`; legend rows `Đạt chuẩn`, `Đèn mờ`, `Hỏng/Tắt`, `Chưa quét`, `Gần trường, cầu`, `Có thiết bị IoT`, `Tuyến bình thường`, `Tuyến đang có sự cố`; basemap FAB description `Nền bản đồ: Vector. Chạm để đổi sang Vệ tinh` / `Nền bản đồ: Vệ tinh. Chạm để đổi sang Vector`; location FAB `Định vị vị trí hiện tại`; filter button `Lọc và lớp bản đồ`, while filtering `Lọc và lớp bản đồ. Đang lọc: ẩn N trạng thái`; layer sheet `Hiển thị trên bản đồ`, groups `Lớp bản đồ`, `Trạng thái cột`, switches `Cột đèn`, `Tuyến đường`; quick view actions `Đường đi`, `Chi tiết`, close `Đóng`; Pole detail title `Chi tiết cột đèn`, IoT `Trực tuyến` / `Mất kết nối`, loading `Đang tải chi tiết cột`, empty `Không tìm thấy cột đèn này`, error title `Không tải được chi tiết cột` + `Kiểm tra kết nối rồi thử lại.` / `Vui lòng thử lại sau ít phút.`.
+- Copy (exact): legend title `Chú giải`; legend rows `Đạt chuẩn`, `Đèn mờ`, `Hỏng/Tắt`, `Chưa quét`, `Gần trường, cầu`, `Có thiết bị IoT`, `Tuyến bình thường`, `Tuyến đang có sự cố`; location FAB `Định vị vị trí hiện tại`; filter button `Lọc và lớp bản đồ`, while filtering `Lọc và lớp bản đồ. Đang lọc: ẩn N trạng thái`; layer sheet `Hiển thị trên bản đồ`, groups `Lớp bản đồ`, `Trạng thái cột`, switches `Cột đèn`, `Tuyến đường`; quick view actions `Đường đi`, `Chi tiết`, close `Đóng`; Pole detail title `Chi tiết cột đèn`, IoT `Trực tuyến` / `Mất kết nối`, loading `Đang tải chi tiết cột`, empty `Không tìm thấy cột đèn này`, error title `Không tải được chi tiết cột` + `Kiểm tra kết nối rồi thử lại.` / `Vui lòng thử lại sau ít phút.`.
 - Unit: `./gradlew testLocalDebugUnitTest --tests "<fqcn>"`. Device (SM-A075F): `./gradlew connectedLocalDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true "-Pandroid.testInstrumentationRunnerArguments.class=<fqcn>"`, then always `adb reverse tcp:5141 tcp:5141`. Run tests and `./gradlew ktlintCheck` as **separate** commands. Stop after each task for the user.
 
 ## Review Focus
 
 1. **Two markers close together inside one 48dp tap square:** the one nearest the finger opens; a tap on empty map near nothing still falls through to cluster/segment handling. Unit test (Task 1).
-2. **Basemap switch:** the FAB always describes the current basemap, and after switching the pole/segment layers and the selected marker are restored (style reload). Manual check + UI test of the description (Task 3).
+2. **Style reload removed:** with no basemap switch the layers are set up once; the selected marker and filters survive configuration changes as before. Manual check (Task 7).
 3. **Filtering hides statuses:** the filter button shows a dot and announces how many statuses are hidden; KPI chips still show total counts. UI test (Task 3/4).
 4. **Pole detail offline:** an IOException shows the network copy with `Thử lại`, and retry re-subscribes once (no stacked collectors). VM test (Task 6).
-5. **Satellite basemap legibility:** markers keep a visible edge on both basemaps (white ring + dark edge). Manual check (Task 7).
+5. **Marker legibility on the vector basemap:** markers keep a visible edge (white ring + dark edge). Manual check (Task 7).
 
 ---
 
@@ -100,31 +100,31 @@ fun tapSquare(tapX: Float, tapY: Float, density: Float): RectF {
 - [ ] **Step 2: Wiring**
   - Tap: replace the single-point pole query with `tapSquare(screenPoint.x, screenPoint.y, density)` → `queryRenderedFeatures(rect, POLES_CIRCLE_LAYER_ID)` → map each feature with a `Point` geometry to `TapCandidate(pole_id, projected x, projected y)` → `pickNearestFeature`. Cluster and segment branches stay point-based and unchanged.
   - Selected size: `selectedIconSizeExpression` uses `24f / 18f` for the selected pole, `1f` otherwise.
-  - Halo color: pass `isSatelliteBasemap` into `setupMapLayers` / `updateSelectedPoleStyle`; `MapMarkerColors.SelectionSatellite` vs `SelectionVector`.
+  - Halo color: `MapMarkerColors.SelectionVector`.
+  - Remove the satellite basemap (M5): `isSatelliteBasemap`, the basemap FAB, the style-switch block, `SATELLITE_MAX_ZOOM`, `MAP_STYLE_URL` (MapLibreConfig) and the `MAPTILER_API_KEY` field in `app/build.gradle.kts`; `MapMarkerColors.SelectionSatellite` deleted.
   - Remove the status badge layer and its add/remove calls; keep POI and IoT badges with offsets moved to the circle's top-right / bottom-left.
   - Out poles on top: `symbolSortKey` = 3 out, 2 dim, 1 normal, 0 unknown.
-- [ ] **Step 3: Build + run `MapViewModelTest` + install and launch on device; check markers render on vector and satellite** (manual — no MapLibre UI test exists). Ledger what was checked.
+- [ ] **Step 3: Build + run `MapViewModelTest` + install and launch on device; check markers render on the vector basemap and the basemap button is gone** (manual — no MapLibre UI test exists). Ledger what was checked.
 - [ ] **Step 4: Commit** `style(map): draw pole markers as flat web-style circles`
 
 ---
 
-### Task 3: Chrome — search, KPI, basemap and location buttons
+### Task 3: Chrome — search, KPI and location button
 
 **Files:** `MapSearchBar.kt`, `MapKpiChipRow.kt`, `MapScreen.kt` (FAB block); create `app/src/androidTest/java/com/luxmap/feature/map/ui/MapChromeTest.kt`.
 
-**Interfaces — Produces:** `MapSearchBar(query, onQueryChange, onFilterClick, hiddenStatusCount: Int = 0, modifier)`; `@Composable fun BasemapToggleButton(isSatellite: Boolean, onToggle: () -> Unit, modifier)` (new, in `MapControls.kt`); `@Composable fun LocateMeButton(isLocating: Boolean, onClick: () -> Unit, modifier)`.
+**Interfaces — Produces:** `MapSearchBar(query, onQueryChange, onFilterClick, hiddenStatusCount: Int = 0, modifier)`; `@Composable fun LocateMeButton(isLocating: Boolean, onClick: () -> Unit, modifier)`.
 
 - [ ] **Step 1: Failing UI tests** (`MapChromeTest`)
-  - `basemap_button_describes_the_current_basemap`: `BasemapToggleButton(isSatellite = false)` → node with description `Nền bản đồ: Vector. Chạm để đổi sang Vệ tinh`, `assertTouchTargetIsAtLeast(48.dp)`; click calls `onToggle`.
   - `filter_button_announces_hidden_statuses`: `MapSearchBar(hiddenStatusCount = 2)` → description `Lọc và lớp bản đồ. Đang lọc: ẩn 2 trạng thái` and tag `map_filter_dot` exists; with 0 → `Lọc và lớp bản đồ`, no dot.
   - `kpi_chips_keep_48dp_targets`: `MapKpiChipRow(...)` chip `Cần chú ý` (existing label — read the file) ≥ 48dp.
   - `locate_button_is_56dp_and_labelled`: `LocateMeButton(isLocating = false)` description `Định vị vị trí hiện tại`, size ≥ 56dp.
 - [ ] **Step 2: Implement**
   - Search bar: `Surface(shape = shapes.medium, color = surface, shadowElevation = 3.dp, border = BorderStroke(1.dp, outlineVariant))` containing the existing text field + trailing `IconButton(Icons.Filled.Layers)` with the description above and a 8dp `error`-colored dot (tag `map_filter_dot`) when `hiddenStatusCount > 0`.
   - KPI chips: `Surface` chips 32dp high in a `heightIn(min = 48.dp)` click area, `surface` + `outlineVariant` border, colored dot from `MapMarkerColors` for status chips, count `labelLarge` in a `widthIn(min = 20.dp)` box, label `labelMedium`. Keep existing chips and their behavior.
-  - `BasemapToggleButton`: `SmallFloatingActionButton(containerColor = surface, contentColor = onSurface)` with icon `Icons.Filled.Map` (vector) / `Icons.Filled.Satellite` (satellite) and the description; `LocateMeButton`: `FloatingActionButton(containerColor = surface)` 56dp, icon `Icons.Filled.MyLocation`, spinner when locating. `MapScreen` uses both; `hiddenStatusCount = AssetCondition.entries.size - statusFilter.size`.
+  - `LocateMeButton` (in `MapControls.kt`): `FloatingActionButton(containerColor = surface)` 56dp, icon `Icons.Filled.MyLocation`, spinner when locating. `hiddenStatusCount = AssetCondition.entries.size - statusFilter.size`.
 - [ ] **Step 3: Run `MapChromeTest` on device + ktlint; PASS.**
-- [ ] **Step 4: Commit** `style(map): rebuild the search bar, kpi chips and map buttons`
+- [ ] **Step 4: Commit** `style(map): rebuild the search bar, kpi chips and location button`
 
 ---
 
@@ -178,9 +178,9 @@ fun tapSquare(tapX: Float, tapY: Float, density: Float): RectF {
 
 ### Task 7: Large font, device run, cleanup, spec status
 
-- [ ] **Step 1:** `MapLargeFontTest` (1.5×, 360dp): `MapSearchBar` filter button, `BasemapToggleButton`, pole quick view `Chi tiết`, Pole detail `Đường đi` all ≥ 48dp and displayed.
+- [ ] **Step 1:** `MapLargeFontTest` (1.5×, 360dp): `MapSearchBar` filter button, `LocateMeButton`, pole quick view `Chi tiết`, Pole detail `Đường đi` all ≥ 48dp and displayed.
 - [ ] **Step 2:** Run device packages `com.luxmap.feature.map.ui` + unit `com.luxmap.feature.map.*`, `com.luxmap.core.map.*` + ktlint (separately). All PASS.
 - [ ] **Step 3:** Cleanup grep in `feature/map/ui/` for `Success600|Rose600|Amber500|Gray500|Blue[0-9]|Navy|Color\(0x|Radius\.|TextStyle|MessageState`; only `core/map/MapMarkerColors.kt` may hold hex.
-- [ ] **Step 4:** Manual on device (ledger it): markers on vector + satellite, tap between two close markers, basemap switch keeps selection, filter dot, legend.
+- [ ] **Step 4:** Manual on device (ledger it): markers on the vector basemap, tap between two close markers, no satellite option left, filter dot, legend.
 - [ ] **Step 5:** Spec status → `**ĐỢT 1 ĐÃ CODE XONG** trên nhánh style/redesign-map-vnext. Đợt 2 (tủ điện, sơ đồ cấp nguồn, ranh giới xã) chưa làm. Còn nợ kiểm tra tay (Light/Night Field, 200%).`
 - [ ] **Step 6: Commit** `test(map): cover the map chrome and pole detail at large font`

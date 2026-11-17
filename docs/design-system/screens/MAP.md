@@ -13,10 +13,10 @@
 **Chi tiết cột:** đọc đủ thông tin một cột và mở đường đi.
 
 **Chia 2 đợt, 2 PR:**
-- **Đợt 1 (M1, M2, M4):** redesign theo vNext, marker giống web, vùng chạm 48dp, Chi tiết cột. Không thêm dữ liệu mới.
+- **Đợt 1 (M1, M2, M4, M5):** redesign theo vNext, marker giống web, vùng chạm 48dp, Chi tiết cột. Không thêm dữ liệu mới.
 - **Đợt 2 (M3):** thêm 3 lớp dữ liệu backend đã có: Tủ điện, Sơ đồ cấp nguồn + lộ mất nguồn, Ranh giới xã.
 
-**Giữ nguyên:** quy tắc KPI luôn đếm tổng thật (FM-36), gom cụm, lớp tuyến theo `has_active_segment_fault`, vị trí bản thân, xử lý quyền vị trí, nền vector mặc định + vệ tinh tùy chọn, mọi hành động hiện có.
+**Giữ nguyên:** quy tắc KPI luôn đếm tổng thật (FM-36), gom cụm, lớp tuyến theo `has_active_segment_fault`, vị trí bản thân, xử lý quyền vị trí, mọi hành động hiện có. **Nền bản đồ chỉ còn vector** (M5): bỏ nền vệ tinh MapTiler.
 
 **Ngoài phạm vi:** bản đồ offline (G1), lớp Work Order/Fault (T-11), bản đồ tối (T-12), điều khiển chiếu sáng (của Kỹ sư bảo trì, web `LightingPreviewModal`), lọc theo tuyến (không chọn).
 
@@ -57,7 +57,7 @@ Các endpoint đợt 2 được backend tự ghi **SELF-SIGNED** (drift CABINET,
 
 - **Badge "Gần trường, cầu"** (`near_sensitive_poi`): tròn hổ phách `#F59E0B` viền trắng + ngôi sao trắng, góc trên-phải (giống web). Bỏ 3 badge trạng thái `ic_marker_badge_*` (web không có).
 - **Badge IoT:** giữ ở đợt 1, bỏ ở đợt 2 khi có lớp tủ điện.
-- **Đang chọn:** 24dp + vòng chọn hiện có (`CircleLayer`), màu vòng `#1F3864` trên nền vector, `#9DB7E0` trên vệ tinh.
+- **Đang chọn:** 24dp + vòng chọn hiện có (`CircleLayer`), màu vòng `#1F3864`.
 - **Thứ tự vẽ:** `out` trên cùng khi chồng lấn.
 - **Lưu ý trợ năng (đã chấp nhận, M2):** trạng thái trên marker chỉ phân biệt bằng màu như web. Bù lại: chú giải và sheet xem nhanh luôn có nhãn chữ; TalkBack đọc trạng thái khi chọn marker.
 - Cụm (cluster): giữ hành vi; vòng viền dùng màu trạng thái nghiêm trọng nhất theo bảng trên.
@@ -73,7 +73,7 @@ Các endpoint đợt 2 được backend tự ghi **SELF-SIGNED** (drift CABINET,
 
 - **Ô tìm kiếm:** nền `surface` đặc, viền `outlineVariant`, shadow Level 2, lề 16dp; nút lớp/lọc là trailing icon `Layers` 48dp, có **chấm báo** khi đang ẩn trạng thái nào đó + `contentDescription` "Đang lọc: ẩn N trạng thái".
 - **Chip KPI:** cao 32dp, vùng chạm 48dp, nền đặc + viền, mỗi chip có chấm màu marker + số (ô độ rộng tối thiểu cố định) + nhãn ngắn; chạm = lọc nhanh nếu hiện đang có hành vi đó (giữ, không thêm).
-- **Nút đổi nền (G3):** `SmallFloatingActionButton` 48dp, icon **trạng thái hiện tại** (`Map` = vector, `SatelliteAlt` = vệ tinh), `contentDescription` "Nền bản đồ: Vector. Chạm để đổi sang Vệ tinh" (và ngược lại).
+- **Nút đổi nền:** bỏ (M5, chỉ còn nền vector). Lỗi G3 hết tồn tại theo.
 - **Nút định vị:** `FloatingActionButton` 56dp, nền `surface`, icon `MyLocation` `onSurface`, viền `outlineVariant`; giữ spinner khi đang lấy vị trí.
 - **Chú giải:** card thu gọn "Chú giải" (`labelLarge`) + chevron; mở ra vẽ **đúng hình marker thật**; nhóm Trạng thái cột (Đạt chuẩn / Đèn mờ / Hỏng/Tắt / Chưa quét) · Ký hiệu (Gần trường, cầu; Có thiết bị IoT ở đợt 1) · Tuyến đường (bình thường / đang có sự cố). Nhãn `labelMedium`. Không che FAB.
 - **Sheet "Hiển thị trên bản đồ":** nhóm Lớp bản đồ (Switch Cột đèn, Switch Tuyến đường; hàng 56dp, role Switch) + nhóm Trạng thái cột (4 `LuxFilterChip` có chấm màu + check). Áp dụng ngay.
@@ -125,3 +125,4 @@ Các endpoint đợt 2 được backend tự ghi **SELF-SIGNED** (drift CABINET,
 | M2 | Kiểu marker | **Giống web** (tròn, màu theo web), bỏ gradient; không dùng T-10/T-09 của vNext |
 | M3 | Lớp thêm so với web | Tủ điện; Sơ đồ cấp nguồn + lộ mất nguồn; Ranh giới xã (đợt 2). Không lọc theo tuyến |
 | M4 | Chi tiết cột | Làm chung đợt 1 |
+| M5 | Nền vệ tinh | **Bỏ hẳn**, mobile chỉ dùng nền vector (OpenFreeMap). Xoá nút đổi nền, `MAP_STYLE_URL`, khoá `MAPTILER_API_KEY` trong `BuildConfig` |
