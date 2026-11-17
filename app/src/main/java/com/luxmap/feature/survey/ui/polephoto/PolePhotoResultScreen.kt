@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
@@ -88,18 +87,21 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
-import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.TopSlideToast
 import com.luxmap.core.ui.components.TopToastState
@@ -107,8 +109,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 private const val PHOTO_HEIGHT_FRACTION = 0.45f
-private val StatePlaceholderHeight = 160.dp
-private val SkeletonBlockHeight = 60.dp
 
 @Composable
 fun PolePhotoResultScreen(
@@ -145,40 +145,37 @@ fun PolePhotoResultScreen(
                         .then(if (showFooter) Modifier else Modifier.navigationBarsPadding()),
             ) {
                 when (state) {
-                    is PolePhotoResultUiState.Loading -> PolePhotoResultSkeleton()
+                    is PolePhotoResultUiState.Loading ->
+                        LuxLoadingRegion(description = "Đang tải kết quả AI") {
+                            LuxSkeleton(Modifier.fillMaxWidth().height(photoHeight()), MaterialTheme.shapes.medium)
+                            LuxSkeleton(Modifier.fillMaxWidth().height(96.dp), MaterialTheme.shapes.medium)
+                            LuxSkeleton(Modifier.fillMaxWidth().height(48.dp), MaterialTheme.shapes.medium)
+                        }
 
                     is PolePhotoResultUiState.Success ->
                         PolePhotoResultBody(poleId, state, onRetake, onRequestAuthorizationHeader) {
                             if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
                         }
 
-                    // heightIn (not a fixed height) - MessageState's action button (Error) makes this
-                    // content taller than the skeleton needs, and a fixed height here clipped
-                    // the button outside the touchable area.
-                    // Defensive-only branch - see PolePhotoResultUiState.Empty's own comment.
-                    // A real "AI model failed" result (ai_status = "unavailable") now renders as
-                    // Success with cvState = null instead, so review stays possible.
                     is PolePhotoResultUiState.Empty ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.SmartToy,
-                                iconColors = SyncStatus.QUEUED_OFFLINE.badgeColors(),
-                                title = "AI chưa phân loại được ảnh này",
-                                subtitle = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                                action = {},
-                            )
-                        }
+                        LuxEmptyState(
+                            title = "AI chưa phân loại được ảnh này",
+                            message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
+                            icon = Icons.Filled.SmartToy,
+                        )
 
                     is PolePhotoResultUiState.Error ->
-                        Box(modifier = Modifier.fillMaxWidth().heightIn(min = StatePlaceholderHeight)) {
-                            MessageState(
-                                icon = Icons.Filled.CloudOff,
-                                iconColors = SyncStatus.FAILED.badgeColors(),
-                                title = "Không tải được kết quả AI",
-                                subtitle = state.message,
-                                action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
-                            )
-                        }
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            title = "Không tải được kết quả AI",
+                            message =
+                                if (state.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
+                        )
                 }
 
                 Spacer(Modifier.height(Spacing.lg))
@@ -242,36 +239,6 @@ fun PolePhotoResultRoute(
 
 @Composable
 private fun photoHeight() = (LocalConfiguration.current.screenHeightDp * PHOTO_HEIGHT_FRACTION).dp
-
-@Composable
-private fun PolePhotoResultSkeleton() {
-    Column(
-        modifier = Modifier.fillMaxWidth().testTag("pole_photo_result_loading"),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(photoHeight())
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(SkeletonBlockHeight + Spacing.lg)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(Dimens.minTouchTarget)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.card)),
-        )
-    }
-}
 
 @Composable
 private fun PolePhotoResultBody(

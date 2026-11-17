@@ -55,7 +55,7 @@ class PolePhotoResultScreenTest {
         composeRule.onNode(hasText(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
 
     @Test
-    fun loading_state_shows_the_skeleton() {
+    fun loading_is_one_announced_region() {
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultScreen(
@@ -67,7 +67,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("pole_photo_result_loading").assertExists()
+        composeRule.onNodeWithContentDescription("Đang tải kết quả AI").assertExists()
     }
 
     @Test
@@ -301,22 +301,24 @@ class PolePhotoResultScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message_and_retry_invokes_onRetry() {
-        var retried = false
+    fun a_network_error_uses_screen_copy_and_retries() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
                 PolePhotoResultScreen(
                     poleId = "P-0103",
                     position = 3,
-                    state = PolePhotoResultUiState.Error("network down"),
+                    state = PolePhotoResultUiState.Error("java.net.SocketTimeoutException", isNetworkError = true),
                     onBack = {},
-                    onRetry = { retried = true },
+                    onRetry = { retries++ },
                 )
             }
         }
-        composeRule.onNodeWithText("network down").assertExists()
+        composeRule.onNodeWithText("Không tải được kết quả AI").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("SocketTimeoutException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
-        assertEquals(true, retried)
+        assertEquals(1, retries)
     }
 
     @Test
