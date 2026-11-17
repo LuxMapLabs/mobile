@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -70,15 +71,37 @@ class PolePhotoCaptureViewModelTest {
         }
 
     @Test
-    fun `onPhotoCaptured falls back to 0,0 when the GPS fix is unavailable`() =
+    fun `onPhotoCaptured does not save fake coordinates when the GPS fix is unavailable`() =
         runTest {
             val repository = mockk<PolePhotoRepository>(relaxed = true)
             val locationTracker = mockk<LocationTracker>()
             coEvery { locationTracker.getCurrentLocation() } returns null
             val vm = PolePhotoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            var done = false
+
+            vm.onPhotoCaptured(File("x.jpg")) { done = true }
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify(exactly = 0) {
+                repository.capture(workOrderId = any(), poleId = any(), filePath = any(), lat = any(), lng = any())
+            }
+            assertTrue(vm.locationMissing.value)
+            assertFalse(done)
+        }
+
+    @Test
+    fun `retrying after a missing GPS fix saves the real location and clears the flag`() =
+        runTest {
+            val repository = mockk<PolePhotoRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            coEvery { locationTracker.getCurrentLocation() } returnsMany listOf(null, LatLng(10.0, 106.0))
+            val vm = PolePhotoCaptureViewModel(savedStateHandle(), repository, locationTracker)
             val file = File("x.jpg")
+            var done = false
 
             vm.onPhotoCaptured(file) {}
+            dispatcher.scheduler.advanceUntilIdle()
+            vm.onPhotoCaptured(file) { done = true }
             dispatcher.scheduler.advanceUntilIdle()
 
             coVerify {
@@ -86,10 +109,12 @@ class PolePhotoCaptureViewModelTest {
                     workOrderId = WORK_ORDER_ID,
                     poleId = POLE_ID,
                     filePath = file.absolutePath,
-                    lat = 0.0,
-                    lng = 0.0,
+                    lat = 10.0,
+                    lng = 106.0,
                 )
             }
+            assertFalse(vm.locationMissing.value)
+            assertTrue(done)
         }
 
     @Test

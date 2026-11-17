@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +43,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -97,6 +99,7 @@ fun PoleVideoCaptureRoute(
     var previewFile by remember { mutableStateOf<File?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+    val locationMissing by viewModel.locationMissing.collectAsState()
 
     val captureVideoLauncher =
         rememberLauncherForActivityResult(CaptureVideoWithDurationLimit(MAX_DURATION_LIMIT_SECONDS)) { success ->
@@ -156,6 +159,22 @@ fun PoleVideoCaptureRoute(
             launchGalleryPicker()
         }
 
+    val retryLocationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            previewFile?.let { viewModel.onVideoCaptured(it, onDone) }
+        }
+
+    fun retryLocation() {
+        val file = previewFile ?: return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.onVideoCaptured(file, onDone)
+        } else {
+            retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
     LaunchedEffect(Unit) {
         when (source) {
             PoleVideoCaptureSource.CAMERA -> {
@@ -190,7 +209,7 @@ fun PoleVideoCaptureRoute(
             PoleVideoPreview(
                 file = fileToPreview,
                 poleId = poleId,
-                isSaving = isSaving,
+                isSaving = isSaving && !locationMissing,
                 retakeLabel = if (source == PoleVideoCaptureSource.GALLERY) "Chọn video khác" else "Quay lại",
                 keepRetakeLabelOnOneLine = source == PoleVideoCaptureSource.GALLERY,
                 onConfirm = {
@@ -207,6 +226,16 @@ fun PoleVideoCaptureRoute(
                 },
                 onClose = ::closePreview,
             )
+            if (locationMissing) {
+                LuxConfirmDialog(
+                    title = "Chưa lấy được vị trí",
+                    message = "Video cột cần vị trí GPS thật. Bật định vị rồi thử lại, hoặc bỏ video này.",
+                    confirmLabel = "Thử lại",
+                    onConfirm = ::retryLocation,
+                    onDismiss = ::closePreview,
+                    dismissLabel = "Bỏ video",
+                )
+            }
         } else {
             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                 LuxLoadingRegion(description = "Đang mở camera", modifier = Modifier.align(Alignment.Center)) {
