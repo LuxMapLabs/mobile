@@ -17,6 +17,8 @@ class MapBoundsUnavailableException : Exception(
     "Khu vực của bạn chưa được thiết lập khung bản đồ trên hệ thống — liên hệ Quản trị viên.",
 )
 
+class MapNetworkException(cause: IOException) : IOException("Không có kết nối mạng. Vui lòng kiểm tra lại.", cause)
+
 // Calls the real GET /auth/me (for map_bounds) + GET /map/poles + GET /map/segments — one fixed
 // bbox per map open, not a bbox per pan/zoom (FM-15 "Hướng B", see the design spec). Follows the
 // same userApi.me() pattern RealHomeRepository/RealSurveyRepository/RealProfileRepository
@@ -46,7 +48,7 @@ class RealMapRepository
                 } catch (e: HttpException) {
                     throw Exception(e.errorMessageOrNull() ?: "Không tải được dữ liệu bản đồ", e)
                 } catch (e: IOException) {
-                    throw Exception("Không có kết nối mạng. Vui lòng kiểm tra lại.", e)
+                    throw MapNetworkException(e)
                 } catch (e: Exception) {
                     throw Exception("Không tải được dữ liệu bản đồ", e)
                 }

@@ -144,6 +144,7 @@ class RealMapRepositoryTest {
             repository.observeGisMapDataset().test {
                 val error = awaitError()
                 assertEquals("Không có kết nối mạng. Vui lòng kiểm tra lại.", error.message)
+                assertTrue(error is java.io.IOException)
             }
         }
 }
