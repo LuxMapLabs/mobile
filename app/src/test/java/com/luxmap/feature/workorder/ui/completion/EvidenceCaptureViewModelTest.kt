@@ -83,7 +83,7 @@ class EvidenceCaptureViewModelTest {
         }
 
     @Test
-    fun `onPhotoCaptured falls back to 0,0 when no location is available, rather than failing the capture`() =
+    fun `onPhotoCaptured without a location holds the photo instead of saving fake coordinates`() =
         runTest {
             val repository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             val locationTracker = mockk<LocationTracker>()
@@ -91,21 +91,47 @@ class EvidenceCaptureViewModelTest {
             io.mockk.coEvery { locationTracker.getCurrentLocation() } returns null
             val handle = savedStateHandle().apply { set("kind", "observation") }
             val vm = EvidenceCaptureViewModel(handle, repository, locationTracker)
+            var doneCalled = false
+            val file = vm.outputFile(kotlin.io.path.createTempDirectory().toFile()).apply { writeText("jpeg") }
+
+            vm.onPhotoCaptured(file) { doneCalled = true }
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify(exactly = 0) {
+                repository.captureEvidence(any(), any(), any(), any(), any(), any(), any())
+            }
+            assertEquals(1, vm.state.value.awaitingLocation)
+            org.junit.Assert.assertTrue(vm.state.value.awaitingFromCamera)
+            org.junit.Assert.assertFalse(doneCalled)
+            org.junit.Assert.assertTrue(file.exists())
+        }
+
+    @Test
+    fun `a camera photo held for location is saved with the retried current location`() =
+        runTest {
+            val repository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            io.mockk.coEvery { locationTracker.getCurrentLocation() } returnsMany listOf(null, LatLng(10.97, 106.49))
+            val vm = EvidenceCaptureViewModel(savedStateHandle(), repository, locationTracker)
             val file = vm.outputFile(kotlin.io.path.createTempDirectory().toFile()).apply { writeText("jpeg") }
 
             vm.onPhotoCaptured(file) {}
+            dispatcher.scheduler.advanceUntilIdle()
+            vm.useCurrentLocation()
             dispatcher.scheduler.advanceUntilIdle()
 
             coVerify {
                 repository.captureEvidence(
                     workOrderId = WORK_ORDER_ID,
-                    kind = EvidenceKind.OBSERVATION,
+                    kind = EvidenceKind.AFTER,
                     clientOpId = vm.clientOpId,
                     filePath = file.absolutePath,
-                    lat = 0.0,
-                    lng = 0.0,
+                    lat = 10.97,
+                    lng = 106.49,
                     capturedAt = any(),
                 )
             }
+            assertEquals(0, vm.state.value.awaitingLocation)
+            assertEquals(1, vm.state.value.added)
         }
 }

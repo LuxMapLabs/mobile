@@ -156,6 +156,8 @@ fun EvidenceCaptureRoute(
                 Text(
                     if (state.locationUnavailable) {
                         "Chưa lấy được vị trí hiện tại. Bật định vị hoặc bỏ qua các ảnh này."
+                    } else if (state.awaitingFromCamera) {
+                        "Chưa lấy được vị trí cho ảnh vừa chụp. Bật định vị rồi thử lấy lại vị trí hiện tại."
                     } else {
                         "Không đọc được GPS của ${state.awaitingLocation} ảnh. Dùng vị trí hiện tại để đính kèm?"
                     },
