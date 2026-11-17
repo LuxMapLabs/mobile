@@ -18,6 +18,7 @@ data class PoleListRowState(
     val hasPendingReview: Boolean = false,
     val hasPendingDecision: Boolean = false,
     val aiVerdict: PoleAiVerdict? = null,
+    val isConfirmed: Boolean = false,
 )
 
 sealed interface PoleListUiState {
@@ -32,7 +33,11 @@ sealed interface PoleListUiState {
         // new poles, same as the mock's state.done - found missing on a real device, 2026-10-29:
         // tapping "Hoan tat" gave no feedback at all and the screen looked completely unchanged.
         val isCompleted: Boolean = false,
-    ) : PoleListUiState
+    ) : PoleListUiState {
+        val unconfirmedCount: Int get() = poles.count { it.aiVerdict != null && !it.isConfirmed }
+        val confirmedCount: Int get() = poles.count { it.isConfirmed }
+        val canComplete: Boolean get() = !isCompleted && poles.isNotEmpty() && unconfirmedCount == 0
+    }
 
     data object Empty : PoleListUiState
 

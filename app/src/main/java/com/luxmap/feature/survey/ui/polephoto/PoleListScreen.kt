@@ -152,7 +152,8 @@ fun PoleListScreen(
         bottomBar = {
             if (state is PoleListUiState.Success) {
                 PoleListBottomBar(
-                    left = state.poles.count { it.syncStatus == null },
+                    left = state.unconfirmedCount,
+                    canComplete = state.canComplete,
                     isCompleted = state.isCompleted,
                     onTapComplete = { showCompleteConfirm = true },
                 )
@@ -246,14 +247,9 @@ fun PoleListScreen(
         }
     }
 
-    if (showCompleteConfirm && state is PoleListUiState.Success) {
-        // A captured pole IS a reported issue in this v1 flow (there is no separate "mark
-        // normal" action - matches the mock's own info line "chi bao cot co loi, con lai tinh
-        // la binh thuong" and PoleListBottomBar's own "left" count below).
-        val issueCount = state.poles.count { it.syncStatus != null }
+    if (showCompleteConfirm && state is PoleListUiState.Success && state.canComplete) {
         CompleteSurveyConfirmSheet(
-            issueCount = issueCount,
-            normalCount = state.poles.size - issueCount,
+            confirmedCount = state.confirmedCount,
             onDismiss = { showCompleteConfirm = false },
             onConfirm = {
                 showCompleteConfirm = false
@@ -351,6 +347,7 @@ private fun ReportMethodOption(
 @Composable
 private fun PoleListBottomBar(
     left: Int,
+    canComplete: Boolean,
     isCompleted: Boolean,
     onTapComplete: () -> Unit,
 ) {
@@ -368,12 +365,12 @@ private fun PoleListBottomBar(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(text = "$left cột chưa chụp", style = MaterialTheme.typography.titleMedium)
+                    Text(text = "$left cột có kết quả chưa xác nhận", style = MaterialTheme.typography.titleMedium)
                 }
                 PrimaryButton(
                     text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất",
                     onClick = onTapComplete,
-                    enabled = !isCompleted,
+                    enabled = canComplete,
                 )
             }
         }
@@ -383,8 +380,7 @@ private fun PoleListBottomBar(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompleteSurveyConfirmSheet(
-    issueCount: Int,
-    normalCount: Int,
+    confirmedCount: Int,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -405,7 +401,7 @@ private fun CompleteSurveyConfirmSheet(
             }
             Text(text = "Hoàn tất khảo sát tuyến?", style = MaterialTheme.typography.titleLarge)
             Text(
-                text = "$issueCount cột báo lỗi, $normalCount cột còn lại được tính là bình thường.",
+                text = "Đã xác nhận kết quả của $confirmedCount cột. Gửi khảo sát để duyệt?",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

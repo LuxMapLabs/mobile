@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.net.Uri
 import android.view.LayoutInflater
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -85,6 +86,7 @@ import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
@@ -101,6 +103,7 @@ import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -117,9 +120,13 @@ fun PolePhotoResultScreen(
     onSubmitReview: (finalCvState: String, reviewNote: String?) -> Unit = { _, _ -> },
     onRequestAuthorizationHeader: suspend () -> String? = { null },
     isCompleted: Boolean = false,
+    onWithdrawResult: (suspend () -> Unit)? = null,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var confirmWithdrawal by rememberSaveable { mutableStateOf(false) }
+    var withdrawing by remember { mutableStateOf(false) }
+    BackHandler(enabled = withdrawing) {}
     val reviewable = state as? PolePhotoResultUiState.Success
     val showFooter = reviewable != null && reviewable.decision == null && !isCompleted
     val draft = if (reviewable != null && showFooter) rememberReviewDraft(poleId, reviewable) else null
@@ -128,7 +135,7 @@ fun PolePhotoResultScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             LuxChildTopBar(
                 title = "Kết quả AI",
-                onBack = onBack,
+                onBack = { if (!withdrawing) onBack() },
                 subtitle = if (position > 0) "Cột $position ($poleId)" else poleId,
             )
 
@@ -153,7 +160,7 @@ fun PolePhotoResultScreen(
                             PolePhotoResultBody(
                                 poleId,
                                 state,
-                                if (isCompleted) null else onRetake,
+                                if (isCompleted || withdrawing) null else onRetake,
                                 onRequestAuthorizationHeader,
                             ) {
                                 if (draft != null) ReviewCard(draft, hasSavedDraft = state.draftFinalCvState != null)
@@ -194,6 +201,8 @@ fun PolePhotoResultScreen(
             if (draft != null) {
                 ReviewSubmitBar(
                     draft = draft,
+                    withdrawing = withdrawing,
+                    onCancel = onWithdrawResult?.let { { confirmWithdrawal = true } },
                     onSubmit = { finalCvState, reviewNote ->
                         scope.launch { snackbarHostState.showSnackbar("Đã lưu, sẽ gửi khi Hoàn tất") }
                         onSubmitReview(finalCvState, reviewNote)
@@ -201,6 +210,32 @@ fun PolePhotoResultScreen(
                 )
             }
         }
+    }
+    if (confirmWithdrawal && onWithdrawResult != null) {
+        LuxConfirmDialog(
+            title = "Hủy kết quả khảo sát cột này?",
+            message = "Ảnh hoặc video và kết quả AI hiện tại sẽ bị rút khỏi lượt khảo sát. Bạn có thể ghi nhận lại.",
+            confirmLabel = "Hủy kết quả",
+            dismissLabel = "Giữ lại",
+            destructive = true,
+            onDismiss = { confirmWithdrawal = false },
+            onConfirm = {
+                confirmWithdrawal = false
+                withdrawing = true
+                scope.launch {
+                    try {
+                        onWithdrawResult()
+                        onBack()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        launch { snackbarHostState.showSnackbar("Không hủy được kết quả. Vui lòng thử lại.") }
+                    } finally {
+                        withdrawing = false
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -241,6 +276,7 @@ fun PolePhotoResultRoute(
         },
         onRequestAuthorizationHeader = viewModel::currentAuthorizationHeader,
         isCompleted = isCompleted,
+        onWithdrawResult = { viewModel.withdrawResult(photoId) },
     )
 }
 
@@ -540,17 +576,38 @@ private fun ReviewCard(
 @Composable
 private fun ReviewSubmitBar(
     draft: ReviewDraft,
+    withdrawing: Boolean,
+    onCancel: (() -> Unit)?,
     onSubmit: (finalCvState: String, reviewNote: String?) -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            PrimaryButton(
-                text = reviewActionLabel(draft.selected, draft.aiCvState),
-                onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
-                enabled = draft.canSubmit,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            )
+            val padding = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+            val confirm: @Composable (Modifier) -> Unit = { modifier ->
+                PrimaryButton(
+                    text = "Xác nhận",
+                    onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
+                    enabled = draft.canSubmit && !withdrawing,
+                    modifier = modifier,
+                )
+            }
+            if (onCancel == null) {
+                confirm(padding.fillMaxWidth())
+            } else {
+                LuxActionPair(
+                    modifier = padding,
+                    secondary = { modifier ->
+                        LuxSecondaryButton(
+                            text = if (withdrawing) "Đang hủy…" else "Hủy",
+                            onClick = onCancel,
+                            enabled = !withdrawing,
+                            modifier = modifier,
+                        )
+                    },
+                    primary = confirm,
+                )
+            }
         }
     }
 }

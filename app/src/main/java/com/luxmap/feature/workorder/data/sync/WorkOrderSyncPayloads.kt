@@ -18,4 +18,5 @@ data class EvidenceSyncPayload(
 data class CompletionSyncPayload(
     @SerialName("work_order_id") val workOrderId: String,
     @SerialName("evidence_client_op_ids") val evidenceClientOpIds: List<String>? = null,
+    @SerialName("pole_review_client_op_ids") val poleReviewClientOpIds: List<String>? = null,
 )

@@ -130,6 +130,33 @@ class PolePhotoResultScreenTest {
     }
 
     @Test
+    fun cancelling_the_result_requires_confirmation_and_then_returns_to_the_list() {
+        var withdrawn = false
+        var wentBack = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(),
+                    onBack = { wentBack = true },
+                    onRetry = {},
+                    onWithdrawResult = { withdrawn = true },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Hủy").performClick()
+        composeRule.onNodeWithText("Giữ lại").performClick()
+        assertEquals(false, withdrawn)
+        composeRule.onNodeWithText("Hủy").performClick()
+        composeRule.onNodeWithText("Hủy kết quả").performClick()
+        composeRule.runOnIdle {
+            assertEquals(true, withdrawn)
+            assertEquals(true, wentBack)
+        }
+    }
+
+    @Test
     fun success_state_tapping_chup_lai_invokes_onRetake() {
         var retaken = false
         composeRule.setContent {
@@ -377,7 +404,7 @@ class PolePhotoResultScreenTest {
             }
         }
         choice("Đèn sáng").performScrollTo().performClick()
-        composeRule.onNodeWithText("Đồng ý với AI").performClick()
+        composeRule.onNodeWithText("Xác nhận").performClick()
         assertEquals("on" to null, submitted)
     }
 
@@ -399,7 +426,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đồng ý với AI").assertIsNotEnabled()
+        composeRule.onNodeWithText("Xác nhận").assertIsNotEnabled()
         composeRule.onNodeWithText("Đã lưu, sẽ gửi khi Hoàn tất").assertExists()
     }
 
@@ -436,10 +463,10 @@ class PolePhotoResultScreenTest {
         }
         choice("Đèn tắt").performScrollTo().performClick()
         composeRule.onNodeWithText("Cần ghi chú vì khác với nhận định của AI").assertExists()
-        composeRule.onNodeWithText("Lưu nhãn đã sửa").assertIsNotEnabled()
+        composeRule.onNodeWithText("Xác nhận").assertIsNotEnabled()
 
         composeRule.onNodeWithText("Ghi chú", substring = true).performTextInput("Thấy đèn tắt khi kiểm tra")
-        composeRule.onNodeWithText("Lưu nhãn đã sửa").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithText("Xác nhận").assertIsEnabled().performSemanticsAction(SemanticsActions.OnClick)
         assertEquals(true, submitted)
     }
 
@@ -474,7 +501,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Đồng ý với AI").assertIsDisplayed()
+        composeRule.onNodeWithText("Xác nhận").assertIsDisplayed()
         composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertIsNotDisplayed()
     }
 
@@ -494,7 +521,7 @@ class PolePhotoResultScreenTest {
         }
         composeRule.onNodeWithTag("ai_verdict_label").assertExists()
         composeRule.onNodeWithText("Kỹ sư xác nhận nhãn").assertDoesNotExist()
-        composeRule.onNodeWithText("Đồng ý với AI").assertDoesNotExist()
+        composeRule.onNodeWithText("Xác nhận").assertDoesNotExist()
         composeRule.onNodeWithTag("details_toggle").performScrollTo().performClick()
         composeRule.onNodeWithText("Chụp lại").assertDoesNotExist()
     }
@@ -535,6 +562,6 @@ class PolePhotoResultScreenTest {
         state = successState(cvState = "on").copy(finalCvState = "off", reviewNote = "Đèn tắt thật")
         composeRule.waitForIdle()
         choice("Đèn tắt").performScrollTo().assertIsSelected()
-        composeRule.onNode(hasText("Lưu nhãn đã sửa") and hasClickAction()).assertIsNotEnabled()
+        composeRule.onNode(hasText("Xác nhận") and hasClickAction()).assertIsNotEnabled()
     }
 }

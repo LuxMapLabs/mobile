@@ -104,16 +104,4 @@ class PolePhotoReviewLogicTest {
             verdictSourceText(cvState = "inconclusive", reviewedCvState = "on"),
         )
     }
-
-    @Test
-    fun `action label agrees with ai when selection matches`() {
-        assertEquals("Đồng ý với AI", reviewActionLabel(selected = "on", aiCvState = "on"))
-    }
-
-    @Test
-    fun `action label saves a correction when selection differs`() {
-        assertEquals("Lưu nhãn đã sửa", reviewActionLabel(selected = "off", aiCvState = "on"))
-        assertEquals("Lưu nhãn đã sửa", reviewActionLabel(selected = "on", aiCvState = "inconclusive"))
-        assertEquals("Lưu nhãn đã sửa", reviewActionLabel(selected = "on", aiCvState = null))
-    }
 }

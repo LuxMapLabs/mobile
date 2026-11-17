@@ -170,10 +170,12 @@ class RealWorkOrderCompletionRepository
                 }
                 return
             }
+            val reviewIds = if (taskKind == "survey") dao.pendingLatestPoleReviewIds(workOrderId) else null
+            val payload = CompletionSyncPayload(workOrderId, poleReviewClientOpIds = reviewIds)
             dao.insertOrReplaceCompletion(completion)
             syncQueueManager.enqueue(
                 opType = "complete_work_order",
-                payloadJson = json.encodeToString(CompletionSyncPayload(workOrderId)),
+                payloadJson = json.encodeToString(payload),
                 clientOpId = clientOpId,
             )
         }

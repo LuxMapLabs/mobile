@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -26,6 +27,7 @@ class RealPolePhotoRepository
         private val dao: PolePhotoDao,
         private val syncQueueManager: SyncQueueManager,
         private val syncQueueDao: SyncQueueDao,
+        private val withdrawal: PolePhotoWithdrawal = PolePhotoWithdrawal(api, dao),
     ) : PolePhotoRepository {
         override fun observePhotos(workOrderId: String): Flow<List<LocalPolePhotoEntity>> =
             dao.observeByWorkOrder(workOrderId)
@@ -100,7 +102,9 @@ class RealPolePhotoRepository
         }
 
         override suspend fun enqueuePendingReviews(workOrderId: String): Int {
-            val pending = dao.observeByWorkOrder(workOrderId).first().filter { it.draftFinalCvState != null }
+            val pending =
+                dao.observeByWorkOrder(workOrderId).first().distinctBy { it.poleId }
+                    .filter { it.draftFinalCvState != null }
             pending.forEach { photo ->
                 syncQueueManager.enqueue(
                     opType = "submit_pole_photo_review",
@@ -126,6 +130,15 @@ class RealPolePhotoRepository
 
         override suspend fun cachedResult(serverPhotoId: String): LocalPolePhotoEntity? =
             dao.byServerPhotoId(serverPhotoId)
+
+        override suspend fun withdrawResult(
+            workOrderId: String,
+            serverPhotoId: String,
+        ) = withdrawal.mediaMutex.withLock {
+            val photo = checkNotNull(dao.byServerPhotoId(serverPhotoId))
+            check(photo.workOrderId == workOrderId)
+            withdrawal.withdrawPole(workOrderId, photo.poleId, serverPhotoId)
+        }
 
         // Writes a server PolePhotoItemDto (from either the GET detail or PATCH review response -
         // both return the same full item shape) into Room.

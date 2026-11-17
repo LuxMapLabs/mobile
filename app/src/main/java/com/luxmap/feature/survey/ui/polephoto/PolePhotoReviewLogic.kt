@@ -26,7 +26,7 @@ fun confidenceLabel(confidence: Double?): String? {
     return "$wording (${(confidence * 100).roundToInt()}%)"
 }
 
-private fun isConclusive(cvState: String?) = cvState == "on" || cvState == "off"
+internal fun isConclusive(cvState: String?) = cvState == "on" || cvState == "off"
 
 fun effectiveCvState(
     cvState: String?,
@@ -46,11 +46,6 @@ fun verdictSourceText(
         cvState == null -> "AI không xử lý được. Hãy chọn trạng thái đèn."
         else -> "AI: Không xác định"
     }
-
-fun reviewActionLabel(
-    selected: String?,
-    aiCvState: String?,
-): String = if (selected != null && selected == aiCvState) "Đồng ý với AI" else "Lưu nhãn đã sửa"
 
 fun cvStateLabel(cvState: String?): String =
     when (cvState) {

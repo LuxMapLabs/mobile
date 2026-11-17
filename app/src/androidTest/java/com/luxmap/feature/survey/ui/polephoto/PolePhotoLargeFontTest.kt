@@ -90,7 +90,7 @@ class PolePhotoLargeFontTest {
             .performScrollTo()
             .assertTouchTargetIsAtLeast(48.dp)
         composeRule.onNode(
-            hasText("Đồng ý với AI") and hasClickAction(),
+            hasText("Xác nhận") and hasClickAction(),
         ).assertIsDisplayed().assertTouchTargetIsAtLeast(48.dp)
     }
 }

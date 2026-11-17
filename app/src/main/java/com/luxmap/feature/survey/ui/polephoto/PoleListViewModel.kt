@@ -123,24 +123,23 @@ class PoleListViewModel
             _aiResultState.value = null
         }
 
+        suspend fun withdrawResult(serverPhotoId: String) {
+            polePhotoRepository.withdrawResult(workOrderId, serverPhotoId)
+            onDismissAiResult()
+        }
+
         // Used to just navigate back right away (PoleListRoute's onDone), leaving the work order
         // stuck "in_progress" forever - there was no other call site for POST
-        // /work-orders/{id}/complete for a survey work order (WorkOrderDetailScreen draws
-        // nothing for task_kind=survey). Only completes when at least one photo was captured -
-        // tapping this on an empty list does nothing (the confirm sheet never opens, see
-        // PoleListScreen). Guarded against double-submit by isCompleted, same guard the UI itself
-        // uses to lock the button - this function can still be called once more after a resume.
+        // /work-orders/{id}/complete for a survey work order.
         fun onComplete() {
             val state = _uiState.value as? PoleListUiState.Success ?: return
-            if (state.isCompleted) return
-            val captured = state.poles.count { it.syncStatus != null }
-            if (captured == 0) return
+            if (!state.canComplete) return
             viewModelScope.launch {
                 val pendingReviews = polePhotoRepository.enqueuePendingReviews(workOrderId)
                 completionRepository.submitCompletion(
                     workOrderId = workOrderId,
                     taskKind = "survey",
-                    reportNote = "Đã khảo sát $captured/${state.poles.size} cột đèn bằng ảnh chụp.",
+                    reportNote = "Đã xác nhận kết quả khảo sát ${state.confirmedCount} cột đèn.",
                     materialsUsed = null,
                     faultOutcomes = null,
                 )
@@ -168,6 +167,7 @@ class PoleListViewModel
             val hasPendingReview: Boolean,
             val hasPendingDecision: Boolean,
             val aiVerdict: PoleAiVerdict?,
+            val isConfirmed: Boolean,
         )
 
         private fun load() {
@@ -192,6 +192,8 @@ class PoleListViewModel
                                                     serverPhotoId = photo.serverPhotoId,
                                                     status = statuses[photo.photoId],
                                                     hasPendingReview = photo.draftFinalCvState != null,
+                                                    isConfirmed =
+                                                        isConclusive(photo.draftFinalCvState ?: photo.finalCvState),
                                                     hasPendingDecision =
                                                         photo.reviewedBy != null && photo.decision == null,
                                                     aiVerdict =
@@ -222,6 +224,7 @@ class PoleListViewModel
                                             hasPendingReview = info?.hasPendingReview ?: false,
                                             hasPendingDecision = info?.hasPendingDecision ?: false,
                                             aiVerdict = info?.aiVerdict,
+                                            isConfirmed = info?.isConfirmed == true && info.status == "done",
                                         )
                                     },
                                 isStale = result.isStale,

@@ -113,6 +113,20 @@ interface WorkOrderCompletionDao {
         opType: String,
     ): SyncQueueEntity?
 
+    @Query(
+        """
+        SELECT photo.photoId || ':review'
+        FROM local_pole_photo AS photo
+        WHERE photo.workOrderId = :workOrderId AND photo.draftFinalCvState IS NOT NULL
+            AND photo.photoId = (
+                SELECT latest.photoId FROM local_pole_photo AS latest
+                WHERE latest.workOrderId = photo.workOrderId AND latest.poleId = photo.poleId
+                ORDER BY latest.capturedAt DESC, latest.rowid DESC LIMIT 1
+            )
+        """,
+    )
+    suspend fun pendingLatestPoleReviewIds(workOrderId: String): List<String>
+
     @Query("DELETE FROM sync_queue WHERE id = :id AND status = 'failed'")
     suspend fun deleteFailedOperation(id: Long)
 

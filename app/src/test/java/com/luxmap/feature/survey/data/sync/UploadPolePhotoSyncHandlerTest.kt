@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.data.sync
 
 import com.luxmap.core.network.WorkOrdersApi
+import com.luxmap.core.network.dto.PagedResultDto
 import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoUploadResponseDto
@@ -49,7 +50,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole-photo", ".jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
                 PolePhotoUploadResponseDto(photoId = "PPH-000001")
@@ -63,16 +66,18 @@ class UploadPolePhotoSyncHandlerTest {
         }
 
     @Test
-    fun `a missing local row returns Failed`() =
+    fun `a missing local row skips withdrawn media`() =
         runTest {
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns null
             val handler = UploadPolePhotoSyncHandler(api, dao)
 
             val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1")))
 
-            assertTrue(result is SyncOpResult.Failed)
+            assertTrue(result is SyncOpResult.Done)
         }
 
     @Test
@@ -80,7 +85,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole-photo", ".jpg").apply { writeBytes(byteArrayOf(1)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } throws httpException(500)
             val handler = UploadPolePhotoSyncHandler(api, dao)
@@ -95,7 +102,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole-photo", ".jpg").apply { writeBytes(byteArrayOf(1)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } throws
                 httpException(409, "IDEMPOTENCY_CONFLICT")
@@ -111,7 +120,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole-photo", ".jpg").apply { writeBytes(byteArrayOf(1)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } throws
                 httpException(404, "POLE_NOT_FOUND")
@@ -127,7 +138,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole-photo", ".tmp").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
                 PolePhotoUploadResponseDto(
@@ -162,7 +175,9 @@ class UploadPolePhotoSyncHandlerTest {
         runTest {
             val tempFile = File.createTempFile("pole", ".tmp").apply { writeBytes(byteArrayOf(1, 2, 3)) }
             val api = mockk<WorkOrdersApi>()
+            coEvery { api.listPolePhotos(any(), any(), any(), any()) } returns PagedResultDto(1, 100, 0, emptyList())
             val dao = mockk<PolePhotoDao>()
+            coEvery { dao.byPole("WO-1", "POLE-1") } returns emptyList()
             coEvery { dao.byId("PHOTO-1") } returns photoEntity(tempFile.absolutePath)
             coEvery { api.uploadPolePhoto(any(), any(), any(), any(), any(), any(), any()) } returns
                 PolePhotoUploadResponseDto(
