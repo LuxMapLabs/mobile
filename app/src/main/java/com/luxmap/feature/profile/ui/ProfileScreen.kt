@@ -1,46 +1,32 @@
 package com.luxmap.feature.profile.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,37 +35,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.core.common.DateFormatUtils
-import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.OverlineTextStyle
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.theme.Success600
-import com.luxmap.core.theme.SyncStatus
-import com.luxmap.core.theme.badgeColors
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.core.ui.components.LuxDestructiveButton
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSectionHeader
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxTabTopBar
-import com.luxmap.core.ui.components.MessageState
-import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.profile.data.CurrentUserProfile
 import java.time.Instant
-
-// Exact hex from the F15 redesign doc ("ĐỀ XUẤT THEO HƯỚNG 2a") - no existing shared token matches
-// this amber, same reasoning as the per-screen bespoke colors in PolePhotoResultBottomSheet.
-private val AttentionColor = Color(0xFFB45309)
-private val PendingCaptionColor = Color(0xFF92400E)
-
-// Icon-chip size + the row's own Spacing.md gap, so the stat grid below a row lines up under its
-// text instead of its icon.
-private val SyncDetailIndent = 48.dp
 
 @Composable
 fun ProfileRoute(
@@ -96,7 +69,6 @@ fun ProfileRoute(
     val isOnline by viewModel.isOnline.collectAsState()
 
     ProfileScreen(
-        // Null only for a session saved before the app kept the username.
         username = username ?: "Tài khoản",
         profileState = profileState,
         isLoggingOut = viewModel.isLoggingOut,
@@ -114,9 +86,6 @@ fun ProfileRoute(
     )
 }
 
-// F15 Cá nhân - "Đề xuất theo hướng 2a": hero carries identity (name/username/role), the sheet
-// below groups network/sync/lux sensor under one "Sẵn sàng làm việc" block, and device/version
-// move to a plain footer line - replacing the old flat settings-list layout.
 @Composable
 fun ProfileScreen(
     username: String,
@@ -134,9 +103,7 @@ fun ProfileScreen(
     onRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // Survives rotation, so the dialog does not disappear while the user is deciding.
     var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
-
     Scaffold(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -152,17 +119,21 @@ fun ProfileScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (profileState) {
                 is ProfileUiState.Loading ->
-                    Box(
-                        modifier = Modifier.fillMaxSize().testTag("profile_loading"),
-                        contentAlignment = Alignment.Center,
+                    LuxLoadingRegion(
+                        description = "Đang tải thông tin cá nhân",
+                        modifier = Modifier.padding(Spacing.lg),
                     ) {
-                        CircularProgressIndicator()
+                        LuxSkeleton(
+                            modifier = Modifier.fillMaxWidth().height(160.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        )
+                        LuxSkeleton(
+                            modifier = Modifier.fillMaxWidth().height(120.dp),
+                            shape = MaterialTheme.shapes.medium,
+                        )
                     }
-
                 is ProfileUiState.Success ->
-                    ProfileContent(
-                        profile = profileState.profile,
-                        username = username,
+                    ProfileBody(
                         isLoggingOut = isLoggingOut,
                         deviceModel = deviceModel,
                         appVersion = appVersion,
@@ -171,62 +142,52 @@ fun ProfileScreen(
                         lastSyncedAt = lastSyncedAt,
                         isOnline = isOnline,
                         onLogoutClick = { showConfirmDialog = true },
-                    )
-
+                    ) {
+                        ProfileCard(profile = profileState.profile, username = username)
+                    }
                 is ProfileUiState.Error ->
-                    MessageState(
-                        icon = Icons.Filled.CloudOff,
-                        iconColors = SyncStatus.FAILED.badgeColors(),
-                        title = "Không tải được thông tin cá nhân",
-                        subtitle = profileState.message,
-                        action = {},
-                    )
+                    ProfileBody(
+                        isLoggingOut = isLoggingOut,
+                        deviceModel = deviceModel,
+                        appVersion = appVersion,
+                        pendingSyncCount = pendingSyncCount,
+                        errorSyncCount = errorSyncCount,
+                        lastSyncedAt = lastSyncedAt,
+                        isOnline = isOnline,
+                        onLogoutClick = { showConfirmDialog = true },
+                    ) {
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (profileState.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
+                            title = "Không tải được thông tin cá nhân",
+                            message =
+                                if (profileState.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
+                        )
+                    }
             }
         }
     }
-
     if (showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            icon = {
-                val tone = AssetCondition.OUT.badgeColors()
-                Box(
-                    modifier = Modifier.size(48.dp).clip(CircleShape).background(tone.background),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(imageVector = Icons.Filled.Logout, contentDescription = null, tint = tone.text)
-                }
+        LuxConfirmDialog(
+            title = "Đăng xuất khỏi thiết bị này?",
+            message = "Bạn cần đăng nhập lại để tiếp tục sử dụng ứng dụng.",
+            confirmLabel = "Đăng xuất",
+            onConfirm = {
+                showConfirmDialog = false
+                onConfirmLogout()
             },
-            title = { Text("Đăng xuất khỏi thiết bị này?") },
-            text = { Text("Bạn cần đăng nhập lại để tiếp tục sử dụng ứng dụng.") },
-            dismissButton = {
-                TextButton(
-                    onClick = { showConfirmDialog = false },
-                    modifier = Modifier.defaultMinSize(minHeight = Dimens.minTouchTarget),
-                ) {
-                    Text("Huỷ")
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showConfirmDialog = false
-                        onConfirmLogout()
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = Dimens.minTouchTarget),
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                ) {
-                    Text("Đăng xuất")
-                }
-            },
+            onDismiss = { showConfirmDialog = false },
+            destructive = true,
         )
     }
 }
 
 @Composable
-private fun ProfileContent(
-    profile: CurrentUserProfile,
-    username: String,
+private fun ProfileBody(
     isLoggingOut: Boolean,
     deviceModel: String,
     appVersion: String,
@@ -235,70 +196,134 @@ private fun ProfileContent(
     lastSyncedAt: Instant?,
     isOnline: Boolean,
     onLogoutClick: () -> Unit,
+    header: @Composable () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
-        Text(text = profile.fullName, style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = "@$username",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        AccountSection(profile)
-        ReadinessSection(
+        header()
+        StatusSection(
+            isOnline = isOnline,
             pendingSyncCount = pendingSyncCount,
             errorSyncCount = errorSyncCount,
             lastSyncedAt = lastSyncedAt,
-            isOnline = isOnline,
         )
-        LogoutSection(isLoggingOut = isLoggingOut, pendingSyncCount = pendingSyncCount, onClick = onLogoutClick)
-        FooterInfo(deviceModel = deviceModel, appVersion = appVersion)
+        LogoutSection(isLoggingOut = isLoggingOut, pendingSyncCount = pendingSyncCount, onLogoutClick = onLogoutClick)
+        Text(
+            text = "$deviceModel · Phiên bản $appVersion",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ProfileCard(
+    profile: CurrentUserProfile,
+    username: String,
+) {
+    LuxCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                Box(
+                    modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = initialsOf(profile.fullName.ifBlank { username }),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = profile.fullName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "@$username · Tổ khảo sát/sửa chữa",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(
+                    text = "Email",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = Spacing.md),
+                )
+                Text(text = profile.email, style = MaterialTheme.typography.bodyLarge)
+            }
+            Text(
+                text = "Địa bàn phụ trách · ${profile.communeIds.size}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+            ) {
+                profile.communeIds.forEach { communeId ->
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Text(
+                            text = communeId,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun AccountSection(profile: CurrentUserProfile) {
+private fun StatusSection(
+    isOnline: Boolean,
+    pendingSyncCount: Int,
+    errorSyncCount: Int,
+    lastSyncedAt: Instant?,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Text(text = "TÀI KHOẢN", style = OverlineTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column(modifier = Modifier.fillMaxWidth().cardOutline()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Email,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        LuxSectionHeader(title = "Tình trạng làm việc")
+        LuxCard {
+            Column {
+                StatusRow(
+                    icon = if (isOnline) Icons.Filled.Wifi else Icons.Filled.WifiOff,
+                    label = "Kết nối mạng",
+                    value = if (isOnline) "Trực tuyến" else "Ngoại tuyến",
+                    valueColor = if (isOnline) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
                 )
-                Column {
-                    Text(
-                        text = "Email",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(text = profile.email, style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Place,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                StatusRow(
+                    icon = Icons.Filled.Sync,
+                    label = "Đồng bộ dữ liệu",
+                    value = profileSyncSummary(pendingSyncCount, errorSyncCount, lastSyncedAt),
+                    valueColor =
+                        if (errorSyncCount > 0) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(
-                        text = "Địa bàn phụ trách · ${profile.communeIds.size}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    CommuneChips(communeIds = profile.communeIds)
-                }
             }
         }
     }
@@ -306,154 +331,26 @@ private fun AccountSection(profile: CurrentUserProfile) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CommuneChips(communeIds: List<String>) {
-    val colors = SyncStatus.QUEUED_ONLINE.badgeColors()
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        communeIds.forEach { communeId ->
-            Box(
-                modifier =
-                    Modifier
-                        .background(colors.background, RoundedCornerShape(Radius.badge))
-                        .padding(horizontal = Spacing.sm, vertical = 4.dp),
-            ) {
-                Text(text = communeId, style = MaterialTheme.typography.labelLarge, color = colors.text)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ReadinessSection(
-    pendingSyncCount: Int,
-    errorSyncCount: Int,
-    lastSyncedAt: Instant?,
-    isOnline: Boolean,
+private fun StatusRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    valueColor: Color,
 ) {
-    val issues =
-        (if (!isOnline) 1 else 0) +
-            (if (errorSyncCount > 0) 1 else 0)
-
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget).padding(vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(end = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "SẴN SÀNG LÀM VIỆC",
-                style = OverlineTextStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val readyColor = if (issues == 0) Success600 else AttentionColor
-            val readyLabel = if (issues == 0) "Sẵn sàng" else "$issues mục cần kiểm tra"
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Box(modifier = Modifier.size(8.dp).background(readyColor, CircleShape))
-                Text(text = readyLabel, style = MaterialTheme.typography.labelMedium, color = readyColor)
-            }
-        }
-        Column(modifier = Modifier.fillMaxWidth().cardOutline()) {
-            NetworkRow(isOnline = isOnline)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            SyncRow(pendingSyncCount = pendingSyncCount, errorSyncCount = errorSyncCount, lastSyncedAt = lastSyncedAt)
-        }
-    }
-}
-
-@Composable
-private fun NetworkRow(isOnline: Boolean) {
-    val colors = if (isOnline) SyncStatus.DONE.badgeColors() else SyncStatus.QUEUED_OFFLINE.badgeColors()
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        IconChip(icon = if (isOnline) Icons.Filled.Wifi else Icons.Filled.WifiOff, colors = colors)
-        Text(text = "Kết nối mạng", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        StatusBadge(text = if (isOnline) "Trực tuyến" else "Ngoại tuyến", colors = colors)
-    }
-}
-
-@Composable
-private fun SyncRow(
-    pendingSyncCount: Int,
-    errorSyncCount: Int,
-    lastSyncedAt: Instant?,
-) {
-    val colors =
-        when {
-            errorSyncCount > 0 -> SyncStatus.FAILED.badgeColors()
-            pendingSyncCount > 0 -> SyncStatus.QUEUED_ONLINE.badgeColors()
-            else -> SyncStatus.DONE.badgeColors()
-        }
-    val icon =
-        when {
-            errorSyncCount > 0 -> Icons.Filled.ErrorOutline
-            pendingSyncCount > 0 -> Icons.Filled.Sync
-            else -> Icons.Filled.CloudDone
-        }
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            IconChip(icon = icon, colors = colors)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Đồng bộ dữ liệu", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = "Lần cuối: ${DateFormatUtils.formatInstant(lastSyncedAt)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = SyncDetailIndent),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            StatCell(label = "Chờ đồng bộ", value = pendingSyncCount, isError = false, modifier = Modifier.weight(1f))
-            StatCell(
-                label = "Đồng bộ lỗi",
-                value = errorSyncCount,
-                isError = errorSyncCount > 0,
-                modifier = Modifier.weight(1f),
-            )
+            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = label, style = MaterialTheme.typography.bodyLarge)
         }
-    }
-}
-
-@Composable
-private fun IconChip(
-    icon: ImageVector,
-    colors: BadgeColors,
-) {
-    Box(
-        modifier = Modifier.size(36.dp).background(colors.background, RoundedCornerShape(Radius.control)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(imageVector = icon, contentDescription = null, tint = colors.text, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Composable
-private fun StatCell(
-    label: String,
-    value: Int,
-    isError: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val colors =
-        if (isError) {
-            SyncStatus.FAILED.badgeColors()
-        } else {
-            BadgeColors(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    Column(modifier = modifier.background(colors.background, RoundedCornerShape(Radius.control)).padding(Spacing.sm)) {
-        Text(
-            text = value.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            color = if (isError) colors.text else MaterialTheme.colorScheme.onSurface,
-        )
-        Text(text = label, style = MaterialTheme.typography.labelSmall, color = colors.text)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, color = valueColor)
     }
 }
 
@@ -461,65 +358,31 @@ private fun StatCell(
 private fun LogoutSection(
     isLoggingOut: Boolean,
     pendingSyncCount: Int,
-    onClick: () -> Unit,
+    onLogoutClick: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        // Outlined (not filled) red: logout only ends the session on this device, so it should
-        // be easy to find but not look like the main action of the screen.
-        OutlinedButton(
-            onClick = onClick,
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        LuxDestructiveButton(
+            text = if (isLoggingOut) "Đang đăng xuất…" else "Đăng xuất",
+            onClick = onLogoutClick,
+            filled = false,
             enabled = !isLoggingOut,
-            modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = Dimens.minTouchTarget),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        ) {
-            if (isLoggingOut) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Icon(imageVector = Icons.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(Spacing.sm))
-                Text("Đăng xuất")
-            }
-        }
+            modifier = Modifier.fillMaxWidth(),
+        )
         if (pendingSyncCount > 0) {
             Text(
                 text = "Còn $pendingSyncCount mục chưa đồng bộ trên thiết bị này",
-                style = MaterialTheme.typography.labelMedium,
-                color = PendingCaptionColor,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
             )
         }
     }
 }
 
-@Composable
-private fun FooterInfo(
-    deviceModel: String,
-    appVersion: String,
-) {
-    Text(
-        text = "$deviceModel · Phiên bản $appVersion",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun Modifier.cardOutline(): Modifier =
-    this
-        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.card))
-        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.card))
-
-// "NB" from "Nguyễn Văn Bình" - first letter of the first word + first letter of the last word.
-// Falls back to the single token's own first letter (e.g. a bare username while loading/erroring).
 private fun initialsOf(name: String): String {
-    val tokens = name.trim().split(" ").filter { it.isNotBlank() }
+    val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
     return when {
-        tokens.size >= 2 -> "${tokens.first().first()}${tokens.last().first()}".uppercase()
-        tokens.size == 1 -> tokens.first().take(1).uppercase()
-        else -> "?"
+        words.isEmpty() -> "?"
+        words.size == 1 -> words.first().take(1).uppercase()
+        else -> (words.first().take(1) + words.last().take(1)).uppercase()
     }
 }

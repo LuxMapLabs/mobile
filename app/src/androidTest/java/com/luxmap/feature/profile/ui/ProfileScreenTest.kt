@@ -3,9 +3,9 @@ package com.luxmap.feature.profile.ui
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.profile.data.CurrentUserProfile
 import org.junit.Assert.assertEquals
@@ -58,16 +58,16 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun loading_state_shows_the_progress_indicator() {
+    fun loading_is_one_announced_region() {
         setContent(profileState = ProfileUiState.Loading)
-        composeRule.onNodeWithTag("profile_loading").assertExists()
+        composeRule.onNodeWithContentDescription("Đang tải thông tin cá nhân").assertExists()
     }
 
     @Test
     fun success_state_shows_the_full_name_username_and_email() {
         setContent()
         composeRule.onNodeWithText("Nguyễn Văn Bình").assertExists()
-        composeRule.onNodeWithText("@fe_thinh").assertExists()
+        composeRule.onNodeWithText("@fe_thinh", substring = true).assertExists()
         composeRule.onNodeWithText("binh.nv@luxmap.vn").assertExists()
     }
 
@@ -87,15 +87,13 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun all_ready_shows_san_sang_label() {
-        setContent(isOnline = true, errorSyncCount = 0)
-        composeRule.onNodeWithText("Sẵn sàng").assertExists()
-    }
-
-    @Test
-    fun offline_and_a_sync_error_shows_2_items_need_attention() {
-        setContent(isOnline = false, errorSyncCount = 1)
-        composeRule.onNodeWithText("2 mục cần kiểm tra").assertExists()
+    fun the_status_card_shows_network_and_a_real_sync_summary() {
+        setContent(isOnline = false, pendingSyncCount = 2, errorSyncCount = 1, lastSyncedAt = null)
+        composeRule.onNodeWithText("Tình trạng làm việc").assertExists()
+        composeRule.onNodeWithText("Ngoại tuyến").assertExists()
+        composeRule.onNodeWithText("Chờ 2 · Lỗi 1").assertExists()
+        composeRule.onNodeWithText("Sẵn sàng").assertDoesNotExist()
+        composeRule.onNodeWithText("mục cần kiểm tra", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -105,9 +103,9 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun shows_chua_cap_nhat_when_never_synced() {
-        setContent(lastSyncedAt = null)
-        composeRule.onNodeWithText("Chưa cập nhật", substring = true).assertExists()
+    fun never_synced_says_so() {
+        setContent(pendingSyncCount = 0, errorSyncCount = 0, lastSyncedAt = null)
+        composeRule.onNodeWithText("Chưa đồng bộ lần nào").assertExists()
     }
 
     @Test
@@ -129,16 +127,25 @@ class ProfileScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message() {
-        setContent(profileState = ProfileUiState.Error("network down"))
-        composeRule.onNodeWithText("network down").assertExists()
+    fun an_error_offers_retry_and_still_lets_the_engineer_sign_out() {
+        var retries = 0
+        setContent(
+            profileState = ProfileUiState.Error("java.net.UnknownHostException", isNetworkError = true),
+            onRetry = { retries++ },
+        )
+        composeRule.onNodeWithText("Không tải được thông tin cá nhân").assertExists()
+        composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Thử lại").performClick()
+        assertEquals(1, retries)
+        composeRule.onNodeWithText("Tình trạng làm việc").performScrollTo().assertExists()
+        composeRule.onNodeWithText("Đăng xuất").performScrollTo().assertExists()
     }
 
     @Test
     fun confirming_logout_still_invokes_onConfirmLogout() {
         var loggedOut = false
         setContent(onConfirmLogout = { loggedOut = true })
-        composeRule.onNodeWithText("Đăng xuất").performClick()
+        composeRule.onNodeWithText("Đăng xuất").performScrollTo().performClick()
         composeRule.onNodeWithText("Đăng xuất khỏi thiết bị này?").assertExists()
         composeRule.onAllNodesWithText("Đăng xuất")[1].performClick()
         assertTrue(loggedOut)
