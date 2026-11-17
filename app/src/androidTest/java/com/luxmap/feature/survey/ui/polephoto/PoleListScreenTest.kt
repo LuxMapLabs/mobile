@@ -1,7 +1,11 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -484,5 +488,38 @@ class PoleListScreenTest {
         composeRule.onNodeWithText("POLE-1").performClick()
         composeRule.onNodeWithText("Chọn từ thư viện").performClick()
         assertEquals(PolePhotoCaptureSource.GALLERY, capturedSource)
+    }
+
+    @Test
+    fun report_rows_are_buttons_and_a_captured_row_says_it_will_retake() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(),
+                                    pole(poleId = "POLE-2", position = 2, syncStatus = SyncStatus.QUEUED_ONLINE),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+
+        fun clickLabel(label: String) =
+            SemanticsMatcher("click label $label") { it.config.getOrNull(SemanticsActions.OnClick)?.label == label }
+        composeRule
+            .onNode(hasText("POLE-1", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(clickLabel("Chụp ảnh cột"))
+        composeRule
+            .onNode(hasText("POLE-2", substring = true) and hasClickAction())
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(clickLabel("Chụp lại cột"))
+        composeRule.onNodeWithTag("pole_retake_POLE-2", useUnmergedTree = true).assertExists()
     }
 }

@@ -22,11 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Lightbulb
@@ -58,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
@@ -441,7 +445,12 @@ private fun PoleRow(
         when (action) {
             is PoleRowAction.OpenAiResult ->
                 Modifier.clickable(onClickLabel = "Xem kết quả AI", role = Role.Button, onClick = onClick)
-            PoleRowAction.OpenReportSheet -> Modifier.clickable(onClickLabel = "Chụp ảnh cột", onClick = onClick)
+            PoleRowAction.OpenReportSheet ->
+                Modifier.clickable(
+                    onClickLabel = if (pole.syncStatus == null) "Chụp ảnh cột" else "Chụp lại cột",
+                    role = Role.Button,
+                    onClick = onClick,
+                )
             PoleRowAction.None -> Modifier
         }
     Row(
@@ -471,8 +480,8 @@ private fun PoleRow(
                     StatusBadge(text = label, colors = condition.badgeColors(), icon = icon)
                 }
                 poleProgressBadge(pole)?.let { progress ->
-                    val (status, label) = progress.badge()
-                    StatusBadge(text = label, colors = status.badgeColors(), icon = status.icon())
+                    val (colors, label, icon) = progress.badge()
+                    StatusBadge(text = label, colors = colors, icon = icon)
                 }
             }
         }
@@ -490,6 +499,13 @@ private fun PoleRow(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
+            action is PoleRowAction.OpenReportSheet ->
+                Icon(
+                    imageVector = Icons.Filled.Replay,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("pole_retake_${pole.poleId}"),
+                )
         }
     }
 }
@@ -501,17 +517,24 @@ private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
         PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "AI không kết luận", Icons.Filled.Help)
     }
 
-private fun PoleProgress.badge(): Pair<SyncStatus, String> =
-    when (this) {
-        PoleProgress.SYNC_FAILED -> SyncStatus.FAILED to "Đồng bộ lỗi"
-        PoleProgress.SYNC_CONFLICT -> SyncStatus.CONFLICT to "Xung đột"
-        PoleProgress.SYNCING -> SyncStatus.SYNCING to SyncStatus.SYNCING.label()
-        PoleProgress.QUEUED_OFFLINE -> SyncStatus.QUEUED_OFFLINE to SyncStatus.QUEUED_OFFLINE.label()
-        PoleProgress.QUEUED_ONLINE -> SyncStatus.QUEUED_ONLINE to SyncStatus.QUEUED_ONLINE.label()
-        PoleProgress.REVIEW_SAVED -> SyncStatus.QUEUED_ONLINE to "Đã xác nhận"
-        PoleProgress.AWAITING_DECISION -> SyncStatus.QUEUED_ONLINE to "Chờ duyệt"
-        PoleProgress.UPLOADED -> SyncStatus.DONE to "Đã tải lên"
+@Composable
+private fun PoleProgress.badge(): Triple<BadgeColors, String, ImageVector> {
+    @Composable
+    fun sync(
+        status: SyncStatus,
+        label: String = status.label(),
+    ) = Triple(status.badgeColors(), label, status.icon())
+    return when (this) {
+        PoleProgress.SYNC_FAILED -> sync(SyncStatus.FAILED, "Đồng bộ lỗi")
+        PoleProgress.SYNC_CONFLICT -> sync(SyncStatus.CONFLICT, "Xung đột")
+        PoleProgress.SYNCING -> sync(SyncStatus.SYNCING)
+        PoleProgress.QUEUED_OFFLINE -> sync(SyncStatus.QUEUED_OFFLINE)
+        PoleProgress.QUEUED_ONLINE -> sync(SyncStatus.QUEUED_ONLINE)
+        PoleProgress.REVIEW_SAVED -> Triple(LuxTheme.status.kind, "Đã xác nhận", Icons.Filled.EditNote)
+        PoleProgress.AWAITING_DECISION -> Triple(LuxTheme.status.kind, "Chờ duyệt", Icons.Filled.HourglassEmpty)
+        PoleProgress.UPLOADED -> sync(SyncStatus.DONE, "Đã tải lên")
     }
+}
 
 @Composable
 private fun PoleNumberAvatar(
