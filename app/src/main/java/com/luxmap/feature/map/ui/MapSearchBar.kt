@@ -32,6 +32,7 @@ fun MapSearchBar(
     onQueryChange: (String) -> Unit,
     onFilterClick: () -> Unit,
     hiddenStatusCount: Int = 0,
+    hiddenLayerCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -49,16 +50,21 @@ fun MapSearchBar(
             placeholder = { Text("Tìm theo mã cột hoặc tên tuyến") },
             leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
+                val hiddenParts =
+                    listOfNotNull(
+                        "$hiddenStatusCount trạng thái".takeIf { hiddenStatusCount > 0 },
+                        "$hiddenLayerCount lớp".takeIf { hiddenLayerCount > 0 },
+                    )
                 val description =
-                    if (hiddenStatusCount > 0) {
-                        "Lọc và lớp bản đồ. Đang lọc: ẩn $hiddenStatusCount trạng thái"
-                    } else {
+                    if (hiddenParts.isEmpty()) {
                         "Lọc và lớp bản đồ"
+                    } else {
+                        "Lọc và lớp bản đồ. Đang lọc: ẩn ${hiddenParts.joinToString(", ")}"
                     }
                 IconButton(onClick = onFilterClick) {
                     Box {
                         Icon(imageVector = Icons.Filled.Layers, contentDescription = description)
-                        if (hiddenStatusCount > 0) {
+                        if (hiddenParts.isNotEmpty()) {
                             Box(
                                 modifier =
                                     Modifier

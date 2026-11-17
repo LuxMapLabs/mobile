@@ -329,28 +329,34 @@ fun MapScreen(
                         }
                         map.addOnMapClickListener addOnMapClickListener@{ latLng ->
                             val screenPoint = map.projection.toScreenLocation(latLng)
+                            val clusterUnderFinger =
+                                map.queryRenderedFeatures(screenPoint, CLUSTER_CIRCLE_LAYER_ID).isNotEmpty()
                             val tappedPoleId =
-                                pickNearestFeature(
-                                    screenPoint.x,
-                                    screenPoint.y,
-                                    map
-                                        .queryRenderedFeatures(
-                                            tapSquare(
-                                                screenPoint.x,
-                                                screenPoint.y,
-                                                context.resources.displayMetrics.density,
-                                            ),
-                                            POLES_CIRCLE_LAYER_ID,
-                                        ).mapNotNull { feature ->
-                                            val id = feature.getStringProperty("pole_id") ?: return@mapNotNull null
-                                            val point = feature.geometry() as? Point ?: return@mapNotNull null
-                                            val screen =
-                                                map.projection.toScreenLocation(
-                                                    LatLng(point.latitude(), point.longitude()),
-                                                )
-                                            TapCandidate(id, screen.x, screen.y)
-                                        },
-                                )
+                                if (clusterUnderFinger) {
+                                    null
+                                } else {
+                                    pickNearestFeature(
+                                        screenPoint.x,
+                                        screenPoint.y,
+                                        map
+                                            .queryRenderedFeatures(
+                                                tapSquare(
+                                                    screenPoint.x,
+                                                    screenPoint.y,
+                                                    context.resources.displayMetrics.density,
+                                                ),
+                                                POLES_CIRCLE_LAYER_ID,
+                                            ).mapNotNull { feature ->
+                                                val id = feature.getStringProperty("pole_id") ?: return@mapNotNull null
+                                                val point = feature.geometry() as? Point ?: return@mapNotNull null
+                                                val screen =
+                                                    map.projection.toScreenLocation(
+                                                        LatLng(point.latitude(), point.longitude()),
+                                                    )
+                                                TapCandidate(id, screen.x, screen.y)
+                                            },
+                                    )
+                                }
                             val tappedPole =
                                 tappedPoleId?.let { id ->
                                     uiState.polesOrEmpty().firstOrNull { it.poleId == id }
@@ -529,6 +535,7 @@ fun MapScreen(
                     onQueryChange = viewModel::setSearchQuery,
                     onFilterClick = { showLayerFilterSheet = true },
                     hiddenStatusCount = AssetCondition.entries.size - statusFilter.size,
+                    hiddenLayerCount = listOf(showFixtures, showRoadSegments).count { !it },
                 )
                 if (searchQuery.isNotBlank()) {
                     MapSearchResultsList(
@@ -661,6 +668,7 @@ fun MapScreen(
                         text = (uiState as MapUiState.Error).message,
                         actionLabel = "Thử lại",
                         onAction = viewModel::retry,
+                        tone = LuxBannerTone.ERROR,
                     )
                 is MapUiState.Success -> Unit
             }
@@ -924,15 +932,7 @@ private fun buildPoleIconLayer(): SymbolLayer =
             ),
             PropertyFactory.iconSize(selectedIconSizeExpression(NO_SELECTION_SENTINEL)),
             PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
-            PropertyFactory.symbolSortKey(
-                Expression.match(
-                    Expression.get("fixture_status"),
-                    Expression.literal(0),
-                    Expression.stop("out", Expression.literal(3)),
-                    Expression.stop("dim", Expression.literal(2)),
-                    Expression.stop("normal", Expression.literal(1)),
-                ),
-            ),
+            PropertyFactory.symbolSortKey(poleSortKeyExpression(NO_SELECTION_SENTINEL)),
             PropertyFactory.iconAllowOverlap(true),
             PropertyFactory.iconIgnorePlacement(true),
         ).apply { setFilter(Expression.not(Expression.has("point_count"))) }
@@ -946,6 +946,19 @@ private fun buildPoleSelectedHaloLayer(): CircleLayer =
             PropertyFactory.circleStrokeOpacity(1f),
             PropertyFactory.circleStrokeColor(MapMarkerColors.SelectionVector.toArgb()),
         ).apply { setFilter(selectedPoleFilter(NO_SELECTION_SENTINEL)) }
+
+private fun poleSortKeyExpression(selectedPoleId: String): Expression =
+    Expression.match(
+        Expression.get("pole_id"),
+        Expression.match(
+            Expression.get("fixture_status"),
+            Expression.literal(0),
+            Expression.stop("out", Expression.literal(3)),
+            Expression.stop("dim", Expression.literal(2)),
+            Expression.stop("normal", Expression.literal(1)),
+        ),
+        Expression.stop(selectedPoleId, Expression.literal(4)),
+    )
 
 private fun selectedPoleFilter(selectedPoleId: String): Expression =
     Expression.eq(Expression.get("pole_id"), Expression.literal(selectedPoleId))
@@ -962,7 +975,10 @@ private fun updateSelectedPoleStyle(
     selectedPoleId: String?,
 ) {
     val id = selectedPoleId ?: NO_SELECTION_SENTINEL
-    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(PropertyFactory.iconSize(selectedIconSizeExpression(id)))
+    style.getLayer(POLES_CIRCLE_LAYER_ID)?.setProperties(
+        PropertyFactory.iconSize(selectedIconSizeExpression(id)),
+        PropertyFactory.symbolSortKey(poleSortKeyExpression(id)),
+    )
     // setFilter() is declared per-layer-subclass, not on the base Layer type style.getLayer()
     // returns — cast is needed even though we know which concrete type was added under this id.
     (style.getLayer(POLES_SELECTED_HALO_LAYER_ID) as? CircleLayer)?.setFilter(selectedPoleFilter(id))
@@ -1079,10 +1095,11 @@ private fun BoxScope.MessageOverlay(
     text: String,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    tone: LuxBannerTone = LuxBannerTone.INFO,
 ) {
     LuxBanner(
         message = text,
-        tone = LuxBannerTone.INFO,
+        tone = tone,
         modifier = Modifier.align(Alignment.TopCenter).padding(Spacing.lg).fillMaxWidth(),
         actionLabel = actionLabel,
         onAction = onAction,

@@ -147,4 +147,40 @@ class MapChromeTest {
         composeRule.onNode(hasText("Đèn mờ", substring = true) and hasClickAction()).assertIsNotSelected()
         composeRule.onNode(hasText("Chưa quét", substring = true) and hasClickAction()).assertIsNotSelected()
     }
+
+    @Test
+    fun the_filter_dot_also_counts_hidden_layers() {
+        composeRule.setContent {
+            LuxMapTheme {
+                MapSearchBar(
+                    query = "",
+                    onQueryChange = {},
+                    onFilterClick = {},
+                    hiddenStatusCount = 0,
+                    hiddenLayerCount = 1,
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Lọc và lớp bản đồ. Đang lọc: ẩn 1 lớp").assertExists()
+        composeRule.onNodeWithTag("map_filter_dot", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun the_locate_button_keeps_a_label_while_locating() {
+        composeRule.setContent { LuxMapTheme { LocateMeButton(isLocating = true, onClick = {}) } }
+        composeRule.onNodeWithContentDescription("Đang định vị vị trí hiện tại").assertExists()
+    }
+
+    @Test
+    fun status_filter_chips_carry_their_marker_colour_dot() {
+        composeRule.setContent {
+            LuxMapTheme { MapStatusFilterRow(selectedStatuses = emptySet(), onToggle = {}) }
+        }
+        MAP_STATUS_ORDER.forEach {
+            composeRule.onNodeWithTag(
+                "status_dot_${it.name}",
+                useUnmergedTree = true,
+            ).assertExists()
+        }
+    }
 }

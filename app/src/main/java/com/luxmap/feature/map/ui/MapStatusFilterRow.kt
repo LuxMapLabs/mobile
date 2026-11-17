@@ -1,10 +1,17 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
+import com.luxmap.core.map.markerFill
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxFilterChip
@@ -33,6 +40,15 @@ fun MapStatusFilterRow(
                 selected = condition in selectedStatuses,
                 onClick = { onToggle(condition) },
                 enabled = enabled,
+                leadingDot = {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(10.dp)
+                                .background(condition.markerFill(), CircleShape)
+                                .testTag("status_dot_${condition.name}"),
+                    )
+                },
             )
         }
     }

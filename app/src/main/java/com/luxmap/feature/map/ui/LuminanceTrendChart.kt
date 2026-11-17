@@ -21,9 +21,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.luxmap.core.map.MapMarkerColors
 import com.luxmap.core.map.markerFill
 import com.luxmap.core.theme.AssetCondition
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.feature.map.data.PoleDetail
 import com.luxmap.feature.map.data.PoleLuminancePoint
@@ -85,6 +85,7 @@ private fun LuminanceTrendChart(
     val latestPercent = values.last().toInt()
     val lineColor = status.trendColor()
     val gridLineColor = MaterialTheme.colorScheme.outlineVariant
+    val thresholdLineColor = LuxTheme.colors.warning
 
     // Baseline (100%) and threshold (80%) are always part of the scale, so max-min is at
     // least 20 even when every data point is identical or there's only 1 point — no need to
@@ -113,7 +114,7 @@ private fun LuminanceTrendChart(
             pathEffect = dashEffect,
         )
         drawLine(
-            color = MapMarkerColors.Dim,
+            color = thresholdLineColor,
             start = Offset(0f, yFor(THRESHOLD_PERCENT)),
             end = Offset(size.width, yFor(THRESHOLD_PERCENT)),
             strokeWidth = GRID_LINE_WIDTH.toPx(),

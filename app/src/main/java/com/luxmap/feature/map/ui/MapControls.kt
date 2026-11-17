@@ -10,6 +10,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -18,9 +20,18 @@ fun LocateMeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val locatingSemantics =
+        if (isLocating) {
+            Modifier.semantics { contentDescription = "Đang định vị vị trí hiện tại" }
+        } else {
+            Modifier
+        }
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier.size(56.dp),
+        modifier =
+            modifier
+                .size(56.dp)
+                .then(locatingSemantics),
         containerColor = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp),
