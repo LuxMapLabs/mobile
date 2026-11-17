@@ -26,18 +26,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -523,13 +523,6 @@ private fun PoleRow(
     action: PoleRowAction,
     onClick: () -> Unit,
 ) {
-    val condition =
-        when (pole.fixtureStatus) {
-            "normal" -> AssetCondition.NORMAL
-            "dim" -> AssetCondition.DIM
-            "out" -> AssetCondition.OUT
-            else -> AssetCondition.UNKNOWN
-        }
     val click =
         when (action) {
             is PoleRowAction.OpenAiResult ->
@@ -559,7 +552,10 @@ private fun PoleRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
-                StatusBadge(text = condition.label(), colors = condition.badgeColors(), icon = condition.rowIcon())
+                pole.aiVerdict?.let { verdict ->
+                    val (condition, label, icon) = verdict.badge()
+                    StatusBadge(text = label, colors = condition.badgeColors(), icon = icon)
+                }
                 poleProgressBadge(pole)?.let { progress ->
                     val (status, label) = progress.badge()
                     StatusBadge(text = label, colors = status.badgeColors(), icon = status.icon())
@@ -584,12 +580,11 @@ private fun PoleRow(
     }
 }
 
-private fun AssetCondition.rowIcon(): ImageVector =
+private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
     when (this) {
-        AssetCondition.NORMAL -> Icons.Filled.CheckCircle
-        AssetCondition.DIM -> Icons.Filled.Warning
-        AssetCondition.OUT -> Icons.Filled.Error
-        AssetCondition.UNKNOWN -> Icons.Filled.Help
+        PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Filled.Lightbulb)
+        PoleAiVerdict.OFF -> Triple(AssetCondition.OUT, "Đèn tắt", Icons.Outlined.Lightbulb)
+        PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "AI không kết luận", Icons.Filled.Help)
     }
 
 private fun PoleProgress.badge(): Pair<SyncStatus, String> =

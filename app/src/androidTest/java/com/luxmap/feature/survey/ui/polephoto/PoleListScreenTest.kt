@@ -46,19 +46,33 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun success_state_shows_each_pole_with_its_condition_badge() {
+    fun a_pole_shows_the_verdict_of_its_photo_not_the_system_status() {
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole(poleId = "POLE-1", fixtureStatus = "dim"))),
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(
+                                        poleId = "POLE-1",
+                                        fixtureStatus = "dim",
+                                        syncStatus = SyncStatus.DONE,
+                                        serverPhotoId = "S-1",
+                                    )
+                                        .copy(aiVerdict = PoleAiVerdict.OFF),
+                                    pole(poleId = "POLE-2", position = 2, fixtureStatus = "dim"),
+                                ),
+                        ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                 )
             }
         }
         composeRule.onNodeWithText("POLE-1").assertExists()
-        composeRule.onNodeWithText("Đèn mờ").assertExists()
+        composeRule.onNodeWithText("Đèn tắt").assertExists()
+        composeRule.onNodeWithText("Đèn mờ").assertDoesNotExist()
     }
 
     @Test
