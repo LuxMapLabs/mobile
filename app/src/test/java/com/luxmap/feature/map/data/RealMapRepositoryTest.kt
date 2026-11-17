@@ -7,6 +7,14 @@ import com.luxmap.feature.auth.data.CommuneBboxDto
 import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.auth.data.MapBoundsDto
 import com.luxmap.feature.auth.data.MapCenterDto
+import com.luxmap.feature.map.data.dto.CabinetFeatureCollectionDto
+import com.luxmap.feature.map.data.dto.CabinetFeatureDto
+import com.luxmap.feature.map.data.dto.CabinetPropertiesDto
+import com.luxmap.feature.map.data.dto.CabinetTopologyDto
+import com.luxmap.feature.map.data.dto.CommuneFeatureCollectionDto
+import com.luxmap.feature.map.data.dto.CommuneFeatureDto
+import com.luxmap.feature.map.data.dto.CommunePropertiesDto
+import com.luxmap.feature.map.data.dto.MultiPolygonGeometryDto
 import com.luxmap.feature.map.data.dto.PoleFeatureCollectionDto
 import com.luxmap.feature.map.data.dto.PoleFeatureDto
 import com.luxmap.feature.map.data.dto.PoleGeometryDto
@@ -53,6 +61,10 @@ class RealMapRepositoryTest {
         val mapApi = mockk<MapApi>()
         coEvery { mapApi.poles(bbox = "105.8,10.5,105.9,10.6") } returns polesResponse
         coEvery { mapApi.segments(bbox = "105.8,10.5,105.9,10.6") } returns segmentsResponse
+        coEvery {
+            mapApi.cabinets(bbox = "105.8,10.5,105.9,10.6")
+        } returns CabinetFeatureCollectionDto("FeatureCollection", emptyList())
+        coEvery { mapApi.communes() } returns CommuneFeatureCollectionDto(emptyList())
         return Triple(RealMapRepository(userApi, mapApi), userApi, mapApi)
     }
 
@@ -146,5 +158,92 @@ class RealMapRepositoryTest {
                 assertEquals("Không có kết nối mạng. Vui lòng kiểm tra lại.", error.message)
                 assertTrue(error is java.io.IOException)
             }
+        }
+
+    private fun cabinetDto() =
+        CabinetFeatureDto(
+            type = "Feature",
+            geometry = PoleGeometryDto(type = "Point", coordinates = listOf(105.85, 10.55)),
+            properties = CabinetPropertiesDto(cabinetId = "CAB-1", cabinetName = "Tủ chợ", communeId = "COM-001"),
+        )
+
+    private fun httpError(code: Int) =
+        HttpException(
+            Response.error<Any>(code, "{}".toResponseBody("application/json".toMediaType())),
+        )
+
+    @Test
+    fun `cabinets and communes are loaded with the same bbox`() =
+        runTest {
+            val (repository, _, mapApi) = repository()
+            coEvery { mapApi.cabinets(bbox = "105.8,10.5,105.9,10.6") } returns
+                CabinetFeatureCollectionDto("FeatureCollection", listOf(cabinetDto()))
+            coEvery { mapApi.communes() } returns
+                CommuneFeatureCollectionDto(
+                    listOf(
+                        CommuneFeatureDto(
+                            MultiPolygonGeometryDto(
+                                listOf(listOf(listOf(listOf(105.8, 10.5), listOf(105.9, 10.5), listOf(105.8, 10.5)))),
+                            ),
+                            CommunePropertiesDto("COM-001", "Phước Hiệp"),
+                        ),
+                    ),
+                )
+            repository.observeGisMapDataset().test {
+                val dataset = awaitItem()
+                assertEquals(listOf("CAB-1"), dataset.cabinets.map { it.cabinetId })
+                assertEquals(listOf("COM-001"), dataset.communes.map { it.communeId })
+                awaitComplete()
+            }
+        }
+
+    @Test
+    fun `a failing cabinets or communes call still shows the map`() =
+        runTest {
+            val (repository, _, mapApi) = repository()
+            coEvery { mapApi.cabinets(any()) } throws httpError(500)
+            coEvery { mapApi.communes() } throws httpError(403)
+            repository.observeGisMapDataset().test {
+                val dataset = awaitItem()
+                assertTrue(dataset.cabinets.isEmpty())
+                assertTrue(dataset.communes.isEmpty())
+                awaitComplete()
+            }
+        }
+
+    @Test
+    fun `topology errors are classified`() =
+        runTest {
+            val (repository, _, mapApi) = repository()
+            coEvery { mapApi.cabinetTopology("A") } throws httpError(404)
+            coEvery { mapApi.cabinetTopology("B") } throws httpError(409)
+            coEvery { mapApi.cabinetTopology("C") } throws java.io.IOException("offline")
+            coEvery { mapApi.cabinetTopology("D") } throws httpError(500)
+            assertTrue(
+                runCatching {
+                    repository.cabinetTopology(
+                        "A",
+                    )
+                }.exceptionOrNull() is CabinetTopologyException.NotInScope,
+            )
+            assertTrue(
+                runCatching {
+                    repository.cabinetTopology(
+                        "B",
+                    )
+                }.exceptionOrNull() is CabinetTopologyException.PolesWithoutSegment,
+            )
+            assertTrue(runCatching { repository.cabinetTopology("C") }.exceptionOrNull() is MapNetworkException)
+            assertTrue(
+                runCatching { repository.cabinetTopology("D") }.exceptionOrNull() is CabinetTopologyException.Failed,
+            )
+        }
+
+    @Test
+    fun `topology is mapped`() =
+        runTest {
+            val (repository, _, mapApi) = repository()
+            coEvery { mapApi.cabinetTopology("CAB-1") } returns CabinetTopologyDto(unlocatedPoleCount = 3)
+            assertEquals(3, repository.cabinetTopology("CAB-1").unlocatedPoleCount)
         }
 }

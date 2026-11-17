@@ -13,6 +13,8 @@ data class GisMapDataset(
     // MapScreen uses this to fit the initial camera to the whole commune instead of a fixed
     // zoom, since a commune's real area varies a lot more than one hardcoded zoom can cover.
     val bbox: GisMapBbox? = null,
+    val cabinets: List<CabinetMarker> = emptyList(),
+    val communes: List<CommuneOutline> = emptyList(),
 )
 
 data class GisMapBbox(
