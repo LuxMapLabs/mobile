@@ -2,7 +2,6 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -85,10 +84,6 @@ fun PolePhotoCaptureRoute(
     fun closePreview() {
         previewFile?.delete()
         onDone()
-    }
-
-    if (previewFile != null) {
-        BackHandler { closePreview() }
     }
 
     fun launchCamera() {

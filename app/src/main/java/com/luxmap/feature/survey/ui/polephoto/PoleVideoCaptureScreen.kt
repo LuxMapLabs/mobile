@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContract
@@ -130,10 +129,6 @@ fun PoleVideoCaptureRoute(
     fun closePreview() {
         previewFile?.delete()
         onDone()
-    }
-
-    if (previewFile != null) {
-        BackHandler { closePreview() }
     }
 
     fun launchCamera() {

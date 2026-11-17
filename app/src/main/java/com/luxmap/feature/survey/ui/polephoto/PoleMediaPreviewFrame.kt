@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +41,7 @@ fun PoleMediaPreviewFrame(
     warning: String? = null,
     media: @Composable BoxScope.() -> Unit,
 ) {
+    BackHandler { if (!isSaving) onClose() }
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
             modifier =

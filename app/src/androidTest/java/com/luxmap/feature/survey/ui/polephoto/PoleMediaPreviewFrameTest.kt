@@ -1,5 +1,6 @@
 package com.luxmap.feature.survey.ui.polephoto
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.test.espresso.Espresso
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.assertTouchTargetIsAtLeast
 import org.junit.Assert.assertEquals
@@ -68,5 +70,38 @@ class PoleMediaPreviewFrameTest {
         show(confirmEnabled = false, warning = "Clip quá ngắn")
         composeRule.onNodeWithText("Clip quá ngắn").assertExists()
         composeRule.onNode(hasText("Dùng ảnh này") and hasClickAction()).assertIsNotEnabled()
+    }
+
+    private fun showWithOuterBack(
+        isSaving: Boolean,
+        onClose: () -> Unit,
+        onOuterBack: () -> Unit,
+    ) {
+        composeRule.setContent {
+            BackHandler { onOuterBack() }
+            LuxMapTheme(forceDark = true) {
+                PoleMediaPreviewFrame("POLE-0047", isSaving, "Chụp lại", "Dùng ảnh này", onClose, {}, {}) {}
+            }
+        }
+    }
+
+    @Test
+    fun system_back_while_saving_does_nothing() {
+        var closed = 0
+        var outer = 0
+        showWithOuterBack(isSaving = true, onClose = { closed++ }, onOuterBack = { outer++ })
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        assertEquals(listOf(0, 0), listOf(closed, outer))
+    }
+
+    @Test
+    fun system_back_when_idle_closes_the_preview() {
+        var closed = 0
+        var outer = 0
+        showWithOuterBack(isSaving = false, onClose = { closed++ }, onOuterBack = { outer++ })
+        Espresso.pressBack()
+        composeRule.waitForIdle()
+        assertEquals(listOf(1, 0), listOf(closed, outer))
     }
 }
