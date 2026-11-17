@@ -96,6 +96,27 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun `returning to Home fetches a repair started from a notification`() =
+        runTest {
+            val repair = summaryItem("R1", "repair").copy(woStatus = "in_progress")
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returnsMany listOf(flowOf(homeData()), flowOf(homeData(repair)))
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(HomeUiState.Empty, awaitItem())
+                viewModel.onResume()
+                expectNoEvents()
+
+                viewModel.onResume()
+                assertEquals(HomeUiState.Loading, awaitItem())
+                val refreshed = awaitItem() as HomeUiState.Success
+                assertEquals(listOf(repair), refreshed.data.visibleTasks())
+            }
+        }
+
+    @Test
     fun `emits Empty when the API only returns survey and pole gps work orders`() =
         runTest {
             val repository = mockk<HomeRepository>()

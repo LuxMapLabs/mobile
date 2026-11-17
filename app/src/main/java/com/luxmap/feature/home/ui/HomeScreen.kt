@@ -34,11 +34,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
@@ -84,12 +84,11 @@ fun HomeRoute(
     // load - but skip the very first ON_RESUME, since init{} already covers that one and retrying
     // too would just flash the loading state right after it.
     val lifecycleOwner = LocalLifecycleOwner.current
-    var isFirstResume by remember { mutableStateOf(true) }
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    if (isFirstResume) isFirstResume = false else viewModel.retry()
+                    viewModel.onResume()
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)

@@ -1,15 +1,19 @@
 package com.luxmap.feature.auth.ui
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,12 +36,14 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -50,9 +57,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -67,13 +76,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.luxmap.BuildConfig
+import com.luxmap.R
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LoginColors
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
-import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.auth.data.LoginFailureReason
 
@@ -220,7 +228,7 @@ internal fun LoginContent(
                 onValueChange = onIdentifierChange,
                 label = { Text("Mã nhân viên hoặc số điện thoại", style = MaterialTheme.typography.labelMedium) },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = { Text("Ví dụ: NV-0125") },
+                placeholder = { Text("Nhập email hoặc tên người dùng") },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
@@ -356,11 +364,9 @@ internal fun LoginContent(
             Spacer(Modifier.height(Spacing.lg))
             OrDivider()
             Spacer(Modifier.height(Spacing.lg))
-            LuxSecondaryButton(
-                text = "Đăng nhập bằng Google",
+            GoogleSignInButton(
                 onClick = onGoogleSignIn,
                 enabled = !isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(Modifier.height(Spacing.lg))
@@ -377,15 +383,36 @@ internal fun LoginContent(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                text = "Phiên bản ${BuildConfig.VERSION_NAME}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
+    }
+}
+
+@Composable
+private fun GoogleSignInButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.minTouchTarget),
+        shape = CircleShape,
+        border = BorderStroke(1.dp, if (enabled) Color(0xFF747775) else MaterialTheme.colorScheme.outlineVariant),
+        colors =
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFF1F1F1F),
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        contentPadding = PaddingValues(horizontal = Spacing.md, vertical = Spacing.sm),
+    ) {
+        Image(
+            painter = painterResource(R.drawable.google_sign_in_mark),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text("Đăng nhập bằng Google", style = MaterialTheme.typography.labelMedium)
     }
 }
 
@@ -481,18 +508,12 @@ private fun RememberMeRow(
     ) {
         Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
         Spacer(Modifier.width(Spacing.sm))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Duy trì đăng nhập trên thiết bị này",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Lần mở sau vào thẳng, kể cả khi offline",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = "Duy trì đăng nhập trên thiết bị này",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

@@ -1,17 +1,18 @@
 package com.luxmap.core.ui.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,12 +25,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.luxmap.core.theme.LuxMapTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,17 +123,26 @@ private fun NotificationAction(
     onClick: () -> Unit,
 ) {
     val description = if (unreadCount > 0) "Thông báo, $unreadCount chưa đọc" else "Thông báo"
-    IconButton(onClick = onClick) {
-        BadgedBox(
-            badge = {
-                if (unreadCount > 0) {
-                    Badge(modifier = Modifier.testTag("notification_badge").atLeastAsWideAsTall()) {
-                        Text(if (unreadCount > 99) "99+" else unreadCount.toString())
-                    }
-                }
-            },
-        ) {
+    Box {
+        IconButton(onClick = onClick) {
             Icon(imageVector = Icons.Outlined.Notifications, contentDescription = description)
+        }
+        if (unreadCount > 0) {
+            Badge(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 2.dp, end = 1.dp)
+                        .testTag("notification_badge")
+                        .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
+                        .clearAndSetSemantics {},
+            ) {
+                Text(
+                    text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 10.sp, lineHeight = 12.sp),
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
@@ -151,11 +162,3 @@ private fun LuxTopBarsPreview() {
         }
     }
 }
-
-private fun Modifier.atLeastAsWideAsTall(): Modifier =
-    layout { measurable, constraints ->
-        val height = measurable.minIntrinsicHeight(constraints.maxWidth)
-        val minWidth = height.coerceIn(constraints.minWidth, constraints.maxWidth)
-        val placeable = measurable.measure(constraints.copy(minWidth = minWidth))
-        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-    }

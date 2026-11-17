@@ -40,6 +40,7 @@ class HomeViewModel
             )
 
         private var loadJob: Job? = null
+        private var hasResumed = false
 
         init {
             load()
@@ -47,6 +48,11 @@ class HomeViewModel
 
         fun retry() {
             load()
+        }
+
+        fun onResume() {
+            if (hasResumed) load()
+            hasResumed = true
         }
 
         private fun load() {

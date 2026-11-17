@@ -67,6 +67,18 @@ private fun repairDetail(
     faults = faults,
 )
 
+private fun inspectionPhoto(workOrderId: String) =
+    LocalWorkOrderEvidenceEntity(
+        clientOpId = "inspection-photo",
+        workOrderId = workOrderId,
+        kind = "observation",
+        filePath = "/data/inspection.jpg",
+        capturedAt = Instant.parse("2026-10-06T10:00:00Z"),
+        lat = 10.0,
+        lng = 106.0,
+        uploadStatus = "draft",
+    )
+
 private fun inspectionDetail(faults: List<WorkOrderFaultDetail>) =
     repairDetail(allowedActions = listOf("complete"), faults = faults).copy(taskKind = "inspection")
 
@@ -424,7 +436,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `an inspection with no linked faults only needs the note, and sends fault_outcomes as null`() =
+    fun `an inspection without a photo cannot submit even with a valid note`() =
         runTest {
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             val vm =
@@ -435,21 +447,13 @@ class WorkOrderDetailViewModelTest {
                 awaitItem()
                 vm.onReportNoteChanged("Không phát hiện sự cố nào")
                 val withNote = awaitItem() as WorkOrderDetailUiState.Success
-                assertTrue(withNote.canSubmit())
+                assertFalse(withNote.canSubmit())
 
                 vm.submit()
                 dispatcher.scheduler.advanceUntilIdle()
                 cancelAndIgnoreRemainingEvents()
             }
-            coVerify {
-                completionRepository.submitCompletion(
-                    workOrderId = WORK_ORDER_ID,
-                    taskKind = "inspection",
-                    reportNote = "Không phát hiện sự cố nào",
-                    materialsUsed = null,
-                    faultOutcomes = null,
-                )
-            }
+            coVerify(exactly = 0) { completionRepository.submitCompletion(any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -458,7 +462,11 @@ class WorkOrderDetailViewModelTest {
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             val faults = listOf(fault("FAULT-1"), fault("FAULT-2"))
             val vm =
-                viewModel(detail = inspectionDetail(faults), completionRepository = completionRepository)
+                viewModel(
+                    detail = inspectionDetail(faults),
+                    evidence = inspectionPhoto(WORK_ORDER_ID),
+                    completionRepository = completionRepository,
+                )
 
             vm.uiState.test {
                 awaitItem()
@@ -501,6 +509,7 @@ class WorkOrderDetailViewModelTest {
             val vm =
                 viewModel(
                     detail = inspectionDetail(emptyList()),
+                    evidence = inspectionPhoto(WORK_ORDER_ID),
                     completionRepository = completionRepository,
                     isOnline = false,
                 )
