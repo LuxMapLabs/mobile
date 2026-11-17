@@ -13,6 +13,7 @@ import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.profile.data.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,11 +43,11 @@ class ProfileViewModel
         private val _profileState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
         val profileState: StateFlow<ProfileUiState> = _profileState.asStateFlow()
 
+        private var loadJob: Job? = null
+
         init {
             loadProfile()
         }
-
-        private var loadJob: Job? = null
 
         fun retry() {
             _profileState.value = ProfileUiState.Loading
@@ -57,8 +58,10 @@ class ProfileViewModel
             loadJob?.cancel()
             loadJob =
                 viewModelScope.launch {
+                    val result = profileRepository.fetchCurrentUser()
+                    ensureActive()
                     _profileState.value =
-                        profileRepository.fetchCurrentUser().fold(
+                        result.fold(
                             onSuccess = { ProfileUiState.Success(it) },
                             onFailure = {
                                 ProfileUiState.Error(

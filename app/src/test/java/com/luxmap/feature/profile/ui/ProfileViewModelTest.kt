@@ -9,6 +9,7 @@ import com.luxmap.feature.profile.data.ProfileRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -135,6 +136,35 @@ class ProfileViewModelTest {
                 vm.retry()
                 assertEquals(ProfileUiState.Loading, awaitItem())
                 assertEquals(ProfileUiState.Success(SAMPLE_PROFILE), awaitItem())
+            }
+        }
+
+    @Test
+    fun `a retry while a load is running never flashes an error from the cancelled load`() =
+        runTest {
+            val firstCall = CompletableDeferred<CurrentUserProfile>()
+            var calls = 0
+            val authRepository = mockk<AuthRepository>()
+            every { authRepository.observeUsername() } returns flowOf("fe_thinh")
+            val profileRepository = mockk<ProfileRepository>()
+            coEvery { profileRepository.fetchCurrentUser() } coAnswers {
+                calls++
+                if (calls == 1) runCatching { firstCall.await() } else Result.success(SAMPLE_PROFILE)
+            }
+            val syncQueueManager = mockk<SyncQueueManager>()
+            every { syncQueueManager.pendingCount } returns flowOf(0)
+            every { syncQueueManager.errorCount } returns flowOf(0)
+            every { syncQueueManager.lastSyncedAt } returns flowOf(null)
+            val connectivityObserver = mockk<ConnectivityObserver>()
+            every { connectivityObserver.isOnline } returns flowOf(true)
+            val vm = ProfileViewModel(authRepository, profileRepository, syncQueueManager, connectivityObserver)
+            vm.profileState.test {
+                assertEquals(ProfileUiState.Loading, awaitItem())
+                testScheduler.runCurrent()
+                vm.retry()
+                assertEquals(ProfileUiState.Success(SAMPLE_PROFILE), awaitItem())
+                testScheduler.advanceUntilIdle()
+                expectNoEvents()
             }
         }
 }
