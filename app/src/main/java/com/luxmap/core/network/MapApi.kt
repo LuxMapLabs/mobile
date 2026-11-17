@@ -1,5 +1,8 @@
 package com.luxmap.core.network
 
+import com.luxmap.feature.map.data.dto.CabinetFeatureCollectionDto
+import com.luxmap.feature.map.data.dto.CabinetTopologyDto
+import com.luxmap.feature.map.data.dto.CommuneFeatureCollectionDto
 import com.luxmap.feature.map.data.dto.PoleDetailDto
 import com.luxmap.feature.map.data.dto.PoleFeatureCollectionDto
 import com.luxmap.feature.map.data.dto.RoadSegmentFeatureCollectionDto
@@ -26,4 +29,17 @@ interface MapApi {
     suspend fun poleDetail(
         @Path("pole_id") poleId: String,
     ): PoleDetailDto
+
+    @GET("api/v1/map/cabinets")
+    suspend fun cabinets(
+        @Query("bbox") bbox: String,
+    ): CabinetFeatureCollectionDto
+
+    @GET("api/v1/map/cabinets/{cabinet_id}/topology")
+    suspend fun cabinetTopology(
+        @Path("cabinet_id") cabinetId: String,
+    ): CabinetTopologyDto
+
+    @GET("api/v1/map/communes")
+    suspend fun communes(): CommuneFeatureCollectionDto
 }
