@@ -103,7 +103,7 @@ import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Point
 
-// Center coordinate and bbox of mock-poles.geojson (HCMC-area mock, 3 segments).
+// Fallback camera used until the commune bounds arrive.
 private val MOCK_AREA_CENTER = LatLng(10.971, 106.497)
 private const val MOCK_AREA_ZOOM = 15.0
 
@@ -119,7 +119,7 @@ private const val POLES_IOT_BADGE_LAYER_ID = "poles-iot-badge-layer"
 private const val CLUSTER_CIRCLE_LAYER_ID = "poles-cluster-circle-layer"
 private const val CLUSTER_COUNT_LAYER_ID = "poles-cluster-count-layer"
 
-// No real pole_id is ever empty (see mock-poles.geojson / Contract v1.1) — used as the selected
+// No real pole_id is ever empty (Contract v1.1) — used as the selected
 // halo layer's filter value when nothing is selected, so it matches zero features.
 private const val NO_SELECTION_SENTINEL = ""
 
@@ -859,7 +859,7 @@ private fun buildRoadSegmentsLineLayer(): LineLayer =
 // Toggling a SymbolLayer's visibility property off then back on does not repaint it on a real
 // device (confirmed FM-37 field test: the layer's own visibility property reads back "visible"
 // correctly, but the icons never reappear) — removing and re-adding the layer instead reliably redraws it. Sources are
-// never removed/re-added here: only FakeMapRepository/RealMapRepository emit new GeoJSON, and
+// never removed/re-added here: only RealMapRepository emits new GeoJSON, and
 // re-adding a GeoJsonSource with the same id would throw.
 private fun applyLayerVisibility(
     style: Style,

@@ -3,7 +3,7 @@ package com.luxmap.feature.map.data.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// Đúng tên field trong mock-segments.geojson (đồng bộ schema với luxmap-web/src/data/mock-segments.geo.json)
+// Đúng tên field theo luxmap_backend (đồng bộ schema với luxmap-web/src/data/mock-segments.geo.json)
 // — không tự đặt tên khác.
 @Serializable
 data class RoadSegmentFeatureCollectionDto(

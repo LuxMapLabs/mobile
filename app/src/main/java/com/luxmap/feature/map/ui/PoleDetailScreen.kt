@@ -493,9 +493,6 @@ private fun FrameThumbnail(frame: PoleDetailFrame) {
 private val FRAME_THUMBNAIL_SIZE = 96.dp
 private val FAULT_ICON_SIZE = 36.dp
 
-// 3 variants match the 3 real mock-pole-detail-POLE-*.json files 1:1 (same poleId, values,
-// history) so these previews show exactly what the app renders for those poles on-device.
-
 private fun sampleDetailDim() =
     PoleDetail(
         poleId = "POLE-0047",
