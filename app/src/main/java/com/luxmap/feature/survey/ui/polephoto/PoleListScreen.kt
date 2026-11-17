@@ -1,8 +1,6 @@
 package com.luxmap.feature.survey.ui.polephoto
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,32 +17,26 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -59,19 +50,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.AssetCondition
 import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.LabelTextStyle
-import com.luxmap.core.theme.Radius
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
 import com.luxmap.core.theme.badgeColors
@@ -81,8 +69,13 @@ import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorKind
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSectionHeader
-import com.luxmap.core.ui.components.MessageState
+import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.TopSlideToast
@@ -177,7 +170,16 @@ fun PoleListScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             Box(Modifier.fillMaxSize()) {
                 when (state) {
-                    is PoleListUiState.Loading -> PoleListLoadingSkeleton()
+                    is PoleListUiState.Loading ->
+                        LuxLoadingRegion(
+                            description = "Đang tải danh sách cột",
+                            modifier = Modifier.padding(Spacing.lg),
+                        ) {
+                            LuxSkeleton(Modifier.fillMaxWidth().height(24.dp), MaterialTheme.shapes.small)
+                            repeat(5) {
+                                LuxSkeleton(Modifier.fillMaxWidth().height(64.dp), MaterialTheme.shapes.medium)
+                            }
+                        }
 
                     is PoleListUiState.Success -> {
                         val nextIndex = state.poles.indexOfFirst { it.syncStatus == null }
@@ -229,21 +231,22 @@ fun PoleListScreen(
                     }
 
                     is PoleListUiState.Empty ->
-                        MessageState(
-                            icon = Icons.Filled.EventAvailable,
-                            iconColors = SyncStatus.DONE.badgeColors(),
+                        LuxEmptyState(
                             title = "Tuyến này chưa có cột đèn nào",
-                            subtitle = "Liên hệ Kỹ sư bảo trì nếu bạn cho rằng đây là nhầm lẫn.",
-                            action = {},
+                            message = "Liên hệ Kỹ sư bảo trì nếu bạn cho rằng đây là nhầm lẫn.",
                         )
 
                     is PoleListUiState.Error ->
-                        MessageState(
-                            icon = Icons.Filled.ErrorOutline,
-                            iconColors = SyncStatus.FAILED.badgeColors(),
+                        LuxErrorState(
+                            onRetry = onRetry,
+                            kind = if (state.isNetworkError) LuxErrorKind.NETWORK else LuxErrorKind.GENERIC,
                             title = "Không tải được danh sách cột",
-                            subtitle = state.message,
-                            action = { PrimaryButton(text = "Thử lại", onClick = onRetry) },
+                            message =
+                                if (state.isNetworkError) {
+                                    "Kiểm tra kết nối rồi thử lại."
+                                } else {
+                                    "Vui lòng thử lại sau ít phút."
+                                },
                         )
                 }
             }
@@ -291,10 +294,6 @@ fun PoleListScreen(
     }
 }
 
-// Mock's "Bao loi cot" sheet, trimmed to just the method choice - the mock's multi-file picker
-// (up to 5 photos/videos staged before one combined submit) does not match how upload actually
-// works today, where POST .../pole-photos and POST .../pole-videos each take exactly 1 file per
-// call (see contract-drift.md).
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportMethodSheet(
@@ -306,52 +305,26 @@ private fun ReportMethodSheet(
     onChooseVideoGallery: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.lg)) {
+            Column(
+                modifier = Modifier.padding(horizontal = Spacing.lg).padding(bottom = Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
+            ) {
+                Text(text = "Báo lỗi cột", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "Báo lỗi cột",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = poleId,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(text = poleId, style = MaterialTheme.typography.titleLarge)
             }
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    ReportMethodOption(
-                        icon = Icons.Filled.PhotoCamera,
-                        label = "Chụp ảnh",
-                        enabled = true,
-                        onClick = onChoosePhoto,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ReportMethodOption(
-                        icon = Icons.Filled.PhotoLibrary,
-                        label = "Chọn từ thư viện",
-                        enabled = true,
-                        onClick = onChooseGallery,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    ReportMethodOption(
-                        icon = Icons.Filled.Videocam,
-                        label = "Quay video",
-                        enabled = true,
-                        onClick = onChooseVideo,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ReportMethodOption(
-                        icon = Icons.Filled.VideoLibrary,
-                        label = "Video từ thư viện",
-                        enabled = true,
-                        onClick = onChooseVideoGallery,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+            ReportMethodOption(icon = Icons.Filled.PhotoCamera, label = "Chụp ảnh", onClick = onChoosePhoto)
+            ReportMethodOption(icon = Icons.Filled.PhotoLibrary, label = "Chọn từ thư viện", onClick = onChooseGallery)
+            ReportMethodOption(icon = Icons.Filled.Videocam, label = "Quay video", onClick = onChooseVideo)
+            ReportMethodOption(
+                icon = Icons.Filled.VideoLibrary,
+                label = "Video từ thư viện",
+                onClick = onChooseVideoGallery,
+            )
         }
     }
 }
@@ -360,96 +333,60 @@ private fun ReportMethodSheet(
 private fun ReportMethodOption(
     icon: ImageVector,
     label: String,
-    enabled: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    val contentColor =
-        if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
+    Row(
         modifier =
-            modifier
-                // Fixed, not just a minimum - "Chọn từ thư viện" wraps to 2 lines at this column
-                // width while the other 2 labels fit on 1, so a min-height let the 3 options sit
-                // at different heights in the same row (found on a real device, 2026-11-10).
-                .height(96.dp)
-                .clickable(enabled = enabled, onClick = onClick)
-                .border(
-                    1.dp,
-                    if (enabled) MaterialTheme.colorScheme.outlineVariant else MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(Radius.control),
-                )
-                .padding(Spacing.md),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = Spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = contentColor)
-        Spacer(Modifier.height(Spacing.xs))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = label,
-                color = contentColor,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-            )
-            if (!enabled) {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Icon(
+            imageVector = Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
-// "Còn lại N cột chưa chụp" + an outlined "Hoàn tất" CTA, matching the design doc's horizontal
-// bottom bar - not the shared BottomActionBar component (that one stacks a centered hint above a
-// full-width filled button, a different layout other screens like F03 still rely on; bespoke here
-// instead of changing that shared component for every caller).
 @Composable
 private fun PoleListBottomBar(
     left: Int,
     isCompleted: Boolean,
     onTapComplete: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg)
-                    .padding(top = Spacing.md, bottom = Spacing.lg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Còn lại", style = LabelTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(text = "$left cột chưa chụp", style = MaterialTheme.typography.titleMedium)
-            }
-            OutlinedButton(
-                onClick = onTapComplete,
-                enabled = !isCompleted,
-                modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-                // colorScheme.primary, not a fixed Navy700 - this screen has no theme override
-                // (unlike SurveyHubScreen), so primary already flips Navy700/Green400 with the
-                // theme and stays readable against this bar's own white/dark surfaceColor.
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+    Surface(color = MaterialTheme.colorScheme.surface) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding()) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             ) {
-                Icon(imageVector = Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(Spacing.sm))
-                Text(text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất")
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Còn lại",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(text = "$left cột chưa chụp", style = MaterialTheme.typography.titleMedium)
+                }
+                PrimaryButton(
+                    text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất",
+                    onClick = onTapComplete,
+                    enabled = !isCompleted,
+                )
             }
         }
     }
 }
 
-// Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CompleteSurveyConfirmSheet(
@@ -466,16 +403,12 @@ private fun CompleteSurveyConfirmSheet(
         ) {
             Box(
                 modifier =
-                    Modifier
-                        .size(56.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.control)),
+                    Modifier.size(
+                        56.dp,
+                    ).background(LuxTheme.colors.successContainer, MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                Icon(imageVector = Icons.Filled.Check, contentDescription = null, tint = LuxTheme.colors.success)
             }
             Text(text = "Hoàn tất khảo sát tuyến?", style = MaterialTheme.typography.titleLarge)
             Text(
@@ -484,36 +417,17 @@ private fun CompleteSurveyConfirmSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = Dimens.minTouchTarget),
-                    contentPadding = PaddingValues(horizontal = Spacing.sm),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
-                ) {
-                    Text("Kiểm tra lại", maxLines = 1)
-                }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                LuxSecondaryButton(text = "Kiểm tra lại", onClick = onDismiss, modifier = Modifier.weight(1f))
                 PrimaryButton(
                     text = "Hoàn tất",
                     onClick = onConfirm,
-                    modifier = Modifier.weight(1.4f).testTag("confirm_survey_complete"),
+                    modifier = Modifier.weight(1f).testTag("confirm_survey_complete"),
                 )
             }
         }
     }
 }
-
-// Shared by the poles card and the loading skeleton's 2 placeholder blocks below - pulled out
-// because the chain is too long to fit on one line once nested inside a LazyColumn item.
-@Composable
-private fun Modifier.cardOutline(): Modifier =
-    this
-        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(Radius.block))
-        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.block))
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -618,60 +532,4 @@ private fun PoleNumberAvatar(
     ) {
         Text(text = position?.toString() ?: "–", style = MaterialTheme.typography.labelLarge, color = textColor)
     }
-}
-
-// Shaped like the real content below it (a blank summary-block placeholder + a bordered card of
-// pole-row-shaped skeletons) instead of a spinner, matching the design doc's loading mock and the
-// same pattern SurveyHubScreen/HomeScreen already use for their own loading states.
-@Composable
-private fun PoleListLoadingSkeleton() {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(modifier = Modifier.fillMaxWidth().height(132.dp).cardOutline())
-        Column(
-            modifier = Modifier.fillMaxWidth().cardOutline(),
-        ) {
-            repeat(4) { index ->
-                if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                PoleRowSkeleton()
-            }
-        }
-    }
-}
-
-@Composable
-private fun PoleRowSkeleton() {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(Spacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Radius.chip)),
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SkeletonBar(widthFraction = 0.5f, height = 12.dp, color = MaterialTheme.colorScheme.outlineVariant)
-            SkeletonBar(widthFraction = 0.3f, height = 10.dp, color = MaterialTheme.colorScheme.surfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SkeletonBar(
-    widthFraction: Float,
-    height: Dp,
-    color: Color,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth(widthFraction)
-                .height(height)
-                .background(color, RoundedCornerShape(Dimens.radiusSmall)),
-    )
 }

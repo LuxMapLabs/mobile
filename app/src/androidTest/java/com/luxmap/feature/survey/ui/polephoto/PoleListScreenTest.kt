@@ -387,22 +387,39 @@ class PoleListScreenTest {
     }
 
     @Test
-    fun error_state_shows_the_message_and_retry_calls_onRetry() {
-        var retried = false
+    fun a_network_error_uses_screen_copy_and_retries() {
+        var retries = 0
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Error("network down"),
+                    state = PoleListUiState.Error("java.net.UnknownHostException", isNetworkError = true),
                     onCapturePole = { _, _ -> },
                     onBack = {},
-                    onRetry = { retried = true },
+                    onRetry = { retries++ },
                 )
             }
         }
-        composeRule.onNodeWithText("network down").assertExists()
+        composeRule.onNodeWithText("Không tải được danh sách cột").assertExists()
+        composeRule.onNodeWithText("Kiểm tra kết nối rồi thử lại.").assertExists()
+        composeRule.onNodeWithText("UnknownHostException", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Thử lại").performClick()
-        assertEquals(true, retried)
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun loading_is_one_announced_region() {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Loading,
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription("Đang tải danh sách cột").assertExists()
     }
 
     @Test
