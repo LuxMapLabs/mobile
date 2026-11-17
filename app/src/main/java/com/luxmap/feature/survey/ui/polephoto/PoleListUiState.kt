@@ -35,7 +35,7 @@ sealed interface PoleListUiState {
 
     data object Empty : PoleListUiState
 
-    data class Error(val message: String) : PoleListUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : PoleListUiState
 }
 
 // State for the on-demand "Xem kết quả AI" bottom sheet - separate from PoleListUiState
@@ -83,5 +83,5 @@ sealed interface PolePhotoResultUiState {
     // instead, since the Field Engineer must still be able to review it (business rule D-2).
     data object Empty : PolePhotoResultUiState
 
-    data class Error(val message: String) : PolePhotoResultUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : PolePhotoResultUiState
 }

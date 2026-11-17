@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -76,7 +77,10 @@ class PoleListViewModel
                     },
                     onFailure = { e ->
                         _aiResultState.value =
-                            cached ?: PolePhotoResultUiState.Error(e.message ?: "Không tải được kết quả AI")
+                            cached ?: PolePhotoResultUiState.Error(
+                                message = e.message ?: "Không tải được kết quả AI",
+                                isNetworkError = e is IOException,
+                            )
                     },
                 )
             }
@@ -215,11 +219,15 @@ class PoleListViewModel
                                 isCompleted = completion != null,
                             )
                         }
-                            .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi") }
+                            .catch { e -> _uiState.value = PoleListUiState.Error(e.message ?: "Lỗi", e is IOException) }
                             .collect { _uiState.value = it }
                     },
                     onFailure = { e ->
-                        _uiState.value = PoleListUiState.Error(e.message ?: "Không tải được danh sách cột")
+                        _uiState.value =
+                            PoleListUiState.Error(
+                                message = e.message ?: "Không tải được danh sách cột",
+                                isNetworkError = e is IOException,
+                            )
                     },
                 )
             }

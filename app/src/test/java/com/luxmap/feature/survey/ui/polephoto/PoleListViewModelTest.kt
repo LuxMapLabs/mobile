@@ -360,6 +360,7 @@ class PoleListViewModelTest {
                 assertEquals(PoleListUiState.Loading, awaitItem())
                 val error = awaitItem() as PoleListUiState.Error
                 assertEquals("network down", error.message)
+                assertEquals(false, error.isNetworkError)
             }
         }
 
@@ -739,6 +740,54 @@ class PoleListViewModelTest {
                 val success = awaitItem() as PoleListUiState.Success
                 assertEquals(false, success.poles.single().hasPendingReview)
                 assertEquals(false, success.poles.single().hasPendingDecision)
+            }
+        }
+
+    @Test
+    fun `an IOException from the pole list is a network error`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns Result.failure(java.io.IOException("x"))
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
+                )
+
+            vm.uiState.test {
+                assertEquals(PoleListUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as PoleListUiState.Error).isNetworkError)
+            }
+        }
+
+    @Test
+    fun `an IOException from the ai result with no cache is a network error`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.failure(java.io.IOException("x"))
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
+                )
+
+            vm.aiResultState.test {
+                assertEquals(null, awaitItem())
+                vm.onViewAiResult("SERVER-PH-1")
+                assertEquals(PolePhotoResultUiState.Loading, awaitItem())
+                assertEquals(true, (awaitItem() as PolePhotoResultUiState.Error).isNetworkError)
             }
         }
 }
