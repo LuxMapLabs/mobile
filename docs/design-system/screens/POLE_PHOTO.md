@@ -55,7 +55,7 @@
 - **Tiêu đề phần:** `LuxSectionHeader("Cột trên tuyến · N")`.
 - **Thẻ:** một `LuxCard(contentPadding = 0)`, các dòng ngăn bằng `HorizontalDivider(outlineVariant)`.
 - **Ô số thứ tự** (40dp, `shapes.small`): cột kế tiếp cần chụp `primary`/`onPrimary`; cột đã chụp `primaryContainer`/`onPrimaryContainer`; cột chưa tới `surfaceContainerHigh`/`onSurfaceVariant`. Cột chưa có GPS hiện "–" (giữ `poleNumberLabel`).
-- **Nội dung dòng:** mã cột `titleMedium` (1 dòng, ellipsis) + `FlowRow` gồm badge tình trạng đèn (`fixtureStatus` từ server) và **tối đa 1 badge tiến độ** (`poleProgressBadge`, mục 6):
+- **Nội dung dòng:** mã cột `titleMedium` (1 dòng, ellipsis) + `FlowRow` gồm badge **kết quả ảnh/video vừa chụp** (P4: `poleAiVerdict` — bản nháp của kỹ sư → nhãn đã xác nhận → `cv_state`; `on` "Đèn sáng" màu `asset[NORMAL]`, `off` "Đèn tắt" màu `asset[OUT]`, `inconclusive`/AI lỗi "AI không kết luận" màu `asset[UNKNOWN]`; chưa có kết quả thì không badge — **không dùng `fixture_status`** của `GET /poles`, vì đó là trạng thái hệ thống trước khi chụp, có cả `dim`) và **tối đa 1 badge tiến độ** (`poleProgressBadge`, mục 6):
 
   | Ưu tiên | Điều kiện | Nhãn | Màu |
   |---|---|---|---|
@@ -143,6 +143,7 @@
 - Hàm thuần mới trong `polephoto/PoleRowLogic.kt`, có unit test:
   - `fun poleProgressBadge(row: PoleListRowState): PoleProgress?` — enum `PoleProgress { SYNC_FAILED, SYNC_CONFLICT, SYNCING, QUEUED_OFFLINE, QUEUED_ONLINE, REVIEW_SAVED, AWAITING_DECISION, UPLOADED }` theo thứ tự ưu tiên ở mục 3.
   - `fun poleRowAction(row: PoleListRowState, isCompleted: Boolean): PoleRowAction` — `OpenAiResult(serverPhotoId) | OpenReportSheet | None`.
+- P4: `PolePhotoUploadResponseDto` thêm 5 field AI (nullable); `UploadPolePhotoSyncHandler`/`UploadPoleVideoSyncHandler` ghi chúng bằng `PolePhotoDao.updateUploadAiResult` (chỉ 5 cột AI, không đụng review/decision/nháp); `PoleListRowState.aiVerdict` từ `poleAiVerdict(aiStatus, cvState, finalCvState, draftFinalCvState)`.
 - `PoleListUiState.Error` và `PolePhotoResultUiState.Error` thêm `isNetworkError: Boolean = false`; `PoleListViewModel` đặt `true` khi lỗi là `IOException`.
 - Không đổi ViewModel nào khác, không đổi repository/Room/sync.
 
@@ -178,5 +179,6 @@ Màn xem trước không có test Composable riêng (đã chốt 2026-10-18 tron
 | P1 | Bấm dòng cột đã có kết quả AI | Mở Kết quả AI; bỏ nút robot riêng; cột chưa chụp vẫn mở sheet báo lỗi |
 | P2 | Badge trên dòng cột | Giữ badge tình trạng đèn + tối đa 1 badge tiến độ theo thứ tự ưu tiên |
 | P3 | Phần "Kỹ sư xác nhận nhãn" | Thẻ trong nội dung cuộn, chỉ ghim nút gửi ở đáy |
+| P4 | Badge đèn trên dòng cột | Kết quả ảnh/video vừa chụp (`on`/`off`/không kết luận), bỏ `fixture_status`. Để có ngay sau upload: lưu `ai_status`/`cv_state`/`confidence`/`model_version`/`analyzed_at` từ response `POST ./pole-photos` và `./pole-videos` (BE chạy AI đồng bộ lúc upload) vào `local_pole_photo` |
 | — | F13 Hàng đợi đồng bộ | Để sau (chưa có màn, là tính năng mới) |
 | — | Màn Hoàn thành lệnh | Bỏ qua (đã theo vNext trong F09 + `EvidenceCaptureScreen`) |

@@ -66,4 +66,22 @@ class PoleRowLogicTest {
         assertEquals(PoleRowAction.OpenReportSheet, poleRowAction(row(SyncStatus.DONE, null), isCompleted = false))
         assertEquals(PoleRowAction.None, poleRowAction(row(), isCompleted = true))
     }
+
+    @Test
+    fun `no ai result yet has no verdict`() {
+        assertNull(poleAiVerdict(aiStatus = null, cvState = null, finalCvState = null, draftFinalCvState = null))
+    }
+
+    @Test
+    fun `the draft wins over the confirmed label which wins over the ai`() {
+        assertEquals(PoleAiVerdict.ON, poleAiVerdict("available", "off", "off", "on"))
+        assertEquals(PoleAiVerdict.OFF, poleAiVerdict("available", "on", "off", null))
+        assertEquals(PoleAiVerdict.ON, poleAiVerdict("available", "on", null, null))
+    }
+
+    @Test
+    fun `inconclusive or a failed model is not concluded`() {
+        assertEquals(PoleAiVerdict.INCONCLUSIVE, poleAiVerdict("available", "inconclusive", null, null))
+        assertEquals(PoleAiVerdict.INCONCLUSIVE, poleAiVerdict("unavailable", null, null, null))
+    }
 }

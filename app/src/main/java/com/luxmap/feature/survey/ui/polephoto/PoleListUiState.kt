@@ -17,6 +17,7 @@ data class PoleListRowState(
     // enqueuePendingReviews is what sends it, on "Hoàn tất").
     val hasPendingReview: Boolean = false,
     val hasPendingDecision: Boolean = false,
+    val aiVerdict: PoleAiVerdict? = null,
 )
 
 sealed interface PoleListUiState {

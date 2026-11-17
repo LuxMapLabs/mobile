@@ -48,3 +48,19 @@ fun poleRowAction(
         else -> PoleRowAction.OpenReportSheet
     }
 }
+
+enum class PoleAiVerdict { ON, OFF, INCONCLUSIVE }
+
+fun poleAiVerdict(
+    aiStatus: String?,
+    cvState: String?,
+    finalCvState: String?,
+    draftFinalCvState: String?,
+): PoleAiVerdict? {
+    if (aiStatus == null) return null
+    return when (draftFinalCvState ?: finalCvState ?: cvState) {
+        "on" -> PoleAiVerdict.ON
+        "off" -> PoleAiVerdict.OFF
+        else -> PoleAiVerdict.INCONCLUSIVE
+    }
+}

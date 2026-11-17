@@ -167,6 +167,7 @@ class PoleListViewModel
             val status: String?,
             val hasPendingReview: Boolean,
             val hasPendingDecision: Boolean,
+            val aiVerdict: PoleAiVerdict?,
         )
 
         private fun load() {
@@ -193,6 +194,13 @@ class PoleListViewModel
                                                     hasPendingReview = photo.draftFinalCvState != null,
                                                     hasPendingDecision =
                                                         photo.reviewedBy != null && photo.decision == null,
+                                                    aiVerdict =
+                                                        poleAiVerdict(
+                                                            photo.aiStatus,
+                                                            photo.cvState,
+                                                            photo.finalCvState,
+                                                            photo.draftFinalCvState,
+                                                        ),
                                                 )
                                             }
                                         }
@@ -213,6 +221,7 @@ class PoleListViewModel
                                             syncStatus = info?.status?.let(::toSyncStatus),
                                             hasPendingReview = info?.hasPendingReview ?: false,
                                             hasPendingDecision = info?.hasPendingDecision ?: false,
+                                            aiVerdict = info?.aiVerdict,
                                         )
                                     },
                                 isStale = result.isStale,
