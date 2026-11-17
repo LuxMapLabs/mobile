@@ -6,7 +6,7 @@ package com.luxmap.feature.map.data
 data class GisMapDataset(
     val poles: List<PoleMarker>,
     val segments: List<RoadSegmentLine>,
-    // (lat, lng) to open the map camera on — null for FakeMapRepository and any other source
+    // (lat, lng) to open the map camera on — null for any source
     // with no real centre to offer; MapScreen falls back to its existing hardcoded default.
     val center: Pair<Double, Double>? = null,
     // Real extent the center was computed from — null under the same conditions as center.

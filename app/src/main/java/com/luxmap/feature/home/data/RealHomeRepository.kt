@@ -9,8 +9,8 @@ import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Calls the real GET /auth/me + GET /work-orders (see UserApi/WorkOrdersApi) - no Room cache yet,
-// same one-shot shape FakeHomeRepository always had. plannedSweepCount stays null: the backend
+// Calls the real GET /auth/me + GET /work-orders (see UserApi/WorkOrdersApi) - no Room cache yet.
+// plannedSweepCount stays null: the backend
 // has no survey-sweep API to answer it (see docs/Backend_API_Requirements_For_Mobile.docx).
 @Singleton
 class RealHomeRepository

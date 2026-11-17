@@ -27,9 +27,8 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 
-// Bind Fake<->Real repository của từng feature tại đây, 1 chỗ duy nhất
-// (xem "Repository Pattern" trong CLAUDE.md). Thêm @Binds khi feature có
-// Repository interface + FakeXxxRepository/RealXxxRepository.
+// Bind the Real repository of each feature here, in one place
+// (see "Repository Pattern" in CLAUDE.md).
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
