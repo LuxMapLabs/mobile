@@ -665,7 +665,7 @@ fun MapScreen(
                 is MapUiState.Empty -> MessageOverlay(text = "Không có cột đèn trong khu vực này")
                 is MapUiState.Error ->
                     MessageOverlay(
-                        text = (uiState as MapUiState.Error).message,
+                        text = mapErrorText((uiState as MapUiState.Error).isNetworkError),
                         actionLabel = "Thử lại",
                         onAction = viewModel::retry,
                         tone = LuxBannerTone.ERROR,

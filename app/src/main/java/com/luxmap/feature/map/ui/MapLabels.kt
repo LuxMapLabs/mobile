@@ -21,3 +21,10 @@ internal fun AssetCondition.markerIconResId(): Int =
         AssetCondition.OUT -> R.drawable.ic_marker_out
         AssetCondition.UNKNOWN -> R.drawable.ic_marker_unknown
     }
+
+internal fun mapErrorText(isNetworkError: Boolean): String =
+    if (isNetworkError) {
+        "Không tải được dữ liệu bản đồ. Kiểm tra kết nối rồi thử lại."
+    } else {
+        "Không tải được dữ liệu bản đồ. Vui lòng thử lại sau ít phút."
+    }

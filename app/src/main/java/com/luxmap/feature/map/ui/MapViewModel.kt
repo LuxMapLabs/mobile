@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.IOException
 import javax.inject.Inject
 
 @HiltViewModel
@@ -60,7 +61,11 @@ class MapViewModel
                         .observeGisMapDataset()
                         .combine(_statusFilter) { dataset, filter -> dataset to filter }
                         .catch { e ->
-                            _uiState.value = MapUiState.Error(e.message ?: "Không tải được dữ liệu bản đồ")
+                            _uiState.value =
+                                MapUiState.Error(
+                                    message = e.message ?: "Không tải được dữ liệu bản đồ",
+                                    isNetworkError = e is IOException,
+                                )
                         }.collect { (dataset, filter) ->
                             _uiState.value =
                                 if (dataset.poles.isEmpty()) {

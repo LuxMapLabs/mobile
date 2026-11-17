@@ -21,5 +21,5 @@ sealed interface MapUiState {
 
     data object Empty : MapUiState
 
-    data class Error(val message: String) : MapUiState
+    data class Error(val message: String, val isNetworkError: Boolean = false) : MapUiState
 }
