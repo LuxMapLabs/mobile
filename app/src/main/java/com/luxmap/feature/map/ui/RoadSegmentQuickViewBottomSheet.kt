@@ -1,19 +1,17 @@
 package com.luxmap.feature.map.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.luxmap.core.map.routeColor
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.feature.map.data.RoadSegmentLine
 
 // Quick view when tapping a surveyed route (F12/FM-36) — same "just enough to decide whether to
@@ -29,31 +27,19 @@ fun RoadSegmentQuickViewBottomSheet(
     val sheetState = rememberModalBottomSheetState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm)) {
-            Text(text = segment.name, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = segment.segmentId,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            QuickViewHeader(title = segment.name, subtitle = segment.segmentId, onClose = onDismiss)
+            LuxBanner(
+                message = if (segment.hasActiveSegmentFault) "Tuyến đang có sự cố" else "Tuyến bình thường",
+                tone = if (segment.hasActiveSegmentFault) LuxBannerTone.ERROR else LuxBannerTone.SUCCESS,
             )
-
-            Spacer(Modifier.height(Spacing.md))
-
-            Text(
-                text = "$visiblePoleCount/${segment.poleCount} cột đang hiển thị",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = "Chiều dài: ${segment.lengthM} m",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = if (segment.hasActiveSegmentFault) "Tuyến đang gặp sự cố" else "Tuyến bình thường",
-                style = MaterialTheme.typography.bodyMedium,
-                color = routeColor(segment.hasActiveSegmentFault),
-            )
-
-            Spacer(Modifier.height(Spacing.lg))
+            Column {
+                QuickViewFactRow(label = "Cột đang hiển thị", value = "$visiblePoleCount/${segment.poleCount}")
+                QuickViewFactRow(label = "Chiều dài", value = "${segment.lengthM} m")
+            }
         }
     }
 }

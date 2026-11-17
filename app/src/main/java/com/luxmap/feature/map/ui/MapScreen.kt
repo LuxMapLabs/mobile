@@ -10,7 +10,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -28,12 +27,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -54,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -72,10 +72,11 @@ import com.luxmap.core.map.markerIconId
 import com.luxmap.core.map.registerMarkerBadgeIcons
 import com.luxmap.core.map.routeColorArgb
 import com.luxmap.core.theme.AssetCondition
-import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
-import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.map.data.GisMapBbox
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
@@ -1098,9 +1099,16 @@ private fun buildClusterCountLayer(): SymbolLayer =
 
 @Composable
 private fun BoxScope.LoadingOverlay() {
-    CircularProgressIndicator(
+    Surface(
         modifier = Modifier.align(Alignment.Center),
-    )
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 3.dp,
+    ) {
+        LuxLoadingRegion(description = "Đang tải bản đồ", modifier = Modifier.padding(Spacing.lg)) {
+            CircularProgressIndicator()
+        }
+    }
 }
 
 @Composable
@@ -1109,26 +1117,13 @@ private fun BoxScope.MessageOverlay(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .align(Alignment.TopCenter)
-                .padding(Spacing.lg)
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(Dimens.radiusMedium),
-                ).padding(Spacing.md),
-    ) {
-        Text(text = text, color = MaterialTheme.colorScheme.onSurface)
-        if (actionLabel != null && onAction != null) {
-            PrimaryButton(
-                text = actionLabel,
-                onClick = onAction,
-                modifier = Modifier.padding(top = Spacing.sm),
-            )
-        }
-    }
+    LuxBanner(
+        message = text,
+        tone = LuxBannerTone.INFO,
+        modifier = Modifier.align(Alignment.TopCenter).padding(Spacing.lg).fillMaxWidth(),
+        actionLabel = actionLabel,
+        onAction = onAction,
+    )
 }
 
 // MapView is a plain Android View, its lifecycle (onStart/onResume/...) must be forwarded
