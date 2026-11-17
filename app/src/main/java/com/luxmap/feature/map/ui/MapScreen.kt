@@ -583,7 +583,7 @@ fun MapScreen(
                     onQueryChange = viewModel::setSearchQuery,
                     onFilterClick = { showLayerFilterSheet = true },
                     hiddenStatusCount = AssetCondition.entries.size - statusFilter.size,
-                    hiddenLayerCount = listOf(showFixtures, showRoadSegments).count { !it },
+                    hiddenLayerCount = listOf(showFixtures, showRoadSegments, showCabinets, showCommunes).count { !it },
                 )
                 if (searchQuery.isNotBlank()) {
                     MapSearchResultsList(
@@ -594,6 +594,17 @@ fun MapScreen(
                                 CameraUpdateFactory.newLatLngZoom(LatLng(pole.lat, pole.lng), SEARCH_RESULT_POLE_ZOOM),
                             )
                             viewModel.setSearchQuery("")
+                        },
+                        onCabinetClick = { cabinet ->
+                            selectedPole = null
+                            selectedSegment = null
+                            viewModel.selectCabinet(cabinet.cabinetId)
+                            maplibreMap?.animateCamera(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(cabinet.lat, cabinet.lng),
+                                    SEARCH_RESULT_POLE_ZOOM,
+                                ),
+                            )
                         },
                         onSegmentClick = { segment ->
                             selectedSegment = segment
@@ -684,6 +695,10 @@ fun MapScreen(
                             onShowFixturesChange = { showFixtures = it },
                             showRoadSegments = showRoadSegments,
                             onShowRoadSegmentsChange = { showRoadSegments = it },
+                            showCabinets = showCabinets,
+                            onShowCabinetsChange = { showCabinets = it },
+                            showCommunes = showCommunes,
+                            onShowCommunesChange = { showCommunes = it },
                             modifier = Modifier.padding(vertical = Spacing.xs),
                         )
                         HorizontalDivider(
@@ -762,6 +777,19 @@ fun MapScreen(
                 selectedPole = null
                 onOpenPoleDetail(pole.poleId)
             },
+        )
+    }
+
+    cabinetSelection?.let { selection ->
+        CabinetQuickViewBottomSheet(
+            selection = selection,
+            communeName =
+                (uiState as? MapUiState.Success)
+                    ?.dataset
+                    ?.communes
+                    ?.firstOrNull { it.communeId == selection.cabinet.communeId }
+                    ?.name,
+            onDismiss = viewModel::clearCabinet,
         )
     }
 

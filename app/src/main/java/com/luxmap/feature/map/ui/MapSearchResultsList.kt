@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material3.Icon
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.label
+import com.luxmap.feature.map.data.CabinetMarker
 import com.luxmap.feature.map.data.PoleMarker
 import com.luxmap.feature.map.data.RoadSegmentLine
 
@@ -42,9 +44,10 @@ fun MapSearchResultsList(
     results: MapSearchResults,
     onPoleClick: (PoleMarker) -> Unit,
     onSegmentClick: (RoadSegmentLine) -> Unit,
+    onCabinetClick: (CabinetMarker) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (results.poles.isEmpty() && results.segments.isEmpty()) {
+    if (results.poles.isEmpty() && results.segments.isEmpty() && results.cabinets.isEmpty()) {
         Text(
             text = "Không tìm thấy kết quả",
             style = MaterialTheme.typography.bodyMedium,
@@ -87,6 +90,17 @@ fun MapSearchResultsList(
                     title = segment.name,
                     subtitle = segment.segmentId,
                     onClick = { onSegmentClick(segment) },
+                )
+            }
+        }
+        if (results.cabinets.isNotEmpty()) {
+            item { ResultGroupHeader(label = "Tủ điện") }
+            items(results.cabinets, key = { it.cabinetId }) { cabinet ->
+                ResultRow(
+                    icon = Icons.Filled.ElectricBolt,
+                    title = cabinet.name,
+                    subtitle = cabinet.cabinetId,
+                    onClick = { onCabinetClick(cabinet) },
                 )
             }
         }

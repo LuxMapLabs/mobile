@@ -20,11 +20,17 @@ fun MapLayerToggle(
     onShowFixturesChange: (Boolean) -> Unit,
     showRoadSegments: Boolean,
     onShowRoadSegmentsChange: (Boolean) -> Unit,
+    showCabinets: Boolean,
+    onShowCabinetsChange: (Boolean) -> Unit,
+    showCommunes: Boolean,
+    onShowCommunesChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         LayerSwitchRow(label = "Cột đèn", checked = showFixtures, onCheckedChange = onShowFixturesChange)
         LayerSwitchRow(label = "Tuyến đường", checked = showRoadSegments, onCheckedChange = onShowRoadSegmentsChange)
+        LayerSwitchRow(label = "Tủ điện", checked = showCabinets, onCheckedChange = onShowCabinetsChange)
+        LayerSwitchRow(label = "Ranh giới xã", checked = showCommunes, onCheckedChange = onShowCommunesChange)
     }
 }
 
