@@ -841,7 +841,7 @@ private fun showQuickLocationFix(
 }
 
 // "Surveyed route" (F12/FM-37) — colored by has_active_segment_fault to match how Web GIS shows
-// grid faults (Rose600 when faulted, Blue500 when normal). Does NOT show a fault detail panel on
+// grid faults (MapMarkerColors.RouteFault / RouteNormal). Does NOT show a fault detail panel on
 // tap — that is still Web GIS scope, mobile only needs the color as a visual warning for the
 // field crew. Drawn as glow (wide, blurred, translucent) + core (narrow, solid) — same 2-layer
 // idea as the pole glow/dot pair, so routes read with the same visual language as markers.
