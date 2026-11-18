@@ -11,6 +11,8 @@ class WorkOrderFaultLabelsTest {
         assertEquals("Mất điện cả tuyến", faultTypeLabel("segment_outage"))
         assertEquals("Mất kết nối cảm biến", faultTypeLabel("node_offline"))
         assertEquals("Suy giảm thời gian chiếu sáng", faultTypeLabel("runtime_decline"))
+        assertEquals("Điện áp bất thường", faultTypeLabel("voltage_anomaly"))
+        assertEquals("Lỗi phần cứng IoT", faultTypeLabel("iot_hardware_fault"))
         assertEquals("future_type", faultTypeLabel("future_type"))
     }
 

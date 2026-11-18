@@ -51,6 +51,10 @@ data class WorkOrderFaultDetail(
     val faultStatus: String,
     val severity: String,
     val inspectionOutcome: String?,
+    val originNodeId: String? = null,
+    val feederId: String? = null,
+    val cabinetId: String? = null,
+    val iotAnomalyCode: String? = null,
 )
 
 fun WorkOrderFaultDetail.hasLocation(): Boolean = lat != 0.0 || lng != 0.0
@@ -105,4 +109,8 @@ private fun WorkOrderFaultDetailDto.toWorkOrderFaultDetail() =
         faultStatus = faultStatus,
         severity = severity,
         inspectionOutcome = inspectionOutcome,
+        originNodeId = originNodeId,
+        feederId = feederId,
+        cabinetId = cabinetId,
+        iotAnomalyCode = iotAnomalyCode,
     )

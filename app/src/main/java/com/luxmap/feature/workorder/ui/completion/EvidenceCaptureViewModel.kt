@@ -1,7 +1,5 @@
 package com.luxmap.feature.workorder.ui.completion
 
-import android.content.ContentResolver
-import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,9 +22,7 @@ internal data class EvidenceCaptureState(
     val added: Int = 0,
     val failed: Int = 0,
     val awaitingLocation: Int = 0,
-    val usedImportTime: Int = 0,
     val locationUnavailable: Boolean = false,
-    val awaitingFromCamera: Boolean = false,
 )
 
 @HiltViewModel
@@ -45,7 +41,7 @@ class EvidenceCaptureViewModel
             savedStateHandle.get<String>("cameraOperationId") ?: UUID.randomUUID().toString().also {
                 savedStateHandle["cameraOperationId"] = it
             }
-        private val missingLocation = mutableListOf<GalleryEvidence>()
+        private val missingLocation = mutableListOf<PendingCameraPhoto>()
         private val _state = MutableStateFlow(EvidenceCaptureState())
         internal val state = _state.asStateFlow()
 
@@ -72,7 +68,7 @@ class EvidenceCaptureViewModel
                     saveFile(file) {
                         val location = withTimeoutOrNull(10_000L) { locationTracker.getCurrentLocation() }
                         if (location == null) {
-                            missingLocation += GalleryEvidence(file, capturedAt, null, capturedAt)
+                            missingLocation += PendingCameraPhoto(file, capturedAt)
                         } else {
                             persist(file, capturedAt, location.latitude to location.longitude)
                             located = true
@@ -82,37 +78,8 @@ class EvidenceCaptureViewModel
                     EvidenceCaptureState(
                         failed = if (saved) 0 else 1,
                         awaitingLocation = missingLocation.size,
-                        awaitingFromCamera = missingLocation.isNotEmpty(),
                     )
                 if (saved && located) onDone()
-            }
-        }
-
-        internal fun onGallerySelected(
-            filesDir: File,
-            resolver: ContentResolver,
-            uris: List<Uri>,
-        ) {
-            if (uris.isEmpty() || _state.value.busy || missingLocation.isNotEmpty()) return
-            _state.value = EvidenceCaptureState(busy = true)
-            viewModelScope.launch {
-                var result = EvidenceCaptureState()
-                for (uri in uris) {
-                    val file = evidenceFile(filesDir, UUID.randomUUID().toString())
-                    val saved =
-                        saveFile(file) {
-                            val photo = importGalleryEvidence(resolver, uri, file)
-                            val coordinates = photo.coordinates
-                            if (coordinates == null) {
-                                missingLocation += photo
-                            } else {
-                                persist(photo.file, photo.capturedAt ?: photo.importedAt, coordinates)
-                                result = result.withSavedImage(photo)
-                            }
-                        }
-                    if (!saved) result = result.copy(failed = result.failed + 1)
-                }
-                _state.value = result.copy(awaitingLocation = missingLocation.size)
             }
         }
 
@@ -131,16 +98,16 @@ class EvidenceCaptureViewModel
                     previous.copy(
                         awaitingLocation = 0,
                         locationUnavailable = false,
-                        awaitingFromCamera = false,
                     )
                 val iterator = missingLocation.iterator()
                 while (iterator.hasNext()) {
                     val photo = iterator.next()
                     val saved =
                         saveFile(photo.file) {
-                            persist(photo.file, photo.capturedAt ?: photo.importedAt, coordinates)
+                            persist(photo.file, photo.capturedAt, coordinates)
                         }
-                    result = if (saved) result.withSavedImage(photo) else result.copy(failed = result.failed + 1)
+                    result =
+                        if (saved) result.copy(added = result.added + 1) else result.copy(failed = result.failed + 1)
                     iterator.remove()
                 }
                 _state.value = result
@@ -157,7 +124,6 @@ class EvidenceCaptureViewModel
                     awaitingLocation = 0,
                     failed = previous.failed + previous.awaitingLocation,
                     locationUnavailable = false,
-                    awaitingFromCamera = false,
                 )
         }
 
@@ -201,8 +167,6 @@ class EvidenceCaptureViewModel
         }
     }
 
-private fun EvidenceCaptureState.withSavedImage(photo: GalleryEvidence) =
-    copy(
-        added = added + 1,
-        usedImportTime = usedImportTime + if (photo.capturedAt == null) 1 else 0,
-    )
+private const val MAX_EVIDENCE_BYTES = 16L * 1024 * 1024
+
+private data class PendingCameraPhoto(val file: File, val capturedAt: Instant)

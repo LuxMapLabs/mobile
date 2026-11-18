@@ -101,7 +101,6 @@ class EvidenceCaptureViewModelTest {
                 repository.captureEvidence(any(), any(), any(), any(), any(), any(), any())
             }
             assertEquals(1, vm.state.value.awaitingLocation)
-            org.junit.Assert.assertTrue(vm.state.value.awaitingFromCamera)
             org.junit.Assert.assertFalse(doneCalled)
             org.junit.Assert.assertTrue(file.exists())
         }

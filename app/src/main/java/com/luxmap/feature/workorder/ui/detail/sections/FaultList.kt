@@ -37,6 +37,7 @@ import com.luxmap.core.ui.components.LuxListItem
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.hasLocation
+import com.luxmap.feature.workorder.ui.detail.faultSupportingText
 import com.luxmap.feature.workorder.ui.detail.faultTypeLabel
 import com.luxmap.feature.workorder.ui.detail.inspectionOutcomeLabel
 
@@ -86,7 +87,8 @@ private fun FaultItem(
 ) {
     LuxListItem(
         headline = faultTypeLabel(fault.faultType),
-        supporting = listOfNotNull(fault.poleId, fault.faultId).joinToString("\n"),
+        supporting = faultSupportingText(fault),
+        supportingMaxLines = Int.MAX_VALUE,
         leadingIcon = faultTypeIcon(fault.faultType),
         trailing = {
             Row(

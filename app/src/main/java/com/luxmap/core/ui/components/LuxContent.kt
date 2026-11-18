@@ -118,6 +118,7 @@ fun LuxListItem(
     onClick: (() -> Unit)? = null,
     showChevron: Boolean = onClick != null,
     trailing: (@Composable () -> Unit)? = null,
+    supportingMaxLines: Int = 2,
 ) {
     val minHeight =
         when {
@@ -175,7 +176,7 @@ fun LuxListItem(
                     text = supporting,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = supportingMaxLines,
                 )
             }
         }
