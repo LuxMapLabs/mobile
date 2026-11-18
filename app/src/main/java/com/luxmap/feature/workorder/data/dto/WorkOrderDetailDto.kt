@@ -36,6 +36,10 @@ data class WorkOrderFaultDetailDto(
     @SerialName("fault_status") val faultStatus: String,
     val severity: String,
     @SerialName("inspection_outcome") val inspectionOutcome: String? = null,
+    @SerialName("origin_node_id") val originNodeId: String? = null,
+    @SerialName("feeder_id") val feederId: String? = null,
+    @SerialName("cabinet_id") val cabinetId: String? = null,
+    @SerialName("iot_anomaly_code") val iotAnomalyCode: String? = null,
 )
 
 @Serializable

@@ -7,6 +7,8 @@ fun faultTypeLabel(value: String): String =
         "segment_outage" -> "Mất điện cả tuyến"
         "node_offline" -> "Mất kết nối cảm biến"
         "runtime_decline" -> "Suy giảm thời gian chiếu sáng"
+        "voltage_anomaly" -> "Điện áp bất thường"
+        "iot_hardware_fault" -> "Lỗi phần cứng IoT"
         else -> value
     }
 

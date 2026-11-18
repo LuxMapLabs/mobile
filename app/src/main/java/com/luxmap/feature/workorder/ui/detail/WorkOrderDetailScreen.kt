@@ -1024,3 +1024,71 @@ private fun WorkOrderDetailScreenErrorPreview() {
         onRemoveEvidence = {},
     )
 }
+
+@Preview(name = "IoT - Inspection", showBackground = true, heightDp = 1000)
+@Preview(name = "IoT - Inspection large text", showBackground = true, fontScale = 2f, widthDp = 360)
+@Preview(name = "IoT - Inspection night", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WorkOrderDetailScreenIotInspectionPreview() {
+    com.luxmap.core.theme.LuxMapTheme {
+        WorkOrderDetailScreen(
+            uiState = WorkOrderDetailUiState.Success(detail = sampleIotWorkOrder("inspection")),
+            onBack = {},
+            onStart = {},
+            onNavigateFault = { _, _ -> },
+            onReportNoteChanged = {},
+            onMaterialsUsedChanged = {},
+            onFaultOutcomeSelected = { _, _ -> },
+            onSubmit = {},
+            onCaptureEvidence = {},
+            onRemoveEvidence = {},
+        )
+    }
+}
+
+@Preview(name = "IoT - Repair", showBackground = true, heightDp = 1000)
+@Preview(name = "IoT - Repair large text", showBackground = true, fontScale = 2f, widthDp = 360)
+@Preview(name = "IoT - Repair night", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun WorkOrderDetailScreenIotRepairPreview() {
+    com.luxmap.core.theme.LuxMapTheme {
+        WorkOrderDetailScreen(
+            uiState = WorkOrderDetailUiState.Success(detail = sampleIotWorkOrder("repair")),
+            onBack = {},
+            onStart = {},
+            onNavigateFault = { _, _ -> },
+            onReportNoteChanged = {},
+            onMaterialsUsedChanged = {},
+            onFaultOutcomeSelected = { _, _ -> },
+            onSubmit = {},
+            onCaptureEvidence = {},
+            onRemoveEvidence = {},
+        )
+    }
+}
+
+private fun sampleIotWorkOrder(kind: String): WorkOrderDetail =
+    sampleRepairWithFaults().let { detail ->
+        detail.copy(
+            taskKind = kind,
+            woStatus = "in_progress",
+            allowedActions = listOf("complete"),
+            faults =
+                listOf(
+                    detail.faults.single().copy(
+                        poleId = null,
+                        faultType = "voltage_anomaly",
+                        cabinetId = "CAB-001",
+                        originNodeId = "NODE-004-LONG-DEVICE-IDENTIFIER",
+                        feederId = "FDR-001",
+                        iotAnomalyCode = "voltage_loss",
+                    ),
+                    detail.faults.single().copy(
+                        faultId = "FAULT-2",
+                        poleId = null,
+                        faultType = "iot_hardware_fault",
+                        originNodeId = "NODE-005",
+                    ),
+                ),
+        )
+    }

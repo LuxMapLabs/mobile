@@ -5,7 +5,6 @@ import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -79,10 +78,6 @@ fun EvidenceCaptureRoute(
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             viewModel.useCurrentLocation()
         }
-    val picker =
-        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
-            viewModel.onGallerySelected(context.filesDir, context.contentResolver, uris)
-        }
 
     fun close() {
         if (state.busy) return
@@ -122,18 +117,6 @@ fun EvidenceCaptureRoute(
                 enabled = available,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("Chụp ảnh") }
-            OutlinedButton(
-                onClick = {
-                    launchError = null
-                    try {
-                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    } catch (_: ActivityNotFoundException) {
-                        launchError = "Không mở được thư viện ảnh."
-                    }
-                },
-                enabled = available,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Chọn từ thư viện") }
             if (state.busy) {
                 CircularProgressIndicator()
                 Text("Đang chuẩn bị ảnh…")
@@ -141,7 +124,6 @@ fun EvidenceCaptureRoute(
             launchError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (state.added > 0) Text("Đã thêm ${state.added} ảnh.")
             if (state.failed > 0) Text("Không thêm được ${state.failed} ảnh.", color = MaterialTheme.colorScheme.error)
-            if (state.usedImportTime > 0) Text("${state.usedImportTime} ảnh thiếu giờ chụp. Đã lưu giờ nhập ảnh.")
             Button(onClick = { close() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Xong") }
         }
     }
@@ -152,10 +134,8 @@ fun EvidenceCaptureRoute(
             message =
                 if (state.locationUnavailable) {
                     "Chưa lấy được vị trí hiện tại. Bật định vị hoặc bỏ qua các ảnh này."
-                } else if (state.awaitingFromCamera) {
-                    "Chưa lấy được vị trí cho ảnh vừa chụp. Bật định vị rồi thử lấy lại vị trí hiện tại."
                 } else {
-                    "Không đọc được GPS của ${state.awaitingLocation} ảnh. Dùng vị trí hiện tại để đính kèm?"
+                    "Chưa lấy được vị trí cho ảnh vừa chụp. Bật định vị rồi thử lấy lại vị trí hiện tại."
                 },
             dismissLabel = "Bỏ qua ảnh này",
             confirmLabel = "Dùng vị trí hiện tại",
