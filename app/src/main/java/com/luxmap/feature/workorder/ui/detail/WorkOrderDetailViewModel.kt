@@ -207,28 +207,38 @@ class WorkOrderDetailViewModel
             if (current !is WorkOrderDetailUiState.Success || !current.canSubmit() || current.isSubmitting) return
             _uiState.value = current.copy(isSubmitting = true, submitError = null, justSubmitted = true)
             viewModelScope.launch {
-                prepareReworkIfNeeded(current)
-                if (current.detail.taskKind == "pole_gps_update") {
-                    poleGpsRepository.enqueuePendingPhotoUploads(workOrderId)
-                }
-                val faultOutcomes =
-                    if (current.detail.taskKind == "inspection" && current.detail.faults.isNotEmpty()) {
-                        current.detail.faults.map { fault ->
-                            FaultOutcome(fault.faultId, current.faultOutcomes.getValue(fault.faultId))
+                try {
+                    prepareReworkIfNeeded(current)
+                    val faultOutcomes =
+                        if (current.detail.taskKind == "inspection" && current.detail.faults.isNotEmpty()) {
+                            current.detail.faults.map { fault ->
+                                FaultOutcome(fault.faultId, current.faultOutcomes.getValue(fault.faultId))
+                            }
+                        } else {
+                            null
                         }
-                    } else {
-                        null
+                    completionRepository.submitCompletion(
+                        workOrderId = workOrderId,
+                        taskKind = current.detail.taskKind,
+                        reportNote = current.reportNote,
+                        materialsUsed = current.materialsUsed.ifBlank { null },
+                        faultOutcomes = faultOutcomes,
+                    )
+                    val afterSubmit = _uiState.value
+                    if (afterSubmit is WorkOrderDetailUiState.Success) {
+                        _uiState.value = afterSubmit.copy(isSubmitting = false)
                     }
-                completionRepository.submitCompletion(
-                    workOrderId = workOrderId,
-                    taskKind = current.detail.taskKind,
-                    reportNote = current.reportNote,
-                    materialsUsed = current.materialsUsed.ifBlank { null },
-                    faultOutcomes = faultOutcomes,
-                )
-                val afterSubmit = _uiState.value
-                if (afterSubmit is WorkOrderDetailUiState.Success) {
-                    _uiState.value = afterSubmit.copy(isSubmitting = false)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    updateSuccess {
+                        it.copy(
+                            submitError = e.message ?: "Không lưu được báo cáo.",
+                            justSubmitted = false,
+                        )
+                    }
+                } finally {
+                    updateSuccess { it.copy(isSubmitting = false) }
                 }
             }
         }
@@ -297,7 +307,7 @@ class WorkOrderDetailViewModel
 
         private suspend fun prepareReworkIfNeeded(state: WorkOrderDetailUiState.Success) {
             val previous = state.localCompletion ?: return
-            if (state.detail.taskKind !in listOf("repair", "inspection")) return
+            if (state.detail.taskKind !in listOf("repair", "inspection", "pole_gps_update")) return
             if (previous.submitStatus == "synced" && isReturnedForRework(state)) {
                 completionRepository.prepareEvidenceRework(workOrderId, previous.clientOpId)
             }

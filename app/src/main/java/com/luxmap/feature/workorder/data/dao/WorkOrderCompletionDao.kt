@@ -107,6 +107,15 @@ interface WorkOrderCompletionDao {
         return true
     }
 
+    @Query(
+        "UPDATE sync_queue SET payloadJson = :payloadJson WHERE clientOpId = :clientOpId " +
+            "AND opType = 'complete_work_order'",
+    )
+    suspend fun updateCompletionPayload(
+        clientOpId: String,
+        payloadJson: String,
+    )
+
     @Query("SELECT * FROM sync_queue WHERE clientOpId = :clientOpId AND opType = :opType ORDER BY id DESC LIMIT 1")
     suspend fun submissionOperation(
         clientOpId: String,

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import java.security.GeneralSecurityException
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,6 +58,10 @@ class TokenStore
                 prefs[ACCESS_TOKEN_KEY] = cipher.encrypt(accessToken)
                 prefs[REFRESH_TOKEN_KEY] = cipher.encrypt(refreshToken)
                 prefs[EXPIRES_AT_KEY] = expiresAt
+                if (rememberMe != null || username != null) {
+                    prefs.remove(CACHED_USER_ID_KEY)
+                    prefs[SESSION_ID_KEY] = UUID.randomUUID().toString()
+                }
                 if (rememberMe != null) prefs[REMEMBER_ME_KEY] = rememberMe
                 if (username != null) prefs[USERNAME_KEY] = username
             }
@@ -89,6 +94,43 @@ class TokenStore
         // an OkHttp background thread, not the main thread, so runBlocking is fine here.
         fun currentTokensBlocking(): SessionTokens? = runBlocking { currentTokens() }
 
+        // A generation survives token refresh but changes for a new login. The compare and
+        // identity write are one DataStore edit, so an old /auth/me cannot re-own a new session.
+        suspend fun identitySessionId(): String? {
+            var sessionId: String? = null
+            context.sessionDataStore.edit { prefs ->
+                if (prefs[REFRESH_TOKEN_KEY] != null) {
+                    sessionId = prefs[SESSION_ID_KEY] ?: UUID.randomUUID().toString()
+                    prefs[SESSION_ID_KEY] = sessionId!!
+                }
+            }
+            return sessionId
+        }
+
+        suspend fun saveCachedUserIdForSession(
+            userId: String,
+            expectedSessionId: String,
+        ): Boolean {
+            var saved = false
+            context.sessionDataStore.edit { prefs ->
+                if (prefs[SESSION_ID_KEY] == expectedSessionId && prefs[REFRESH_TOKEN_KEY] != null) {
+                    prefs[CACHED_USER_ID_KEY] = userId
+                    saved = true
+                }
+            }
+            return saved
+        }
+
+        suspend fun cachedUserId(): String? = context.sessionDataStore.data.first()[CACHED_USER_ID_KEY]
+
+        suspend fun saveCachedUserId(userId: String) {
+            context.sessionDataStore.edit { it[CACHED_USER_ID_KEY] = userId }
+        }
+
+        suspend fun clearCachedUserId() {
+            context.sessionDataStore.edit { it.remove(CACHED_USER_ID_KEY) }
+        }
+
         suspend fun clear() {
             context.sessionDataStore.edit { prefs ->
                 prefs.remove(ACCESS_TOKEN_KEY)
@@ -96,6 +138,8 @@ class TokenStore
                 prefs.remove(EXPIRES_AT_KEY)
                 prefs.remove(REMEMBER_ME_KEY)
                 prefs.remove(USERNAME_KEY)
+                prefs.remove(CACHED_USER_ID_KEY)
+                prefs.remove(SESSION_ID_KEY)
             }
         }
 
@@ -111,6 +155,8 @@ class TokenStore
             val REFRESH_TOKEN_KEY = stringPreferencesKey("refresh_token")
             val EXPIRES_AT_KEY = longPreferencesKey("expires_at")
             val REMEMBER_ME_KEY = booleanPreferencesKey("remember_me")
+            val SESSION_ID_KEY = stringPreferencesKey("identity_session_id")
+            val CACHED_USER_ID_KEY = stringPreferencesKey("cached_user_id")
             val USERNAME_KEY = stringPreferencesKey("username")
             const val MILLIS_PER_SECOND = 1000L
         }

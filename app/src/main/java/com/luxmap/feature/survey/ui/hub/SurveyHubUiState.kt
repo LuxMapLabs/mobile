@@ -9,7 +9,7 @@ sealed interface SurveyHubUiState {
     data class Success(
         val assignedRoutes: List<AssignedSurveyRoute>,
         val assignedPoleGpsOrders: List<AssignedSurveyRoute> = emptyList(),
-        // True when assignedRoutes came from the local cache after a failed fetch.
+        // True when either source is cached or temporarily unavailable.
         val isStale: Boolean = false,
         // The route currently calling POST /work-orders/{id}/start - disables its "Bat dau
         // tuyen" button while in flight, null the rest of the time.
@@ -28,6 +28,8 @@ sealed interface SurveyHubUiState {
         val locallyCompletedWorkOrderIds: Set<String> = emptySet(),
         val completionSyncStates: Map<String, CompletionSyncState> = emptyMap(),
     ) : SurveyHubUiState
+
+    data object OfflineEmpty : SurveyHubUiState
 
     data object Empty : SurveyHubUiState
 

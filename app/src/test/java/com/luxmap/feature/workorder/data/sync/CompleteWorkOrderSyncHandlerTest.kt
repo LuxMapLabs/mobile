@@ -70,7 +70,7 @@ class CompleteWorkOrderSyncHandlerTest {
                 mockk { every { status } returns "queued" }
             val payload = CompletionSyncPayload("WO-1", poleReviewClientOpIds = listOf("PH-1:review"))
 
-            val result = CompleteWorkOrderSyncHandler(api, dao, mockk()).handle(Json.encodeToString(payload))
+            val result = CompleteWorkOrderSyncHandler(api, dao, legacyGps()).handle(Json.encodeToString(payload))
 
             assertEquals(SyncOpResult.WaitingForDependency, result)
             coVerify(exactly = 0) { api.complete(any(), any()) }
@@ -81,7 +81,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val handler = CompleteWorkOrderSyncHandler(api, dao, mockk(relaxed = true))
+            val handler = CompleteWorkOrderSyncHandler(api, dao, legacyGps())
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { dao.completionEvidenceStatus("WO-1", "older") } returns "queued"
             coEvery { dao.completionEvidenceStatus("WO-1", "newer") } returns "done"
@@ -101,7 +101,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val handler = CompleteWorkOrderSyncHandler(api, dao, mockk(relaxed = true))
+            val handler = CompleteWorkOrderSyncHandler(api, dao, legacyGps())
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { dao.completionEvidenceStatus("WO-1", "waiting") } returns "queued"
             coEvery { dao.completionEvidenceStatus("WO-1", "broken") } returns "failed"
@@ -117,7 +117,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { api.complete("WO-1", any()) } returns detailDto()
             val handler = CompleteWorkOrderSyncHandler(api, dao, poleGpsRepository)
@@ -133,7 +133,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { api.complete("WO-1", any()) } throws httpException(409, "AFTER_EVIDENCE_REQUIRED")
             val handler = CompleteWorkOrderSyncHandler(api, dao, poleGpsRepository)
@@ -148,7 +148,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { api.complete("WO-1", any()) } throws httpException(409, "ALREADY_COMPLETED")
             val handler = CompleteWorkOrderSyncHandler(api, dao, poleGpsRepository)
@@ -163,7 +163,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { api.complete("WO-1", any()) } throws httpException(400, "VALIDATION_FAILED")
             val handler = CompleteWorkOrderSyncHandler(api, dao, poleGpsRepository)
@@ -178,10 +178,14 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             val locations = listOf(PoleLocationRequestDto("P-1", 10.0, 106.0, 3.0, "2026-11-13T02:00:00Z"))
-            coEvery { poleGpsRepository.completionPoleLocations("WO-1") } returns locations
+            coEvery { poleGpsRepository.legacyCompletionPayload(any()) } returns
+                CompletionSyncPayload("WO-1", evidenceClientOpIds = listOf("GPS-PHOTO"), poleLocations = locations)
+            coEvery { dao.completionEvidenceStatus("WO-1", "GPS-PHOTO") } returns "done"
+            coEvery { api.detail("WO-1") } returns
+                detailDto().copy(taskKind = "pole_gps_update", woStatus = "in_progress")
             val body = slot<CompleteWorkOrderRequestDto>()
             coEvery { api.complete("WO-1", capture(body)) } returns detailDto()
             val handler = CompleteWorkOrderSyncHandler(api, dao, poleGpsRepository)
@@ -196,7 +200,7 @@ class CompleteWorkOrderSyncHandlerTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val poleGpsRepository = mockk<PoleGpsRepository>()
+            val poleGpsRepository = legacyGps()
             coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
             coEvery { poleGpsRepository.completionPoleLocations("WO-1") } returns null
             val body = slot<CompleteWorkOrderRequestDto>()
@@ -209,3 +213,8 @@ class CompleteWorkOrderSyncHandlerTest {
             assertTrue(!Json { encodeDefaults = false }.encodeToString(body.captured).contains("pole_locations"))
         }
 }
+
+private fun legacyGps(): PoleGpsRepository =
+    mockk<PoleGpsRepository>(relaxed = true).also {
+        coEvery { it.legacyCompletionPayload(any()) } returns null
+    }

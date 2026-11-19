@@ -2,11 +2,14 @@ package com.luxmap.feature.workorder.polegps.data
 
 import androidx.room.withTransaction
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dto.PoleLocationRequestDto
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
+import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import com.luxmap.feature.workorder.data.sync.EvidenceSyncPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -115,31 +118,121 @@ class PoleGpsRepository
             )
         }
 
-        suspend fun enqueuePendingPhotoUploads(workOrderId: String) {
-            dao.pendingPhotoMeasurements(workOrderId).forEach { measurement ->
+        suspend fun stageCompletion(completion: LocalWorkOrderCompletionEntity): Boolean {
+            val staged =
                 database.withTransaction {
-                    val clientOpId = UUID.randomUUID().toString()
-                    completionDao.insertEvidence(
-                        LocalWorkOrderEvidenceEntity(
-                            clientOpId = clientOpId,
-                            workOrderId = workOrderId,
-                            kind = "observation",
-                            filePath = measurement.photoFilePath!!,
-                            capturedAt = measurement.capturedAt,
-                            lat = measurement.lat,
-                            lng = measurement.lng,
-                            uploadStatus = "pending",
-                            poleId = measurement.poleId,
-                        ),
+                    val previous = completionDao.completionByWorkOrderId(completion.workOrderId)
+                    if (previous != null && previous.submitStatus != "draft") return@withTransaction false
+                    val payload =
+                        snapshotCompletion(
+                            completion.workOrderId,
+                            resetRetryableUploads = previous?.submitStatus == "draft",
+                        )
+                    completionDao.insertOrReplaceCompletion(completion)
+                    completionDao.insertSubmissionQueueRows(
+                        listOf(queueRow(completion.clientOpId, "complete_work_order", Json.encodeToString(payload))),
                     )
-                    syncQueueManager.enqueue(
-                        opType = "upload_work_order_evidence",
-                        payloadJson = Json.encodeToString(EvidenceSyncPayload(clientOpId)),
-                        clientOpId = clientOpId,
-                    )
-                    dao.updateEvidenceUploadStatus(workOrderId, measurement.poleId, "queued")
+                    true
                 }
+            if (staged) syncQueueManager.triggerSync()
+            return staged
+        }
+
+        suspend fun reopenFailedCompletion(workOrderId: String): Boolean {
+            if (detailSync.cached(workOrderId)?.taskKind != "pole_gps_update") return false
+            return database.withTransaction {
+                val completion =
+                    completionDao.completionByWorkOrderId(workOrderId)
+                        ?.takeIf { it.submitStatus == "failed" } ?: return@withTransaction false
+                val operation =
+                    completionDao.submissionOperation(completion.clientOpId, "complete_work_order")
+                        ?.takeIf { it.status == "failed" } ?: return@withTransaction false
+                // Keep all measurements and photos: the engineer decides which pole needs to be retaken.
+                completionDao.deleteFailedOperation(operation.id)
+                completionDao.updateCompletionSubmitStatus(workOrderId, "draft")
+                true
             }
+        }
+
+        // Old GPS submissions did not carry a snapshot or photo dependencies. Upgrade them durably before sending.
+        suspend fun legacyCompletionPayload(completion: LocalWorkOrderCompletionEntity): CompletionSyncPayload? {
+            val order = detailSync.cached(completion.workOrderId) ?: return null
+            if (order.taskKind != "pole_gps_update") return null
+            return database.withTransaction {
+                val payload = snapshotCompletion(completion.workOrderId, includeServerMeasurements = true)
+                completionDao.updateCompletionPayload(completion.clientOpId, Json.encodeToString(payload))
+                payload
+            }
+        }
+
+        private suspend fun snapshotCompletion(
+            workOrderId: String,
+            includeServerMeasurements: Boolean = false,
+            resetRetryableUploads: Boolean = false,
+        ): CompletionSyncPayload {
+            val order = checkNotNull(detailSync.cached(workOrderId)) { "Chưa có chi tiết lệnh GPS trên máy." }
+            check(order.taskKind == "pole_gps_update")
+            val measurements =
+                dao.measurements(workOrderId).filter {
+                    it.poleId in order.poleIds &&
+                        (includeServerMeasurements || it.source == MeasurementSourceColumn.DEVICE)
+                }
+            check(measurements.isNotEmpty()) { "Cần đo ít nhất một cột trước khi nộp báo cáo." }
+            val evidence = completionDao.evidenceForCompletion(workOrderId, "observation")
+            val operations = mutableListOf<SyncQueueEntity>()
+            val ids =
+                measurements.map { measurement ->
+                    check(
+                        measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
+                            measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
+                            measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
+                    ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
+                    val matching =
+                        evidence.firstOrNull {
+                            it.poleId == measurement.poleId && it.capturedAt == measurement.capturedAt &&
+                                it.lat == measurement.lat && it.lng == measurement.lng &&
+                                (measurement.photoFilePath == null || it.filePath == measurement.photoFilePath)
+                        }
+                    val photo =
+                        matching ?: run {
+                            val path = measurement.photoFilePath
+                            check(path != null && java.io.File(path).isFile) {
+                                "Thiếu ảnh cho cột ${measurement.poleId}. Hãy chụp và đo lại."
+                            }
+                            LocalWorkOrderEvidenceEntity(
+                                clientOpId = UUID.randomUUID().toString(),
+                                workOrderId = workOrderId,
+                                kind = "observation",
+                                filePath = path,
+                                capturedAt = measurement.capturedAt,
+                                lat = measurement.lat,
+                                lng = measurement.lng,
+                                uploadStatus = "pending",
+                                poleId = measurement.poleId,
+                            ).also { completionDao.insertEvidence(it) }
+                        }
+                    if (resetRetryableUploads) completionDao.resetRetryablePhoto(photo.clientOpId, Instant.now())
+                    if (completionDao.completionEvidenceStatus(workOrderId, photo.clientOpId) == null) {
+                        check(java.io.File(photo.filePath).isFile) { "Ảnh đã mất. Hãy chụp và đo lại cột." }
+                        operations +=
+                            queueRow(
+                                photo.clientOpId,
+                                "upload_work_order_evidence",
+                                Json.encodeToString(EvidenceSyncPayload(photo.clientOpId)),
+                            )
+                    }
+                    dao.linkEvidence(workOrderId, measurement.poleId, photo.clientOpId)
+                    photo.clientOpId
+                }
+            completionDao.insertSubmissionQueueRows(operations)
+            return CompletionSyncPayload(
+                workOrderId,
+                evidenceClientOpIds = ids,
+                poleLocations =
+                    measurements.map {
+                        PoleLocationRequestDto(it.poleId, it.lat, it.lng, it.accuracyM, it.capturedAt.toString())
+                    },
+            )
         }
 
         fun observeAttachments(workOrderId: String): Flow<List<PoleGpsAttachment>> =
@@ -183,3 +276,20 @@ class PoleGpsRepository
                 }
         }
     }
+
+private fun queueRow(
+    clientOpId: String,
+    opType: String,
+    payload: String,
+): SyncQueueEntity {
+    val now = Instant.now()
+    return SyncQueueEntity(
+        clientOpId = clientOpId,
+        opType = opType,
+        payloadJson = payload,
+        dependsOnClientOpId = null,
+        status = "queued",
+        createdAt = now,
+        updatedAt = now,
+    )
+}

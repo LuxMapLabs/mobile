@@ -8,6 +8,7 @@ data class GpsFix(
     val lng: Double,
     val accuracyM: Double,
     val capturedAt: Instant,
+    val elapsedRealtimeNanos: Long,
 )
 
 interface GpsFixSource {

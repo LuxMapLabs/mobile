@@ -2,10 +2,13 @@ package com.luxmap.feature.survey.ui.hub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.feature.survey.data.AssignedRoutesResult
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -14,7 +17,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import java.io.IOException
 import javax.inject.Inject
 
@@ -47,7 +52,11 @@ class SurveyHubViewModel
 
         fun onRetry() {
             val current = _uiState.value
-            if (current !is SurveyHubUiState.Error && current !is SurveyHubUiState.Empty) return
+            if (current !is SurveyHubUiState.Error && current !is SurveyHubUiState.Empty &&
+                current !is SurveyHubUiState.OfflineEmpty
+            ) {
+                return
+            }
             _uiState.value = SurveyHubUiState.Loading
             load()
         }
@@ -117,24 +126,44 @@ class SurveyHubViewModel
             }
         }
 
+        private fun Flow<AssignedRoutesResult>.isolated(): Flow<Result<AssignedRoutesResult>> =
+            map { Result.success(it) }.catch { error ->
+                if (error is CancellationException) throw error
+                if (error is HttpException && (error.code() == 401 || error.code() == 403)) throw error
+                emit(Result.failure(error))
+            }
+
         private fun load() {
             loadJob?.cancel()
             loadJob =
                 viewModelScope.launch {
                     combine(
-                        repository.observeAssignedRoutes(),
-                        repository.observeAssignedPoleGpsOrders(),
+                        repository.observeAssignedRoutes().isolated(),
+                        repository.observeAssignedPoleGpsOrders().isolated(),
                         completionRepository.observeCompletedWorkOrderIds(),
                         completionRepository.observeCompletionSyncStates(),
-                    ) { routesResult, poleGpsOrders, completedIds, syncStates ->
+                    ) { surveySource, gpsSource, completedIds, syncStates ->
+                        val routesResult = surveySource.getOrElse { AssignedRoutesResult(emptyList(), true) }
+                        val gpsResult = gpsSource.getOrElse { AssignedRoutesResult(emptyList(), true) }
+                        val poleGpsOrders = gpsResult.routes
+                        val stale = routesResult.isStale || gpsResult.isStale
                         val groups = surveyHubGroups(routesResult.routes, poleGpsOrders, syncStates, completedIds)
                         if (groups.isEmpty()) {
-                            SurveyHubUiState.Empty
+                            val failure = surveySource.exceptionOrNull() ?: gpsSource.exceptionOrNull()
+                            when {
+                                failure is IOException -> SurveyHubUiState.OfflineEmpty
+                                failure != null ->
+                                    SurveyHubUiState.Error(
+                                        failure.message ?: "Không tải được Khảo sát", failure is IOException,
+                                    )
+                                stale -> SurveyHubUiState.OfflineEmpty
+                                else -> SurveyHubUiState.Empty
+                            }
                         } else {
                             SurveyHubUiState.Success(
                                 assignedRoutes = routesResult.routes,
                                 assignedPoleGpsOrders = poleGpsOrders,
-                                isStale = routesResult.isStale,
+                                isStale = stale,
                                 cancelledWorkOrderIds = cancelledWorkOrderIds,
                                 locallyCompletedWorkOrderIds = completedIds,
                                 completionSyncStates = syncStates,

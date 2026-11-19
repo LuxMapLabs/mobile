@@ -7,11 +7,16 @@ import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dto.CompleteWorkOrderRequestDto
 import com.luxmap.feature.workorder.data.dto.FaultOutcomeRequestDto
+import com.luxmap.feature.workorder.data.dto.PoleLocationRequestDto
+import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 import java.io.IOException
+import java.time.OffsetDateTime
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 class CompleteWorkOrderSyncHandler
@@ -27,11 +32,25 @@ class CompleteWorkOrderSyncHandler
             payloadJson: String,
             onProgress: suspend (Long, Long) -> Unit,
         ): SyncOpResult {
-            val payload = Json.decodeFromString<CompletionSyncPayload>(payloadJson)
+            var payload = Json.decodeFromString<CompletionSyncPayload>(payloadJson)
             val completion =
                 dao.completionByWorkOrderId(payload.workOrderId)
                     ?: return SyncOpResult.Failed("Local completion row missing")
             if (completion.submitStatus == "synced") return SyncOpResult.Done
+            if (payload.poleLocations == null) {
+                try {
+                    payload = poleGpsRepository.legacyCompletionPayload(completion) ?: payload
+                } catch (e: IllegalStateException) {
+                    dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                    return SyncOpResult.Failed(e.message ?: "Không phục hồi được báo cáo GPS. Hãy đo lại.")
+                }
+            }
+            if (payload.poleLocations != null &&
+                (payload.poleLocations!!.isEmpty() || payload.evidenceClientOpIds.isNullOrEmpty())
+            ) {
+                dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                return SyncOpResult.Failed("Báo cáo GPS thiếu tọa độ hoặc liên kết ảnh. Hãy đo lại.")
+            }
             val evidenceStates =
                 payload.evidenceClientOpIds.orEmpty().associateWith {
                     dao.completionEvidenceStatus(payload.workOrderId, it)
@@ -61,6 +80,26 @@ class CompleteWorkOrderSyncHandler
             val outcomes = completion.faultOutcomesJson?.let { Json.decodeFromString<List<FaultOutcome>>(it) }
 
             return try {
+                if (payload.poleLocations != null) {
+                    // GET also resolves an interrupted POST whose server transaction already committed.
+                    val remote = api.detail(payload.workOrderId)
+                    if (remote.taskKind != "pole_gps_update") {
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
+                        return SyncOpResult.Conflict("Loại công việc trên máy chủ đã thay đổi.")
+                    }
+                    val accepted = remote.woStatus in setOf("done", "verified")
+                    val returned = remote.woStatus == "in_progress" && !remote.reviewNote.isNullOrBlank()
+                    if ((accepted || returned) && remote.matchesGpsReport(completion, payload.poleLocations!!)) {
+                        // A manager may have returned an accepted report while the app was interrupted.
+                        // Do not undo that decision by automatically POSTing the old report again.
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "synced")
+                        return SyncOpResult.Done
+                    }
+                    if (accepted) {
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
+                        return SyncOpResult.Conflict("Máy chủ đã nhận một báo cáo GPS khác. Cần đối chiếu.")
+                    }
+                }
                 api.complete(
                     id = payload.workOrderId,
                     body =
@@ -68,7 +107,7 @@ class CompleteWorkOrderSyncHandler
                             reportNote = completion.reportNote,
                             materialsUsed = completion.materialsUsed,
                             faultOutcomes = outcomes?.map { FaultOutcomeRequestDto(it.faultId, it.outcome) },
-                            poleLocations = poleGpsRepository.completionPoleLocations(payload.workOrderId),
+                            poleLocations = payload.poleLocations,
                         ),
                 )
                 dao.updateCompletionSubmitStatus(payload.workOrderId, "synced")
@@ -95,3 +134,26 @@ class CompleteWorkOrderSyncHandler
             val terminalReviewErrors = setOf("failed", "conflict")
         }
     }
+
+private fun WorkOrderDetailDto.matchesGpsReport(
+    completion: LocalWorkOrderCompletionEntity,
+    expected: List<PoleLocationRequestDto>,
+): Boolean {
+    if (reportNote?.trim() != completion.reportNote.trim() ||
+        materialsUsed.orEmpty().trim() != completion.materialsUsed.orEmpty().trim() ||
+        poleLocations.size != expected.size
+    ) {
+        return false
+    }
+    val actual = poleLocations.associateBy { it.poleId }
+    return actual.size == expected.size &&
+        expected.all { sent ->
+            val received = actual[sent.poleId]
+            val sentAt = normalizedGpsTime(sent.capturedAt)
+            received != null && sentAt != null && received.lat == sent.lat && received.lng == sent.lng &&
+                received.accuracyM == sent.accuracyM && normalizedGpsTime(received.capturedAt) == sentAt
+        }
+}
+
+private fun normalizedGpsTime(value: String) =
+    runCatching { OffsetDateTime.parse(value).toInstant().truncatedTo(ChronoUnit.MICROS) }.getOrNull()

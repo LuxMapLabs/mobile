@@ -57,12 +57,27 @@ class SurveyHubViewModelTest {
                 flowOf(AssignedRoutesResult(routes, isStale))
             }
         every { repository.observeAssignedPoleGpsOrders() } returns
-            if (poleGpsThrows) flow { throw IllegalStateException("x") } else flowOf(poleGpsOrders)
+            if (poleGpsThrows) {
+                flow { throw IllegalStateException("x") }
+            } else {
+                flowOf(AssignedRoutesResult(poleGpsOrders, false))
+            }
         val completionRepository = mockk<WorkOrderCompletionRepository>()
         every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
         every { completionRepository.observeCompletionSyncStates() } returns flowOf(syncStates)
         return SurveyHubViewModel(repository, completionRepository)
     }
+
+    @Test
+    fun `survey failure preserves available GPS cache and marks hub stale`() =
+        runTest {
+            viewModel(repositoryFlowThrows = true, poleGpsOrders = listOf(route)).uiState.test {
+                awaitItem()
+                val state = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(route), state.assignedPoleGpsOrders)
+                assertTrue(state.isStale)
+            }
+        }
 
     @Before
     fun setUp() {
@@ -139,7 +154,7 @@ class SurveyHubViewModelTest {
                     flow { throw IllegalStateException("offline") },
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                 )
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
@@ -165,7 +180,7 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
@@ -190,7 +205,7 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
@@ -220,7 +235,7 @@ class SurveyHubViewModelTest {
                     flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
                     flowOf(AssignedRoutesResult(listOf(startedRoute), isStale = false)),
                 )
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
@@ -242,7 +257,7 @@ class SurveyHubViewModelTest {
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(AssignedRoutesResult(listOf(route), false))
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
@@ -309,20 +324,20 @@ class SurveyHubViewModelTest {
         }
 
     @Test
-    fun `an IOException is a network error`() =
+    fun `offline without cached rows is distinct from live empty`() =
         runTest {
             viewModel(repositoryFlowThrows = true, routesThrowable = IOException("timeout")).uiState.test {
                 assertEquals(SurveyHubUiState.Loading, awaitItem())
-                assertEquals(true, (awaitItem() as SurveyHubUiState.Error).isNetworkError)
+                assertEquals(SurveyHubUiState.OfflineEmpty, awaitItem())
             }
         }
 
     @Test
-    fun `a pole gps flow failure shows Error, not a crash`() =
+    fun `a pole gps flow failure preserves survey rows marked stale`() =
         runTest {
             viewModel(routes = listOf(route), poleGpsThrows = true).uiState.test {
                 assertEquals(SurveyHubUiState.Loading, awaitItem())
-                assertEquals(false, (awaitItem() as SurveyHubUiState.Error).isNetworkError)
+                assertEquals(true, (awaitItem() as SurveyHubUiState.Success).isStale)
             }
         }
 
@@ -344,7 +359,7 @@ class SurveyHubViewModelTest {
         runTest {
             val repository = mockk<SurveyRepository>()
             every { repository.observeAssignedRoutes() } returns flowOf(AssignedRoutesResult(listOf(route), false))
-            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(emptyList())
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             val started = CompletableDeferred<Result<Unit>>()
             coEvery { repository.startRoute("WO-1") } coAnswers { started.await() }
             val syncStates = MutableStateFlow<Map<String, CompletionSyncState>>(emptyMap())

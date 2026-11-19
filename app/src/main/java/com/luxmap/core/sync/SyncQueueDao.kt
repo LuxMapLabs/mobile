@@ -15,7 +15,10 @@ interface SyncQueueDao {
     @Query(
         "SELECT * FROM sync_queue WHERE status = 'queued' OR " +
             "(status = 'syncing' AND opType IN (" +
-            "'upload_work_order_evidence', 'upload_pole_photo', 'upload_pole_video')) " +
+            "'upload_work_order_evidence', 'upload_pole_photo', 'upload_pole_video')) OR " +
+            "(status = 'syncing' AND opType = 'complete_work_order' AND clientOpId IN (" +
+            "SELECT completion.clientOpId FROM local_work_order_completion AS completion " +
+            "INNER JOIN local_pole_gps_order AS gps ON gps.workOrderId = completion.workOrderId)) " +
             "ORDER BY createdAt ASC, id ASC",
     )
     suspend fun queuedRows(): List<SyncQueueEntity>

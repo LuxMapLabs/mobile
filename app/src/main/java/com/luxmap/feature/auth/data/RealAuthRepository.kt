@@ -2,6 +2,7 @@ package com.luxmap.feature.auth.data
 
 import com.luxmap.core.network.AuthApi
 import com.luxmap.core.security.TokenStore
+import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -19,6 +20,7 @@ class RealAuthRepository
     constructor(
         private val authApi: AuthApi,
         private val tokenStore: TokenStore,
+        private val surveyRouteCacheDao: SurveyRouteCacheDao,
     ) : AuthRepository {
         override suspend fun login(
             identifier: String,
@@ -28,6 +30,8 @@ class RealAuthRepository
             return runCatching { authApi.login(LoginRequestDto(identifier, password)) }
                 .fold(
                     onSuccess = { tokens ->
+                        tokenStore.clearCachedUserId()
+                        surveyRouteCacheDao.deleteAll()
                         tokenStore.saveSession(
                             tokens.access_token,
                             tokens.refresh_token,
@@ -49,6 +53,8 @@ class RealAuthRepository
             return runCatching { authApi.google(GoogleLoginRequestDto(idToken)) }
                 .fold(
                     onSuccess = { tokens ->
+                        tokenStore.clearCachedUserId()
+                        surveyRouteCacheDao.deleteAll()
                         tokenStore.saveSession(
                             tokens.access_token,
                             tokens.refresh_token,
@@ -70,6 +76,7 @@ class RealAuthRepository
                 runCatching { authApi.logout(LogoutRequestDto(refreshToken)) }
             }
             tokenStore.clear()
+            surveyRouteCacheDao.deleteAll()
             return Result.success(Unit)
         }
 
