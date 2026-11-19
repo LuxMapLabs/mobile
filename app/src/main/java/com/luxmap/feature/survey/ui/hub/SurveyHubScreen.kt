@@ -157,6 +157,15 @@ fun SurveyHubScreen(
                         onOpenWorkOrderDetail = onOpenWorkOrderDetail,
                     )
 
+                is SurveyHubUiState.OfflineEmpty ->
+                    LuxEmptyState(
+                        title = "Chưa có dữ liệu đã lưu",
+                        message = "Kết nối mạng để tải danh sách. Mở lệnh và tải PDF trước khi đi hiện trường.",
+                        icon = Icons.Filled.EventAvailable,
+                        actionLabel = "Thử lại",
+                        onAction = onRetry,
+                    )
+
                 is SurveyHubUiState.Empty ->
                     LuxEmptyState(
                         title = "Chưa có việc khảo sát được giao",
@@ -248,7 +257,9 @@ private fun SurveyHubContent(
         if (state.isStale) {
             item(key = "stale") {
                 LuxBanner(
-                    message = "Đang xem danh sách đã lưu trên máy, có thể chưa phải bản mới nhất",
+                    message =
+                        "Danh sách có thể chưa đầy đủ hoặc mới nhất. " +
+                            "Mở lệnh và tải PDF khi có mạng trước khi đi hiện trường.",
                     tone = LuxBannerTone.INFO,
                 )
             }

@@ -64,3 +64,16 @@ val MIGRATION_21_22: Migration =
             db.execSQL("DELETE FROM sync_queue WHERE opType = 'update_pole_location'")
         }
     }
+
+val MIGRATION_22_23: Migration =
+    object : Migration(22, 23) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_assigned_survey_route ADD COLUMN ownerUserId TEXT")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_assigned_pole_gps_order (ownerUserId TEXT NOT NULL, " +
+                    "workOrderId TEXT NOT NULL, title TEXT NOT NULL, communeId TEXT NOT NULL, " +
+                    "woStatus TEXT NOT NULL, dueDate TEXT, scheduledDate TEXT, " +
+                    "PRIMARY KEY(ownerUserId, workOrderId))",
+            )
+        }
+    }

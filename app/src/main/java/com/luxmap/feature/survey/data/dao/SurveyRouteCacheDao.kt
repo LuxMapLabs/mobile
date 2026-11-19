@@ -12,6 +12,9 @@ interface SurveyRouteCacheDao {
     @Query("SELECT * FROM local_assigned_survey_route ORDER BY scheduledDate")
     suspend fun all(): List<LocalAssignedSurveyRouteEntity>
 
+    @Query("SELECT * FROM local_assigned_survey_route WHERE ownerUserId = :ownerUserId ORDER BY scheduledDate")
+    suspend fun allForOwner(ownerUserId: String): List<LocalAssignedSurveyRouteEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(items: List<LocalAssignedSurveyRouteEntity>)
 

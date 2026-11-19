@@ -42,12 +42,18 @@ class FusedGpsFixSource
                                     lat = location.latitude,
                                     lng = location.longitude,
                                     accuracyM = location.accuracy.toDouble(),
-                                    capturedAt = Instant.now(),
+                                    capturedAt = Instant.ofEpochMilli(location.time),
+                                    elapsedRealtimeNanos = location.elapsedRealtimeNanos,
                                 ),
                             )
                         }
                     }
-                client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+                try {
+                    client.requestLocationUpdates(request, callback, Looper.getMainLooper())
+                        .addOnFailureListener { close(it) }
+                } catch (error: SecurityException) {
+                    close(error)
+                }
                 awaitClose { client.removeLocationUpdates(callback) }
             }
     }

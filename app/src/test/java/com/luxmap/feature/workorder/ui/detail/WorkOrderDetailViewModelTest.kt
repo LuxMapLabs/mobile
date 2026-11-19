@@ -19,7 +19,6 @@ import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -623,7 +622,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `submit for pole_gps_update enqueues pending photo uploads before completing`() =
+    fun `submit for pole_gps_update delegates atomic staging to the completion repository`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
@@ -647,8 +646,7 @@ class WorkOrderDetailViewModelTest {
             vm.submit()
             dispatcher.scheduler.advanceUntilIdle()
 
-            coVerifyOrder {
-                poleGpsRepository.enqueuePendingPhotoUploads(WORK_ORDER_ID)
+            coVerify(exactly = 1) {
                 completionRepository.submitCompletion(any(), any(), any(), any(), any())
             }
         }
@@ -736,4 +734,44 @@ class WorkOrderDetailViewModelTest {
 
             coVerify { poleGpsRepository.retryAttachment(WORK_ORDER_ID, "A-1") }
         }
+
+    @Test
+    fun `returned GPS order prepares its synced submission for new measurements`() =
+        runTest {
+            val gps = mockk<PoleGpsRepository>(relaxed = true)
+            val reports = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            every { gps.observeMeasurements(WORK_ORDER_ID) } returns
+                flowOf(
+                    listOf(PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.EPOCH, MeasurementSource.DEVICE)),
+                )
+            every { gps.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            val previous = LocalWorkOrderCompletionEntity(WORK_ORDER_ID, "Đã đo tọa độ", null, null, "OLD", "synced")
+            val vm =
+                viewModel(
+                    detail = poleGpsDetail().copy(woStatus = "in_progress", reviewNote = "Đo lại vị trí cột"),
+                    poleGpsRepository = gps,
+                    completionRepository = reports,
+                    completion = previous,
+                )
+            advanceUntilIdle()
+            vm.onReportNoteChanged("Đã đo lại vị trí cột")
+            vm.submit()
+            advanceUntilIdle()
+            coVerify(exactly = 1) { reports.prepareEvidenceRework(WORK_ORDER_ID, "OLD") }
+            coVerify(exactly = 1) { reports.submitCompletion(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `prior server measurements alone are not a new partial GPS report`() {
+        val state =
+            WorkOrderDetailUiState.Success(
+                detail = poleGpsDetail(),
+                reportNote = "Đã kiểm tra hiện trường",
+                poleMeasurements =
+                    listOf(
+                        PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.EPOCH, MeasurementSource.SERVER),
+                    ),
+            )
+        assertFalse(state.canSubmit())
+    }
 }

@@ -68,6 +68,16 @@ abstract class PoleGpsDao {
     abstract suspend fun measurements(workOrderId: String): List<LocalPoleGpsMeasurementEntity>
 
     @Query(
+        "UPDATE local_pole_gps_measurement SET evidenceClientOpId = :clientOpId, evidenceUploadStatus = 'queued' " +
+            "WHERE workOrderId = :workOrderId AND poleId = :poleId",
+    )
+    abstract suspend fun linkEvidence(
+        workOrderId: String,
+        poleId: String,
+        clientOpId: String,
+    )
+
+    @Query(
         "UPDATE local_pole_gps_measurement SET evidenceUploadStatus = :status " +
             "WHERE workOrderId = :workOrderId AND poleId = :poleId",
     )

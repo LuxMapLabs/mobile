@@ -8,6 +8,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import com.luxmap.feature.workorder.data.sync.EvidenceSyncPayload
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
+import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -28,6 +29,7 @@ class RealWorkOrderCompletionRepository
         private val dao: WorkOrderCompletionDao,
         private val syncQueueManager: SyncQueueManager,
         private val syncQueueDao: SyncQueueDao,
+        private val poleGpsRepository: PoleGpsRepository,
     ) : WorkOrderCompletionRepository {
         override fun observeEvidence(workOrderId: String): Flow<LocalWorkOrderEvidenceEntity?> =
             dao.observeLatestEvidence(workOrderId)
@@ -88,6 +90,7 @@ class RealWorkOrderCompletionRepository
         }
 
         override suspend fun reopenEvidenceSubmission(workOrderId: String): Boolean {
+            if (poleGpsRepository.reopenFailedCompletion(workOrderId)) return true
             val discardedFiles = dao.reopenEvidenceSubmission(workOrderId) ?: return false
             discardedFiles.forEach { File(it).delete() }
             return true
@@ -158,6 +161,10 @@ class RealWorkOrderCompletionRepository
                     clientOpId = clientOpId,
                     submitStatus = "pending",
                 )
+            if (taskKind == "pole_gps_update") {
+                poleGpsRepository.stageCompletion(completion)
+                return
+            }
             val evidenceKind =
                 when (taskKind) {
                     "repair" -> EvidenceKind.AFTER

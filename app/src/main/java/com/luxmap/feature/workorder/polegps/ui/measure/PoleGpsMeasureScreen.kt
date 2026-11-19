@@ -15,18 +15,20 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,7 +48,9 @@ import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.workorder.polegps.data.GpsFix
 import java.io.File
+import java.util.Locale
 
 @Composable
 fun PoleGpsMeasureRoute(
@@ -55,10 +59,15 @@ fun PoleGpsMeasureRoute(
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
-    var pendingFile by remember { mutableStateOf<File?>(null) }
-    var previewFile by remember { mutableStateOf<File?>(null) }
-    var hasLocationPermission by remember { mutableStateOf(false) }
-    var isSaving by remember { mutableStateOf(false) }
+    var pendingPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var previewPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val pendingFile = pendingPath?.let(::File)
+    val previewFile = previewPath?.let(::File)
+    var hasLocationPermission by rememberSaveable { mutableStateOf(false) }
+    val isSaving by viewModel.isSaving.collectAsState()
+    val currentFix by viewModel.currentFix.collectAsState()
+    val confirmation by viewModel.pendingConfirmation.collectAsState()
+    LocationWatchingEffect(hasLocationPermission, viewModel)
     val locationMissing by viewModel.locationMissing.collectAsState()
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
 
@@ -66,7 +75,7 @@ fun PoleGpsMeasureRoute(
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val file = pendingFile
             if (success && file != null) {
-                previewFile = file
+                previewPath = file.absolutePath
             } else {
                 onBack()
             }
@@ -74,9 +83,15 @@ fun PoleGpsMeasureRoute(
 
     fun launchCamera() {
         val file = viewModel.outputFile(context.filesDir)
-        pendingFile = file
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        takePictureLauncher.launch(uri)
+        pendingPath = file.absolutePath
+        if (hasLocationPermission) viewModel.startWatchingLocation()
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            takePictureLauncher.launch(uri)
+        } catch (_: Exception) {
+            pendingPath = null
+            viewModel.onCameraFailure()
+        }
     }
 
     // CAMERA is a hard requirement here - some OEM camera apps (confirmed on a real Samsung
@@ -86,7 +101,7 @@ fun PoleGpsMeasureRoute(
     val permissionsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
             hasLocationPermission = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
-            if (result[Manifest.permission.CAMERA] == true) {
+            if (result[Manifest.permission.CAMERA] == true && hasLocationPermission) {
                 viewModel.onPermissionGranted()
                 launchCamera()
             } else {
@@ -101,7 +116,7 @@ fun PoleGpsMeasureRoute(
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
         when {
-            cameraGranted -> {
+            cameraGranted && hasLocationPermission -> {
                 viewModel.onPermissionGranted()
                 launchCamera()
             }
@@ -118,7 +133,10 @@ fun PoleGpsMeasureRoute(
     fun retryPermissions() {
         val cameraGranted =
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (cameraGranted) {
+        hasLocationPermission =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (cameraGranted && hasLocationPermission) {
             viewModel.onPermissionGranted()
             launchCamera()
         } else {
@@ -129,6 +147,7 @@ fun PoleGpsMeasureRoute(
     val retryLocationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             hasLocationPermission = granted
+            if (granted) viewModel.startWatchingLocation()
             previewFile?.let { viewModel.onPhotoCaptured(it, granted, onBack) }
         }
 
@@ -149,23 +168,45 @@ fun PoleGpsMeasureRoute(
         onBack()
     }
 
-    LaunchedEffect(Unit) { requestPermissionsAndStart() }
+    LaunchedEffect(Unit) {
+        if (pendingPath == null && previewPath == null) requestPermissionsAndStart()
+    }
 
     val fileToPreview = previewFile
     if (fileToPreview != null) {
         PhotoPreview(
             file = fileToPreview,
-            isSaving = isSaving && !locationMissing,
+            isSaving = isSaving,
+            fix = currentFix,
             onConfirm = {
-                isSaving = true
+                hasLocationPermission =
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
                 viewModel.onPhotoCaptured(fileToPreview, hasLocationPermission, onBack)
             },
             onRetake = {
                 fileToPreview.delete()
-                previewFile = null
+                previewPath = null
                 launchCamera()
             },
         )
+        confirmation?.let { candidate ->
+            LowAccuracyConfirmation(
+                fix = candidate,
+                onConfirm = {
+                    val granted =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                            PackageManager.PERMISSION_GRANTED
+                    if (granted) {
+                        viewModel.confirmLowAccuracy()
+                    } else {
+                        hasLocationPermission = false
+                        viewModel.onPhotoCaptured(fileToPreview, false, onBack)
+                    }
+                },
+                onRetry = viewModel::retryMeasurement,
+            )
+        }
         if (locationMissing) {
             LuxConfirmDialog(
                 title = "Chưa lấy được vị trí",
@@ -203,14 +244,15 @@ fun PoleGpsMeasureContent(
 }
 
 @Composable
-private fun PhotoPreview(
+internal fun PhotoPreview(
     file: File,
     isSaving: Boolean,
+    fix: GpsFix?,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().padding(Spacing.lg),
+        modifier = Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.lg),
     ) {
         AsyncImage(
@@ -219,6 +261,10 @@ private fun PhotoPreview(
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(RoundedCornerShape(Radius.card)),
         )
+        fix?.let {
+            Text("Sai số GPS: ±%.1f m".format(Locale.ROOT, it.accuracyM), style = MaterialTheme.typography.bodyLarge)
+            Text("Thời gian mẫu: ${it.capturedAt}", style = MaterialTheme.typography.bodyMedium)
+        }
         CaptureActions(enabled = !isSaving, isSaving = isSaving, onRetake = onRetake, onConfirm = onConfirm)
     }
 }
@@ -279,4 +325,35 @@ private fun CenteredMessage(
             PrimaryButton(text = actionLabel, onClick = onAction, modifier = Modifier.fillMaxWidth())
         }
     }
+}
+
+@Composable
+internal fun LocationWatchingEffect(
+    fineLocationGranted: Boolean,
+    viewModel: PoleGpsMeasureViewModel,
+) {
+    LaunchedEffect(fineLocationGranted, viewModel) {
+        if (fineLocationGranted) viewModel.startWatchingLocation() else viewModel.stopWatchingLocation()
+    }
+    DisposableEffect(viewModel) {
+        onDispose { viewModel.stopWatchingLocation() }
+    }
+}
+
+@Composable
+internal fun LowAccuracyConfirmation(
+    fix: GpsFix,
+    onConfirm: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    LuxConfirmDialog(
+        title = "Sai số GPS lớn",
+        message =
+            "Sai số GPS: ±%.1f m\nThời gian mẫu: %s\n".format(Locale.ROOT, fix.accuracyM, fix.capturedAt) +
+                "Có thể chờ tín hiệu tốt hơn và đo lại, hoặc xác nhận lưu vị trí này.",
+        confirmLabel = "Vẫn lưu vị trí này",
+        onConfirm = onConfirm,
+        onDismiss = onRetry,
+        dismissLabel = "Đo lại",
+    )
 }

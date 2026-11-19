@@ -14,6 +14,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,6 +30,7 @@ import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxListItem
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
+import com.luxmap.feature.workorder.polegps.data.MeasurementSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
@@ -36,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 
 @Composable
 internal fun PoleGpsSection(
@@ -75,7 +78,9 @@ internal fun PoleGpsSection(
             }
         }
     val referenceIds = references.map { it.poleId }.toSet()
-    val measuredIds = measurements.map { it.poleId }.toSet().intersect(referenceIds)
+    val measuredIds =
+        measurements.filter { it.source == MeasurementSource.DEVICE }
+            .map { it.poleId }.toSet().intersect(referenceIds)
 
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -96,13 +101,21 @@ internal fun PoleGpsSection(
             }
         }
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            CountedSectionHeader(title = "Cột đèn", count = "${measuredIds.size}/${references.size} đã đo")
+            CountedSectionHeader(title = "Cột đèn", count = "${measuredIds.size}/${references.size} đã đo trên máy")
+            if (measurements.any { it.source == MeasurementSource.SERVER }) {
+                Text(
+                    "Báo cáo mới chỉ gửi các cột đã chụp ảnh trên thiết bị này. " +
+                        "Cột đã báo trước cần chụp lại để gửi lại.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             ListCard {
                 references.forEachIndexed { index, reference ->
                     if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     PoleGpsItem(
                         reference = reference,
-                        measured = measurements.any { it.poleId == reference.poleId },
+                        measurement = measurements.firstOrNull { it.poleId == reference.poleId },
                         enabled = canCapture,
                         onClick = { onMeasurePole(reference.poleId) },
                     )
@@ -168,24 +181,31 @@ private fun PdfAttachmentItem(
 @Composable
 private fun PoleGpsItem(
     reference: PoleReference,
-    measured: Boolean,
+    measurement: PoleMeasurement?,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     val oldPosition =
         if (reference.lat != null && reference.lng != null) {
-            "%.6f, %.6f".format(reference.lat, reference.lng)
+            "%.6f, %.6f".format(Locale.ROOT, reference.lat, reference.lng)
         } else {
             "Chưa có"
         }
     LuxListItem(
         headline = reference.poleId,
-        supporting = "GPS cũ: $oldPosition",
+        supporting =
+            measurement?.let {
+                "GPS đã ghi nhận: %.6f, %.6f\nSai số GPS: ±%.1f m\nThời gian mẫu: %s"
+                    .format(Locale.ROOT, it.lat, it.lng, it.accuracyM, it.capturedAt)
+            } ?: "GPS cũ: $oldPosition",
         leadingIcon = Icons.Filled.LocationOn,
         onClick = if (enabled) onClick else null,
         trailing = {
             when {
-                measured -> StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                measurement?.source == MeasurementSource.DEVICE ->
+                    StatusBadge(text = "Đã đo", colors = WorkOrderStatus.VERIFIED.badgeColors())
+                measurement?.source == MeasurementSource.SERVER ->
+                    StatusBadge(text = "Đã báo trước", colors = WorkOrderStatus.OPEN.badgeColors())
                 !enabled -> StatusBadge(text = "Chưa bắt đầu", colors = WorkOrderStatus.OPEN.badgeColors())
                 else -> StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
             }

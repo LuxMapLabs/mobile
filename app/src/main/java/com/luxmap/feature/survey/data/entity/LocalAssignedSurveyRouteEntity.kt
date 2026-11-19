@@ -13,4 +13,5 @@ data class LocalAssignedSurveyRouteEntity(
     val woStatus: String,
     val dueDate: String?,
     val scheduledDate: String?,
+    val ownerUserId: String? = null,
 )

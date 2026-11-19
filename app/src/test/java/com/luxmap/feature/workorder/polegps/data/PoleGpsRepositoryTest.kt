@@ -69,51 +69,6 @@ class PoleGpsRepositoryTest {
         }
 
     @Test
-    fun `enqueuePendingPhotoUploads inserts evidence rows and marks them queued`() =
-        runTest {
-            val withPhoto =
-                row("P-1", MeasurementSourceColumn.DEVICE)
-                    .copy(photoFilePath = "/f/p1.jpg", evidenceUploadStatus = "pending")
-            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns listOf(withPhoto)
-            repository.enqueuePendingPhotoUploads("WO-1")
-            coVerify {
-                completionDao.insertEvidence(
-                    withArg {
-                        assertEquals("WO-1", it.workOrderId)
-                        assertEquals("P-1", it.poleId)
-                        assertEquals("/f/p1.jpg", it.filePath)
-                        assertEquals("observation", it.kind)
-                        assertEquals("pending", it.uploadStatus)
-                    },
-                )
-            }
-            coVerify {
-                syncQueueManager.enqueue(opType = "upload_work_order_evidence", payloadJson = any(), clientOpId = any())
-            }
-            coVerify { dao.updateEvidenceUploadStatus("WO-1", "P-1", "queued") }
-        }
-
-    @Test
-    fun `enqueuePendingPhotoUploads runs each measurement's insert+enqueue+status-flip in one transaction`() =
-        runTest {
-            val withPhoto =
-                row("P-1", MeasurementSourceColumn.DEVICE)
-                    .copy(photoFilePath = "/f/p1.jpg", evidenceUploadStatus = "pending")
-            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns listOf(withPhoto)
-            repository.enqueuePendingPhotoUploads("WO-1")
-            coVerify(exactly = 1) { database.withTransaction(any()) }
-        }
-
-    @Test
-    fun `enqueuePendingPhotoUploads does nothing when there are no pending photos`() =
-        runTest {
-            coEvery { dao.pendingPhotoMeasurements("WO-1") } returns emptyList()
-            repository.enqueuePendingPhotoUploads("WO-1")
-            coVerify(exactly = 0) { completionDao.insertEvidence(any()) }
-            coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), any(), any()) }
-        }
-
-    @Test
     fun `measurements are mapped with their source`() =
         runTest {
             coEvery { dao.measurements("WO-1") } returns

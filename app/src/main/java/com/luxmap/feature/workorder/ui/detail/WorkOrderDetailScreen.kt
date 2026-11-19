@@ -603,21 +603,29 @@ private fun EvidenceRecoveryActions(
     val retry =
         state.localEvidence.any { it.uploadStatus == "retryable_error" } &&
             state.localEvidence.none { it.uploadStatus in setOf("replaceable_error", "failed", "conflict") }
+    val reopenGps = state.detail.taskKind == "pole_gps_update" && !retry
+    val canReplace = replace || reopenGps
     var confirmReplacement by rememberSaveable { mutableStateOf(false) }
-    if (replace && allowReplacement) {
+    if (canReplace && allowReplacement) {
         LuxSecondaryButton(
-            text = "Thay ảnh lỗi",
+            text = if (reopenGps) "Mở lại báo cáo GPS" else "Thay ảnh lỗi",
             enabled = !state.isSubmitting,
             onClick = { confirmReplacement = true },
         )
     } else if (retry) {
         LuxSecondaryButton(text = "Thử lại ảnh lỗi", enabled = !state.isSubmitting, onClick = { onRecover(false) })
     }
-    if (confirmReplacement && replace && allowReplacement) {
+    if (confirmReplacement && canReplace && allowReplacement) {
         LuxConfirmDialog(
             title = "Mở lại bản nộp?",
-            message = "App sẽ bỏ các ảnh hỏng hoặc bị từ chối và giữ lại nội dung báo cáo cùng các ảnh còn lại.",
-            confirmLabel = "Mở lại để thay ảnh",
+            message =
+                if (reopenGps) {
+                    "App giữ lại ảnh, tọa độ và ghi chú. Hãy kiểm tra các cột, " +
+                        "chụp và đo lại cột thiếu dữ liệu trước khi nộp."
+                } else {
+                    "App sẽ bỏ các ảnh hỏng hoặc bị từ chối và giữ lại nội dung báo cáo cùng các ảnh còn lại."
+                },
+            confirmLabel = if (reopenGps) "Mở lại báo cáo" else "Mở lại để thay ảnh",
             dismissLabel = "Quay lại",
             onConfirm = {
                 confirmReplacement = false

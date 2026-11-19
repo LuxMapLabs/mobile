@@ -4,6 +4,7 @@ import com.luxmap.core.theme.SyncStatus
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
+import com.luxmap.feature.workorder.polegps.data.MeasurementSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
@@ -42,7 +43,11 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
         "repair" -> noteValid && localEvidence.any { it.kind == "after" }
         "inspection" ->
             noteValid && hasInspectionPhoto() && detail.faults.all { faultOutcomes.containsKey(it.faultId) }
-        "pole_gps_update" -> noteValid && poleMeasurements.isNotEmpty()
+        "pole_gps_update" ->
+            noteValid &&
+                poleMeasurements.any {
+                    it.source == MeasurementSource.DEVICE
+                }
         else -> false
     }
 }
