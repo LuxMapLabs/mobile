@@ -117,6 +117,7 @@ fun WorkOrderDetailRoute(
     onStartSurvey: (workOrderId: String) -> Unit,
     onOpenPdf: (attachmentId: String) -> Unit = {},
     onMeasurePole: (poleId: String) -> Unit = {},
+    onOpenMap: (poleId: String, lat: Double?, lng: Double?, isProposed: Boolean) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: WorkOrderDetailViewModel = hiltViewModel(),
 ) {
@@ -132,6 +133,7 @@ fun WorkOrderDetailRoute(
         onBack = onBack,
         onStart = viewModel::start,
         onNavigateFault = { lat, lng -> openInMaps(context, lat, lng) },
+        onOpenMap = onOpenMap,
         onReportNoteChanged = viewModel::onReportNoteChanged,
         onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
@@ -175,6 +177,7 @@ fun WorkOrderDetailScreen(
     onRetryAttachment: (String) -> Unit = {},
     onRetry: () -> Unit = {},
     onOpenSurvey: (String) -> Unit = {},
+    onOpenMap: (poleId: String, lat: Double?, lng: Double?, isProposed: Boolean) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
@@ -243,6 +246,7 @@ fun WorkOrderDetailScreen(
                         onAttachmentFeedback = { message ->
                             scope.launch { snackbarHostState.showSnackbar(message) }
                         },
+                        onOpenMap = onOpenMap,
                     )
                 is WorkOrderDetailUiState.Empty ->
                     LuxEmptyState(
@@ -458,6 +462,7 @@ private fun WorkOrderDetailContent(
     onMeasurePole: (String) -> Unit,
     onRetryAttachment: (String) -> Unit,
     onAttachmentFeedback: (String) -> Unit,
+    onOpenMap: (poleId: String, lat: Double?, lng: Double?, isProposed: Boolean) -> Unit,
 ) {
     val detail = state.detail
     val kind = workOrderTaskKindFromWire(detail.taskKind)
@@ -526,6 +531,7 @@ private fun WorkOrderDetailContent(
                     onRetryAttachment = onRetryAttachment,
                     onReportNoteChanged = onReportNoteChanged,
                     onAttachmentFeedback = onAttachmentFeedback,
+                    onOpenMap = onOpenMap,
                 )
             } else if (kind == WorkOrderTaskKind.INSPECTION) {
                 InspectionSection(
@@ -537,6 +543,9 @@ private fun WorkOrderDetailContent(
                     onNavigateFault = onNavigateFault,
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onReportNoteChanged = onReportNoteChanged,
+                    onOpenPoleOnMap = { poleId, lat, lng ->
+                        onOpenMap(poleId, lat.takeIf { it != 0.0 }, lng.takeIf { it != 0.0 }, false)
+                    },
                 )
                 val photos = state.localEvidence.filter { it.kind == "observation" }
                 if (canComplete || photos.isNotEmpty()) {
@@ -559,6 +568,9 @@ private fun WorkOrderDetailContent(
                     title = "Sự cố cần sửa",
                     faults = detail.faults,
                     onNavigateFault = onNavigateFault,
+                    onOpenPoleOnMap = { poleId, lat, lng ->
+                        onOpenMap(poleId, lat.takeIf { it != 0.0 }, lng.takeIf { it != 0.0 }, false)
+                    },
                     footer = { fault ->
                         fault.inspectionOutcome?.let { outcome ->
                             FaultFooter { InspectionOutcomeBadge(outcome) }

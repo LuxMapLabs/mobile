@@ -47,6 +47,7 @@ internal fun FaultListCard(
     faults: List<WorkOrderFaultDetail>,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     modifier: Modifier = Modifier,
+    onOpenPoleOnMap: ((poleId: String, lat: Double, lng: Double) -> Unit)? = null,
     footer: @Composable (WorkOrderFaultDetail) -> Unit = {},
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -65,7 +66,11 @@ internal fun FaultListCard(
                     if (index > 0) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     }
-                    FaultItem(fault = fault, onNavigate = { onNavigateFault(fault.lat, fault.lng) })
+                    FaultItem(
+                        fault = fault,
+                        onNavigate = { onNavigateFault(fault.lat, fault.lng) },
+                        onOpenPoleOnMap = onOpenPoleOnMap,
+                    )
                     footer(fault)
                 }
             }
@@ -84,12 +89,21 @@ internal fun FaultFooter(content: @Composable () -> Unit) {
 private fun FaultItem(
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
+    onOpenPoleOnMap: ((poleId: String, lat: Double, lng: Double) -> Unit)? = null,
 ) {
+    val canOpenMap = !fault.poleId.isNullOrBlank() || fault.hasLocation()
     LuxListItem(
         headline = faultTypeLabel(fault.faultType),
         supporting = faultSupportingText(fault),
         supportingMaxLines = Int.MAX_VALUE,
         leadingIcon = faultTypeIcon(fault.faultType),
+        onClick =
+            if (canOpenMap && onOpenPoleOnMap != null) {
+                { onOpenPoleOnMap(fault.poleId.orEmpty(), fault.lat, fault.lng) }
+            } else {
+                null
+            },
+        showChevron = false,
         trailing = {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -31,6 +32,7 @@ fun MapSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     onFilterClick: () -> Unit,
+    onBack: (() -> Unit)? = null,
     hiddenStatusCount: Int = 0,
     hiddenLayerCount: Int = 0,
     modifier: Modifier = Modifier,
@@ -48,7 +50,18 @@ fun MapSearchBar(
             singleLine = true,
             shape = MaterialTheme.shapes.medium,
             placeholder = { Text("Tìm theo mã cột hoặc tên tuyến") },
-            leadingIcon = { Icon(imageVector = Icons.Filled.Search, contentDescription = null) },
+            leadingIcon = {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Quay lại",
+                        )
+                    }
+                } else {
+                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                }
+            },
             trailingIcon = {
                 val hiddenParts =
                     listOfNotNull(
