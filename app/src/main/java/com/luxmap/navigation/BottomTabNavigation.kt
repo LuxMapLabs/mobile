@@ -12,7 +12,12 @@ internal fun NavController.navigateToBottomTab(route: String) {
         return
     }
 
-    val target = if (route == Routes.Survey.route) Routes.Survey.createRoute() else route
+    val target =
+        when (route) {
+            Routes.Survey.route -> Routes.Survey.createRoute()
+            Routes.Map.route -> Routes.Map.createRoute()
+            else -> route
+        }
     navigate(target) {
         popUpTo(Routes.Home.route) { saveState = true }
         launchSingleTop = true

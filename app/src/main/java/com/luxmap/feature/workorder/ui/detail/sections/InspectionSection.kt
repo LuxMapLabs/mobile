@@ -29,12 +29,14 @@ internal fun InspectionSection(
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onFaultOutcomeSelected: (faultId: String, outcome: String) -> Unit,
     onReportNoteChanged: (String) -> Unit,
+    onOpenPoleOnMap: ((poleId: String, lat: Double, lng: Double) -> Unit)? = null,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xl)) {
         FaultListCard(
             title = "Sự cố cần kiểm tra",
             faults = faults,
             onNavigateFault = onNavigateFault,
+            onOpenPoleOnMap = onOpenPoleOnMap,
             footer = { fault ->
                 if (editable) {
                     FaultFooter {

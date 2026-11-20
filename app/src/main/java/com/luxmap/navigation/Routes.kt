@@ -56,7 +56,22 @@ sealed interface Routes {
     }
 
     data object Map : Routes {
-        override val route = "map"
+        override val route =
+            "map?focusPoleId={focusPoleId}&focusLat={focusLat}&focusLng={focusLng}&isProposed={isProposed}"
+
+        fun createRoute(
+            focusPoleId: String? = null,
+            focusLat: Double? = null,
+            focusLng: Double? = null,
+            isProposed: Boolean = false,
+        ): String {
+            val params = mutableListOf<String>()
+            if (!focusPoleId.isNullOrBlank()) params.add("focusPoleId=$focusPoleId")
+            if (focusLat != null) params.add("focusLat=$focusLat")
+            if (focusLng != null) params.add("focusLng=$focusLng")
+            if (isProposed) params.add("isProposed=true")
+            return if (params.isEmpty()) "map" else "map?" + params.joinToString("&")
+        }
     }
 
     data object PoleDetail : Routes {

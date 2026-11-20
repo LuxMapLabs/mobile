@@ -315,11 +315,49 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onDone = { navController.popBackStack() },
                 )
             }
-            composable(Routes.Map.route) {
+            composable(
+                route = Routes.Map.route,
+                arguments =
+                    listOf(
+                        navArgument("focusPoleId") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument("focusLat") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument("focusLng") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument("isProposed") {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
+                    ),
+            ) { backStackEntry ->
+                val focusPoleId = backStackEntry.arguments?.getString("focusPoleId")
+                val focusLat = backStackEntry.arguments?.getString("focusLat")?.toDoubleOrNull()
+                val focusLng = backStackEntry.arguments?.getString("focusLng")?.toDoubleOrNull()
+                val isProposed = backStackEntry.arguments?.getBoolean("isProposed") ?: false
                 MapScreen(
+                    initialFocusPoleId = focusPoleId,
+                    initialFocusLat = focusLat,
+                    initialFocusLng = focusLng,
+                    initialIsProposed = isProposed,
                     onOpenPoleDetail = { poleId ->
                         navController.navigate(Routes.PoleDetail.createRoute(poleId))
                     },
+                    onBack =
+                        if (navController.previousBackStackEntry != null) {
+                            { navController.popBackStack() }
+                        } else {
+                            null
+                        },
                 )
             }
             composable(Routes.Profile.route) {
@@ -369,6 +407,16 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     },
                     onMeasurePole = { poleId ->
                         navController.navigate(Routes.PoleGpsMeasure.createRoute(workOrderId, poleId))
+                    },
+                    onOpenMap = { poleId, lat, lng, isProposed ->
+                        navController.navigate(
+                            Routes.Map.createRoute(
+                                focusPoleId = poleId,
+                                focusLat = lat,
+                                focusLng = lng,
+                                isProposed = isProposed,
+                            ),
+                        )
                     },
                 )
             }

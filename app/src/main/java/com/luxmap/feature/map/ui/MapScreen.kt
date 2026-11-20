@@ -177,7 +177,12 @@ private const val CLUSTER_RADIUS = 50
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
+    initialFocusPoleId: String? = null,
+    initialFocusLat: Double? = null,
+    initialFocusLng: Double? = null,
+    initialIsProposed: Boolean = false,
     onOpenPoleDetail: (poleId: String) -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = hiltViewModel(),
 ) {
@@ -197,6 +202,11 @@ fun MapScreen(
     // `update` in practice only runs once — setting things directly in it won't react later.
     var maplibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var selectedPole by remember { mutableStateOf<PoleMarker?>(null) }
+    var proposedPole by remember { mutableStateOf<PoleMarker?>(null) }
+    var isProposedSelection by rememberSaveable { mutableStateOf(false) }
+    var hasAppliedInitialFocus by rememberSaveable(initialFocusPoleId, initialFocusLat, initialFocusLng) {
+        mutableStateOf(false)
+    }
     var selectedSegment by remember { mutableStateOf<RoadSegmentLine?>(null) }
     // These four use rememberSaveable so they survive a tab switch: the MapView is created again
     // each time the user comes back to the map tab, and without this the view would reset to the
@@ -210,7 +220,7 @@ fun MapScreen(
     var savedCamera by rememberSaveable { mutableStateOf<DoubleArray?>(null) }
     // True once the camera has been auto-moved to the real map_bounds.center — guards against
     // re-centering every time uiState re-emits (e.g. after a search/filter change).
-    var hasCenteredOnRealData by rememberSaveable { mutableStateOf(false) }
+    var hasCenteredOnRealData by rememberSaveable { mutableStateOf(initialFocusPoleId != null) }
     // True only once the user has actually dragged/pinched the map — distinct from savedCamera,
     // which also gets set by the idle event the very first programmatic camera placement below
     // triggers, so savedCamera alone can't tell "the user moved it" from "we moved it".
@@ -385,10 +395,15 @@ fun MapScreen(
                             }
                             val tappedPole =
                                 tappedId?.let { id ->
-                                    uiState.polesOrEmpty().firstOrNull { it.poleId == id }
+                                    if (proposedPole?.poleId == id) {
+                                        proposedPole
+                                    } else {
+                                        uiState.polesOrEmpty().firstOrNull { it.poleId == id }
+                                    }
                                 }
                             if (tappedPole != null) {
                                 selectedPole = tappedPole
+                                isProposedSelection = tappedPole == proposedPole
                                 return@addOnMapClickListener true
                             }
 
@@ -453,9 +468,18 @@ fun MapScreen(
 
         // React to state — do not rely on AndroidView's `update` running again (see the comment
         // where maplibreMap is declared above).
-        LaunchedEffect(maplibreMap, uiState) {
+        LaunchedEffect(maplibreMap, uiState, proposedPole) {
             val style = maplibreMap?.style ?: return@LaunchedEffect
-            (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(uiState.polesOrEmpty().toGeoJson())
+            val basePoles = uiState.polesOrEmpty()
+            val poles =
+                proposedPole?.let { p ->
+                    if (basePoles.none { it.poleId == p.poleId }) {
+                        basePoles + p
+                    } else {
+                        basePoles.map { if (it.poleId == p.poleId) p else it }
+                    }
+                } ?: basePoles
+            (style.getSource(POLES_SOURCE_ID) as? GeoJsonSource)?.setGeoJson(poles.toGeoJson())
             (style.getSource(ROAD_SEGMENTS_SOURCE_ID) as? GeoJsonSource)
                 ?.setGeoJson(uiState.roadSegmentsOrEmpty().toGeoJson())
             setNetworkGeoJson(
@@ -463,6 +487,53 @@ fun MapScreen(
                 uiState.cabinetsOrEmpty().toCabinetGeoJson(),
                 uiState.communesOrEmpty().toCommuneGeoJson(),
             )
+        }
+
+        // Auto-focus on targeted pole when opened from another screen (e.g. WorkOrder task)
+        LaunchedEffect(maplibreMap, uiState, initialFocusPoleId) {
+            val map = maplibreMap ?: return@LaunchedEffect
+            if (hasAppliedInitialFocus || initialFocusPoleId.isNullOrBlank()) return@LaunchedEffect
+            if (uiState !is MapUiState.Success) return@LaunchedEffect
+
+            val officialPole =
+                (uiState as MapUiState.Success).dataset.poles.firstOrNull { it.poleId == initialFocusPoleId }
+            val fallbackPole =
+                PoleMarker(
+                    poleId = initialFocusPoleId,
+                    segmentId = null,
+                    lat = initialFocusLat ?: 0.0,
+                    lng = initialFocusLng ?: 0.0,
+                    fixtureStatus = AssetCondition.UNKNOWN,
+                    powerSource = null,
+                    hasIotNode = false,
+                    nearSensitivePoi = false,
+                )
+            val targetPole =
+                when {
+                    initialIsProposed && initialFocusLat != null && initialFocusLng != null -> {
+                        (officialPole ?: fallbackPole).copy(lat = initialFocusLat, lng = initialFocusLng)
+                    }
+                    officialPole != null -> officialPole
+                    initialFocusLat != null && initialFocusLng != null -> fallbackPole
+                    else -> null
+                }
+
+            if (targetPole != null) {
+                hasAppliedInitialFocus = true
+                if (initialIsProposed) {
+                    proposedPole = targetPole
+                    isProposedSelection = true
+                } else {
+                    isProposedSelection = false
+                }
+                selectedPole = targetPole
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(targetPole.lat, targetPole.lng),
+                        SEARCH_RESULT_POLE_ZOOM,
+                    ),
+                )
+            }
         }
 
         // Moves the camera to the real area the first time it's known (FM-15 "Hướng B") — only
@@ -577,6 +648,7 @@ fun MapScreen(
                     query = searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
                     onFilterClick = { showLayerFilterSheet = true },
+                    onBack = onBack,
                     hiddenStatusCount = AssetCondition.entries.size - statusFilter.size,
                     hiddenLayerCount = listOf(showFixtures, showRoadSegments, showCabinets, showCommunes).count { !it },
                 )
@@ -585,6 +657,7 @@ fun MapScreen(
                         results = searchResults,
                         onPoleClick = { pole ->
                             selectedPole = pole
+                            isProposedSelection = false
                             maplibreMap?.animateCamera(
                                 CameraUpdateFactory.newLatLngZoom(LatLng(pole.lat, pole.lng), SEARCH_RESULT_POLE_ZOOM),
                             )
@@ -768,9 +841,14 @@ fun MapScreen(
     selectedPole?.let { pole ->
         PoleQuickViewBottomSheet(
             pole = pole,
-            onDismiss = { selectedPole = null },
+            isProposedGps = isProposedSelection,
+            onDismiss = {
+                selectedPole = null
+                isProposedSelection = false
+            },
             onOpenDetail = {
                 selectedPole = null
+                isProposedSelection = false
                 onOpenPoleDetail(pole.poleId)
             },
         )
