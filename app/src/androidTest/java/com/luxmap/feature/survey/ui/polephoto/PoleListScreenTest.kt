@@ -15,6 +15,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -36,6 +37,39 @@ private fun pole(
 
 class PoleListScreenTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun identification_and_map_action_are_available_even_for_completed_poles() {
+        var mapped: String? = null
+        val item =
+            com.luxmap.feature.survey.data.PoleListItem(
+                "POLE-1", 2, 10.0, 106.0, "normal", segmentId = "S1", note = "Trước cổng trường",
+                fixtureType = "led_road_lamp", lampWatt = 100, lampCount = 2, fixtureCount = 1, nearSensitivePoi = true,
+            )
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "W",
+                    state =
+                        PoleListUiState.Success(
+                            listOf(pole().copy(identification = item)),
+                            isCompleted = true,
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                    onOpenMap = { id, _, _ -> mapped = id },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Cột số 2 · S1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Đèn LED · 100W × 2", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Gần trường/cầu", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithContentDescription("Thông tin cột POLE-1").performClick()
+        assertTrue(composeRule.onAllNodesWithText("Trước cổng trường").fetchSemanticsNodes().isNotEmpty())
+        composeRule.onNodeWithText("Đường đi").assertExists()
+        composeRule.onNodeWithText("Xem trên bản đồ").performClick()
+        assertEquals("POLE-1", mapped)
+    }
 
     @Test
     fun survey_feedback_is_displayed_above_the_bottom_action() {

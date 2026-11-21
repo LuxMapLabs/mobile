@@ -79,6 +79,7 @@ import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
+import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import kotlinx.coroutines.launch
@@ -90,6 +91,7 @@ fun PoleListRoute(
     onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit,
     onViewAiResult: (serverPhotoId: String) -> Unit,
     onDone: () -> Unit,
+    onOpenMap: (String, Double?, Double?) -> Unit = { _, _, _ -> },
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -120,6 +122,7 @@ fun PoleListRoute(
         onBack = onDone,
         onComplete = viewModel::onComplete,
         onRetry = viewModel::onRetry,
+        onOpenMap = onOpenMap,
         onViewAiResult = onViewAiResult,
     )
 }
@@ -134,6 +137,7 @@ fun PoleListScreen(
     onComplete: () -> Unit = {},
     onRetry: () -> Unit = {},
     onViewAiResult: (serverPhotoId: String) -> Unit = {},
+    onOpenMap: (String, Double?, Double?) -> Unit = { _, _, _ -> },
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     // Which pole's "Bao loi" method chooser (Chup anh / Quay video) is open, if any - matches
@@ -202,6 +206,7 @@ fun PoleListScreen(
                                                 pole = pole,
                                                 isNext = index == nextIndex,
                                                 action = action,
+                                                onOpenMap = onOpenMap,
                                                 onClick = {
                                                     when (action) {
                                                         is PoleRowAction.OpenAiResult ->
@@ -385,6 +390,7 @@ private fun PoleRow(
     isNext: Boolean,
     action: PoleRowAction,
     onClick: () -> Unit,
+    onOpenMap: (String, Double?, Double?) -> Unit,
 ) {
     val click =
         when (action) {
@@ -416,6 +422,22 @@ private fun PoleRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            pole.identification?.let { item ->
+                PoleIdentificationDetails(
+                    poleId = item.poleId,
+                    position = item.position,
+                    segmentId = item.segmentId,
+                    note = item.note,
+                    fixtureType = item.fixtureType,
+                    lampWatt = item.lampWatt,
+                    lampCount = item.lampCount,
+                    fixtureCount = item.fixtureCount,
+                    nearSensitivePoi = item.nearSensitivePoi,
+                    lat = item.lat,
+                    lng = item.lng,
+                    onOpenMap = { onOpenMap(item.poleId, item.lat, item.lng) },
+                )
+            }
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),

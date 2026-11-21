@@ -14,4 +14,11 @@ data class LocalPoleListItemEntity(
     val lat: Double?,
     val lng: Double?,
     val fixtureStatus: String,
+    val segmentId: String? = null,
+    val note: String? = null,
+    val fixtureType: String? = null,
+    val lampWatt: Int? = null,
+    val lampCount: Int? = null,
+    val fixtureCount: Int? = null,
+    val nearSensitivePoi: Boolean? = null,
 )

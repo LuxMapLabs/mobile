@@ -5,6 +5,7 @@ import com.luxmap.core.database.AppDatabase
 import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
+import com.luxmap.feature.survey.data.toDomain
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dto.PoleLocationRequestDto
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
@@ -47,6 +48,7 @@ data class PoleReference(
     val position: Int?,
     val lat: Double?,
     val lng: Double?,
+    val identification: com.luxmap.feature.survey.data.PoleListItem? = null,
 )
 
 private fun LocalPoleGpsMeasurementEntity.toDomain() =
@@ -261,7 +263,13 @@ class PoleGpsRepository
             val rows = poleCache.byWorkOrder(workOrderId).associateBy { it.poleId }
             return order.poleIds.map { poleId ->
                 val row = rows[poleId]
-                PoleReference(poleId, row?.position, row?.lat, row?.lng)
+                PoleReference(
+                    poleId,
+                    row?.position,
+                    row?.lat,
+                    row?.lng,
+                    identification = row?.toDomain(),
+                )
             }
         }
 

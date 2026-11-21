@@ -218,6 +218,7 @@ class PoleListViewModel
                                         PoleListRowState(
                                             poleId = pole.poleId,
                                             position = pole.position,
+                                            identification = pole,
                                             fixtureStatus = pole.fixtureStatus,
                                             serverPhotoId = info?.serverPhotoId,
                                             syncStatus = info?.status?.let(::toSyncStatus),

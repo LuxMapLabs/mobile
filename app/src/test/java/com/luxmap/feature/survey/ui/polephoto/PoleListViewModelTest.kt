@@ -71,6 +71,8 @@ class PoleListViewModelTest {
     @Test
     fun `emits Loading then Success with the sync status of each pole's latest photo`() =
         runTest {
+            val pole1 = PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")
+            val pole2 = PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "dim")
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
@@ -78,8 +80,8 @@ class PoleListViewModelTest {
                 Result.success(
                     PoleListResult(
                         listOf(
-                            PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal"),
-                            PoleListItem("POLE-2", 2, lat = null, lng = null, fixtureStatus = "dim"),
+                            pole1,
+                            pole2,
                         ),
                         isStale = false,
                     ),
@@ -109,8 +111,16 @@ class PoleListViewModelTest {
                             "normal",
                             serverPhotoId = "SERVER-PH-POLE-1",
                             syncStatus = SyncStatus.DONE,
+                            identification = pole1,
                         ),
-                        PoleListRowState("POLE-2", 2, "dim", serverPhotoId = null, syncStatus = null),
+                        PoleListRowState(
+                            "POLE-2",
+                            2,
+                            "dim",
+                            serverPhotoId = null,
+                            syncStatus = null,
+                            identification = pole2,
+                        ),
                     ),
                     success.poles,
                 )

@@ -36,7 +36,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalWorkOrderAttachmentEntity::class,
         LocalPoleGpsMeasurementEntity::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
