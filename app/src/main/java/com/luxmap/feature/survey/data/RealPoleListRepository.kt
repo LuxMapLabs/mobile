@@ -2,6 +2,7 @@ package com.luxmap.feature.survey.data
 
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
+import com.luxmap.feature.survey.data.dto.PoleListItemDto
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,10 +16,15 @@ class RealPoleListRepository
     ) : PoleListRepository {
         override suspend fun poles(workOrderId: String): Result<PoleListResult> =
             runCatching {
-                val items =
-                    api.poles(workOrderId).items.map {
-                        PoleListItem(it.poleId, it.position, it.location?.lat, it.location?.lng, it.fixtureStatus)
-                    }
+                val firstPage = api.poles(workOrderId)
+                val dtos = firstPage.items.toMutableList()
+                var page = firstPage.page
+                while (dtos.size < firstPage.total) {
+                    val next = api.poles(workOrderId, page = ++page)
+                    check(next.items.isNotEmpty()) { "Danh sách cột chưa tải đủ" }
+                    dtos.addAll(next.items)
+                }
+                val items = dtos.map { it.toDomain() }
                 dao.replaceForWorkOrder(workOrderId, items.map { it.toEntity(workOrderId) })
                 PoleListResult(items, isStale = false)
             }.recoverCatching { e ->
@@ -28,9 +34,40 @@ class RealPoleListRepository
                 if (cached.isEmpty()) throw e
                 PoleListResult(cached, isStale = true)
             }
-
-        private fun PoleListItem.toEntity(workOrderId: String) =
-            LocalPoleListItemEntity(workOrderId, poleId, position, lat, lng, fixtureStatus)
-
-        private fun LocalPoleListItemEntity.toDomain() = PoleListItem(poleId, position, lat, lng, fixtureStatus)
     }
+
+internal fun PoleListItemDto.toDomain() =
+    PoleListItem(
+        poleId, position, location?.lat, location?.lng, fixtureStatus,
+        segmentId = segmentId,
+        note = note,
+        fixtureType = fixtureType,
+        lampWatt = lampWatt,
+        lampCount = lampCount,
+        fixtureCount = fixtureCount,
+        nearSensitivePoi = nearSensitivePoi,
+    )
+
+internal fun PoleListItem.toEntity(workOrderId: String) =
+    LocalPoleListItemEntity(
+        workOrderId, poleId, position, lat, lng, fixtureStatus,
+        segmentId = segmentId,
+        note = note,
+        fixtureType = fixtureType,
+        lampWatt = lampWatt,
+        lampCount = lampCount,
+        fixtureCount = fixtureCount,
+        nearSensitivePoi = nearSensitivePoi,
+    )
+
+internal fun LocalPoleListItemEntity.toDomain() =
+    PoleListItem(
+        poleId, position, lat, lng, fixtureStatus,
+        segmentId = segmentId,
+        note = note,
+        fixtureType = fixtureType,
+        lampWatt = lampWatt,
+        lampCount = lampCount,
+        fixtureCount = fixtureCount,
+        nearSensitivePoi = nearSensitivePoi,
+    )

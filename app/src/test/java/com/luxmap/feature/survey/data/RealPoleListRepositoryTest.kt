@@ -85,6 +85,20 @@ class RealPoleListRepositoryTest {
         }
 
     @Test
+    fun `loads all pages before caching so segment counts include the entire order`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PoleListCacheDao>(relaxed = true)
+            val first = PoleListItemDto("P1", 1, fixtureStatus = "normal", segmentId = "S", note = "Gần cầu")
+            val second = first.copy(poleId = "P2", position = 2)
+            coEvery { api.poles("W") } returns PagedResultDto(1, 1, 2, listOf(first))
+            coEvery { api.poles("W", page = 2) } returns PagedResultDto(2, 1, 2, listOf(second))
+            val result = RealPoleListRepository(api, dao).poles("W").getOrThrow()
+            assertEquals(listOf(first.toDomain(), second.toDomain()), result.poles)
+            coVerify { dao.replaceForWorkOrder("W", result.poles.map { it.toEntity("W") }) }
+        }
+
+    @Test
     fun `returns failure when the backend rejects the request and there is no cache`() =
         runTest {
             val api = mockk<WorkOrdersApi>()

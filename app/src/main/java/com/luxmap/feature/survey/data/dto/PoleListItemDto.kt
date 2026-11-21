@@ -10,4 +10,11 @@ data class PoleListItemDto(
     val position: Int? = null,
     val location: PoleCoordinateDto? = null,
     @SerialName("fixture_status") val fixtureStatus: String,
+    @SerialName("segment_id") val segmentId: String? = null,
+    val note: String? = null,
+    @SerialName("fixture_type") val fixtureType: String? = null,
+    @SerialName("lamp_watt") val lampWatt: Int? = null,
+    @SerialName("lamp_count") val lampCount: Int? = null,
+    @SerialName("fixture_count") val fixtureCount: Int? = null,
+    @SerialName("near_sensitive_poi") val nearSensitivePoi: Boolean? = null,
 )

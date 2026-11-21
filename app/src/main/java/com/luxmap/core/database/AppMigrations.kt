@@ -77,3 +77,16 @@ val MIGRATION_22_23: Migration =
             )
         }
     }
+
+val MIGRATION_23_24: Migration =
+    object : Migration(23, 24) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN segmentId TEXT")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN note TEXT")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN fixtureType TEXT")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN lampWatt INTEGER")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN lampCount INTEGER")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN fixtureCount INTEGER")
+            db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN nearSensitivePoi INTEGER")
+        }
+    }

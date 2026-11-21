@@ -116,7 +116,13 @@ class PoleGpsRepositoryTest {
                     poleIds = listOf("P-1"),
                 )
             coEvery { cache.byWorkOrder("WO-1") } returns
-                listOf(LocalPoleListItemEntity("WO-1", "P-1", 4, 10.0, 106.0, "unknown"))
+                listOf(
+                    LocalPoleListItemEntity(
+                        "WO-1", "P-1", 4, 10.0, 106.0, "unknown",
+                        segmentId = "S1", note = "Cạnh cầu", fixtureType = "led", lampWatt = 100,
+                        lampCount = 2, fixtureCount = 1, nearSensitivePoi = true,
+                    ),
+                )
             val reference = repository.poleReference("WO-1", "P-1")!!
             assertEquals(4, reference.position)
             assertEquals(10.0, reference.lat!!, 0.0)
@@ -247,10 +253,24 @@ class PoleGpsRepositoryTest {
                     poleIds = listOf("P-1", "P-2"),
                 )
             coEvery { cache.byWorkOrder("WO-1") } returns
-                listOf(LocalPoleListItemEntity("WO-1", "P-1", 4, 10.0, 106.0, "unknown"))
+                listOf(
+                    LocalPoleListItemEntity(
+                        "WO-1", "P-1", 4, 10.0, 106.0, "unknown",
+                        segmentId = "S1", note = "Cạnh cầu", fixtureType = "led", lampWatt = 100,
+                        lampCount = 2, fixtureCount = 1, nearSensitivePoi = true,
+                    ),
+                )
             val refs = repository.poleReferences("WO-1")
             assertEquals(listOf("P-1", "P-2"), refs.map { it.poleId })
             assertEquals(4, refs[0].position)
+            assertEquals("Cạnh cầu", refs[0].identification?.note)
+            assertEquals("S1", refs[0].identification?.segmentId)
+            assertEquals("led", refs[0].identification?.fixtureType)
+            assertEquals(100, refs[0].identification?.lampWatt)
+            assertEquals(2, refs[0].identification?.lampCount)
+            assertEquals(1, refs[0].identification?.fixtureCount)
+            assertEquals(true, refs[0].identification?.nearSensitivePoi)
+            assertNull(refs[1].identification)
             assertNull(refs[1].position)
             assertNull(refs[1].lat)
         }
