@@ -100,9 +100,9 @@ fun PoleListRoute(
         viewModel.surveyCompleted.collect { pendingReviews ->
             val message =
                 if (pendingReviews > 0) {
-                    "Đã hoàn tất $workOrderId. Đang gửi $pendingReviews kết quả xác nhận cho Kỹ sư bảo trì."
+                    "Đã hoàn tất $workOrderId. Đang gửi $pendingReviews kết quả xác nhận cho Quản lý."
                 } else {
-                    "Đã hoàn tất $workOrderId. Đã gửi kết quả cho Kỹ sư bảo trì."
+                    "Đã hoàn tất $workOrderId. Đã gửi kết quả cho Quản lý."
                 }
             scope.launch { snackbarHostState.showSnackbar(message) }
         }
@@ -224,7 +224,7 @@ fun PoleListScreen(
                     is PoleListUiState.Empty ->
                         LuxEmptyState(
                             title = "Tuyến này chưa có cột đèn nào",
-                            message = "Liên hệ Kỹ sư bảo trì nếu bạn cho rằng đây là nhầm lẫn.",
+                            message = "Liên hệ Quản lý nếu bạn cho rằng đây là nhầm lẫn.",
                         )
 
                     is PoleListUiState.Error ->

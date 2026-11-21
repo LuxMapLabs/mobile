@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import com.luxmap.core.network.UserApi
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.network.dto.PagedResultDto
+import com.luxmap.feature.auth.data.CommuneSummaryDto
 import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
 import io.mockk.coEvery
@@ -28,6 +29,7 @@ class RealHomeRepositoryTest {
                 fullName = "Field Engineer 1",
                 role = "field_engineer",
                 communeIds = listOf("COM-001"),
+                communes = listOf(CommuneSummaryDto("COM-001", "Phước Hiệp")),
             )
         val workOrdersApi = mockk<WorkOrdersApi>()
         coEvery {
@@ -60,6 +62,19 @@ class RealHomeRepositoryTest {
         dueDate = dueDate,
         scheduledDate = scheduledDate,
     )
+
+    @Test
+    fun `reuses full name and commune names from existing me request`() =
+        runTest {
+            repository(listOf(workOrder("WO-1"), workOrder("WO-2", communeId = "COM-002"))).observeHomeData().test {
+                val data = awaitItem()
+                assertEquals("Field Engineer 1", data.fullName)
+                val items = data.clusters.flatMap { it.items }
+                assertEquals("Phước Hiệp", items[0].communeName)
+                assertNull(items[1].communeName)
+                awaitComplete()
+            }
+        }
 
     @Test
     fun `maps title, scheduled_date, fault count and commune into the summary item`() =

@@ -106,7 +106,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        val banner = composeRule.onNodeWithText("Kỹ sư bảo trì đã xác nhận", substring = true).fetchSemanticsNode()
+        val banner = composeRule.onNodeWithText("Quản lý đã xác nhận", substring = true).fetchSemanticsNode()
         val photo = composeRule.onNodeWithTag("photo_preview").fetchSemanticsNode()
         assertTrue(banner.boundsInRoot.top < photo.boundsInRoot.top)
     }
@@ -280,7 +280,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Chưa có quyết định từ Kỹ sư bảo trì").assertDoesNotExist()
+        composeRule.onNodeWithText("Chưa có quyết định từ Quản lý").assertDoesNotExist()
     }
 
     @Test
@@ -296,7 +296,7 @@ class PolePhotoResultScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Kỹ sư bảo trì đã xác nhận").assertExists()
+        composeRule.onNodeWithText("Quản lý đã xác nhận").assertExists()
         composeRule.onNodeWithText("Đã kiểm tra thực tế", substring = true).assertExists()
         composeRule.onNodeWithText("Lúc ", substring = true).assertExists()
     }

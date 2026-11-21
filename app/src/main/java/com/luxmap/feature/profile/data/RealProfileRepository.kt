@@ -20,6 +20,7 @@ class RealProfileRepository
                     email = dto.email,
                     role = dto.role,
                     communeIds = dto.communeIds,
+                    communeNames = dto.communes.associate { it.communeId to it.name },
                 )
             }
     }

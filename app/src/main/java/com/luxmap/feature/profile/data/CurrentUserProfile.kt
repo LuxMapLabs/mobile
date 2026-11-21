@@ -5,4 +5,5 @@ data class CurrentUserProfile(
     val email: String,
     val role: String,
     val communeIds: List<String>,
+    val communeNames: Map<String, String> = emptyMap(),
 )

@@ -35,3 +35,22 @@ fun List<WorkOrderSummaryItem>.sortedFor(
             .thenByDescending { dueDateLabel(it.dueDate, today).isToday }
             .thenByDescending { it.priorityScore ?: 0.0 },
     )
+
+internal fun initialHomeTab(
+    state: HomeUiState,
+    selected: HomeTaskTab?,
+): HomeTaskTab? {
+    if (selected != null) return selected
+    return when (state) {
+        HomeUiState.Loading, is HomeUiState.Error -> null
+        HomeUiState.Empty -> HomeTaskTab.REPAIR
+        is HomeUiState.Success -> {
+            val tasks = state.data.visibleTasks()
+            if (tasks.countFor(HomeTaskTab.REPAIR) == 0 && tasks.countFor(HomeTaskTab.INSPECTION) > 0) {
+                HomeTaskTab.INSPECTION
+            } else {
+                HomeTaskTab.REPAIR
+            }
+        }
+    }
+}

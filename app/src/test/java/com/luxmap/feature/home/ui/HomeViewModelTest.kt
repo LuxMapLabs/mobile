@@ -70,6 +70,23 @@ private fun homeData(vararg items: WorkOrderSummaryItem) =
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
+    @Test
+    fun `retains the existing profile full name when tasks are empty and while refreshing`() =
+        runTest {
+            val repository = mockk<HomeRepository>()
+            every { repository.observeHomeData() } returns flowOf(homeData().copy(fullName = "Nguyễn Văn Bình"))
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            viewModel.uiState.test {
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals(HomeUiState.Empty, awaitItem())
+                assertEquals("Nguyễn Văn Bình", viewModel.fullName.value)
+                viewModel.retry()
+                assertEquals(HomeUiState.Loading, awaitItem())
+                assertEquals("Nguyễn Văn Bình", viewModel.fullName.value)
+                assertEquals(HomeUiState.Empty, awaitItem())
+            }
+        }
+
     private val dispatcher = StandardTestDispatcher()
 
     @Before

@@ -276,7 +276,7 @@ fun WorkOrderDetailScreen(
                 showSubmitConfirm = false
                 onSubmit()
                 scope.launch {
-                    snackbarHostState.showSnackbar("Nộp báo cáo thành công. Chờ Kỹ sư bảo trì duyệt")
+                    snackbarHostState.showSnackbar("Nộp báo cáo thành công. Chờ Quản lý duyệt")
                 }
             },
         )
@@ -296,7 +296,7 @@ fun WorkOrderDetailScreen(
         if (showCancelSheet && success?.detail?.cancellationRequestStatus == "pending") {
             showCancelSheet = false
             scope.launch {
-                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Kỹ sư bảo trì duyệt")
+                snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Quản lý duyệt")
             }
         }
     }
@@ -422,7 +422,7 @@ private fun SubmitConfirmationSheet(
         }
         Text(
             text =
-                "Báo cáo sẽ chuyển cho Kỹ sư bảo trì duyệt. " +
+                "Báo cáo sẽ chuyển cho Quản lý duyệt. " +
                     "Bạn không chỉnh sửa được cho đến khi có kết quả duyệt.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -864,7 +864,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                text = "Theo cấu hình của Kỹ sư bảo trì. Nhập sau khi bắt đầu.",
+                text = "Theo cấu hình của Quản lý. Nhập sau khi bắt đầu.",
                 style = LabelTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

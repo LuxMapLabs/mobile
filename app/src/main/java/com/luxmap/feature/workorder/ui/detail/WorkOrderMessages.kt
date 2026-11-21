@@ -40,7 +40,7 @@ fun workOrderMessages(
         candidates +=
             WorkOrderMessage(
                 title = "Quá hạn nộp báo cáo",
-                body = "Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.",
+                body = "Biểu mẫu đã khoá. Liên hệ Quản lý.",
                 tone = WorkOrderMessageTone.ERROR,
             )
     }
@@ -48,7 +48,7 @@ fun workOrderMessages(
         candidates +=
             WorkOrderMessage(
                 title = "Quá hạn bắt đầu",
-                body = "Liên hệ Kỹ sư bảo trì để được giao lại.",
+                body = "Liên hệ Quản lý để được giao lại.",
                 tone = WorkOrderMessageTone.ERROR,
             )
     }
@@ -56,7 +56,7 @@ fun workOrderMessages(
     if (reviewNote != null && status == WorkOrderStatus.IN_PROGRESS) {
         candidates +=
             WorkOrderMessage(
-                title = "Kỹ sư bảo trì yêu cầu bổ sung",
+                title = "Quản lý yêu cầu bổ sung",
                 body = reviewNote,
                 tone = WorkOrderMessageTone.WARNING,
             )
@@ -73,7 +73,7 @@ fun workOrderMessages(
             candidates +=
                 WorkOrderMessage(
                     title = "Đã gửi yêu cầu hủy",
-                    body = "Đang chờ Kỹ sư bảo trì duyệt. Chưa thể bắt đầu lệnh.",
+                    body = "Đang chờ Quản lý duyệt. Chưa thể bắt đầu lệnh.",
                     tone = WorkOrderMessageTone.NEUTRAL,
                 )
     }
@@ -100,7 +100,7 @@ private fun submittedMessage(syncStatus: SyncStatus?): WorkOrderMessage =
         null, SyncStatus.DONE ->
             WorkOrderMessage(
                 title = "Đã nộp báo cáo",
-                body = "Đang chờ Kỹ sư bảo trì duyệt.",
+                body = "Đang chờ Quản lý duyệt.",
                 tone = WorkOrderMessageTone.INFO,
             )
         SyncStatus.FAILED, SyncStatus.CONFLICT ->
@@ -112,7 +112,7 @@ private fun submittedMessage(syncStatus: SyncStatus?): WorkOrderMessage =
         SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE, SyncStatus.SYNCING ->
             WorkOrderMessage(
                 title = "Đã nộp báo cáo",
-                body = "${syncStatus.label()}. Kỹ sư bảo trì sẽ duyệt sau khi đồng bộ.",
+                body = "${syncStatus.label()}. Quản lý sẽ duyệt sau khi đồng bộ.",
                 tone = WorkOrderMessageTone.INFO,
             )
     }

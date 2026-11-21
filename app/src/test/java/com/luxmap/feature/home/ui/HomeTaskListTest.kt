@@ -36,6 +36,32 @@ private fun data(vararg items: WorkOrderSummaryItem) =
 
 class HomeTaskListTest {
     @Test
+    fun `default tab waits for loaded data and selects the tab with work`() {
+        assertEquals(null, initialHomeTab(HomeUiState.Loading, null))
+        assertEquals(null, initialHomeTab(HomeUiState.Error("offline"), null))
+        assertEquals(HomeTaskTab.INSPECTION, initialHomeTab(HomeUiState.Success(data(item("I", "inspection"))), null))
+        assertEquals(HomeTaskTab.REPAIR, initialHomeTab(HomeUiState.Success(data(item("R"))), null))
+        assertEquals(
+            HomeTaskTab.REPAIR,
+            initialHomeTab(HomeUiState.Success(data(item("R"), item("I", "inspection"))), null),
+        )
+        assertEquals(HomeTaskTab.REPAIR, initialHomeTab(HomeUiState.Success(data()), null))
+        assertEquals(HomeTaskTab.REPAIR, initialHomeTab(HomeUiState.Empty, null))
+    }
+
+    @Test
+    fun `user tab choice survives reloads and updated tasks`() {
+        val selected = HomeTaskTab.INSPECTION
+        assertEquals(selected, initialHomeTab(HomeUiState.Loading, selected))
+        assertEquals(selected, initialHomeTab(HomeUiState.Empty, selected))
+        assertEquals(selected, initialHomeTab(HomeUiState.Success(data(item("R"))), selected))
+        assertEquals(
+            HomeTaskTab.REPAIR,
+            initialHomeTab(HomeUiState.Success(data(item("I", "inspection"))), HomeTaskTab.REPAIR),
+        )
+    }
+
+    @Test
     fun `visible tasks keep only repair and inspection, dropping survey, pole gps and unknown kinds`() {
         val visible =
             data(
