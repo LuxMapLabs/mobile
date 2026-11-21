@@ -54,6 +54,7 @@ class Migration23To24Test {
             }
             before.close()
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("DROP TABLE local_work_order_draft")
                 restoreV23PoleCache(it)
                 it.execSQL("DELETE FROM room_master_table")
                 it.version = 23
@@ -63,7 +64,7 @@ class Migration23To24Test {
                     context,
                     AppDatabase::class.java,
                     name,
-                ).addMigrations(MIGRATION_23_24).build()
+                ).addMigrations(MIGRATION_23_24, MIGRATION_24_25).build()
             try {
                 val db = upgraded.openHelper.writableDatabase // Validates the entire schema.
                 val pole = upgraded.poleListCacheDao().byWorkOrder("W").single()

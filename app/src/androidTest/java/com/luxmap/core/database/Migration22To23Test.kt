@@ -43,6 +43,7 @@ class Migration22To23Test {
             )
             before.close()
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                it.execSQL("DROP TABLE local_work_order_draft")
                 restoreV23PoleCache(it)
                 it.execSQL("DROP TABLE local_assigned_pole_gps_order")
                 it.execSQL(
@@ -60,7 +61,7 @@ class Migration22To23Test {
             }
             val upgraded =
                 Room.databaseBuilder(context, AppDatabase::class.java, name)
-                    .addMigrations(MIGRATION_22_23, MIGRATION_23_24).build()
+                    .addMigrations(MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25).build()
             try {
                 val database = upgraded.openHelper.writableDatabase
                 listOf(
