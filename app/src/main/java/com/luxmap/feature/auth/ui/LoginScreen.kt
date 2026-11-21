@@ -226,9 +226,9 @@ internal fun LoginContent(
             OutlinedTextField(
                 value = identifier,
                 onValueChange = onIdentifierChange,
-                label = { Text("Mã nhân viên hoặc số điện thoại", style = MaterialTheme.typography.labelMedium) },
+                label = { Text("Tên đăng nhập hoặc email", style = MaterialTheme.typography.labelMedium) },
                 textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = { Text("Nhập email hoặc tên người dùng") },
+                placeholder = { Text("Tên đăng nhập hoặc email") },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,

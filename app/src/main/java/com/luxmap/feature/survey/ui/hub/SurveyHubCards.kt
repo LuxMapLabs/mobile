@@ -64,7 +64,7 @@ private fun CardHeader(item: HubItem) {
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                text = item.kind.label(),
+                text = "${item.kind.label()} ${item.order.workOrderId}",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

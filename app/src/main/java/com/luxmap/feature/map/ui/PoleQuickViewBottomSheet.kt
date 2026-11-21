@@ -61,7 +61,7 @@ fun PoleQuickViewBottomSheet(
                     title = "Tọa độ chưa duyệt",
                     message =
                         "Vị trí được hiển thị theo dữ liệu GPS mới đo, " +
-                            "đang chờ Kỹ sư bảo trì duyệt vào GIS chính thức.",
+                            "đang chờ Quản lý duyệt vào GIS chính thức.",
                     tone = LuxBannerTone.WARNING,
                 )
             } else {

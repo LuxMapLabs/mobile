@@ -138,7 +138,7 @@ class LoginViewModel
                 identifier.isBlank() ->
                     LoginUiState.Error(
                         LoginFailureReason.MissingIdentifier,
-                        "Vui lòng nhập mã nhân viên hoặc số điện thoại.",
+                        "Vui lòng nhập tên đăng nhập hoặc email.",
                     )
                 password.isBlank() ->
                     LoginUiState.Error(LoginFailureReason.MissingPassword, "Vui lòng nhập mật khẩu.")

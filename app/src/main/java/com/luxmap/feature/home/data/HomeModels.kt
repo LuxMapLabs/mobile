@@ -29,6 +29,7 @@ data class WorkOrderSummaryItem(
     val title: String,
     val scheduledDate: String?,
     val faultCount: Int,
+    val communeName: String? = null,
 )
 
 // One cluster - clusterLabel is the raw commune_id (e.g. "COM-001") for now, not a friendly
@@ -42,4 +43,5 @@ data class WorkOrderCluster(
 data class HomeData(
     val metrics: HomeMetrics,
     val clusters: List<WorkOrderCluster>,
+    val fullName: String? = null,
 )

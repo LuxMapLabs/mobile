@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.common.communeLabel
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
@@ -258,7 +259,7 @@ private fun ProfileCard(profile: CurrentUserProfile) {
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     ) {
                         Text(
-                            text = communeId,
+                            text = communeLabel(communeId, profile.communeNames[communeId]),
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
                         )

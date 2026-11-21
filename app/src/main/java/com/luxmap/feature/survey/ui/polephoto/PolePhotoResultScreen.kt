@@ -823,9 +823,9 @@ private fun VideoPlayer(
 private fun PolePhotoDecisionCard(state: PolePhotoResultUiState.Success) {
     val (title, tone) =
         when (state.decision) {
-            "confirm" -> "Kỹ sư bảo trì đã xác nhận" to LuxBannerTone.SUCCESS
-            "reject" -> "Kỹ sư bảo trì đã từ chối" to LuxBannerTone.ERROR
-            else -> "Chưa có quyết định từ Kỹ sư bảo trì" to LuxBannerTone.INFO
+            "confirm" -> "Quản lý đã xác nhận" to LuxBannerTone.SUCCESS
+            "reject" -> "Quản lý đã từ chối" to LuxBannerTone.ERROR
+            else -> "Chưa có quyết định từ Quản lý" to LuxBannerTone.INFO
         }
     val message =
         listOfNotNull(

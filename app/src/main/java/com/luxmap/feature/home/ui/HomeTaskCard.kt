@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.common.DateFormatUtils
+import com.luxmap.core.common.communeLabel
 import com.luxmap.core.theme.BadgeColors
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxTheme
@@ -180,7 +181,12 @@ fun HomeTaskCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = if (item.faultCount > 0) "${item.faultCount} sự cố tại ${item.communeId}" else item.communeId,
+                text =
+                    if (item.faultCount > 0) {
+                        "${item.faultCount} sự cố tại ${communeLabel(item.communeId, item.communeName)}"
+                    } else {
+                        communeLabel(item.communeId, item.communeName)
+                    },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

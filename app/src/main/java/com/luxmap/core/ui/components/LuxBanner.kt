@@ -123,11 +123,11 @@ private fun LuxBannerPreview() {
             LuxBanner(
                 tone = LuxBannerTone.ERROR,
                 title = "Quá hạn nộp báo cáo",
-                message = "Form đã khoá. Liên hệ Kỹ sư bảo trì để được xử lý.",
+                message = "Form đã khoá. Liên hệ Quản lý để được xử lý.",
             )
             LuxBanner(
                 tone = LuxBannerTone.WARNING,
-                title = "Kỹ sư bảo trì yêu cầu bổ sung",
+                title = "Quản lý yêu cầu bổ sung",
                 message = "Chụp lại ảnh chóa đèn sau sửa chữa.",
             )
             LuxBanner(
@@ -137,7 +137,7 @@ private fun LuxBannerPreview() {
                 onAction = {},
             )
             LuxBanner(tone = LuxBannerTone.SUCCESS, message = "Đã lưu trên thiết bị — sẽ đồng bộ khi có mạng")
-            LuxBanner(tone = LuxBannerTone.NEUTRAL, message = "Đã gửi yêu cầu hủy, chờ Kỹ sư bảo trì duyệt")
+            LuxBanner(tone = LuxBannerTone.NEUTRAL, message = "Đã gửi yêu cầu hủy, chờ Quản lý duyệt")
         }
     }
 }

@@ -68,6 +68,7 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Khảo sát đường A").assertExists()
+        composeRule.onNodeWithText("Tuyến khảo sát WO-1").assertExists()
         composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
     }
 
@@ -175,7 +176,7 @@ class SurveyHubScreenTest {
             }
         }
         composeRule.onNodeWithText("Chưa bắt đầu (1)").assertExists()
-        composeRule.onNodeWithText("Đo GPS cột").assertExists()
+        composeRule.onNodeWithText("Đo GPS cột WO-9").assertExists()
     }
 
     @Test

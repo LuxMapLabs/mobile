@@ -59,6 +59,7 @@ class LoginViewModelTest {
             vm.onLoginClick()
             advanceUntilIdle()
             assertEquals(LoginFailureReason.MissingIdentifier, (vm.uiState.value as LoginUiState.Error).reason)
+            assertEquals("Vui lòng nhập tên đăng nhập hoặc email.", (vm.uiState.value as LoginUiState.Error).message)
             coVerify(exactly = 0) { authRepository.login(any(), any(), any()) }
         }
 

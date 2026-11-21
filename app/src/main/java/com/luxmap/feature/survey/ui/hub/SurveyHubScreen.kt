@@ -169,7 +169,7 @@ fun SurveyHubScreen(
                 is SurveyHubUiState.Empty ->
                     LuxEmptyState(
                         title = "Chưa có việc khảo sát được giao",
-                        message = "Khi Kỹ sư bảo trì giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
+                        message = "Khi Quản lý giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
                         icon = Icons.Filled.EventAvailable,
                         actionLabel = "Làm mới",
                         onAction = onRetry,
@@ -205,7 +205,7 @@ fun SurveyHubScreen(
     LaunchedEffect(state) {
         val success = state as? SurveyHubUiState.Success
         if (sheetWorkOrderId != null && success?.cancelledWorkOrderIds?.contains(sheetWorkOrderId) == true) {
-            scope.launch { snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Kỹ sư bảo trì duyệt") }
+            scope.launch { snackbarHostState.showSnackbar("Đã gửi yêu cầu hủy. Chờ Quản lý duyệt") }
             cancelSheetWorkOrderId = null
         }
     }
