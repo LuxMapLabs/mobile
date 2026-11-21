@@ -62,7 +62,7 @@ import kotlinx.coroutines.isActive
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
     listOf(
-        BottomNavItem(Routes.Home.route, "Việc hôm nay", Icons.Filled.Home),
+        BottomNavItem(Routes.Home.route, "Hôm nay", Icons.Filled.Home),
         BottomNavItem(Routes.Survey.route, "Khảo sát", Icons.Filled.CameraAlt),
         BottomNavItem(Routes.Map.route, "Bản đồ", Icons.Filled.Map),
         BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Filled.Person),

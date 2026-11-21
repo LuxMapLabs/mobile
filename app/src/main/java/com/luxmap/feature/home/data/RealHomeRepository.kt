@@ -2,6 +2,7 @@ package com.luxmap.feature.home.data
 
 import com.luxmap.core.network.UserApi
 import com.luxmap.core.network.WorkOrdersApi
+import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -21,15 +22,16 @@ class RealHomeRepository
     ) : HomeRepository {
         override fun observeHomeData(): Flow<HomeData> =
             flow {
-                val userId = userApi.me().userId
+                val user = userApi.me()
                 // "Việc hôm nay" only means open work - without this filter the server returns
                 // every work order ever assigned to this user, including done/verified/cancelled
                 // ones from the past, which then show up mixed into today's task list.
-                val items = workOrdersApi.list(assignedTo = userId, woStatus = ACTIVE_STATUSES).items
-                emit(items.toHomeData())
+                val items = workOrdersApi.list(assignedTo = user.userId, woStatus = ACTIVE_STATUSES).items
+                emit(items.toHomeData(user))
             }
 
-        private fun List<WorkOrderItemDto>.toHomeData(): HomeData {
+        private fun List<WorkOrderItemDto>.toHomeData(user: CurrentUserResponseDto): HomeData {
+            val communeNames = user.communes.associate { it.communeId to it.name }
             val today = LocalDate.now()
             val metrics =
                 HomeMetrics(
@@ -43,10 +45,10 @@ class RealHomeRepository
                     .map { (communeId, group) ->
                         WorkOrderCluster(
                             clusterLabel = communeId,
-                            items = group.map { it.toSummaryItem() },
+                            items = group.map { it.toSummaryItem().copy(communeName = communeNames[communeId]) },
                         )
                     }
-            return HomeData(metrics = metrics, clusters = clusters)
+            return HomeData(metrics = metrics, clusters = clusters, fullName = user.fullName)
         }
 
         // A cancelled or already-finished order is never "overdue", no matter its due_date.

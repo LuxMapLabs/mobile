@@ -168,7 +168,7 @@ class WorkOrderDetailScreenTest {
     fun a_review_note_shows_the_maintenance_engineers_request() {
         val detail = repairDetail().copy(reviewNote = "Chụp thêm ảnh góc rộng")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Quản lý yêu cầu bổ sung").assertExists()
         composeRule.onNodeWithText("Chụp thêm ảnh góc rộng").assertExists()
     }
 
@@ -181,7 +181,7 @@ class WorkOrderDetailScreenTest {
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
         composeRule.onNodeWithText("Ghi chú & lịch sử").assertExists()
-        composeRule.onNodeWithText("Kỹ sư bảo trì yêu cầu bổ sung").assertExists()
+        composeRule.onNodeWithText("Quản lý yêu cầu bổ sung").assertExists()
         composeRule.onNodeWithText("Ghi chú giao việc").assertExists()
         composeRule.onNodeWithText("Ưu tiên trước mưa").assertExists()
     }
@@ -192,8 +192,8 @@ class WorkOrderDetailScreenTest {
         val detail = repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("Đã khoá do quá hạn").assertExists()
-        composeRule.onNodeWithText("liên hệ Kỹ sư bảo trì để xử lý", substring = true).assertDoesNotExist()
-        composeRule.onNodeWithText("Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.").assertExists()
+        composeRule.onNodeWithText("liên hệ Quản lý để xử lý", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Biểu mẫu đã khoá. Liên hệ Quản lý.").assertExists()
     }
 
     @Test
@@ -328,7 +328,7 @@ class WorkOrderDetailScreenTest {
         val detail = repairDetail(woStatus = "done").copy(allowedActions = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onAllNodesWithText("Đã nộp báo cáo").onFirst().assertExists()
-        composeRule.onNodeWithText("Chờ Kỹ sư bảo trì duyệt").assertExists()
+        composeRule.onNodeWithText("Chờ Quản lý duyệt").assertExists()
     }
 
     @Test

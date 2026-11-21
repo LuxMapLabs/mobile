@@ -30,8 +30,9 @@ class HomeViewModel
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-        // Same source ProfileViewModel already reads for the greeting on F15 - no separate
-        // profile fetch just for a first-name greeting here.
+        // Reuse the profile returned by Home's existing /auth/me request, even when tasks are empty.
+        private val _fullName = MutableStateFlow<String?>(null)
+        val fullName: StateFlow<String?> = _fullName.asStateFlow()
         val username: StateFlow<String?> =
             authRepository.observeUsername().stateIn(
                 viewModelScope,
@@ -71,6 +72,7 @@ class HomeViewModel
                                     isNetworkError = e is IOException,
                                 )
                         }.collect { (data, syncStates) ->
+                            _fullName.value = data.fullName
                             _uiState.value =
                                 if (data.visibleTasks().isEmpty()) {
                                     HomeUiState.Empty

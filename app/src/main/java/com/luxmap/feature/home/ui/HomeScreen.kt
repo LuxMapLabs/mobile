@@ -25,6 +25,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,7 @@ fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val username by viewModel.username.collectAsState()
+    val fullName by viewModel.fullName.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Home's own ViewModel survives navigating into another screen (work order detail, survey...)
@@ -97,6 +99,7 @@ fun HomeRoute(
     HomeScreen(
         uiState = uiState,
         username = username,
+        fullName = fullName,
         onOpenWorkOrder = onOpenWorkOrder,
         onRetry = viewModel::retry,
         unreadNotificationCount = unreadNotificationCount,
@@ -111,9 +114,10 @@ private val VI = Locale.forLanguageTag("vi")
 internal fun homeGreeting(
     username: String?,
     today: LocalDate,
+    fullName: String? = null,
 ): String {
     val date = today.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/yyyy", VI)).replaceFirstChar { it.titlecase(VI) }
-    val name = username?.takeIf { it.isNotBlank() }
+    val name = fullName?.takeIf { it.isNotBlank() } ?: username?.takeIf { it.isNotBlank() }
     return if (name != null) "Xin chào, $name\n$date" else "Xin chào\n$date"
 }
 
@@ -127,15 +131,21 @@ fun HomeScreen(
     onOpenNotifications: () -> Unit,
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    fullName: String? = null,
 ) {
     val today = remember { LocalDate.now() }
+    var selectedTab by rememberSaveable { mutableStateOf<HomeTaskTab?>(null) }
+    val resolvedTab = initialHomeTab(uiState, selectedTab)
+    LaunchedEffect(resolvedTab) {
+        if (selectedTab == null) selectedTab = resolvedTab
+    }
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             LuxTabTopBar(
                 title = "Việc hôm nay",
-                subtitle = homeGreeting(username, today),
+                subtitle = homeGreeting(username, today, fullName),
                 unreadNotificationCount = unreadNotificationCount,
                 onNotificationsClick = onOpenNotifications,
             )
@@ -149,6 +159,8 @@ fun HomeScreen(
                 is HomeUiState.Success ->
                     HomeContent(
                         data = uiState.data,
+                        selectedTab = resolvedTab ?: HomeTaskTab.REPAIR,
+                        onSelectTab = { selectedTab = it },
                         isStale = uiState.isStale,
                         lastSyncedAt = uiState.lastSyncedAt,
                         completionSyncStates = uiState.completionSyncStates,
@@ -164,12 +176,13 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     data: HomeData,
+    selectedTab: HomeTaskTab,
+    onSelectTab: (HomeTaskTab) -> Unit,
     isStale: Boolean,
     lastSyncedAt: Instant?,
     completionSyncStates: Map<String, CompletionSyncState>,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(HomeTaskTab.REPAIR) }
     val today = remember { LocalDate.now() }
     val tasks = remember(data) { data.visibleTasks() }
     val summary = remember(tasks, today) { tasks.homeSummary(today) }
@@ -182,7 +195,7 @@ private fun HomeContent(
             LuxSegmented(
                 segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
                 selected = selectedTab,
-                onSelect = { selectedTab = it },
+                onSelect = onSelectTab,
             )
         }
         val visibleItems = remember(tasks, selectedTab, today) { tasks.sortedFor(selectedTab, today) }
@@ -306,7 +319,7 @@ private fun HomeLoading() {
 private fun HomeEmpty(onRetry: () -> Unit) {
     LuxEmptyState(
         title = "Chưa có việc được giao",
-        message = "Khi Kỹ sư bảo trì giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.",
+        message = "Khi Quản lý giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.",
         icon = Icons.Filled.EventAvailable,
         actionLabel = "Làm mới",
         onAction = onRetry,

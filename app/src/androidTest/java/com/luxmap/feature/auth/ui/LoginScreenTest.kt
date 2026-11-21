@@ -87,8 +87,14 @@ class LoginScreenTest {
 
     @Test
     fun a_missing_identifier_error_is_shown_once_and_focuses_identifier() {
-        setContent(uiState = LoginUiState.Error(LoginFailureReason.MissingIdentifier, "Nhập mã nhân viên"))
-        composeRule.onAllNodesWithText("Nhập mã nhân viên").assertCountEquals(1)
+        setContent(
+            uiState =
+                LoginUiState.Error(
+                    LoginFailureReason.MissingIdentifier,
+                    "Vui lòng nhập tên đăng nhập hoặc email.",
+                ),
+        )
+        composeRule.onAllNodesWithText("Vui lòng nhập tên đăng nhập hoặc email.").assertCountEquals(1)
         composeRule.onAllNodes(hasSetTextAction())[0].assertIsFocused()
     }
 

@@ -54,7 +54,7 @@ class WorkOrderMessagesTest {
         val result = messages(detail(woStatus = "in_progress", scheduledDate = "2026-11-15"))
         assertEquals("Quá hạn nộp báo cáo", result.prominent?.title)
         assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
-        assertEquals("Biểu mẫu đã khoá. Liên hệ Kỹ sư bảo trì.", result.prominent?.body)
+        assertEquals("Biểu mẫu đã khoá. Liên hệ Quản lý.", result.prominent?.body)
     }
 
     @Test
@@ -62,13 +62,13 @@ class WorkOrderMessagesTest {
         val result = messages(detail(woStatus = "assigned", scheduledDate = "2026-11-15"))
         assertEquals("Quá hạn bắt đầu", result.prominent?.title)
         assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
-        assertEquals("Liên hệ Kỹ sư bảo trì để được giao lại.", result.prominent?.body)
+        assertEquals("Liên hệ Quản lý để được giao lại.", result.prominent?.body)
     }
 
     @Test
     fun `a returned order shows the maintenance engineer request as a warning`() {
         val result = messages(detail(woStatus = "in_progress", reviewNote = "Chụp lại ảnh chóa đèn"))
-        assertEquals("Kỹ sư bảo trì yêu cầu bổ sung", result.prominent?.title)
+        assertEquals("Quản lý yêu cầu bổ sung", result.prominent?.title)
         assertEquals("Chụp lại ảnh chóa đèn", result.prominent?.body)
         assertEquals(WorkOrderMessageTone.WARNING, result.prominent?.tone)
     }
@@ -92,7 +92,7 @@ class WorkOrderMessagesTest {
         val result =
             messages(detail(woStatus = "in_progress"), submitted = true, syncStatus = SyncStatus.QUEUED_OFFLINE)
         assertEquals("Đã nộp báo cáo", result.prominent?.title)
-        assertEquals("Chờ mạng. Kỹ sư bảo trì sẽ duyệt sau khi đồng bộ.", result.prominent?.body)
+        assertEquals("Chờ mạng. Quản lý sẽ duyệt sau khi đồng bộ.", result.prominent?.body)
         assertEquals(WorkOrderMessageTone.INFO, result.prominent?.tone)
     }
 
@@ -100,8 +100,8 @@ class WorkOrderMessagesTest {
     fun `a synced or server done order only says it is waiting for review`() {
         val synced = messages(detail(woStatus = "in_progress"), submitted = true, syncStatus = SyncStatus.DONE)
         val done = messages(detail(woStatus = "done"))
-        assertEquals("Đang chờ Kỹ sư bảo trì duyệt.", synced.prominent?.body)
-        assertEquals("Đang chờ Kỹ sư bảo trì duyệt.", done.prominent?.body)
+        assertEquals("Đang chờ Quản lý duyệt.", synced.prominent?.body)
+        assertEquals("Đang chờ Quản lý duyệt.", done.prominent?.body)
     }
 
     @Test
@@ -123,7 +123,7 @@ class WorkOrderMessagesTest {
                 ),
             )
         assertEquals("Quá hạn nộp báo cáo", result.prominent?.title)
-        assertEquals(listOf("Kỹ sư bảo trì yêu cầu bổ sung", "Ghi chú giao việc"), result.notes.map { it.label })
+        assertEquals(listOf("Quản lý yêu cầu bổ sung", "Ghi chú giao việc"), result.notes.map { it.label })
     }
 
     @Test
