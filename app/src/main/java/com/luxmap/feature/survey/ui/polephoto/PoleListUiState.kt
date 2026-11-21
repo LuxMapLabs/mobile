@@ -19,6 +19,7 @@ data class PoleListRowState(
     val hasPendingDecision: Boolean = false,
     val aiVerdict: PoleAiVerdict? = null,
     val isConfirmed: Boolean = false,
+    val identification: com.luxmap.feature.survey.data.PoleListItem? = null,
 )
 
 sealed interface PoleListUiState {

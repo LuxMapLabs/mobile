@@ -565,6 +565,26 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
+    fun gps_pole_shows_identification_and_keeps_old_coordinates() {
+        val item =
+            com.luxmap.feature.survey.data.PoleListItem(
+                "P-1", 2, 10.0, 106.0, "normal", segmentId = "S1", note = "Cạnh cầu",
+                fixtureType = "led_road_lamp", lampWatt = 100, lampCount = 2, fixtureCount = 1, nearSensitivePoi = true,
+            )
+        setContent(
+            WorkOrderDetailUiState.Success(
+                detail = poleGpsDetail(poleIds = listOf("P-1")),
+                poleReferences = listOf(PoleReference("P-1", 2, 10.0, 106.0, item)),
+            ),
+        )
+        composeRule.onNodeWithText("Cột số 2 · S1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Cạnh cầu", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Đèn LED · 100W × 2", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Gần trường/cầu", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("GPS cũ: 10.000000, 106.000000").assertExists()
+    }
+
+    @Test
     fun pole_with_no_cached_position_shows_chua_co() {
         setContent(
             uiState =

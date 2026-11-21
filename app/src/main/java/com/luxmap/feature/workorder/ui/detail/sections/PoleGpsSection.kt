@@ -8,7 +8,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -39,6 +40,7 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxListItem
+import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
 import com.luxmap.feature.workorder.polegps.data.MeasurementSource
@@ -135,15 +137,7 @@ internal fun PoleGpsSection(
                                 measurement != null -> {
                                     onOpenMap(reference.poleId, measurement.lat, measurement.lng, true)
                                 }
-                                reference.lat != null && reference.lng != null && reference.lat != 0.0 -> {
-                                    onOpenMap(reference.poleId, reference.lat, reference.lng, false)
-                                }
-                                else -> {
-                                    onAttachmentFeedback(
-                                        "Cột ${reference.poleId} chưa có tọa độ trên bản đồ. " +
-                                            "Vui lòng bấm 'Đo GPS' để thu thập vị trí.",
-                                    )
-                                }
+                                else -> onOpenMap(reference.poleId, reference.lat, reference.lng, false)
                             }
                         },
                         onMeasure = { onMeasurePole(reference.poleId) },
@@ -216,84 +210,115 @@ private fun PoleGpsItem(
     onMeasure: () -> Unit,
 ) {
     val oldPosition =
-        if (reference.lat != null && reference.lng != null && reference.lat != 0.0) {
+        if (reference.lat != null && reference.lng != null) {
             "%.6f, %.6f".format(Locale.ROOT, reference.lat, reference.lng)
         } else {
             "Chưa có"
         }
-    LuxListItem(
-        headline = reference.poleId,
-        supporting =
-            measurement?.let {
-                "GPS đã ghi nhận: %.6f, %.6f\nSai số GPS: ±%.1f m\nThời gian mẫu: %s"
-                    .format(Locale.ROOT, it.lat, it.lng, it.accuracyM, it.capturedAt)
-            } ?: "GPS cũ: $oldPosition",
-        leadingIcon = Icons.Filled.LocationOn,
-        onClick = onOpenMap,
-        showChevron = false,
-        trailing = {
-            if (canCapture) {
-                if (measurement == null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
-                        FilledTonalButton(
-                            onClick = onMeasure,
-                            contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp),
+    Column(
+        Modifier.padding(bottom = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        LuxListItem(
+            headline = reference.poleId,
+            leadingIcon = Icons.Filled.LocationOn,
+            onClick = onOpenMap,
+            showChevron = false,
+            trailing = {
+                if (canCapture) {
+                    if (measurement == null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.CameraAlt,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Spacer(modifier = Modifier.width(Spacing.xs))
-                            Text("Đo GPS", style = MaterialTheme.typography.labelSmall)
+                            StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
+                            FilledTonalButton(
+                                onClick = onMeasure,
+                                contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
+                                modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CameraAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(modifier = Modifier.width(Spacing.xs))
+                                Text("Đo GPS", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            val badgeText =
+                                if (measurement.source == MeasurementSource.DEVICE) "Đã đo" else "Đã báo trước"
+                            val badgeColors =
+                                if (measurement.source == MeasurementSource.DEVICE) {
+                                    WorkOrderStatus.VERIFIED.badgeColors()
+                                } else {
+                                    WorkOrderStatus.OPEN.badgeColors()
+                                }
+                            StatusBadge(text = badgeText, colors = badgeColors)
+                            IconButton(
+                                onClick = onMeasure,
+                                modifier = Modifier.size(Dimens.minTouchTarget),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Replay,
+                                    contentDescription = "Đo lại GPS cột ${reference.poleId}",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
                         }
                     }
                 } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                    ) {
-                        val badgeText =
-                            if (measurement.source == MeasurementSource.DEVICE) "Đã đo" else "Đã báo trước"
-                        val badgeColors =
-                            if (measurement.source == MeasurementSource.DEVICE) {
-                                WorkOrderStatus.VERIFIED.badgeColors()
-                            } else {
-                                WorkOrderStatus.OPEN.badgeColors()
-                            }
-                        StatusBadge(text = badgeText, colors = badgeColors)
-                        IconButton(
-                            onClick = onMeasure,
-                            modifier = Modifier.size(Dimens.minTouchTarget),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Replay,
-                                contentDescription = "Đo lại GPS cột ${reference.poleId}",
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
+                    val badgeText =
+                        when {
+                            measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
+                            measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
+                            else -> "Chưa bắt đầu"
                         }
-                    }
+                    val badgeColors =
+                        if (measurement != null) {
+                            WorkOrderStatus.VERIFIED.badgeColors()
+                        } else {
+                            WorkOrderStatus.OPEN.badgeColors()
+                        }
+                    StatusBadge(text = badgeText, colors = badgeColors)
                 }
-            } else {
-                val badgeText =
-                    when {
-                        measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
-                        measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
-                        else -> "Chưa bắt đầu"
-                    }
-                val badgeColors =
-                    if (measurement != null) {
-                        WorkOrderStatus.VERIFIED.badgeColors()
-                    } else {
-                        WorkOrderStatus.OPEN.badgeColors()
-                    }
-                StatusBadge(text = badgeText, colors = badgeColors)
-            }
-        },
-    )
+            },
+        )
+        reference.identification?.let { item ->
+            PoleIdentificationDetails(
+                poleId = reference.poleId,
+                position = reference.position,
+                segmentId = item.segmentId,
+                note = item.note,
+                fixtureType = item.fixtureType,
+                lampWatt = item.lampWatt,
+                lampCount = item.lampCount,
+                fixtureCount = item.fixtureCount,
+                nearSensitivePoi = item.nearSensitivePoi,
+                lat = measurement?.lat ?: reference.lat,
+                lng = measurement?.lng ?: reference.lng,
+                onOpenMap = onOpenMap,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+        Text(
+            "GPS cũ: $oldPosition",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = Spacing.lg),
+        )
+        measurement?.let {
+            Text(
+                "GPS đã ghi nhận: %.6f, %.6f\nSai số GPS: ±%.1f m\nThời gian mẫu: %s"
+                    .format(Locale.ROOT, it.lat, it.lng, it.accuracyM, it.capturedAt),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = Spacing.lg),
+            )
+        }
+    }
 }
