@@ -577,7 +577,12 @@ private fun WorkOrderDetailContent(
                 WorkOrderNotesCard(notes = messages.notes)
             }
             if (kind == WorkOrderTaskKind.INSPECTION || kind == WorkOrderTaskKind.REPAIR) {
-                OrderPolesSection(state.orderPoles, onRetryPoles, onOpenMap)
+                OrderPolesSection(
+                    state = state.orderPoles,
+                    faultPoleIds = detail.faults.mapNotNull { it.poleId }.toSet(),
+                    onRetry = onRetryPoles,
+                    onOpenMap = onOpenMap,
+                )
             }
             if (kind == WorkOrderTaskKind.SURVEY) {
                 SurveySection(

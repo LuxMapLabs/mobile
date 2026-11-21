@@ -159,9 +159,9 @@ class WorkOrderDetailScreenTest {
                 ),
             onOpenMap = { id, _, _, _ -> opened = id },
         )
-        composeRule.onNodeWithText("Cột cần đến (1)").assertExists()
+        composeRule.onNodeWithText("Cột trong phạm vi lệnh (1)").assertExists()
         composeRule.onNodeWithText("POLE-0214").assertExists()
-        composeRule.onNodeWithText("10.0, 106.0").assertExists()
+        composeRule.onNodeWithText("Toạ độ: 10.000000, 106.000000").assertExists()
         composeRule.onNodeWithText("Danh sách đã lưu · chưa cập nhật").assertExists()
         composeRule.onNodeWithContentDescription("Thông tin cột POLE-0214").performScrollTo().performClick()
         composeRule.onNodeWithText("Đường đi").assertExists()
