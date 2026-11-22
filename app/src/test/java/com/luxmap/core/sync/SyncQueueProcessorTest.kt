@@ -202,4 +202,42 @@ class SyncQueueProcessorTest {
 
             assertEquals(1, maxConcurrentEntries)
         }
+
+    @Test
+    fun `a row enqueued while a pass is running is processed in the same call`() =
+        runTest {
+            val dao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { dao.queuedRows() } returnsMany
+                listOf(
+                    listOf(row(1, "REVIEW-1", "submit_pole_photo_review")),
+                    listOf(row(2, "COMP-1", "complete_work_order")),
+                    emptyList(),
+                )
+            val processor =
+                SyncQueueProcessor(
+                    dao,
+                    setOf(
+                        handler("submit_pole_photo_review", SyncOpResult.Done),
+                        handler("complete_work_order", SyncOpResult.Done),
+                    ),
+                )
+
+            assertFalse(processor.processQueuedOps())
+
+            coVerify { dao.updateStatus(1, "done", 0, null, any()) }
+            coVerify { dao.updateStatus(2, "done", 0, null, any()) }
+        }
+
+    @Test
+    fun `a row that stays queued is not processed again in the same call`() =
+        runTest {
+            val dao = mockk<SyncQueueDao>(relaxed = true)
+            coEvery { dao.queuedRows() } returns listOf(row(1, "OP-1"))
+            val processor =
+                SyncQueueProcessor(dao, setOf(handler("upload_work_order_evidence", SyncOpResult.RetryLater)))
+
+            assertTrue(processor.processQueuedOps())
+
+            coVerify(exactly = 1) { dao.updateStatus(1, "queued", 1, null, any()) }
+        }
 }

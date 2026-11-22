@@ -9,11 +9,14 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.util.concurrent.TimeUnit
 
 // BASE_URL comes from BuildConfig.API_BASE_URL (see app/build.gradle.kts) — defaults to
 // 10.0.2.2, the loopback address Android Emulator uses to reach the host machine, matching the
 // http port in luxmap_backend/src/LuxMap.Api/Properties/launchSettings.json.
 object ApiClient {
+    private const val UPLOAD_TIMEOUT_SECONDS = 180
+
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonConverterFactory = json.asConverterFactory("application/json".toMediaType())
 
@@ -28,6 +31,23 @@ object ApiClient {
                 } else {
                     HttpLoggingInterceptor.Level.NONE
                 }
+        }
+
+    private val uploadTimeoutInterceptor =
+        Interceptor { chain ->
+            val request = chain.request()
+            val path = request.url.encodedPath
+            val isMediaUpload =
+                (request.method == "POST" || request.method == "PUT") &&
+                    (path.contains("/pole-videos/") || path.endsWith("/pole-photos") || path.endsWith("/evidence"))
+            if (isMediaUpload) {
+                chain
+                    .withReadTimeout(UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .withWriteTimeout(UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .proceed(request)
+            } else {
+                chain.proceed(request)
+            }
         }
 
     // "Plain" client — no Authorization header, no Authenticator. AuthApi (login/refresh/
@@ -48,6 +68,7 @@ object ApiClient {
     ): OkHttpClient =
         OkHttpClient.Builder()
             .addInterceptor(authHeaderInterceptor)
+            .addInterceptor(uploadTimeoutInterceptor)
             .addInterceptor(loggingInterceptor)
             .authenticator(tokenAuthenticator)
             .build()

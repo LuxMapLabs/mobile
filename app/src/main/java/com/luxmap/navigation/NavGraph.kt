@@ -237,6 +237,12 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.PolePhotoResult.createRoute(polePhotoWorkOrderId, photoId))
                     },
                     onDone = { navController.popBackStack() },
+                    onSurveyCompleted = {
+                        navController.navigate(Routes.Survey.createRoute(polePhotoWorkOrderId)) {
+                            popUpTo(Routes.Home.route)
+                            launchSingleTop = true
+                        }
+                    },
                 )
             }
             composable(
