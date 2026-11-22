@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -45,11 +46,14 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.core.ui.components.dueDateLabel
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
 import com.luxmap.feature.workorder.data.CompletionSyncState
+import com.luxmap.feature.workorder.ui.detail.workOrderScheduleWindow
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 
 sealed interface HomeTaskBadge {
     data class Sync(val state: CompletionSyncState) : HomeTaskBadge
+
+    data class Locked(val text: String) : HomeTaskBadge
 
     data object Overdue : HomeTaskBadge
 
@@ -60,12 +64,31 @@ fun homeTaskBadge(
     item: WorkOrderSummaryItem,
     syncState: CompletionSyncState?,
     today: LocalDate,
-): HomeTaskBadge =
-    when {
+): HomeTaskBadge {
+    val lock = homeScheduleLock(item, today)
+    return when {
         syncState != null -> HomeTaskBadge.Sync(syncState)
+        lock != null -> HomeTaskBadge.Locked(lock)
         dueDateLabel(item.dueDate, today).isOverdue -> HomeTaskBadge.Overdue
         else -> HomeTaskBadge.Status(item.woStatus)
     }
+}
+
+internal fun homeScheduleLock(
+    item: WorkOrderSummaryItem,
+    today: LocalDate,
+): String? {
+    if (item.woStatus !in setOf("assigned", "in_progress")) return null
+    val window = workOrderScheduleWindow(item.scheduledDate, today)
+    return when {
+        window.isOverdueToComplete -> "Đã khoá · quá lịch ${DateFormatUtils.formatPlainDate(item.scheduledDate!!)}"
+        item.woStatus == "assigned" && !window.canActOnSchedule ->
+            "Đã khoá · mở ${DateFormatUtils.formatPlainDate(window.unlocksOn.toString())}"
+        item.woStatus == "in_progress" && window.submitOpensOn != null ->
+            "Đã khoá · nộp từ ${DateFormatUtils.formatPlainDate(window.submitOpensOn.toString())}"
+        else -> null
+    }
+}
 
 data class HomeDateLine(
     val scheduled: String?,
@@ -109,6 +132,12 @@ private fun HomeTaskBadgeView(badge: HomeTaskBadge) {
             val text = if (badge.state == CompletionSyncState.PENDING) "Đã nộp, chờ đồng bộ" else status.label()
             StatusBadge(text = text, colors = status.badgeColors(), icon = status.icon())
         }
+        is HomeTaskBadge.Locked ->
+            StatusBadge(
+                text = badge.text,
+                colors = BadgeColors(MaterialTheme.colorScheme.errorContainer, LuxTheme.colors.dueOverdue),
+                icon = Icons.Filled.Lock,
+            )
         HomeTaskBadge.Overdue ->
             StatusBadge(
                 text = "Quá hạn",
@@ -132,6 +161,7 @@ fun HomeTaskCard(
 ) {
     val kind = workOrderTaskKindFromWire(item.taskKind)
     val dates = homeDateLine(item, today)
+    val badge = homeTaskBadge(item, syncState, today)
     val dueColor: Color =
         when {
             dates.isOverdue -> LuxTheme.colors.dueOverdue
@@ -171,7 +201,7 @@ fun HomeTaskCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                HomeTaskBadgeView(homeTaskBadge(item, syncState, today))
+                HomeTaskBadgeView(badge)
             }
             Text(
                 text = item.title,
@@ -206,7 +236,7 @@ fun HomeTaskCard(
                     DateText(Icons.Filled.EventAvailable, "Chưa có lịch", neutral)
                 }
                 dates.scheduled?.let { DateText(Icons.Filled.EventAvailable, it, neutral) }
-                dates.due?.let {
+                dates.due?.takeUnless { badge is HomeTaskBadge.Locked }?.let {
                     DateText(
                         if (dates.isOverdue) Icons.Filled.EventBusy else Icons.Filled.Schedule,
                         it,

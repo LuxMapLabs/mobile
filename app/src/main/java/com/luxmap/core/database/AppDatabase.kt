@@ -14,7 +14,9 @@ import com.luxmap.feature.survey.data.entity.LocalAssignedSurveyRouteEntity
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
+import com.luxmap.feature.workorder.data.dao.WorkOrderDraftDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderDraftEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsMeasurementEntity
 import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsOrderEntity
@@ -26,6 +28,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 @Database(
     entities = [
         SyncQueueEntity::class,
+        LocalWorkOrderDraftEntity::class,
         LocalAssignedPoleGpsOrderEntity::class,
         LocalWorkOrderEvidenceEntity::class,
         LocalWorkOrderCompletionEntity::class,
@@ -36,11 +39,13 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalWorkOrderAttachmentEntity::class,
         LocalPoleGpsMeasurementEntity::class,
     ],
-    version = 24,
+    version = 25,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun workOrderDraftDao(): WorkOrderDraftDao
+
     abstract fun syncQueueDao(): SyncQueueDao
 
     abstract fun workOrderCompletionDao(): WorkOrderCompletionDao

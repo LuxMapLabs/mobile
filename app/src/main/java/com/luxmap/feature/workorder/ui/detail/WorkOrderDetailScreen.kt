@@ -1,5 +1,6 @@
 package com.luxmap.feature.workorder.ui.detail
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,6 +63,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.common.openInMaps
 import com.luxmap.core.theme.AssetCondition
@@ -104,9 +109,12 @@ import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionSection
+import com.luxmap.feature.workorder.ui.detail.sections.OrderPolesSection
 import com.luxmap.feature.workorder.ui.detail.sections.PoleGpsSection
 import com.luxmap.feature.workorder.ui.detail.sections.RepairCompletionSection
 import com.luxmap.feature.workorder.ui.detail.sections.SurveySection
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -123,6 +131,23 @@ fun WorkOrderDetailRoute(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val leave: () -> Unit = {
+        scope.launch {
+            viewModel.flushDraft()
+            onBack()
+        }
+    }
+    BackHandler(onBack = leave)
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) scope.launch { viewModel.flushDraft() }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.startedSurveyWorkOrderId.collect { workOrderId -> onStartSurvey(workOrderId) }
@@ -130,14 +155,25 @@ fun WorkOrderDetailRoute(
 
     WorkOrderDetailScreen(
         uiState = uiState,
-        onBack = onBack,
+        onBack = leave,
         onStart = viewModel::start,
-        onNavigateFault = { lat, lng -> openInMaps(context, lat, lng) },
-        onOpenMap = onOpenMap,
+        onNavigateFault = { lat, lng ->
+            scope.launch {
+                viewModel.flushDraft()
+                openInMaps(context, lat, lng)
+            }
+        },
+        onOpenMap = { poleId, lat, lng, proposed ->
+            scope.launch {
+                viewModel.flushDraft()
+                onOpenMap(poleId, lat, lng, proposed)
+            }
+        },
         onReportNoteChanged = viewModel::onReportNoteChanged,
         onMaterialsUsedChanged = viewModel::onMaterialsUsedChanged,
         onFaultOutcomeSelected = viewModel::onFaultOutcomeSelected,
         onSubmit = viewModel::submit,
+        submitEvents = viewModel.submitEvents,
         onRequestCancellation = viewModel::requestCancellation,
         onCaptureEvidence = {
             val state = uiState as? WorkOrderDetailUiState.Success
@@ -149,10 +185,21 @@ fun WorkOrderDetailRoute(
         },
         onRemoveEvidence = viewModel::removeEvidence,
         onRecoverEvidence = viewModel::recoverEvidenceSubmission,
-        onOpenPdf = onOpenPdf,
-        onMeasurePole = onMeasurePole,
+        onOpenPdf = { attachmentId ->
+            scope.launch {
+                viewModel.flushDraft()
+                onOpenPdf(attachmentId)
+            }
+        },
+        onMeasurePole = { poleId ->
+            scope.launch {
+                viewModel.flushDraft()
+                onMeasurePole(poleId)
+            }
+        },
         onRetryAttachment = viewModel::retryAttachment,
         onRetry = viewModel::retry,
+        onRetryPoles = viewModel::retryPoles,
         onOpenSurvey = onStartSurvey,
         modifier = modifier,
     )
@@ -168,6 +215,7 @@ fun WorkOrderDetailScreen(
     onMaterialsUsedChanged: (String) -> Unit,
     onFaultOutcomeSelected: (String, String) -> Unit,
     onSubmit: () -> Unit,
+    submitEvents: Flow<ReportSubmitEvent> = emptyFlow(),
     onRequestCancellation: (reason: String) -> Unit = {},
     onCaptureEvidence: () -> Unit,
     onRemoveEvidence: (String) -> Unit,
@@ -176,6 +224,7 @@ fun WorkOrderDetailScreen(
     onMeasurePole: (String) -> Unit = {},
     onRetryAttachment: (String) -> Unit = {},
     onRetry: () -> Unit = {},
+    onRetryPoles: () -> Unit = {},
     onOpenSurvey: (String) -> Unit = {},
     onOpenMap: (poleId: String, lat: Double?, lng: Double?, isProposed: Boolean) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier,
@@ -184,6 +233,17 @@ fun WorkOrderDetailScreen(
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(submitEvents) {
+        submitEvents.collect { event ->
+            snackbarHostState.showSnackbar(
+                when (event) {
+                    ReportSubmitEvent.SavedLocally -> "Đã lưu báo cáo trên máy · sẽ gửi khi có mạng"
+                    is ReportSubmitEvent.Failed -> "Không lưu được báo cáo: ${event.reason}"
+                },
+            )
+        }
+    }
 
     Scaffold(
         snackbarHost = { LuxSnackbarHost(snackbarHostState) },
@@ -233,6 +293,7 @@ fun WorkOrderDetailScreen(
                     WorkOrderDetailContent(
                         state = uiState,
                         onOpenSurvey = onOpenSurvey,
+                        onRetryPoles = onRetryPoles,
                         onNavigateFault = onNavigateFault,
                         onReportNoteChanged = onReportNoteChanged,
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
@@ -275,9 +336,6 @@ fun WorkOrderDetailScreen(
             onConfirm = {
                 showSubmitConfirm = false
                 onSubmit()
-                scope.launch {
-                    snackbarHostState.showSnackbar("Nộp báo cáo thành công. Chờ Quản lý duyệt")
-                }
             },
         )
     }
@@ -451,6 +509,7 @@ private fun SubmitConfirmationSheet(
 private fun WorkOrderDetailContent(
     state: WorkOrderDetailUiState.Success,
     onOpenSurvey: (String) -> Unit,
+    onRetryPoles: () -> Unit,
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     onReportNoteChanged: (String) -> Unit,
     onMaterialsUsedChanged: (String) -> Unit,
@@ -494,6 +553,12 @@ private fun WorkOrderDetailContent(
                 showSubmittedBadge = hasActiveLocalCompletion,
                 syncStatus = state.syncStatus(),
             )
+            if (state.hasDraft && !hasActiveLocalCompletion && !state.justSubmitted) {
+                Text("Đã lưu nháp trên máy", style = MaterialTheme.typography.bodySmall)
+            }
+            state.draftError?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             if (messages.showOffline) {
                 LuxBanner(
                     title = "Đang ngoại tuyến",
@@ -511,6 +576,14 @@ private fun WorkOrderDetailContent(
             if (messages.notes.isNotEmpty()) {
                 WorkOrderNotesCard(notes = messages.notes)
             }
+            if (kind == WorkOrderTaskKind.INSPECTION || kind == WorkOrderTaskKind.REPAIR) {
+                OrderPolesSection(
+                    state = state.orderPoles,
+                    faultPoleIds = detail.faults.mapNotNull { it.poleId }.toSet(),
+                    onRetry = onRetryPoles,
+                    onOpenMap = onOpenMap,
+                )
+            }
             if (kind == WorkOrderTaskKind.SURVEY) {
                 SurveySection(
                     started = status == WorkOrderStatus.IN_PROGRESS,
@@ -525,7 +598,7 @@ private fun WorkOrderDetailContent(
                     canCapture = canComplete && !isFormLocked,
                     showReport = canComplete,
                     reportNote = state.reportNote,
-                    locked = isFormLocked,
+                    locked = isFormLocked || state.isSubmitting,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -539,7 +612,7 @@ private fun WorkOrderDetailContent(
                     selectedOutcomes = state.faultOutcomes,
                     reportNote = state.reportNote,
                     editable = canComplete,
-                    locked = isFormLocked,
+                    locked = isFormLocked || state.isSubmitting,
                     onNavigateFault = onNavigateFault,
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onReportNoteChanged = onReportNoteChanged,

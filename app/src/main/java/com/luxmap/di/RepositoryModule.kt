@@ -20,8 +20,10 @@ import com.luxmap.feature.survey.data.RealSurveyRepository
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderDetailRepository
+import com.luxmap.feature.workorder.data.RealWorkOrderDraftRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
+import com.luxmap.feature.workorder.data.WorkOrderDraftRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -32,6 +34,9 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+    @Binds
+    abstract fun bindWorkOrderDraftRepository(impl: RealWorkOrderDraftRepository): WorkOrderDraftRepository
+
     @Binds
     abstract fun bindMapRepository(impl: RealMapRepository): MapRepository
 

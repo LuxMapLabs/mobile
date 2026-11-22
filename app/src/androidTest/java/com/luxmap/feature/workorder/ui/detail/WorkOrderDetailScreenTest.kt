@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
@@ -19,6 +20,9 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleReference
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -100,6 +104,9 @@ class WorkOrderDetailScreenTest {
         onMaterialsUsedChanged: (String) -> Unit = {},
         onFaultOutcomeSelected: (String, String) -> Unit = { _, _ -> },
         onSubmit: () -> Unit = {},
+        submitEvents: Flow<ReportSubmitEvent> = emptyFlow(),
+        onRetryPoles: () -> Unit = {},
+        onOpenMap: (String, Double?, Double?, Boolean) -> Unit = { _, _, _, _ -> },
         onCaptureEvidence: () -> Unit = {},
         onRemoveEvidence: (String) -> Unit = {},
         onRecoverEvidence: (Boolean) -> Unit = {},
@@ -123,6 +130,9 @@ class WorkOrderDetailScreenTest {
                     onMaterialsUsedChanged = onMaterialsUsedChanged,
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onSubmit = onSubmit,
+                    submitEvents = submitEvents,
+                    onRetryPoles = onRetryPoles,
+                    onOpenMap = onOpenMap,
                     onCaptureEvidence = onCaptureEvidence,
                     onRemoveEvidence = onRemoveEvidence,
                     onRecoverEvidence = onRecoverEvidence,
@@ -132,6 +142,71 @@ class WorkOrderDetailScreenTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun inspection_without_faults_shows_target_pole_and_map_action_before_start() {
+        var opened: String? = null
+        val pole = PoleListItem("POLE-0214", 3, 10.0, 106.0, "normal", note = "Cạnh cầu")
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail =
+                        inspectionDetail(
+                            emptyList(),
+                        ).copy(woStatus = "assigned", allowedActions = listOf("start")),
+                    orderPoles = OrderPolesUiState.Success(listOf(pole), true),
+                ),
+            onOpenMap = { id, _, _, _ -> opened = id },
+        )
+        composeRule.onNodeWithText("Cột trong phạm vi lệnh (1)").assertExists()
+        composeRule.onNodeWithText("POLE-0214").assertExists()
+        composeRule.onNodeWithText("Toạ độ: 10.000000, 106.000000").assertExists()
+        composeRule.onNodeWithText("Danh sách đã lưu · chưa cập nhật").assertExists()
+        composeRule.onNodeWithContentDescription("Thông tin cột POLE-0214").performScrollTo().performClick()
+        composeRule.onNodeWithText("Đường đi").assertExists()
+        composeRule.onNodeWithText("Xem trên bản đồ").performClick()
+        assertEquals("POLE-0214", opened)
+    }
+
+    @Test
+    fun pole_failure_can_retry_without_replacing_the_detail() {
+        var retries = 0
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = repairDetail(),
+                    orderPoles = OrderPolesUiState.Error("Mất kết nối"),
+                ),
+            onRetryPoles = { retries++ },
+        )
+        composeRule.onNodeWithText("Sửa đèn tuyến A").assertExists()
+        composeRule.onNodeWithText("Mất kết nối").assertExists()
+        composeRule.onNodeWithText("Thử lại").performScrollTo().performClick()
+        assertEquals(1, retries)
+    }
+
+    @Test
+    fun local_save_event_shows_pending_sync_wording() {
+        val events = MutableSharedFlow<ReportSubmitEvent>(extraBufferCapacity = 1)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()), submitEvents = events)
+        composeRule.runOnIdle { events.tryEmit(ReportSubmitEvent.SavedLocally) }
+        composeRule.onNodeWithText("Đã lưu báo cáo trên máy · sẽ gửi khi có mạng").assertExists()
+        composeRule.onNodeWithText("Nộp báo cáo thành công", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun local_save_failure_shows_the_reason() {
+        val events = MutableSharedFlow<ReportSubmitEvent>(extraBufferCapacity = 1)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()), submitEvents = events)
+        composeRule.runOnIdle { events.tryEmit(ReportSubmitEvent.Failed("disk full")) }
+        composeRule.onNodeWithText("Không lưu được báo cáo: disk full").assertExists()
+    }
+
+    @Test
+    fun a_persisted_draft_shows_a_discreet_local_hint() {
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail(), hasDraft = true))
+        composeRule.onNodeWithText("Đã lưu nháp trên máy").assertExists()
     }
 
     @Test
@@ -301,6 +376,8 @@ class WorkOrderDetailScreenTest {
         composeRule.onNodeWithText("Nộp báo cáo?").assertExists()
         composeRule.onNodeWithText("Nộp báo cáo").performClick()
         assertEquals(1, submitted)
+        composeRule.onNodeWithText("Nộp báo cáo thành công", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Đã lưu báo cáo trên máy", substring = true).assertDoesNotExist()
     }
 
     @Test

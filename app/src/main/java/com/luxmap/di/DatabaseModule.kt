@@ -9,12 +9,14 @@ import com.luxmap.core.database.MIGRATION_18_19
 import com.luxmap.core.database.MIGRATION_21_22
 import com.luxmap.core.database.MIGRATION_22_23
 import com.luxmap.core.database.MIGRATION_23_24
+import com.luxmap.core.database.MIGRATION_24_25
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.survey.data.dao.PoleGpsOrderCacheDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
+import com.luxmap.feature.workorder.data.dao.WorkOrderDraftDao
 import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 import dagger.Module
 import dagger.Provides
@@ -33,10 +35,7 @@ object DatabaseModule {
     ): AppDatabase =
         Room
             .databaseBuilder(context, AppDatabase::class.java, "luxmap.db")
-            // No shipped release yet (versionCode = 1) and the schema is still changing task by
-            // task in this plan (this task adds v1's tables, Task 13 bumps to v2) — destructive
-            // migration is acceptable pre-release. Revisit before the app ships to a real device
-            // with data worth preserving across an update.
+            // Preserve local drafts and the offline upload queue; missing migrations fail closed.
             .addMigrations(
                 MIGRATION_16_17,
                 MIGRATION_17_18,
@@ -44,13 +43,17 @@ object DatabaseModule {
                 MIGRATION_21_22,
                 MIGRATION_22_23,
                 MIGRATION_23_24,
+                MIGRATION_24_25,
             )
-            .fallbackToDestructiveMigration()
             .build()
 
     @Provides
     @Singleton
     fun provideSyncQueueDao(db: AppDatabase): SyncQueueDao = db.syncQueueDao()
+
+    @Provides
+    @Singleton
+    fun provideWorkOrderDraftDao(db: AppDatabase): WorkOrderDraftDao = db.workOrderDraftDao()
 
     @Provides
     @Singleton

@@ -9,6 +9,7 @@ import com.luxmap.feature.survey.data.PoleListResult
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
+import com.luxmap.feature.workorder.data.WorkOrderDraftRepository
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
@@ -142,6 +143,10 @@ class WorkOrderDetailViewModelTest {
             resolvedPoleGpsRepository,
             resolvedPoleListRepository,
             connectivityObserver,
+            mockk<WorkOrderDraftRepository>(relaxed = true).also {
+                coEvery { it.ownerUserId() } returns "U"
+                coEvery { it.load(any(), any()) } returns null
+            },
         )
     }
 
@@ -652,10 +657,11 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `a repair order never refreshes the pole list`() =
+    fun `a survey order never refreshes the pole list`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>(relaxed = true)
-            val vm = viewModel(detail = repairDetail(), poleListRepository = poleListRepository)
+            val vm =
+                viewModel(detail = repairDetail().copy(taskKind = "survey"), poleListRepository = poleListRepository)
 
             vm.uiState.test {
                 awaitItem()

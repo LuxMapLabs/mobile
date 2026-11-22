@@ -14,6 +14,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
@@ -23,6 +24,7 @@ import com.luxmap.feature.workorder.data.CompletionSyncState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 private fun item(
     id: String,
@@ -89,6 +91,17 @@ class HomeScreenTest {
     }
 
     @Test
+    fun an_expired_schedule_shows_a_lock_instead_of_due_today() {
+        val scheduled = LocalDate.now().minusDays(3).toString()
+        setContent(uiState = successWith(item("WO-LOCK", scheduled = scheduled, due = LocalDate.now().toString())))
+        composeTestRule.onNodeWithText(
+            "Đã khoá · quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}",
+            useUnmergedTree = true,
+        ).assertExists()
+        composeTestRule.onNodeWithText("Hạn hôm nay", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
     fun the_top_bar_is_the_same_in_loading_and_has_the_greeting() {
         setContent(uiState = HomeUiState.Loading)
         composeTestRule.onNodeWithText("Việc hôm nay").assertExists()
@@ -116,13 +129,22 @@ class HomeScreenTest {
         setContent(
             uiState =
                 successWith(
-                    item("WO-7", title = "Sửa đèn chợ", faultCount = 3, scheduled = "2026-11-17", due = "2030-01-01"),
+                    item(
+                        "WO-7",
+                        title = "Sửa đèn chợ",
+                        faultCount = 3,
+                        scheduled = LocalDate.now().toString(),
+                        due = "2030-01-01",
+                    ),
                 ),
             onOpenWorkOrder = { opened = it },
         )
         composeTestRule.onNodeWithText("Sửa đèn chợ", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("3 sự cố tại COM-001", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithText("Làm: 17/11/2026", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText(
+            "Làm: ${DateFormatUtils.formatPlainDate(LocalDate.now().toString())}",
+            useUnmergedTree = true,
+        ).assertExists()
         composeTestRule.onNodeWithText("Hạn 01/01/2030", useUnmergedTree = true).assertExists()
         composeTestRule.onNode(hasClickAction() and hasText("WO-7", substring = true)).performClick()
         assertEquals("WO-7", opened)

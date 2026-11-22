@@ -2,6 +2,7 @@ package com.luxmap.feature.home.ui
 
 import com.luxmap.feature.home.data.WorkOrderSummaryItem
 import com.luxmap.feature.workorder.data.CompletionSyncState
+import com.luxmap.feature.workorder.ui.detail.workOrderScheduleWindow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -28,6 +29,40 @@ private fun item(
 )
 
 class HomeTaskCardLogicTest {
+    @Test
+    fun `expired schedule takes precedence over due today`() {
+        val scheduled = "2026-11-13"
+        assertTrue(workOrderScheduleWindow(scheduled, TODAY).isOverdueToComplete)
+        assertEquals(
+            HomeTaskBadge.Locked("Đã khoá · quá lịch 13/11/2026"),
+            homeTaskBadge(item(due = TODAY.toString(), scheduled = scheduled), null, TODAY),
+        )
+    }
+
+    @Test
+    fun `shared schedule window controls locked and unlocked badges`() {
+        for (offset in -2L..3L) {
+            val scheduled = TODAY.plusDays(offset).toString()
+            val window = workOrderScheduleWindow(scheduled, TODAY)
+            assertEquals(
+                !window.canActOnSchedule,
+                homeTaskBadge(item(scheduled = scheduled), null, TODAY) is HomeTaskBadge.Locked,
+            )
+        }
+        assertEquals(
+            HomeTaskBadge.Status("done"),
+            homeTaskBadge(item(status = "done", scheduled = "2026-11-01"), null, TODAY),
+        )
+    }
+
+    @Test
+    fun `pending sync takes precedence over an expired schedule`() {
+        assertEquals(
+            HomeTaskBadge.Sync(CompletionSyncState.PENDING),
+            homeTaskBadge(item(scheduled = "2026-11-01"), CompletionSyncState.PENDING, TODAY),
+        )
+    }
+
     @Test
     fun `a sync state wins over overdue`() {
         assertEquals(

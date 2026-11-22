@@ -90,3 +90,14 @@ val MIGRATION_23_24: Migration =
             db.execSQL("ALTER TABLE local_pole_list_item ADD COLUMN nearSensitivePoi INTEGER")
         }
     }
+
+val MIGRATION_24_25: Migration =
+    object : Migration(24, 25) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_work_order_draft (ownerUserId TEXT NOT NULL, " +
+                    "workOrderId TEXT NOT NULL, reportNote TEXT NOT NULL, materialsUsed TEXT NOT NULL, " +
+                    "faultOutcomesJson TEXT NOT NULL, PRIMARY KEY(ownerUserId, workOrderId))",
+            )
+        }
+    }
