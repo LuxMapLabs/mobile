@@ -101,3 +101,13 @@ val MIGRATION_24_25: Migration =
             )
         }
     }
+
+val MIGRATION_25_26: Migration =
+    object : Migration(25, 26) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_pole_gps_route (workOrderId TEXT NOT NULL, " +
+                    "segmentId TEXT NOT NULL, geomWkt TEXT, fetchedAt INTEGER NOT NULL, PRIMARY KEY(workOrderId))",
+            )
+        }
+    }

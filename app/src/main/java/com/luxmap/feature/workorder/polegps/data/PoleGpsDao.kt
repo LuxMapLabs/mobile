@@ -92,4 +92,13 @@ abstract class PoleGpsDao {
             "AND evidenceUploadStatus = 'pending'",
     )
     abstract suspend fun pendingPhotoMeasurements(workOrderId: String): List<LocalPoleGpsMeasurementEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun upsertRoute(entity: LocalPoleGpsRouteEntity)
+
+    @Query("SELECT * FROM local_pole_gps_route WHERE workOrderId = :workOrderId")
+    abstract suspend fun route(workOrderId: String): LocalPoleGpsRouteEntity?
+
+    @Query("SELECT * FROM local_pole_gps_route WHERE workOrderId = :workOrderId")
+    abstract fun observeRoute(workOrderId: String): Flow<LocalPoleGpsRouteEntity?>
 }
