@@ -200,7 +200,7 @@ class PoleGpsMeasureViewModel
             val onDone = pendingDone ?: return
             _pendingCorridor.value = null
             pendingCorridorFix = null
-            if (!fix.isUsable()) {
+            if (fix.quality(clock.elapsedRealtimeNanos()) == GpsFixQuality.INVALID) {
                 _locationMissing.value = true
                 return
             }
@@ -208,7 +208,7 @@ class PoleGpsMeasureViewModel
             captureJob =
                 viewModelScope.launch {
                     try {
-                        persist(file, fix, onDone)
+                        persist(file, fix, onDone, requireFresh = false)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) {
@@ -249,18 +249,22 @@ class PoleGpsMeasureViewModel
                 GpsFixQuality.INVALID, GpsFixQuality.STALE -> false
             }
 
+        private fun GpsFix.passes(requireFresh: Boolean): Boolean =
+            if (requireFresh) isUsable() else quality(clock.elapsedRealtimeNanos()) != GpsFixQuality.INVALID
+
         private suspend fun persist(
             file: File,
             fix: GpsFix,
             onDone: () -> Unit,
+            requireFresh: Boolean = true,
         ) {
-            if (!fix.isUsable() || savedPhoto == file.absolutePath) {
+            if (!fix.passes(requireFresh) || savedPhoto == file.absolutePath) {
                 _locationMissing.value = true
                 return
             }
             exif.write(file, fix.lat, fix.lng)
             val (lat, lng) = exif.read(file) ?: (fix.lat to fix.lng)
-            require(fix.copy(lat = lat, lng = lng).isUsable())
+            require(fix.copy(lat = lat, lng = lng).passes(requireFresh))
             repository.saveCapturedPhoto(
                 workOrderId = workOrderId,
                 poleId = poleId,
