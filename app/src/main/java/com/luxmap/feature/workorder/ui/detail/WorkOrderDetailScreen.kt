@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.StickyNote2
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -104,6 +105,7 @@ import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.EvidenceKind
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.ui.detail.sections.CompletionEvidenceSection
 import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
@@ -398,8 +400,15 @@ private fun submitSummaryRows(
         )
     } else if (kind == WorkOrderTaskKind.POLE_GPS_UPDATE) {
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
+        val outside = state.poleMeasurements.count { it.corridor is CorridorCheck.Outside }
         listOf(
             SubmitSummaryRow(Icons.Filled.Navigation, primary, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
+            SubmitSummaryRow(
+                Icons.Filled.Warning,
+                if (outside > 0) MaterialTheme.colorScheme.error else primary,
+                "Ngoài hành lang 25 m",
+                "$outside cột",
+            ),
             SubmitSummaryRow(Icons.Filled.StickyNote2, primary, "Tệp PDF", state.poleAttachments.size.toString()),
             SubmitSummaryRow(Icons.Filled.EditNote, primary, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
