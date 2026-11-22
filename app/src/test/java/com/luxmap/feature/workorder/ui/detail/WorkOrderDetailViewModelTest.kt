@@ -129,6 +129,7 @@ class WorkOrderDetailViewModelTest {
                 every { it.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
                 every { it.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
                 coEvery { it.poleReferences(WORK_ORDER_ID) } returns emptyList()
+                coEvery { it.refreshRoute(WORK_ORDER_ID) } returns Unit
             }
         val resolvedPoleListRepository =
             poleListRepository ?: mockk<PoleListRepository>().also {
@@ -591,6 +592,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns
                 listOf(PoleReference("P-1", 4, 10.0, 106.0))
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm = viewModel(detail = poleGpsDetail(poleIds = listOf("P-1")), poleGpsRepository = poleGpsRepository)
 
             vm.uiState.test {
@@ -609,6 +611,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(PoleListResult(emptyList(), isStale = false))
             val vm =
@@ -627,6 +630,21 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
+    fun `a pole_gps_update order refreshes its route geometry when opened`() =
+        runTest {
+            val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
+            every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
+            val vm = viewModel(detail = poleGpsDetail(), poleGpsRepository = poleGpsRepository)
+            vm.uiState.test {
+                assertEquals(WorkOrderDetailUiState.Loading, awaitItem())
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+            coVerify { poleGpsRepository.refreshRoute(WORK_ORDER_ID) }
+        }
+
+    @Test
     fun `submit for pole_gps_update delegates atomic staging to the completion repository`() =
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
@@ -636,6 +654,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm =
                 viewModel(
                     detail = poleGpsDetail(),
@@ -678,6 +697,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm = viewModel(detail = poleGpsDetail(), poleGpsRepository = poleGpsRepository)
 
             vm.uiState.test {
@@ -696,6 +716,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm =
                 viewModel(detail = poleGpsDetail(poleIds = listOf("P-1", "P-2")), poleGpsRepository = poleGpsRepository)
 
@@ -716,6 +737,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm = viewModel(detail = poleGpsDetail(poleIds = listOf("P-1")), poleGpsRepository = poleGpsRepository)
 
             vm.uiState.test {
@@ -733,6 +755,7 @@ class WorkOrderDetailViewModelTest {
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
+            coEvery { poleGpsRepository.refreshRoute(WORK_ORDER_ID) } returns Unit
             val vm = viewModel(detail = poleGpsDetail(), poleGpsRepository = poleGpsRepository)
 
             vm.retryAttachment("A-1")

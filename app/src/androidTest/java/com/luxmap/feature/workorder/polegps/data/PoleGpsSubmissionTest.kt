@@ -46,7 +46,7 @@ class PoleGpsSubmissionTest {
         gps =
             PoleGpsRepository(
                 db, db.poleGpsDao(), mockk(relaxed = true), mockk(relaxed = true), sync,
-                db.poleListCacheDao(), db.workOrderCompletionDao(), mockk(relaxed = true),
+                db.poleListCacheDao(), db.workOrderCompletionDao(), mockk(relaxed = true), mockk(relaxed = true),
             )
     }
 

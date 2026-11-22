@@ -114,6 +114,7 @@ class WorkOrderDetailViewModel
                         _uiState.value = WorkOrderDetailUiState.Empty
                     } else {
                         if (detail.taskKind == "pole_gps_update") {
+                            poleGpsRepository.refreshRoute(workOrderId)
                             poleListRepository.poles(workOrderId)
                             poleReferencesState.value = poleGpsRepository.poleReferences(workOrderId)
                         }
