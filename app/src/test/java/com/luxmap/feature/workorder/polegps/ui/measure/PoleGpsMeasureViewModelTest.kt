@@ -459,7 +459,7 @@ class PoleGpsMeasureViewModelTest {
         }
 
     @Test
-    fun `confirming after the sample went stale saves nothing and asks to retry`() =
+    fun `confirming outside the corridor saves the warned fix even after it went stale`() =
         runTest {
             coEvery { repository.routeGeometry("WO-1") } returns route
             fixesFlow = flowOf(GpsFix(10.0005, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
@@ -467,6 +467,20 @@ class PoleGpsMeasureViewModelTest {
             vm.onPermissionGranted()
             vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
             nowNanos += 11_000_000_000L
+            vm.confirmOutsideCorridor()
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", any(), 10.0005, 106.0005, 4.0, any()) }
+            assertFalse(vm.locationMissing.value)
+        }
+
+    @Test
+    fun `confirming outside the corridor rejects an invalid fix`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            fixesFlow = flowOf(GpsFix(10.0005, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            nowNanos = 500_000_000L
             vm.confirmOutsideCorridor()
             coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
             assertTrue(vm.locationMissing.value)
