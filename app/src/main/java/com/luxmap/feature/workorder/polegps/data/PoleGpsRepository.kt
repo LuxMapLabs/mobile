@@ -161,7 +161,7 @@ class PoleGpsRepository
             val order = detailSync.cached(completion.workOrderId) ?: return null
             if (order.taskKind != "pole_gps_update") return null
             return database.withTransaction {
-                val payload = snapshotCompletion(completion.workOrderId, includeServerMeasurements = true)
+                val payload = snapshotCompletion(completion.workOrderId)
                 completionDao.updateCompletionPayload(completion.clientOpId, Json.encodeToString(payload))
                 payload
             }
@@ -169,26 +169,25 @@ class PoleGpsRepository
 
         private suspend fun snapshotCompletion(
             workOrderId: String,
-            includeServerMeasurements: Boolean = false,
             resetRetryableUploads: Boolean = false,
         ): CompletionSyncPayload {
             val order = checkNotNull(detailSync.cached(workOrderId)) { "Chưa có chi tiết lệnh GPS trên máy." }
             check(order.taskKind == "pole_gps_update")
-            val measurements =
-                dao.measurements(workOrderId).filter {
-                    it.poleId in order.poleIds &&
-                        (includeServerMeasurements || it.source == MeasurementSourceColumn.DEVICE)
-                }
-            check(measurements.isNotEmpty()) { "Cần đo ít nhất một cột trước khi nộp báo cáo." }
+            val measurements = dao.measurements(workOrderId).filter { it.poleId in order.poleIds }
+            check(measurements.any { it.source == MeasurementSourceColumn.DEVICE }) {
+                "Cần đo ít nhất một cột trước khi nộp báo cáo."
+            }
+            measurements.forEach { measurement ->
+                check(
+                    measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
+                        measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
+                        measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
+                ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
+            }
             val evidence = completionDao.evidenceForCompletion(workOrderId, "observation")
             val operations = mutableListOf<SyncQueueEntity>()
             val ids =
-                measurements.map { measurement ->
-                    check(
-                        measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
-                            measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
-                            measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
-                    ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
+                measurements.filter { it.source == MeasurementSourceColumn.DEVICE }.map { measurement ->
                     val matching =
                         evidence.firstOrNull {
                             it.poleId == measurement.poleId && it.capturedAt == measurement.capturedAt &&

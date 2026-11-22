@@ -118,8 +118,8 @@ internal fun PoleGpsSection(
             CountedSectionHeader(title = "Cột đèn", count = "${measuredIds.size}/${references.size} đã đo trên máy")
             if (measurements.any { it.source == MeasurementSource.SERVER }) {
                 Text(
-                    "Báo cáo mới chỉ gửi các cột đã chụp ảnh trên thiết bị này. " +
-                        "Cột đã báo trước cần chụp lại để gửi lại.",
+                    "Cột đã báo trước sẽ được gửi lại với vị trí cũ. " +
+                        "Chỉ cần đo lại cột Quản lý yêu cầu.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

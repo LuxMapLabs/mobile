@@ -188,7 +188,7 @@ class PoleGpsSubmissionTest {
         }
 
     @Test
-    fun partial_rework_does_not_require_local_photos_for_previous_server_measurements() =
+    fun rework_resends_previous_server_coordinates_without_new_photos() =
         runTest {
             db.poleGpsDao().insertServerMeasurements(
                 listOf(
@@ -197,7 +197,39 @@ class PoleGpsSubmissionTest {
             )
             measure(poleId = "P-2", lat = 11.0)
             assertTrue(gps.stageCompletion(report))
-            assertEquals(listOf("P-2"), payload().poleLocations!!.map { it.poleId })
+            val submitted = payload()
+            assertEquals(setOf("P-1", "P-2"), submitted.poleLocations!!.map { it.poleId }.toSet())
+            assertEquals(10.0, submitted.poleLocations!!.single { it.poleId == "P-1" }.lat, 0.0)
+            assertEquals(1, submitted.evidenceClientOpIds!!.size)
+        }
+
+    @Test
+    fun remeasured_server_pole_is_sent_once_with_its_new_coordinates() =
+        runTest {
+            db.poleGpsDao().insertServerMeasurements(
+                listOf(
+                    LocalPoleGpsMeasurementEntity("WO-1", "P-1", 10.0, 106.0, 3.0, at, MeasurementSourceColumn.SERVER),
+                ),
+            )
+            measure(poleId = "P-1", lat = 11.0)
+            assertTrue(gps.stageCompletion(report))
+            val location = payload().poleLocations!!.single()
+            assertEquals("P-1", location.poleId)
+            assertEquals(11.0, location.lat, 0.0)
+        }
+
+    @Test
+    fun report_with_only_server_coordinates_is_refused_and_nothing_is_queued() =
+        runTest {
+            db.poleGpsDao().insertServerMeasurements(
+                listOf(
+                    LocalPoleGpsMeasurementEntity("WO-1", "P-1", 10.0, 106.0, 3.0, at, MeasurementSourceColumn.SERVER),
+                ),
+            )
+            val error = runCatching { gps.stageCompletion(report) }.exceptionOrNull()
+            assertTrue(error is IllegalStateException)
+            assertTrue(db.syncQueueDao().queuedRows().isEmpty())
+            assertNull(db.workOrderCompletionDao().completionByWorkOrderId("WO-1"))
         }
 
     @Test
