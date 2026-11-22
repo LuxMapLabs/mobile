@@ -8,6 +8,7 @@ sealed interface PoleGpsMeasureUiState {
     data class Success(
         val poleLabel: String,
         val previous: PoleReference?,
+        val routeGeometry: String? = null,
     ) : PoleGpsMeasureUiState
 
     data object Empty : PoleGpsMeasureUiState

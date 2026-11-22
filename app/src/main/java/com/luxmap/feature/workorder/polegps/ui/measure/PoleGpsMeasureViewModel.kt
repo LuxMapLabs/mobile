@@ -4,12 +4,15 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.camera.PhotoGpsExif
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsClock
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixQuality
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import com.luxmap.feature.workorder.polegps.data.PoleReference
+import com.luxmap.feature.workorder.polegps.data.corridorCheck
+import com.luxmap.feature.workorder.polegps.data.distanceMetres
 import com.luxmap.feature.workorder.polegps.data.quality
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -45,6 +48,9 @@ class PoleGpsMeasureViewModel
         private var captureJob: Job? = null
         private val _pendingConfirmation = MutableStateFlow<GpsFix?>(null)
         val pendingConfirmation: StateFlow<GpsFix?> = _pendingConfirmation.asStateFlow()
+        private val _pendingCorridor = MutableStateFlow<CorridorCheck.Outside?>(null)
+        val pendingCorridor: StateFlow<CorridorCheck.Outside?> = _pendingCorridor.asStateFlow()
+        private var pendingCorridorFix: GpsFix? = null
         private val _isSaving = MutableStateFlow(false)
         val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
         private var pendingPhoto: File? = null
@@ -70,6 +76,8 @@ class PoleGpsMeasureViewModel
             captureJob = null
             _currentFix.value = null
             _pendingConfirmation.value = null
+            _pendingCorridor.value = null
+            pendingCorridorFix = null
             pendingPhoto = null
             pendingDone = null
             _isSaving.value = false
@@ -86,7 +94,11 @@ class PoleGpsMeasureViewModel
                     if (reference == null) {
                         PoleGpsMeasureUiState.Empty
                     } else {
-                        PoleGpsMeasureUiState.Success(poleLabel(reference), reference)
+                        PoleGpsMeasureUiState.Success(
+                            poleLabel(reference),
+                            reference,
+                            repository.routeGeometry(workOrderId),
+                        )
                     }
             }
         }
@@ -110,6 +122,8 @@ class PoleGpsMeasureViewModel
             if (_isSaving.value || savedPhoto == file.absolutePath) return
             _locationMissing.value = false
             _pendingConfirmation.value = null
+            _pendingCorridor.value = null
+            pendingCorridorFix = null
             pendingPhoto = file
             pendingDone = onDone
             if (!hasLocationPermission) {
@@ -131,7 +145,7 @@ class PoleGpsMeasureViewModel
                         } else if (fix.quality(clock.elapsedRealtimeNanos()) == GpsFixQuality.LOW_ACCURACY) {
                             _pendingConfirmation.value = fix
                         } else {
-                            persist(file, fix, onDone)
+                            proceed(file, fix, onDone)
                         }
                     } catch (error: CancellationException) {
                         throw error
@@ -157,6 +171,43 @@ class PoleGpsMeasureViewModel
             captureJob =
                 viewModelScope.launch {
                     try {
+                        proceed(file, fix, onDone)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        _locationMissing.value = true
+                    } finally {
+                        _isSaving.value = false
+                    }
+                }
+        }
+
+        fun corridorFor(fix: GpsFix): CorridorCheck =
+            corridorCheck((_state.value as? PoleGpsMeasureUiState.Success)?.routeGeometry, fix.lat, fix.lng)
+
+        fun distanceFromPrevious(fix: GpsFix): Double? {
+            val previous = (_state.value as? PoleGpsMeasureUiState.Success)?.previous ?: return null
+            val lat = previous.lat ?: return null
+            val lng = previous.lng ?: return null
+            if (lat == 0.0 && lng == 0.0) return null
+            return distanceMetres(lat, lng, fix.lat, fix.lng)
+        }
+
+        fun confirmOutsideCorridor() {
+            if (_isSaving.value) return
+            val fix = pendingCorridorFix ?: return
+            val file = pendingPhoto ?: return
+            val onDone = pendingDone ?: return
+            _pendingCorridor.value = null
+            pendingCorridorFix = null
+            if (!fix.isUsable()) {
+                _locationMissing.value = true
+                return
+            }
+            _isSaving.value = true
+            captureJob =
+                viewModelScope.launch {
+                    try {
                         persist(file, fix, onDone)
                     } catch (error: CancellationException) {
                         throw error
@@ -168,10 +219,26 @@ class PoleGpsMeasureViewModel
                 }
         }
 
+        private suspend fun proceed(
+            file: File,
+            fix: GpsFix,
+            onDone: () -> Unit,
+        ) {
+            val corridor = corridorFor(fix)
+            if (corridor is CorridorCheck.Outside) {
+                pendingCorridorFix = fix
+                _pendingCorridor.value = corridor
+            } else {
+                persist(file, fix, onDone)
+            }
+        }
+
         fun retryMeasurement() {
             val file = pendingPhoto ?: return
             val onDone = pendingDone ?: return
             _pendingConfirmation.value = null
+            _pendingCorridor.value = null
+            pendingCorridorFix = null
             _currentFix.value = null
             onPhotoCaptured(file, true, onDone)
         }
