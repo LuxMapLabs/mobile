@@ -48,7 +48,11 @@ import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
+import com.luxmap.feature.workorder.polegps.data.ROUTE_CORRIDOR_METRES
+import com.luxmap.feature.workorder.polegps.ui.corridorPreviewLabel
+import com.luxmap.feature.workorder.polegps.ui.previousDistanceLabel
 import java.io.File
 import java.util.Locale
 
@@ -67,6 +71,7 @@ fun PoleGpsMeasureRoute(
     val isSaving by viewModel.isSaving.collectAsState()
     val currentFix by viewModel.currentFix.collectAsState()
     val confirmation by viewModel.pendingConfirmation.collectAsState()
+    val corridorWarning by viewModel.pendingCorridor.collectAsState()
     LocationWatchingEffect(hasLocationPermission, viewModel)
     val locationMissing by viewModel.locationMissing.collectAsState()
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
@@ -189,6 +194,8 @@ fun PoleGpsMeasureRoute(
                 previewPath = null
                 launchCamera()
             },
+            corridor = currentFix?.let(viewModel::corridorFor),
+            previousDistanceM = currentFix?.let(viewModel::distanceFromPrevious),
         )
         confirmation?.let { candidate ->
             LowAccuracyConfirmation(
@@ -205,6 +212,21 @@ fun PoleGpsMeasureRoute(
                     }
                 },
                 onRetry = viewModel::retryMeasurement,
+            )
+        }
+        corridorWarning?.let { outside ->
+            LuxConfirmDialog(
+                title = "Vị trí ngoài hành lang tuyến",
+                message =
+                    "Vị trí đo cách tuyến %.1f m, vượt %.0f m. ".format(
+                        Locale.ROOT,
+                        outside.distanceM,
+                        ROUTE_CORRIDOR_METRES,
+                    ) + "Quản lý có thể trả lại báo cáo. Hãy đứng sát cột rồi đo lại nếu có thể.",
+                confirmLabel = "Vẫn lưu vị trí này",
+                onConfirm = viewModel::confirmOutsideCorridor,
+                onDismiss = viewModel::retryMeasurement,
+                dismissLabel = "Đo lại",
             )
         }
         if (locationMissing) {
@@ -250,6 +272,8 @@ internal fun PhotoPreview(
     fix: GpsFix?,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
+    corridor: CorridorCheck? = null,
+    previousDistanceM: Double? = null,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(Spacing.lg),
@@ -264,6 +288,21 @@ internal fun PhotoPreview(
         fix?.let {
             Text("Sai số GPS: ±%.1f m".format(Locale.ROOT, it.accuracyM), style = MaterialTheme.typography.bodyLarge)
             Text("Thời gian mẫu: ${it.capturedAt}", style = MaterialTheme.typography.bodyMedium)
+        }
+        corridor?.let {
+            Text(
+                corridorPreviewLabel(it),
+                style = MaterialTheme.typography.bodyLarge,
+                color =
+                    if (it is CorridorCheck.Outside) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
+        }
+        previousDistanceLabel(previousDistanceM)?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         CaptureActions(enabled = !isSaving, isSaving = isSaving, onRetake = onRetake, onConfirm = onConfirm)
     }

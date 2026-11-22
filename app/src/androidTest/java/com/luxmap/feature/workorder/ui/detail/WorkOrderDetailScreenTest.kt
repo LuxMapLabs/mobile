@@ -18,7 +18,10 @@ import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
+import com.luxmap.feature.workorder.polegps.data.MeasurementSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
+import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -763,5 +766,53 @@ class WorkOrderDetailScreenTest {
                 ),
         )
         composeRule.onNodeWithText("Nộp báo cáo").assertIsEnabled()
+    }
+
+    private fun corridorState(corridor: CorridorCheck) =
+        WorkOrderDetailUiState.Success(
+            detail = poleGpsDetail(poleIds = listOf("P-1")),
+            reportNote = "Đã đo cột đèn hôm nay",
+            poleReferences = listOf(PoleReference("P-1", 1, 10.0, 106.0)),
+            poleMeasurements =
+                listOf(
+                    PoleMeasurement(
+                        poleId = "P-1",
+                        lat = 10.0,
+                        lng = 106.0,
+                        accuracyM = 3.0,
+                        capturedAt = Instant.ofEpochSecond(1),
+                        source = MeasurementSource.DEVICE,
+                        corridor = corridor,
+                    ),
+                ),
+        )
+
+    @Test
+    fun pole_row_shows_the_corridor_line_and_no_gps_accuracy() {
+        setContent(uiState = corridorState(CorridorCheck.Inside(12.3)))
+        composeRule.onNodeWithText("Cách tuyến 12.3 m / 25.0 m").assertExists()
+        composeRule.onNodeWithText("Sai số GPS", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun pole_row_marks_a_position_outside_the_corridor() {
+        setContent(uiState = corridorState(CorridorCheck.Outside(31.0)))
+        composeRule.onNodeWithText("Ngoài hành lang tuyến", substring = true).assertExists()
+    }
+
+    @Test
+    fun pole_row_shows_no_corridor_line_when_it_cannot_be_checked() {
+        setContent(uiState = corridorState(CorridorCheck.Unknown))
+        composeRule.onNodeWithText("Cách tuyến", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Ngoài hành lang tuyến", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun submit_sheet_counts_the_poles_outside_the_corridor() {
+        setContent(uiState = corridorState(CorridorCheck.Outside(31.0)))
+        composeRule.onNodeWithText("Nộp báo cáo").performClick()
+        composeRule.onNodeWithText("Nộp báo cáo?").assertExists()
+        composeRule.onNodeWithText("Ngoài hành lang 25 m").assertExists()
+        composeRule.onNodeWithText("1 cột").assertExists()
     }
 }

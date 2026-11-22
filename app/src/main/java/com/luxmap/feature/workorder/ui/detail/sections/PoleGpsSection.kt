@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,10 +44,12 @@ import com.luxmap.core.ui.components.LuxListItem
 import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.polegps.data.AttachmentStatus
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.MeasurementSource
 import com.luxmap.feature.workorder.polegps.data.PoleGpsAttachment
 import com.luxmap.feature.workorder.polegps.data.PoleMeasurement
 import com.luxmap.feature.workorder.polegps.data.PoleReference
+import com.luxmap.feature.workorder.polegps.ui.corridorListLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -118,8 +121,8 @@ internal fun PoleGpsSection(
             CountedSectionHeader(title = "Cột đèn", count = "${measuredIds.size}/${references.size} đã đo trên máy")
             if (measurements.any { it.source == MeasurementSource.SERVER }) {
                 Text(
-                    "Báo cáo mới chỉ gửi các cột đã chụp ảnh trên thiết bị này. " +
-                        "Cột đã báo trước cần chụp lại để gửi lại.",
+                    "Cột đã báo trước sẽ được gửi lại với vị trí cũ. " +
+                        "Chỉ cần đo lại cột Quản lý yêu cầu.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -314,11 +317,37 @@ private fun PoleGpsItem(
         )
         measurement?.let {
             Text(
-                "GPS đã ghi nhận: %.6f, %.6f\nSai số GPS: ±%.1f m\nThời gian mẫu: %s"
-                    .format(Locale.ROOT, it.lat, it.lng, it.accuracyM, it.capturedAt),
+                "GPS đã ghi nhận: %.6f, %.6f".format(Locale.ROOT, it.lat, it.lng),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
+            corridorListLabel(it.corridor)?.let { label ->
+                val outside = it.corridor is CorridorCheck.Outside
+                Row(
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    if (outside) {
+                        Icon(
+                            imageVector = Icons.Filled.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (outside) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                }
+            }
         }
     }
 }

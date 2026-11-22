@@ -2,6 +2,7 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 
 import androidx.lifecycle.SavedStateHandle
 import com.luxmap.core.camera.PhotoGpsExif
+import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsClock
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.GpsFixSource
@@ -27,6 +28,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -53,6 +55,7 @@ class PoleGpsMeasureViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", 3, 10.0, 106.0)
         every { exif.read(any()) } returns null
+        coEvery { repository.routeGeometry("WO-1") } returns null
     }
 
     @After
@@ -413,5 +416,74 @@ class PoleGpsMeasureViewModelTest {
             coEvery { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) } returns Unit
             vm.onPhotoCaptured(file, true) { done = true }
             assertTrue(done)
+        }
+
+    private val route = "LINESTRING (106 10, 106.001 10)"
+
+    @Test
+    fun `a fix outside the corridor waits for confirmation before saving`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            fixesFlow = flowOf(GpsFix(10.0005, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            assertTrue(vm.pendingCorridor.value is CorridorCheck.Outside)
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+            vm.confirmOutsideCorridor()
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", any(), 10.0005, 106.0005, 4.0, any()) }
+            assertNull(vm.pendingCorridor.value)
+        }
+
+    @Test
+    fun `a fix inside the corridor saves without asking`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            fixesFlow = flowOf(GpsFix(10.0001, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            assertNull(vm.pendingCorridor.value)
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", any(), 10.0001, 106.0005, 4.0, any()) }
+        }
+
+    @Test
+    fun `no cached route saves without asking`() =
+        runTest {
+            fixesFlow = flowOf(GpsFix(10.5, 106.5, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            assertNull(vm.pendingCorridor.value)
+            coVerify { repository.saveCapturedPhoto("WO-1", "P-1", any(), 10.5, 106.5, 4.0, any()) }
+        }
+
+    @Test
+    fun `confirming after the sample went stale saves nothing and asks to retry`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            fixesFlow = flowOf(GpsFix(10.0005, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            nowNanos += 11_000_000_000L
+            vm.confirmOutsideCorridor()
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+            assertTrue(vm.locationMissing.value)
+        }
+
+    @Test
+    fun `distance from the previous position is shown only when one exists`() =
+        runTest {
+            val fix = GpsFix(10.0001, 106.0, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L)
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            assertEquals(11.1, vm.distanceFromPrevious(fix)!!, 0.1)
+            coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", 3, 0.0, 0.0)
+            val zero = viewModel().also { it.onPermissionGranted() }
+            assertNull(zero.distanceFromPrevious(fix))
+            coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", 3, null, null)
+            val missing = viewModel().also { it.onPermissionGranted() }
+            assertNull(missing.distanceFromPrevious(fix))
         }
 }

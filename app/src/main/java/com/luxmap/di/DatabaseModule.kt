@@ -10,6 +10,7 @@ import com.luxmap.core.database.MIGRATION_21_22
 import com.luxmap.core.database.MIGRATION_22_23
 import com.luxmap.core.database.MIGRATION_23_24
 import com.luxmap.core.database.MIGRATION_24_25
+import com.luxmap.core.database.MIGRATION_25_26
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.survey.data.dao.PoleGpsOrderCacheDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
@@ -44,6 +45,7 @@ object DatabaseModule {
                 MIGRATION_22_23,
                 MIGRATION_23_24,
                 MIGRATION_24_25,
+                MIGRATION_25_26,
             )
             .build()
 

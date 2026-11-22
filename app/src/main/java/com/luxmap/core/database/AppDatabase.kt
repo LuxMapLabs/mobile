@@ -20,6 +20,7 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderDraftEntity
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsMeasurementEntity
 import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsOrderEntity
+import com.luxmap.feature.workorder.polegps.data.LocalPoleGpsRouteEntity
 import com.luxmap.feature.workorder.polegps.data.LocalWorkOrderAttachmentEntity
 import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
 
@@ -38,8 +39,9 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalPoleGpsOrderEntity::class,
         LocalWorkOrderAttachmentEntity::class,
         LocalPoleGpsMeasurementEntity::class,
+        LocalPoleGpsRouteEntity::class,
     ],
-    version = 25,
+    version = 26,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)

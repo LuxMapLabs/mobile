@@ -2,12 +2,15 @@ package com.luxmap.feature.workorder.polegps.data
 
 import androidx.room.withTransaction
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.network.AssetsApi
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
+import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.slot
@@ -22,6 +25,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 import java.time.Instant
 
 class PoleGpsRepositoryTest {
@@ -34,6 +38,8 @@ class PoleGpsRepositoryTest {
         coEvery { database.withTransaction(any<suspend () -> Unit>()) } coAnswers {
             secondArg<suspend () -> Unit>().invoke()
         }
+        every { dao.observeRoute(any()) } returns flowOf(null)
+        coEvery { dao.route(any()) } returns null
     }
 
     @After
@@ -49,8 +55,9 @@ class PoleGpsRepositoryTest {
     private val cache = mockk<PoleListCacheDao>(relaxed = true)
     private val completionDao = mockk<WorkOrderCompletionDao>(relaxed = true)
     private val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+    private val assetsApi = mockk<AssetsApi>()
     private val repository =
-        PoleGpsRepository(database, dao, downloader, scheduler, sync, cache, completionDao, syncQueueManager)
+        PoleGpsRepository(database, dao, downloader, scheduler, sync, cache, completionDao, syncQueueManager, assetsApi)
 
     private fun row(
         poleId: String,
@@ -280,5 +287,67 @@ class PoleGpsRepositoryTest {
         runTest {
             coEvery { sync.cached("WO-1") } returns null
             assertTrue(repository.poleReferences("WO-1").isEmpty())
+        }
+
+    private val route = "LINESTRING (106 10, 106.001 10)"
+
+    @Test
+    fun `refreshRoute stores the order segment geometry`() =
+        runTest {
+            coEvery { sync.cached("WO-1") } returns
+                WorkOrderDetailDto("WO-1", "GPS", "pole_gps_update", "in_progress", segmentId = "SEG-1")
+            coEvery { assetsApi.segment("SEG-1") } returns SegmentDetailDto(route)
+            val saved = slot<LocalPoleGpsRouteEntity>()
+            coEvery { dao.upsertRoute(capture(saved)) } returns Unit
+            repository.refreshRoute("WO-1")
+            assertEquals("SEG-1", saved.captured.segmentId)
+            assertEquals(route, saved.captured.geomWkt)
+        }
+
+    @Test
+    fun `refreshRoute keeps the cached route when offline`() =
+        runTest {
+            coEvery { sync.cached("WO-1") } returns
+                WorkOrderDetailDto("WO-1", "GPS", "pole_gps_update", "in_progress", segmentId = "SEG-1")
+            coEvery { assetsApi.segment("SEG-1") } throws IOException("offline")
+            repository.refreshRoute("WO-1")
+            coVerify(exactly = 0) { dao.upsertRoute(any()) }
+        }
+
+    @Test
+    fun `refreshRoute does nothing for an order without a segment`() =
+        runTest {
+            coEvery { sync.cached("WO-1") } returns
+                WorkOrderDetailDto("WO-1", "GPS", "pole_gps_update", "in_progress")
+            repository.refreshRoute("WO-1")
+            coVerify(exactly = 0) { assetsApi.segment(any()) }
+        }
+
+    @Test
+    fun `observed measurements carry their corridor check`() =
+        runTest {
+            every { dao.observeMeasurements("WO-1") } returns
+                flowOf(
+                    listOf(
+                        LocalPoleGpsMeasurementEntity(
+                            "WO-1", "P-1", 10.0005, 106.0005, 3.0, Instant.EPOCH, MeasurementSourceColumn.DEVICE,
+                        ),
+                        LocalPoleGpsMeasurementEntity(
+                            "WO-1", "P-2", 10.0001, 106.0005, 3.0, Instant.EPOCH, MeasurementSourceColumn.SERVER,
+                        ),
+                    ),
+                )
+            every { dao.observeRoute("WO-1") } returns
+                flowOf(LocalPoleGpsRouteEntity("WO-1", "SEG-1", route, Instant.EPOCH))
+            val measured = repository.observeMeasurements("WO-1").first()
+            assertTrue(measured[0].corridor is CorridorCheck.Outside)
+            assertTrue(measured[1].corridor is CorridorCheck.Inside)
+        }
+
+    @Test
+    fun `measurements without a cached route are Unknown`() =
+        runTest {
+            every { dao.observeMeasurements("WO-1") } returns flowOf(listOf(row("P-1", MeasurementSourceColumn.DEVICE)))
+            assertEquals(CorridorCheck.Unknown, repository.observeMeasurements("WO-1").first().single().corridor)
         }
 }

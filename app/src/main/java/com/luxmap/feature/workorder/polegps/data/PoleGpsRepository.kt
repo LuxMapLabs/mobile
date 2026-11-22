@@ -2,6 +2,7 @@ package com.luxmap.feature.workorder.polegps.data
 
 import androidx.room.withTransaction
 import com.luxmap.core.database.AppDatabase
+import com.luxmap.core.network.AssetsApi
 import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
@@ -13,9 +14,13 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import com.luxmap.feature.workorder.data.sync.EvidenceSyncPayload
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import retrofit2.HttpException
+import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -33,6 +38,7 @@ data class PoleMeasurement(
     val capturedAt: Instant,
     val source: MeasurementSource,
     val photoFilePath: String? = null,
+    val corridor: CorridorCheck = CorridorCheck.Unknown,
 )
 
 data class PoleGpsAttachment(
@@ -51,7 +57,7 @@ data class PoleReference(
     val identification: com.luxmap.feature.survey.data.PoleListItem? = null,
 )
 
-private fun LocalPoleGpsMeasurementEntity.toDomain() =
+private fun LocalPoleGpsMeasurementEntity.toDomain(geomWkt: String?) =
     PoleMeasurement(
         poleId = poleId,
         lat = lat,
@@ -60,6 +66,7 @@ private fun LocalPoleGpsMeasurementEntity.toDomain() =
         capturedAt = capturedAt,
         source = if (source == MeasurementSourceColumn.DEVICE) MeasurementSource.DEVICE else MeasurementSource.SERVER,
         photoFilePath = photoFilePath,
+        corridor = corridorCheck(geomWkt, lat, lng),
     )
 
 private fun LocalWorkOrderAttachmentEntity.toDomain() =
@@ -89,12 +96,34 @@ class PoleGpsRepository
         private val poleCache: PoleListCacheDao,
         private val completionDao: WorkOrderCompletionDao,
         private val syncQueueManager: SyncQueueManager,
+        private val assetsApi: AssetsApi,
     ) {
         fun observeMeasurements(workOrderId: String): Flow<List<PoleMeasurement>> =
-            dao.observeMeasurements(workOrderId).map { rows -> rows.map { it.toDomain() } }
+            combine(dao.observeMeasurements(workOrderId), dao.observeRoute(workOrderId)) { rows, route ->
+                rows.map { it.toDomain(route?.geomWkt) }
+            }
 
-        suspend fun allMeasurements(workOrderId: String): List<PoleMeasurement> =
-            dao.measurements(workOrderId).map { it.toDomain() }
+        suspend fun allMeasurements(workOrderId: String): List<PoleMeasurement> {
+            val geomWkt = dao.route(workOrderId)?.geomWkt
+            return dao.measurements(workOrderId).map { it.toDomain(geomWkt) }
+        }
+
+        suspend fun refreshRoute(workOrderId: String) {
+            val segmentId = detailSync.cached(workOrderId)?.segmentId ?: return
+            val segment =
+                try {
+                    assetsApi.segment(segmentId)
+                } catch (_: IOException) {
+                    return
+                } catch (_: HttpException) {
+                    return
+                } catch (_: SerializationException) {
+                    return
+                }
+            dao.upsertRoute(LocalPoleGpsRouteEntity(workOrderId, segmentId, segment.geomWkt, Instant.now()))
+        }
+
+        suspend fun routeGeometry(workOrderId: String): String? = dao.route(workOrderId)?.geomWkt
 
         suspend fun saveCapturedPhoto(
             workOrderId: String,
@@ -161,7 +190,7 @@ class PoleGpsRepository
             val order = detailSync.cached(completion.workOrderId) ?: return null
             if (order.taskKind != "pole_gps_update") return null
             return database.withTransaction {
-                val payload = snapshotCompletion(completion.workOrderId, includeServerMeasurements = true)
+                val payload = snapshotCompletion(completion.workOrderId)
                 completionDao.updateCompletionPayload(completion.clientOpId, Json.encodeToString(payload))
                 payload
             }
@@ -169,26 +198,25 @@ class PoleGpsRepository
 
         private suspend fun snapshotCompletion(
             workOrderId: String,
-            includeServerMeasurements: Boolean = false,
             resetRetryableUploads: Boolean = false,
         ): CompletionSyncPayload {
             val order = checkNotNull(detailSync.cached(workOrderId)) { "Chưa có chi tiết lệnh GPS trên máy." }
             check(order.taskKind == "pole_gps_update")
-            val measurements =
-                dao.measurements(workOrderId).filter {
-                    it.poleId in order.poleIds &&
-                        (includeServerMeasurements || it.source == MeasurementSourceColumn.DEVICE)
-                }
-            check(measurements.isNotEmpty()) { "Cần đo ít nhất một cột trước khi nộp báo cáo." }
+            val measurements = dao.measurements(workOrderId).filter { it.poleId in order.poleIds }
+            check(measurements.any { it.source == MeasurementSourceColumn.DEVICE }) {
+                "Cần đo ít nhất một cột trước khi nộp báo cáo."
+            }
+            measurements.forEach { measurement ->
+                check(
+                    measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
+                        measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
+                        measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
+                ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
+            }
             val evidence = completionDao.evidenceForCompletion(workOrderId, "observation")
             val operations = mutableListOf<SyncQueueEntity>()
             val ids =
-                measurements.map { measurement ->
-                    check(
-                        measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
-                            measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
-                            measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
-                    ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
+                measurements.filter { it.source == MeasurementSourceColumn.DEVICE }.map { measurement ->
                     val matching =
                         evidence.firstOrNull {
                             it.poleId == measurement.poleId && it.capturedAt == measurement.capturedAt &&

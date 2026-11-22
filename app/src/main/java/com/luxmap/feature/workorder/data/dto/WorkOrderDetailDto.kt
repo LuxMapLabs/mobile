@@ -23,6 +23,7 @@ data class WorkOrderDetailDto(
     @SerialName("cancellation_rejected_at") val cancellationRejectedAt: String? = null,
     val faults: List<WorkOrderFaultDetailDto> = emptyList(),
     @SerialName("pole_ids") val poleIds: List<String> = emptyList(),
+    @SerialName("segment_id") val segmentId: String? = null,
     val attachments: List<WorkOrderAttachmentDto> = emptyList(),
     @SerialName("pole_locations") val poleLocations: List<WorkOrderPoleLocationDto> = emptyList(),
 )

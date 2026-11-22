@@ -47,3 +47,11 @@ data class LocalPoleGpsMeasurementEntity(
     val evidenceClientOpId: String? = null,
     val evidenceUploadStatus: String? = null,
 )
+
+@Entity(tableName = "local_pole_gps_route")
+data class LocalPoleGpsRouteEntity(
+    @PrimaryKey val workOrderId: String,
+    val segmentId: String,
+    val geomWkt: String?,
+    val fetchedAt: Instant,
+)
