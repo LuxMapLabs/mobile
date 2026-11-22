@@ -47,7 +47,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,7 +81,6 @@ import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
-import kotlinx.coroutines.launch
 
 @Composable
 fun PoleListRoute(
@@ -92,22 +90,14 @@ fun PoleListRoute(
     onViewAiResult: (serverPhotoId: String) -> Unit,
     onDone: () -> Unit,
     onOpenMap: (String, Double?, Double?) -> Unit = { _, _, _ -> },
+    onSurveyCompleted: () -> Unit = onDone,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
-        viewModel.surveyCompleted.collect { pendingReviews ->
-            val message =
-                if (pendingReviews > 0) {
-                    "Đã hoàn tất $workOrderId. Đang gửi $pendingReviews kết quả xác nhận cho Quản lý."
-                } else {
-                    "Đã hoàn tất $workOrderId. Đã gửi kết quả cho Quản lý."
-                }
-            scope.launch { snackbarHostState.showSnackbar(message) }
-        }
+        viewModel.surveyCompleted.collect { onSurveyCompleted() }
     }
 
     PoleListScreen(
