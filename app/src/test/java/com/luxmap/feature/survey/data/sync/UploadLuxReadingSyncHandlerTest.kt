@@ -34,7 +34,7 @@ class UploadLuxReadingSyncHandlerTest {
             photoId = "PHOTO-1",
             measuredAt = Instant.parse("2026-11-23T12:42:00Z"),
             luxValue = 12.3,
-            meterModel = "LuxMap_ESP32",
+            meterModel = "ESP32C3_LUX",
             dataSource = "field",
             serverLuxId = serverLuxId,
             createdAt = Instant.parse("2026-11-23T12:42:00Z"),
@@ -48,7 +48,7 @@ class UploadLuxReadingSyncHandlerTest {
             measuredAt = "2026-11-23T12:42:00Z",
             luxValue = 12.3,
             dataSource = "field",
-            meterModel = "LuxMap_ESP32",
+            meterModel = "ESP32C3_LUX",
         )
 
     private fun httpException(
@@ -79,7 +79,7 @@ class UploadLuxReadingSyncHandlerTest {
                     measuredAt = "2026-11-23T12:42:00Z",
                     luxValue = 12.3,
                     dataSource = "field",
-                    meterModel = "LuxMap_ESP32",
+                    meterModel = "ESP32C3_LUX",
                 ),
                 request.captured,
             )

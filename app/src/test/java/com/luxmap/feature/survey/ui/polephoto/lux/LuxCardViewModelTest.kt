@@ -28,7 +28,7 @@ private val STABLE_READINGS = doubleArrayOf(12.1, 12.4, 12.3, 12.2, 12.3, 12.4, 
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LuxCardViewModelTest {
-    private val meter = LuxDevice("LuxMap_ESP32", "AA:BB")
+    private val meter = LuxDevice("ESP32C3_LUX", "AA:BB")
     private val paired = MutableStateFlow<LuxDevice?>(meter)
     private val connection = MutableStateFlow<BleConnectionState>(BleConnectionState.Disconnected)
     private val samples = MutableSharedFlow<LuxSample>(extraBufferCapacity = 16)

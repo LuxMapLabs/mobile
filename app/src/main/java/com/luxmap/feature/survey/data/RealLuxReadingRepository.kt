@@ -76,7 +76,7 @@ class RealLuxReadingRepository
             )
 
         private companion object {
-            const val METER_MODEL = "LuxMap_ESP32"
+            const val METER_MODEL = "ESP32C3_LUX"
             const val DATA_SOURCE = "field"
         }
     }

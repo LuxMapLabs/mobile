@@ -35,7 +35,7 @@ class RealLuxReadingRepositoryTest {
         photoId = photoId,
         measuredAt = Instant.ofEpochMilli(measuredAtMs),
         luxValue = 12.3,
-        meterModel = "LuxMap_ESP32",
+        meterModel = "ESP32C3_LUX",
         dataSource = "field",
         createdAt = Instant.ofEpochMilli(measuredAtMs),
     )
@@ -69,7 +69,7 @@ class RealLuxReadingRepositoryTest {
             val result = repository.record("WO-1", "POLE-1", "PHOTO-1", 12.3, measuredAt)
 
             coVerify { dao.insert(capture(saved)) }
-            assertEquals("LuxMap_ESP32", saved.captured.meterModel)
+            assertEquals("ESP32C3_LUX", saved.captured.meterModel)
             assertEquals("field", saved.captured.dataSource)
             assertEquals(measuredAt, saved.captured.measuredAt)
             assertEquals("PHOTO-1", saved.captured.photoId)

@@ -30,7 +30,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LuxMeterPairingViewModelTest {
-    private val meter = LuxDevice("LuxMap_ESP32", "AA:BB")
+    private val meter = LuxDevice("ESP32C3_LUX", "AA:BB")
     private val phone = LuxDevice("Tai nghe", "CC:DD")
     private val paired = MutableStateFlow<LuxDevice?>(null)
     private val preferences = mockk<LuxDevicePreferences>(relaxed = true)
