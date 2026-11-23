@@ -50,8 +50,8 @@ class LuxMeterPairingViewModel
         fun refresh() {
             if (!sheet.value.hasPermission) return
             val bluetoothOn = runCatching { scanner.isBluetoothEnabled() }.getOrDefault(false)
-            val bonded = if (bluetoothOn) runCatching { scanner.bondedDevices() }.getOrNull().orEmpty() else emptyList()
-            sheet.update { it.copy(isBluetoothOn = bluetoothOn, bondedDevices = bonded) }
+            sheet.update { it.copy(isBluetoothOn = bluetoothOn) }
+            if (bluetoothOn) scan()
         }
 
         fun scan() {

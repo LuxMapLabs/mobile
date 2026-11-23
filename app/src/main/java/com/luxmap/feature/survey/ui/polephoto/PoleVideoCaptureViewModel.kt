@@ -4,7 +4,9 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.location.LocationTracker
+import com.luxmap.feature.survey.data.LuxReadingRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxCardUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +24,7 @@ class PoleVideoCaptureViewModel
         savedStateHandle: SavedStateHandle,
         private val repository: PolePhotoRepository,
         private val locationTracker: LocationTracker,
+        private val luxReadingRepository: LuxReadingRepository,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val poleId: String = checkNotNull(savedStateHandle[POLE_ID_ARG])
@@ -39,6 +42,7 @@ class PoleVideoCaptureViewModel
 
         fun onVideoCaptured(
             file: File,
+            lux: LuxCardUiState.Recorded? = null,
             onDone: () -> Unit,
         ) {
             _locationMissing.value = false
@@ -48,14 +52,20 @@ class PoleVideoCaptureViewModel
                     _locationMissing.value = true
                     return@launch
                 }
-                runCatching {
-                    repository.captureVideo(
-                        workOrderId = workOrderId,
-                        poleId = poleId,
-                        filePath = file.absolutePath,
-                        lat = location.latitude,
-                        lng = location.longitude,
-                    )
+                val saved =
+                    runCatching {
+                        repository.captureVideo(
+                            workOrderId = workOrderId,
+                            poleId = poleId,
+                            filePath = file.absolutePath,
+                            lat = location.latitude,
+                            lng = location.longitude,
+                        )
+                    }.getOrNull()
+                if (saved != null && lux != null) {
+                    runCatching {
+                        luxReadingRepository.record(workOrderId, poleId, saved.photoId, lux.lux, lux.measuredAt)
+                    }
                 }
                 onDone()
             }

@@ -8,7 +8,7 @@
 The per-pole survey flow (`feature/survey/ui/polephoto/`) uploads one photo or one short video per pole, and the server AI returns `cv_state` = `on` / `off` / `inconclusive`. The AI only decides ON/OFF — `luxmap_backend` `YoloOnOffDetector.cs`: *"CV decides ON / OFF only; Dim comes from the lux sensor"*. A field lux reading is the missing input for the server to classify `dim`, and it is ground truth for RQ1 / CV-12.
 
 Confirmed with the user (2026-11-23):
-- **Q1 — Device:** the handheld `LuxMap_ESP32` meter over Classic Bluetooth SPP (not a fixed IoT node on the pole).
+- **Q1 — Device (corrected 2026-11-24 on a real device):** the handheld **`ESP32C3_LUX`** meter, BLE only (not a fixed IoT node on the pole). The older `LuxMap_ESP32` (Classic Bluetooth SPP) is no longer supported.
 - **Q2 — Link (revised 2026-11-23):** a reading is linked **directly to the photo/video it was taken with, on the server too** — not only by pole + time. This needs a backend change (section 2.1). Until BE ships it, the reading is sent by pole + `measured_at` and the link stays in Room.
 - **Live capture only:** lux can be measured only together with a photo or video taken **now** with the camera. Gallery picks have no lux, because their capture time is unknown and cannot match a live reading.
 - **Q3 — Verdict:** mobile shows the **raw, relative** value only. It never shows "dim", "pass" or "fail". The engineer's review stays ON/OFF only.
@@ -25,7 +25,7 @@ POST /api/v1/lux-readings          capability RecordLuxReading = field_engineer 
   "measured_at": "2026-11-23T12:42:00Z",  required, ISO 8601 UTC
   "lux_value": 12.4,                required, finite, >= 0, no upper bound (>200 logged, still stored)
   "data_source": "field",           required: field | calibration_rig
-  "meter_model": "LuxMap_ESP32",    optional
+  "meter_model": "ESP32C3_LUX",    optional
   "note": "..."                     optional
 }
 201 new record · 200 same client_op_id already stored · 404 POLE_NOT_FOUND (also out of scope)
@@ -48,13 +48,15 @@ Proposal for BE:
 - Optionally, `PolePhotoItem` exposes the linked reading (e.g. `lux_value`, `lux_measured_at`), so Web GIS shows it next to the photo without a second query.
 - Additive only: readings without `photo_id` keep working.
 
-## 3. Device protocol (from the deleted `core/ble`, real-device check 2026-09-30)
+## 3. Device protocol (read from the real `ESP32C3_LUX`, 2026-11-24)
 
-- Classic Bluetooth SPP (RFCOMM), device name `LuxMap_ESP32`.
-- One plain-text line per reading, about **1 line per second**: `2026-09-30 23:32:07 | Light: 69.17 lux`.
-- A line that does not match the pattern is skipped, not an error (partial read at connect).
-- Code to restore: commit `292e5ab^` — `core/ble/LuxSensorBleClient.kt`, `LuxDeviceScanner.kt`, `LuxPacketCodec.kt`, `LuxDevicePreferences.kt`, test `LuxPacketCodecTest.kt`.
-- Simplify on restore: `sample_no` / `module_epoch` existed for the deleted continuous-video `lux_log` and are not needed here. Keep the parser and the connection state machine.
+- BLE GATT, **Nordic UART Service**: service `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`, TX notify characteristic `6E400003-B5A3-F393-E0A9-E50E24DCCA9E` (CCCD `0x2902`). No bonding needed.
+- One plain-text line per notification, about **4 lines per second**: `Lux: 0.83
+`. Chunks are joined on `
+` before parsing (`LuxLineBuffer`), a line that does not match is skipped.
+- Discovery is a BLE scan (`BluetoothLeScanner`). Classic discovery does not find this device.
+- `core/ble/LuxSensorBleClient` connects with `connectGatt(TRANSPORT_LE)`, enables notifications, and reconnects every 2s after a lost link until `disconnect()`.
+- The older `LuxMap_ESP32` (Classic SPP, `yyyy-MM-dd HH:mm:ss | Light: 69.17 lux`, 1 line per second) is no longer supported (owner decision, 2026-11-24).
 
 ## 4. Business rules
 
@@ -69,7 +71,7 @@ Proposal for BE:
 
 ## 5. Sampling rule
 
-- Use a window of the **last 5 valid samples** (about 5 seconds at 1 Hz).
+- Use a window of the **last 12 valid samples** (about 3 seconds at 4 Hz, owner decision 2026-11-24).
 - **Stable** means `max - min <= max(0.5 lux, 10% of the median)`.
 - The "Ghi nhận" button is enabled only when the window is full and stable.
 - Recorded value = **median** of the window, rounded to 2 decimals. `measured_at` = phone clock (UTC) at the moment of the tap.
@@ -81,7 +83,7 @@ The thresholds are a first proposal. Tune them after a real-device check.
 
 ### 6.1 Pairing — Profile screen
 - New row "Cảm biến lux" in `ProfileScreen`: shows the paired device name, or "Chưa ghép nối".
-- Tap opens a pairing sheet: request `BLUETOOTH_SCAN` / `BLUETOOTH_CONNECT`, list bonded + discovered devices, choose one, then save its address (`LuxDevicePreferences`, DataStore).
+- Tap opens a pairing sheet: request `BLUETOOTH_SCAN` / `BLUETOOTH_CONNECT`, BLE-scan automatically when the sheet opens (devices whose name contains "LUX" listed first), choose one, then save its address (`LuxDevicePreferences`, DataStore).
 - "Bỏ ghép nối" clears the saved address.
 
 ### 6.2 Lux card — where it appears
@@ -105,12 +107,15 @@ Why before the AI result: the AI result is not immediate (upload + processing, p
 ### 6.3 Card states (exhaustive)
 | State | Shown | Action |
 |---|---|---|
-| `NotPaired` | "Chưa ghép nối máy đo lux" | "Ghép nối" → Profile pairing sheet |
+| `Collapsed` | one row "Đo lux (tuỳ chọn)" | tap to expand |
+| `NotPaired` | "Chưa ghép nối máy đo lux" | "Ghép nối" → the pairing sheet, opened on the same screen |
 | `PermissionMissing` | "Cần quyền Bluetooth" | "Cấp quyền" |
+| `BluetoothOff` | "Bluetooth đang tắt" | "Bật Bluetooth" (system dialog) |
 | `Connecting` | spinner + "Đang kết nối…" | — |
 | `Live(value, stable)` | big number + "lux · số đo tương đối" + stability hint + R7 posture line | "Ghi nhận" (enabled when stable) |
 | `Recorded(value, time)` | "Đã ghi 12.4 lux · 19:42" | "Đo lại" |
 | `Disconnected` | "Mất kết nối máy đo" | "Thử lại" |
+| `Unreachable` | after 2 failed attempts in a row: "Không kết nối được máy đo. Kiểm tra máy đo đã bật và ở gần điện thoại." (keeps retrying in the background, goes to `Live` as soon as it connects) | "Thử lại" |
 
 The card is collapsed by default, with the title "Đo lux (tuỳ chọn)". Expanding it starts the connection; leaving the screen disconnects. There is no background service, so no foreground-service permission is needed.
 
@@ -132,7 +137,7 @@ All UI uses vNext tokens only (`MaterialTheme.*`, `LuxTheme.*`), 48dp touch targ
 | `photo_id` | String | local id (`LocalPolePhotoEntity.photoId`) of the photo/video taken with this reading. The **server** id sent to BE is read at sync time from `LocalPolePhotoEntity.serverPhotoId` |
 | `measured_at` | Instant | UTC |
 | `lux_value` | Double | median of the window |
-| `meter_model` | String | `"LuxMap_ESP32"` |
+| `meter_model` | String | `"ESP32C3_LUX"` |
 | `data_source` | String | `"field"` |
 | `server_lux_id` | String? | filled from the 201/200 response |
 | `created_at` | Instant | |
@@ -166,7 +171,7 @@ No new library: Android Bluetooth is a platform API.
 
 ## 8. Tests
 - Unit: `LuxPacketCodecTest` (restored), `LuxSamplingWindowTest` (stable/unstable/negative/NaN/disconnect reset), `RealLuxReadingRepositoryTest`, `UploadLuxReadingSyncHandlerTest` (201/200/404/400/IOException), ViewModel tests for card states.
-- Compose UI: the lux card's 6 states. `PoleListScreenTest` and `PolePhotoResultScreenTest`: lux line shown or hidden.
+- Compose UI: the lux card states. `PoleListScreenTest` and `PolePhotoResultScreenTest`: lux line shown or hidden.
 - Manual on a real device (SM-A075F + ESP32): pairing, live value, record, offline record then sync, disconnect mid-window.
 
 ## 9. Delivery plan (each PR ≤ 400 changed lines per commit, PRs into `dev`)

@@ -30,7 +30,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LuxMeterPairingViewModelTest {
-    private val meter = LuxDevice("LuxMap_ESP32", "AA:BB")
+    private val meter = LuxDevice("ESP32C3_LUX", "AA:BB")
     private val phone = LuxDevice("Tai nghe", "CC:DD")
     private val paired = MutableStateFlow<LuxDevice?>(null)
     private val preferences = mockk<LuxDevicePreferences>(relaxed = true)
@@ -43,7 +43,7 @@ class LuxMeterPairingViewModelTest {
         coEvery { preferences.save(any()) } answers { paired.value = firstArg() }
         coEvery { preferences.clear() } answers { paired.value = null }
         every { scanner.isBluetoothEnabled() } returns true
-        every { scanner.bondedDevices() } returns listOf(meter)
+        every { scanner.scan(any()) } returns flowOf(meter)
     }
 
     @After
@@ -74,33 +74,33 @@ class LuxMeterPairingViewModelTest {
 
             assertTrue(vm.uiState.value.isSheetOpen)
             assertFalse(vm.uiState.value.hasPermission)
-            verify(exactly = 0) { scanner.bondedDevices() }
+            verify(exactly = 0) { scanner.scan(any()) }
         }
 
     @Test
-    fun `opening with permission loads bonded devices`() =
+    fun `opening with permission starts scanning right away`() =
         runTest {
             val vm = viewModel()
 
             vm.openSheet(hasPermission = true)
 
-            assertEquals(listOf(meter), vm.uiState.value.bondedDevices)
+            assertEquals(listOf(meter), vm.uiState.value.foundDevices)
             assertTrue(vm.uiState.value.isBluetoothOn)
         }
 
     @Test
-    fun `granting permission loads bonded devices`() =
+    fun `granting permission starts scanning`() =
         runTest {
             val vm = viewModel()
             vm.openSheet(hasPermission = false)
 
             vm.onPermissionResult(granted = true)
 
-            assertEquals(listOf(meter), vm.uiState.value.bondedDevices)
+            assertEquals(listOf(meter), vm.uiState.value.foundDevices)
         }
 
     @Test
-    fun `bluetooth off shows no devices`() =
+    fun `bluetooth off does not scan`() =
         runTest {
             every { scanner.isBluetoothEnabled() } returns false
             val vm = viewModel()
@@ -108,7 +108,7 @@ class LuxMeterPairingViewModelTest {
             vm.openSheet(hasPermission = true)
 
             assertFalse(vm.uiState.value.isBluetoothOn)
-            assertEquals(emptyList<LuxDevice>(), vm.uiState.value.bondedDevices)
+            verify(exactly = 0) { scanner.scan(any()) }
         }
 
     @Test

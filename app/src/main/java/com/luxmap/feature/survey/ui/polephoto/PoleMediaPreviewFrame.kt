@@ -47,6 +47,7 @@ fun PoleMediaPreviewFrame(
     confirmEnabled: Boolean = true,
     warning: String? = null,
     keepRetakeLabelOnOneLine: Boolean = false,
+    footer: (@Composable () -> Unit)? = null,
     media: @Composable BoxScope.() -> Unit,
 ) {
     BackHandler { if (!isSaving) onClose() }
@@ -88,6 +89,9 @@ fun PoleMediaPreviewFrame(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = Spacing.lg),
             )
+        }
+        if (footer != null) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) { footer() }
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg)) {
             val stackActions =

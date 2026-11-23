@@ -2,7 +2,10 @@ package com.luxmap.feature.survey.ui.polephoto
 
 import androidx.lifecycle.SavedStateHandle
 import com.luxmap.core.location.LocationTracker
+import com.luxmap.feature.survey.data.LuxReadingRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
+import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxCardUiState
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -19,6 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import org.maplibre.android.geometry.LatLng
 import java.io.File
+import java.time.Instant
 
 private const val WORK_ORDER_ID = "WO-1"
 private const val POLE_ID = "POLE-1"
@@ -51,7 +55,7 @@ class PoleVideoCaptureViewModelTest {
             val repository = mockk<PolePhotoRepository>(relaxed = true)
             val locationTracker = mockk<LocationTracker>()
             coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
-            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, mockk(relaxed = true))
             val file = File("x.mp4")
             var done = false
 
@@ -76,7 +80,7 @@ class PoleVideoCaptureViewModelTest {
             val repository = mockk<PolePhotoRepository>(relaxed = true)
             val locationTracker = mockk<LocationTracker>()
             coEvery { locationTracker.getCurrentLocation() } returns null
-            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, mockk(relaxed = true))
             var done = false
 
             vm.onVideoCaptured(File("x.mp4")) { done = true }
@@ -95,7 +99,7 @@ class PoleVideoCaptureViewModelTest {
             val repository = mockk<PolePhotoRepository>(relaxed = true)
             val locationTracker = mockk<LocationTracker>()
             coEvery { locationTracker.getCurrentLocation() } returnsMany listOf(null, LatLng(10.0, 106.0))
-            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, mockk(relaxed = true))
             val file = File("x.mp4")
             var done = false
 
@@ -126,12 +130,81 @@ class PoleVideoCaptureViewModelTest {
             } throws RuntimeException("disk full")
             val locationTracker = mockk<LocationTracker>()
             coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
-            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, mockk(relaxed = true))
             var done = false
 
             vm.onVideoCaptured(File("x.mp4")) { done = true }
             dispatcher.scheduler.advanceUntilIdle()
 
+            assertTrue(done)
+        }
+
+    private val luxReading = LuxCardUiState.Recorded(12.3, Instant.parse("2026-11-24T12:00:00Z"))
+
+    private fun savedMedia() =
+        LocalPolePhotoEntity(
+            photoId = "PHOTO-9",
+            workOrderId = WORK_ORDER_ID,
+            poleId = POLE_ID,
+            filePath = "x.mp4",
+            capturedAt = Instant.EPOCH,
+            lat = 10.0,
+            lng = 106.0,
+        )
+
+    @Test
+    fun `onVideoCaptured records the lux reading against the saved media`() =
+        runTest {
+            val repository = mockk<PolePhotoRepository>()
+            coEvery {
+                repository.captureVideo(workOrderId = any(), poleId = any(), filePath = any(), lat = any(), lng = any())
+            } returns savedMedia()
+            val luxRepository = mockk<LuxReadingRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, luxRepository)
+
+            vm.onVideoCaptured(File("x.mp4"), luxReading) {}
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify { luxRepository.record(WORK_ORDER_ID, POLE_ID, "PHOTO-9", 12.3, luxReading.measuredAt) }
+        }
+
+    @Test
+    fun `onVideoCaptured records no lux when none was measured`() =
+        runTest {
+            val repository = mockk<PolePhotoRepository>()
+            coEvery {
+                repository.captureVideo(workOrderId = any(), poleId = any(), filePath = any(), lat = any(), lng = any())
+            } returns savedMedia()
+            val luxRepository = mockk<LuxReadingRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, luxRepository)
+
+            vm.onVideoCaptured(File("x.mp4")) {}
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify(exactly = 0) { luxRepository.record(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `onVideoCaptured records no lux when saving the media fails`() =
+        runTest {
+            val repository = mockk<PolePhotoRepository>()
+            coEvery {
+                repository.captureVideo(workOrderId = any(), poleId = any(), filePath = any(), lat = any(), lng = any())
+            } throws RuntimeException("disk full")
+            val luxRepository = mockk<LuxReadingRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.0, 106.0)
+            val vm = PoleVideoCaptureViewModel(savedStateHandle(), repository, locationTracker, luxRepository)
+            var done = false
+
+            vm.onVideoCaptured(File("x.mp4"), luxReading) { done = true }
+            dispatcher.scheduler.advanceUntilIdle()
+
+            coVerify(exactly = 0) { luxRepository.record(any(), any(), any(), any(), any()) }
             assertTrue(done)
         }
 }

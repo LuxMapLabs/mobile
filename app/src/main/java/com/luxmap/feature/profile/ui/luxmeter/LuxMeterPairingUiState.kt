@@ -7,7 +7,6 @@ data class LuxMeterPairingUiState(
     val isSheetOpen: Boolean = false,
     val hasPermission: Boolean = false,
     val isBluetoothOn: Boolean = true,
-    val bondedDevices: List<LuxDevice> = emptyList(),
     val foundDevices: List<LuxDevice> = emptyList(),
     val isScanning: Boolean = false,
 )

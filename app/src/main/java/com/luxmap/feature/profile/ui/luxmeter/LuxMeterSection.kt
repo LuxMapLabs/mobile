@@ -113,19 +113,13 @@ private fun DeviceLists(
     onUnpair: () -> Unit,
 ) {
     Text(
-        text = "Chọn máy đo LuxMap_ESP32. Máy đo cần được bật và ở gần điện thoại.",
+        text = "Chọn máy đo ESP32C3_LUX. Máy đo cần được bật và ở gần điện thoại.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    DeviceGroup(
-        title = "Đã ghép nối với điện thoại",
-        devices = state.bondedDevices,
-        selected = state.pairedDevice,
-        onSelect = onSelect,
-    )
-    val newDevices = state.foundDevices.filterNot { found -> state.bondedDevices.any { it.address == found.address } }
-    DeviceGroup(title = "Tìm thấy gần đây", devices = newDevices, selected = state.pairedDevice, onSelect = onSelect)
-    if (state.bondedDevices.isEmpty() && newDevices.isEmpty() && !state.isScanning) {
+    val devices = state.foundDevices.sortedByDescending { it.name.orEmpty().contains("LUX", ignoreCase = true) }
+    DeviceGroup(title = "Tìm thấy gần đây", devices = devices, selected = state.pairedDevice, onSelect = onSelect)
+    if (devices.isEmpty() && !state.isScanning) {
         Text(
             text = "Chưa thấy thiết bị nào. Bật máy đo rồi bấm Tìm thiết bị.",
             style = MaterialTheme.typography.bodyMedium,

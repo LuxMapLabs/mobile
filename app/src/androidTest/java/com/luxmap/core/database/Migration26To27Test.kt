@@ -43,7 +43,7 @@ class Migration26To27Test {
                     photoId = "PH1",
                     measuredAt = Instant.ofEpochMilli(2000),
                     luxValue = 12.3,
-                    meterModel = "LuxMap_ESP32",
+                    meterModel = "ESP32C3_LUX",
                     dataSource = "field",
                     createdAt = Instant.ofEpochMilli(2000),
                 ),
