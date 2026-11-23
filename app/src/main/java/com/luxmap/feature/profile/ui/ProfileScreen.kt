@@ -53,6 +53,7 @@ import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxTabTopBar
 import com.luxmap.feature.profile.data.CurrentUserProfile
+import com.luxmap.feature.profile.ui.luxmeter.LuxMeterRoute
 import java.time.Instant
 
 @Composable
@@ -79,6 +80,7 @@ fun ProfileRoute(
         unreadNotificationCount = unreadNotificationCount,
         onOpenNotifications = onOpenNotifications,
         onRetry = viewModel::retry,
+        luxMeterSection = { LuxMeterRoute() },
         modifier = modifier,
     )
 }
@@ -95,6 +97,7 @@ fun ProfileScreen(
     unreadNotificationCount: Int = 0,
     onOpenNotifications: () -> Unit = {},
     onRetry: () -> Unit = {},
+    luxMeterSection: @Composable () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showConfirmDialog by rememberSaveable { mutableStateOf(false) }
@@ -134,6 +137,7 @@ fun ProfileScreen(
                         lastSyncedAt = lastSyncedAt,
                         isOnline = isOnline,
                         onLogoutClick = { showConfirmDialog = true },
+                        luxMeterSection = luxMeterSection,
                     ) {
                         ProfileCard(profileState.profile)
                     }
@@ -145,6 +149,7 @@ fun ProfileScreen(
                         lastSyncedAt = lastSyncedAt,
                         isOnline = isOnline,
                         onLogoutClick = { showConfirmDialog = true },
+                        luxMeterSection = luxMeterSection,
                     ) {
                         LuxErrorState(
                             onRetry = onRetry,
@@ -184,6 +189,7 @@ private fun ProfileBody(
     lastSyncedAt: Instant?,
     isOnline: Boolean,
     onLogoutClick: () -> Unit,
+    luxMeterSection: @Composable () -> Unit,
     header: @Composable () -> Unit,
 ) {
     Column(
@@ -201,6 +207,7 @@ private fun ProfileBody(
             errorSyncCount = errorSyncCount,
             lastSyncedAt = lastSyncedAt,
         )
+        luxMeterSection()
         LogoutSection(isLoggingOut = isLoggingOut, pendingSyncCount = pendingSyncCount, onLogoutClick = onLogoutClick)
     }
 }
