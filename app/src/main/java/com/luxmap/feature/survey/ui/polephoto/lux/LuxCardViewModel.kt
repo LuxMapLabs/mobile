@@ -146,6 +146,6 @@ class LuxCardViewModel
             }
 
         private companion object {
-            const val REQUIRED_SAMPLES = 5
+            const val REQUIRED_SAMPLES = 12
         }
     }

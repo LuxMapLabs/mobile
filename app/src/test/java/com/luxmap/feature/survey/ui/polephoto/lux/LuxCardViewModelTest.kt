@@ -24,6 +24,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+private val STABLE_READINGS = doubleArrayOf(12.1, 12.4, 12.3, 12.2, 12.3, 12.4, 12.2, 12.3, 12.1, 12.4, 12.3, 12.5)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class LuxCardViewModelTest {
     private val meter = LuxDevice("LuxMap_ESP32", "AA:BB")
@@ -126,7 +128,7 @@ class LuxCardViewModelTest {
         }
 
     @Test
-    fun `live readings become stable after five close samples`() =
+    fun `live readings become stable after twelve close samples`() =
         runTest {
             val vm = viewModel()
 
@@ -135,18 +137,18 @@ class LuxCardViewModelTest {
             assertEquals(3, warming.sampleCount)
             assertNull(warming.stableLux)
 
-            samples.emit(LuxSample(12.2, 0L))
-            samples.emit(LuxSample(12.5, 0L))
+            STABLE_READINGS.drop(3).forEach { samples.emit(LuxSample(it, 0L)) }
             val stable = vm.uiState.value as LuxCardUiState.Live
             assertEquals(12.3, stable.stableLux)
             assertEquals(12.5, stable.latestLux)
+            assertEquals(12, stable.requiredSamples)
         }
 
     @Test
     fun `record keeps the stable value and disconnects`() =
         runTest {
             val vm = viewModel()
-            vm.connectAndFeed(12.1, 12.4, 12.3, 12.2, 12.5)
+            vm.connectAndFeed(*STABLE_READINGS)
 
             vm.record()
 
@@ -195,7 +197,7 @@ class LuxCardViewModelTest {
     fun `remeasure drops the recorded value and reconnects`() =
         runTest {
             val vm = viewModel()
-            vm.connectAndFeed(12.1, 12.4, 12.3, 12.2, 12.5)
+            vm.connectAndFeed(*STABLE_READINGS)
             vm.record()
 
             vm.remeasure()
@@ -209,7 +211,7 @@ class LuxCardViewModelTest {
     fun `collapse discards the reading and disconnects`() =
         runTest {
             val vm = viewModel()
-            vm.connectAndFeed(12.1, 12.4, 12.3, 12.2, 12.5)
+            vm.connectAndFeed(*STABLE_READINGS)
             vm.record()
 
             vm.collapse()

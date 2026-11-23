@@ -17,7 +17,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -318,8 +317,7 @@ private fun PoleVideoPreview(
             factory = { viewContext -> PlayerView(viewContext).apply { this.player = player } },
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(3f / 4f)
+                    .aspectRatio(3f / 4f, matchHeightConstraintsFirst = true)
                     .clip(MaterialTheme.shapes.medium)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
         )
