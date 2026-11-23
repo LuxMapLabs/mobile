@@ -120,7 +120,7 @@ Why before the AI result: the AI result is not immediate (upload + processing, p
 The card is collapsed by default, with the title "Đo lux (tuỳ chọn)". Expanding it starts the connection; leaving the screen disconnects. There is no background service, so no foreground-service permission is needed.
 
 ### 6.4 Display elsewhere
-- `PoleRow` (`PoleListScreen`): a secondary line "☀ 12.4 lux" with the sync badge (`LuxTheme.status.sync`), latest reading of that pole within this work order.
+- `PoleRow` (`PoleListScreen`): a chip "☀ 12,40 lux" next to the AI and upload badges, from the reading taken with the pole's **latest photo/video** (not just the latest reading of the pole: after a retake without lux, an older reading would sit next to a newer AI verdict). A reading whose upload failed shows "· chưa gửi được" in the failed sync colours.
 - `PolePhotoResultScreen`: a row "Lux đo tại hiện trường · 12.4 (tương đối)" under the AI conclusion, only from a reading linked to **this** `photo_id`. No fallback to other readings of the pole. Hidden when there is none (always the case for gallery media).
 - Review card unchanged: ON/OFF only.
 

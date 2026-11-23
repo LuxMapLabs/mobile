@@ -608,4 +608,39 @@ class PoleListScreenTest {
             .assert(clickLabel("Chụp lại cột"))
         composeRule.onNodeWithTag("pole_retake_POLE-2", useUnmergedTree = true).assertExists()
     }
+
+    private fun showRow(lux: PoleLuxInfo?) {
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state = PoleListUiState.Success(poles = listOf(pole().copy(lux = lux))),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun a_row_shows_the_lux_measured_with_its_photo() {
+        showRow(PoleLuxInfo(0.83, isSyncFailed = false))
+
+        composeRule.onNodeWithTag("pole_lux_POLE-1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("0,83 lux", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun a_row_marks_a_lux_reading_that_failed_to_sync() {
+        showRow(PoleLuxInfo(0.83, isSyncFailed = true))
+
+        composeRule.onNodeWithText("0,83 lux · chưa gửi được", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun a_row_without_lux_has_no_lux_chip() {
+        showRow(null)
+
+        composeRule.onNodeWithTag("pole_lux_POLE-1", useUnmergedTree = true).assertDoesNotExist()
+    }
 }

@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.security.TokenStore
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.survey.data.LuxReadingRepository
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.latestForPhoto
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -35,6 +38,7 @@ class PoleListViewModel
         private val polePhotoRepository: PolePhotoRepository,
         private val completionRepository: WorkOrderCompletionRepository,
         private val tokenStore: TokenStore,
+        private val luxReadingRepository: LuxReadingRepository,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
         private val _uiState = MutableStateFlow<PoleListUiState>(PoleListUiState.Loading)
@@ -68,12 +72,14 @@ class PoleListViewModel
                 // stale), instead of a Loading spinner - only fall back to Loading when there is
                 // nothing cached yet. A failed refresh then keeps the stale cache on screen
                 // rather than replacing it with an error.
-                val cached = polePhotoRepository.cachedResult(serverPhotoId)?.toResultUiState(isStale = true)
+                val cachedPhoto = polePhotoRepository.cachedResult(serverPhotoId)
+                val cached = cachedPhoto?.toResultUiState(isStale = true, luxValue = luxFor(cachedPhoto))
                 _aiResultState.value = cached ?: PolePhotoResultUiState.Loading
 
                 polePhotoRepository.fetchResult(workOrderId, serverPhotoId).fold(
                     onSuccess = { photo ->
-                        _aiResultState.value = photo.toResultUiState(isStale = false) ?: PolePhotoResultUiState.Empty
+                        val fresh = photo.toResultUiState(isStale = false, luxValue = luxFor(photo))
+                        _aiResultState.value = fresh ?: PolePhotoResultUiState.Empty
                     },
                     onFailure = { e ->
                         _aiResultState.value =
@@ -90,7 +96,13 @@ class PoleListViewModel
         // Both "available" and "unavailable" map to Success now - even when the AI model failed
         // entirely (cvState null), the Field Engineer must still be able to review it (business
         // rule D-2, ticket PHOTO-REVIEW) - there is no longer a separate "AI failed" dead end.
-        private fun LocalPolePhotoEntity.toResultUiState(isStale: Boolean): PolePhotoResultUiState? =
+        private suspend fun luxFor(photo: LocalPolePhotoEntity): Double? =
+            luxReadingRepository.observeReadings(workOrderId).first().latestForPhoto(photo.photoId)?.luxValue
+
+        private fun LocalPolePhotoEntity.toResultUiState(
+            isStale: Boolean,
+            luxValue: Double?,
+        ): PolePhotoResultUiState? =
             if (aiStatus == null) {
                 null
             } else {
@@ -113,6 +125,7 @@ class PoleListViewModel
                     isStale = isStale,
                     mediaType = mediaType,
                     videoUrl = videoUrl,
+                    luxValue = luxValue,
                 )
             }
 
@@ -162,6 +175,7 @@ class PoleListViewModel
         }
 
         private data class PoleSyncInfo(
+            val photoId: String,
             val serverPhotoId: String?,
             val status: String?,
             val hasPendingReview: Boolean,
@@ -189,6 +203,7 @@ class PoleListViewModel
                                         .map { statuses ->
                                             latestByPole.mapValues { (_, photo) ->
                                                 PoleSyncInfo(
+                                                    photoId = photo.photoId,
                                                     serverPhotoId = photo.serverPhotoId,
                                                     status = statuses[photo.photoId],
                                                     hasPendingReview = photo.draftFinalCvState != null,
@@ -210,7 +225,8 @@ class PoleListViewModel
                         combine(
                             infoByPoleFlow,
                             completionRepository.observeCompletion(workOrderId),
-                        ) { infoByPole, completion ->
+                            luxReadingRepository.observeReadings(workOrderId),
+                        ) { infoByPole, completion, luxReadings ->
                             PoleListUiState.Success(
                                 poles =
                                     poles.map { pole ->
@@ -226,6 +242,10 @@ class PoleListViewModel
                                             hasPendingDecision = info?.hasPendingDecision ?: false,
                                             aiVerdict = info?.aiVerdict,
                                             isConfirmed = info?.isConfirmed == true && info.status == "done",
+                                            lux =
+                                                info?.let { luxReadings.latestForPhoto(it.photoId) }?.let { reading ->
+                                                    PoleLuxInfo(reading.luxValue, reading.syncStatus == "failed")
+                                                },
                                         )
                                     },
                                 isStale = result.isStale,

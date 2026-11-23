@@ -40,6 +40,7 @@ private fun successState(
     decisionNote: String? = null,
     isStale: Boolean = false,
     mediaType: String = "photo",
+    luxValue: Double? = null,
 ) = PolePhotoResultUiState.Success(
     filePath = "/data/pole-photo.jpg",
     cvState = cvState,
@@ -52,6 +53,7 @@ private fun successState(
     decidedAt = Instant.parse("2026-10-16T11:00:00Z"),
     isStale = isStale,
     mediaType = mediaType,
+    luxValue = luxValue,
 )
 
 class PolePhotoResultScreenTest {
@@ -563,5 +565,34 @@ class PolePhotoResultScreenTest {
         composeRule.waitForIdle()
         choice("Đèn tắt").performScrollTo().assertIsSelected()
         composeRule.onNode(hasText("Xác nhận") and hasClickAction()).assertIsNotEnabled()
+    }
+
+    private fun showResult(luxValue: Double?) {
+        composeRule.setContent {
+            LuxMapTheme {
+                PolePhotoResultScreen(
+                    poleId = "P-0103",
+                    position = 3,
+                    state = successState(luxValue = luxValue),
+                    onBack = {},
+                    onRetry = {},
+                )
+            }
+        }
+    }
+
+    @Test
+    fun the_field_lux_is_shown_under_the_conclusion() {
+        showResult(0.83)
+
+        composeRule.onNodeWithTag("ai_result_lux", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("0,83 (tương đối)", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun no_field_lux_row_without_a_reading() {
+        showResult(null)
+
+        composeRule.onNodeWithTag("ai_result_lux", useUnmergedTree = true).assertDoesNotExist()
     }
 }

@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.luxmap.core.security.TokenStore
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.feature.survey.data.LuxReading
+import com.luxmap.feature.survey.data.LuxReadingRepository
 import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PoleListResult
@@ -31,6 +33,11 @@ import java.time.Instant
 private const val WORK_ORDER_ID = "WO-1"
 
 private fun savedStateHandle() = SavedStateHandle(mapOf(PoleListViewModel.WORK_ORDER_ID_ARG to WORK_ORDER_ID))
+
+private fun luxReadings(vararg readings: LuxReading): LuxReadingRepository =
+    mockk {
+        every { observeReadings(WORK_ORDER_ID) } returns flowOf(readings.toList())
+    }
 
 private fun photo(
     poleId: String,
@@ -98,6 +105,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -163,6 +171,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -207,6 +216,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
             dispatcher.scheduler.advanceUntilIdle()
 
@@ -262,6 +272,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -295,6 +306,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -338,6 +350,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -361,6 +374,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -383,6 +397,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -410,6 +425,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -441,6 +457,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -477,6 +494,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -506,6 +524,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -538,6 +557,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -568,6 +588,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -598,6 +619,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -641,6 +663,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
             vm.uiState.test {
                 awaitItem() // Loading
@@ -684,6 +707,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -722,6 +746,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -762,6 +787,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -785,6 +811,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
@@ -810,6 +837,7 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     mockk<WorkOrderCompletionRepository>(relaxed = true),
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.aiResultState.test {
@@ -845,12 +873,115 @@ class PoleListViewModelTest {
                     polePhotoRepository,
                     completionRepository,
                     mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
                 )
 
             vm.uiState.test {
                 awaitItem()
                 val success = awaitItem() as PoleListUiState.Success
                 assertEquals(PoleAiVerdict.OFF, success.poles.single().aiVerdict)
+            }
+        }
+
+    private fun reading(
+        photoId: String,
+        lux: Double,
+        status: String? = "done",
+        measuredAtMs: Long = 1_000,
+    ) = LuxReading("L-$photoId-$measuredAtMs", "POLE-1", photoId, lux, Instant.ofEpochMilli(measuredAtMs), status)
+
+    private fun listViewModel(vararg readings: LuxReading): PoleListViewModel {
+        val poleListRepository = mockk<PoleListRepository>()
+        val polePhotoRepository = mockk<PolePhotoRepository>()
+        val completionRepository = mockk<WorkOrderCompletionRepository>()
+        coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+            Result.success(
+                PoleListResult(
+                    listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                    isStale = false,
+                ),
+            )
+        every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
+            flowOf(listOf(photo("POLE-1", serverPhotoId = "S-1", aiStatus = "available", cvState = "on")))
+        every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+            flowOf(mapOf("PH-POLE-1" to "done"))
+        every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+        return PoleListViewModel(
+            savedStateHandle(),
+            poleListRepository,
+            polePhotoRepository,
+            completionRepository,
+            mockk<TokenStore>(relaxed = true),
+            luxReadings(*readings),
+        )
+    }
+
+    @Test
+    fun `a pole row carries the lux measured with its latest photo`() =
+        runTest {
+            val vm =
+                listViewModel(
+                    reading("PH-POLE-1", 0.5, measuredAtMs = 1_000),
+                    reading("PH-POLE-1", 0.83, measuredAtMs = 2_000),
+                )
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(PoleLuxInfo(0.83, isSyncFailed = false), success.poles.single().lux)
+            }
+        }
+
+    @Test
+    fun `a pole row ignores lux measured with an older photo`() =
+        runTest {
+            val vm = listViewModel(reading("PH-OLD", 0.83))
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(null, success.poles.single().lux)
+            }
+        }
+
+    @Test
+    fun `a pole row flags a lux reading that failed to sync`() =
+        runTest {
+            val vm = listViewModel(reading("PH-POLE-1", 0.83, status = "failed"))
+
+            vm.uiState.test {
+                awaitItem()
+                val success = awaitItem() as PoleListUiState.Success
+                assertEquals(PoleLuxInfo(0.83, isSyncFailed = true), success.poles.single().lux)
+            }
+        }
+
+    @Test
+    fun `onViewAiResult carries the lux measured with that photo`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(emptyList(), isStale = false))
+            coEvery { polePhotoRepository.cachedResult("SERVER-PH-1") } returns null
+            coEvery { polePhotoRepository.fetchResult(WORK_ORDER_ID, "SERVER-PH-1") } returns
+                Result.success(photo("POLE-1", serverPhotoId = "SERVER-PH-1", aiStatus = "available"))
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    mockk<WorkOrderCompletionRepository>(relaxed = true),
+                    mockk<TokenStore>(relaxed = true),
+                    luxReadings(reading("PH-POLE-1", 0.83), reading("PH-OTHER", 9.0)),
+                )
+
+            vm.aiResultState.test {
+                awaitItem()
+                vm.onViewAiResult("SERVER-PH-1")
+                awaitItem()
+                val result = awaitItem() as PolePhotoResultUiState.Success
+                assertEquals(0.83, result.luxValue)
             }
         }
 }

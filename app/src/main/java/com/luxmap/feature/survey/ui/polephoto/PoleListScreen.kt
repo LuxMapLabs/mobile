@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -81,6 +82,7 @@ import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
+import com.luxmap.feature.survey.ui.polephoto.lux.formatLux
 
 @Composable
 fun PoleListRoute(
@@ -439,6 +441,15 @@ private fun PoleRow(
                 poleProgressBadge(pole)?.let { progress ->
                     val (colors, label, icon) = progress.badge()
                     StatusBadge(text = label, colors = colors, icon = icon)
+                }
+                pole.lux?.let { lux ->
+                    val value = "${formatLux(lux.luxValue)} lux"
+                    StatusBadge(
+                        text = if (lux.isSyncFailed) "$value · chưa gửi được" else value,
+                        colors = if (lux.isSyncFailed) SyncStatus.FAILED.badgeColors() else LuxTheme.status.kind,
+                        icon = Icons.Filled.WbSunny,
+                        modifier = Modifier.testTag("pole_lux_${pole.poleId}"),
+                    )
                 }
             }
         }

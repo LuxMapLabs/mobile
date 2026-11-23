@@ -5,6 +5,11 @@ import java.time.Instant
 
 fun poleNumberLabel(position: Int?): String = position?.let { "Cột $it" } ?: "Chưa có GPS"
 
+data class PoleLuxInfo(
+    val luxValue: Double,
+    val isSyncFailed: Boolean,
+)
+
 data class PoleListRowState(
     val poleId: String,
     val position: Int?,
@@ -20,6 +25,7 @@ data class PoleListRowState(
     val aiVerdict: PoleAiVerdict? = null,
     val isConfirmed: Boolean = false,
     val identification: com.luxmap.feature.survey.data.PoleListItem? = null,
+    val lux: PoleLuxInfo? = null,
 )
 
 sealed interface PoleListUiState {
@@ -81,6 +87,7 @@ sealed interface PolePhotoResultUiState {
         val isStale: Boolean = false,
         val mediaType: String = "photo",
         val videoUrl: String? = null,
+        val luxValue: Double? = null,
     ) : PolePhotoResultUiState
 
     // Defensive-only fallback, kept for the mandatory 4-state UiState pattern (CLAUDE.md) - the
