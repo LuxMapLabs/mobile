@@ -51,7 +51,7 @@ class Migration24To25Test {
             }
             val upgraded =
                 Room.databaseBuilder(context, AppDatabase::class.java, name)
-                    .addMigrations(MIGRATION_24_25).build()
+                    .addMigrations(MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27).build()
             try {
                 val db = upgraded.openHelper.writableDatabase // Room validates the entire schema.
                 listOf(

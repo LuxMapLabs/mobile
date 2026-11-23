@@ -64,7 +64,7 @@ class Migration23To24Test {
                     context,
                     AppDatabase::class.java,
                     name,
-                ).addMigrations(MIGRATION_23_24, MIGRATION_24_25).build()
+                ).addMigrations(MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27).build()
             try {
                 val db = upgraded.openHelper.writableDatabase // Validates the entire schema.
                 val pole = upgraded.poleListCacheDao().byWorkOrder("W").single()
