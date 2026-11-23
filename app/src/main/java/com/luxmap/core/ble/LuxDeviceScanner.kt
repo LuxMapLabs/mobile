@@ -27,6 +27,9 @@ class LuxDeviceScanner
     constructor(
         @ApplicationContext private val context: Context,
     ) {
+        fun isBluetoothEnabled(): Boolean =
+            context.getSystemService(BluetoothManager::class.java).adapter?.isEnabled == true
+
         fun bondedDevices(): List<LuxDevice> =
             context.getSystemService(BluetoothManager::class.java).adapter
                 .bondedDevices
