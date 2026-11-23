@@ -9,7 +9,7 @@ The per-pole survey flow (`feature/survey/ui/polephoto/`) uploads one photo or o
 
 Confirmed with the user (2026-11-23):
 - **Q1 — Device:** the handheld `LuxMap_ESP32` meter over Classic Bluetooth SPP (not a fixed IoT node on the pole).
-- **Q2 — Link:** a reading is sent per **pole + `measured_at`** using the existing API. The link to a specific photo (`photo_id`) is kept only in Room, for display. No backend change for v1.
+- **Q2 — Link (revised 2026-11-23):** a reading is linked **directly to the photo/video it was taken with, on the server too** — not only by pole + time. This needs a backend change (section 2.1). Until BE ships it, the reading is sent by pole + `measured_at` and the link stays in Room.
 - **Live capture only:** lux can be measured only together with a photo or video taken **now** with the camera. Gallery picks have no lux, because their capture time is unknown and cannot match a live reading.
 - **Q3 — Verdict:** mobile shows the **raw, relative** value only. It never shows "dim", "pass" or "fail". The engineer's review stays ON/OFF only.
 
@@ -37,6 +37,17 @@ Not used in v1: `GET /lux-readings`, `GET /lux-readings/poles/{poleId}`. The mob
 
 Known contract mismatch (to report to BE, not blocking): section 5.7 describes `lux_value` as the **phone's** light sensor and `meter_model` as the phone model. We send readings from the ESP32 meter with `meter_model = "LuxMap_ESP32"`.
 
+### 2.1 Backend change requested — link a lux reading to a pole photo
+
+Checked in source: `CreateLuxReadingRequest` (`LuxReadingContracts.cs`) has **no** photo field today, and an unknown body key is silently ignored, so mobile must not send one before BE adds it. The field name below is a **proposal**; mobile codes against whatever name BE confirms (contract version bump + `docs/contract-drift.md` entry).
+
+Proposal for BE:
+- `POST /lux-readings` gets an **optional** field `photo_id` — the server id of a `PolePhotoItem` (a photo, or the representative frame of a pole video).
+- Validation: the photo exists, is in scope, and belongs to the same `pole_id`. Otherwise `400` / `404` with a clear code.
+- `LuxReadingResponse` echoes `photo_id`.
+- Optionally, `PolePhotoItem` exposes the linked reading (e.g. `lux_value`, `lux_measured_at`), so Web GIS shows it next to the photo without a second query.
+- Additive only: readings without `photo_id` keep working.
+
 ## 3. Device protocol (from the deleted `core/ble`, real-device check 2026-09-30)
 
 - Classic Bluetooth SPP (RFCOMM), device name `LuxMap_ESP32`.
@@ -48,9 +59,9 @@ Known contract mismatch (to report to BE, not blocking): section 5.7 describes `
 ## 4. Business rules
 
 - **R1 — Never blocks.** Measuring lux never blocks capture, upload, review or completing the work order. No paired device or a lost connection: the rest of the flow works as today.
-- **R2 — Pole + time.** The server gets `pole_id` + `measured_at`. `photo_id` stays local. It is never put into `note`.
+- **R2 — Linked to the photo.** The server gets `pole_id` + `measured_at` + the server `photo_id` of the photo/video taken with it (once BE supports it, section 2.1). The photo id is never put into `note` as a workaround.
 - **R3 — Relative value.** Always labelled "số đo tương đối". No dim / pass / fail wording anywhere.
-- **R4 — Offline-first.** Write Room first, then enqueue a `sync_queue` op. Independent from the photo/video upload ops.
+- **R4 — Offline-first.** Write Room first, then enqueue a `sync_queue` op. It is a separate op from the photo/video upload and runs after it (to get the server `photo_id`). A failed photo upload never loses the reading (section 7.3).
 - **R5 — Validation.** Cannot record when the value is negative, NaN or Infinity, the line failed to parse, or the connection dropped during the sampling window. Above 200 lux: allowed, with a soft hint ("Có thể đang đo ban ngày").
 - **R6 — Source.** `data_source = field`. `calibration_rig` is out of scope for v1 (no testbed UI).
 - **R7 — Fixed posture.** A one-line instruction on how to hold the meter, so readings stay comparable.
@@ -118,7 +129,7 @@ All UI uses vNext tokens only (`MaterialTheme.*`, `LuxTheme.*`), 48dp touch targ
 | `client_op_id` (PK) | String | UUID, also the sync idempotency key |
 | `work_order_id` | String | for list/scope queries |
 | `pole_id` | String | |
-| `photo_id` | String | local photo/video row this reading was taken with; local link only, never sent |
+| `photo_id` | String | local id (`LocalPolePhotoEntity.photoId`) of the photo/video taken with this reading. The **server** id sent to BE is read at sync time from `LocalPolePhotoEntity.serverPhotoId` |
 | `measured_at` | Instant | UTC |
 | `lux_value` | Double | median of the window |
 | `meter_model` | String | `"LuxMap_ESP32"` |
@@ -136,6 +147,9 @@ The sync status comes from the `sync_queue` row, joined like the pole-photo rows
 
 ### 7.3 Sync
 - `UploadLuxReadingSyncHandler`, registered in `SyncModule`'s `Set<SyncOpHandler>`, same pattern as `UploadPolePhotoSyncHandler`.
+- **Dependency on the photo upload:** the server `photo_id` exists only after the photo/video upload succeeds. The lux op is enqueued with `dependsOnClientOpId` = the photo/video op's `client_op_id`, so it runs after it. At send time the handler reads `serverPhotoId` from `local_pole_photo` and puts it in the body.
+- If the photo/video op ends `failed` (permanent), the lux reading is **still sent, without `photo_id`**, so the measurement is not lost. The server then has only pole + time for that reading.
+- Before BE ships section 2.1, the handler sends no `photo_id` at all (one switch in the DTO mapping, removed when BE confirms).
 - 201 / 200: save `server_lux_id`, then `done`.
 - 404 `POLE_NOT_FOUND`, 400: permanent `failed`.
 - Network errors and 5xx: retry with backoff.
@@ -162,10 +176,11 @@ No new library: Android Bluetooth is a platform API.
 3. **Pairing row** in Profile.
 4. **Lux card** in the live photo/video preview step (not for gallery picks) + tests.
 5. **Display:** pole row line + result screen row + tests.
+6. **Send `photo_id`** — after BE confirms the field from section 2.1: DTO field, handler reads `serverPhotoId`, tests. Blocked on BE; PRs 1–5 do not wait for it.
 
 ## 10. Out of scope
 - Manual lux entry (old F07) and `calibration_rig` UI.
 - A mobile "dim" verdict, any pass/fail standard.
 - Fixed IoT node telemetry.
 - Reading other users' lux history from the server.
-- Linking `photo_id` on the server. Propose an additive optional field to BE only if AI/WP4 asks for it.
+- Choosing the backend field name or validation for `photo_id` — BE decides (section 2.1 is only a proposal).
