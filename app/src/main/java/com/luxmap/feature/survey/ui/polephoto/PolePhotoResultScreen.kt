@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -103,6 +104,7 @@ import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.survey.ui.polephoto.lux.formatLux
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.io.File
@@ -389,8 +391,31 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
                         )
                     }
                 }
+                state.luxValue?.let { lux -> FieldLuxRow(lux) }
             }
         }
+    }
+}
+
+@Composable
+private fun FieldLuxRow(lux: Double) {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("ai_result_lux"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.WbSunny,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = "Lux đo tại hiện trường",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(text = "${formatLux(lux)} (tương đối)", style = MaterialTheme.typography.bodyLarge)
     }
 }
 
