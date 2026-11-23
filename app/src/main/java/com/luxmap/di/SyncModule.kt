@@ -4,6 +4,7 @@ import com.luxmap.core.sync.SyncOpHandler
 import com.luxmap.core.sync.SyncTrigger
 import com.luxmap.core.sync.WorkManagerSyncTrigger
 import com.luxmap.feature.survey.data.sync.SubmitPolePhotoReviewSyncHandler
+import com.luxmap.feature.survey.data.sync.UploadLuxReadingSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPolePhotoSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPoleVideoSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
@@ -43,4 +44,8 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindUploadPoleVideoSyncHandler(impl: UploadPoleVideoSyncHandler): SyncOpHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindUploadLuxReadingSyncHandler(impl: UploadLuxReadingSyncHandler): SyncOpHandler
 }

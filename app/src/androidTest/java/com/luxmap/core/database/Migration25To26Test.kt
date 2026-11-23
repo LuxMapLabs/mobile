@@ -32,7 +32,7 @@ class Migration25To26Test {
             }
             val after =
                 Room.databaseBuilder(context, AppDatabase::class.java, name)
-                    .addMigrations(MIGRATION_25_26)
+                    .addMigrations(MIGRATION_25_26, MIGRATION_26_27)
                     .build()
             val dao = after.poleGpsDao()
             assertEquals(1, dao.measurements("W").size)
