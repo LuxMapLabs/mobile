@@ -6,7 +6,7 @@ data class LuxSample(
 )
 
 object LuxLineParser {
-    private val LINE_PATTERN = Regex("""^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \| Light: ([0-9.]+) lux$""")
+    private val LINE_PATTERN = Regex("""^Lux:\s*([0-9.]+)$""")
 
     fun parse(
         line: String,
@@ -16,5 +16,30 @@ object LuxLineParser {
         val lux = match.groupValues[1].toDoubleOrNull() ?: return null
         if (!lux.isFinite() || lux < 0) return null
         return LuxSample(lux = lux, receivedAtElapsedNs = receivedAtElapsedNs)
+    }
+}
+
+class LuxLineBuffer {
+    private val pending = StringBuilder()
+
+    fun append(chunk: String): List<String> {
+        pending.append(chunk)
+        val lines = mutableListOf<String>()
+        while (true) {
+            val end = pending.indexOf("\n")
+            if (end < 0) break
+            lines += pending.substring(0, end)
+            pending.delete(0, end + 1)
+        }
+        if (pending.length > MAX_PENDING) pending.clear()
+        return lines
+    }
+
+    fun clear() {
+        pending.clear()
+    }
+
+    private companion object {
+        const val MAX_PENDING = 256
     }
 }
