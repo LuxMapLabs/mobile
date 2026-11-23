@@ -12,8 +12,10 @@ import com.luxmap.feature.notification.data.NotificationRepository
 import com.luxmap.feature.notification.data.RealNotificationRepository
 import com.luxmap.feature.profile.data.ProfileRepository
 import com.luxmap.feature.profile.data.RealProfileRepository
+import com.luxmap.feature.survey.data.LuxReadingRepository
 import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PolePhotoRepository
+import com.luxmap.feature.survey.data.RealLuxReadingRepository
 import com.luxmap.feature.survey.data.RealPoleListRepository
 import com.luxmap.feature.survey.data.RealPolePhotoRepository
 import com.luxmap.feature.survey.data.RealSurveyRepository
@@ -65,6 +67,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindPoleListRepository(impl: RealPoleListRepository): PoleListRepository
+
+    @Binds
+    abstract fun bindLuxReadingRepository(impl: RealLuxReadingRepository): LuxReadingRepository
 
     @Binds
     abstract fun bindNotificationRepository(impl: RealNotificationRepository): NotificationRepository
