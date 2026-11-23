@@ -35,6 +35,9 @@ import coil.compose.AsyncImage
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.feature.profile.ui.luxmeter.LuxMeterPairingViewModel
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxCardViewModel
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxMeasureSection
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -44,6 +47,8 @@ fun PolePhotoCaptureRoute(
     source: PolePhotoCaptureSource = PolePhotoCaptureSource.CAMERA,
     onDone: () -> Unit,
     viewModel: PolePhotoCaptureViewModel = hiltViewModel(),
+    luxCardViewModel: LuxCardViewModel = hiltViewModel(),
+    luxPairingViewModel: LuxMeterPairingViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -120,7 +125,7 @@ fun PolePhotoCaptureRoute(
 
     val retryLocationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            previewFile?.let { viewModel.onPhotoCaptured(it, onDone) }
+            previewFile?.let { viewModel.onPhotoCaptured(it, luxCardViewModel.recordedReading, onDone) }
         }
 
     fun retryLocation() {
@@ -128,7 +133,7 @@ fun PolePhotoCaptureRoute(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            viewModel.onPhotoCaptured(file, onDone)
+            viewModel.onPhotoCaptured(file, luxCardViewModel.recordedReading, onDone)
         } else {
             retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -170,11 +175,17 @@ fun PolePhotoCaptureRoute(
             PolePhotoPreview(
                 file = fileToPreview,
                 poleId = poleId,
+                footer =
+                    if (source == PolePhotoCaptureSource.CAMERA) {
+                        { LuxMeasureSection(luxCardViewModel, luxPairingViewModel, isEnabled = !isSaving) }
+                    } else {
+                        null
+                    },
                 isSaving = isSaving && !locationMissing,
                 retakeLabel = if (source == PolePhotoCaptureSource.GALLERY) "Chọn ảnh khác" else "Chụp lại",
                 onConfirm = {
                     isSaving = true
-                    viewModel.onPhotoCaptured(fileToPreview, onDone)
+                    viewModel.onPhotoCaptured(fileToPreview, luxCardViewModel.recordedReading, onDone)
                 },
                 onRetake = {
                     fileToPreview.delete()
@@ -210,6 +221,7 @@ fun PolePhotoCaptureRoute(
 private fun PolePhotoPreview(
     file: File,
     poleId: String,
+    footer: (@Composable () -> Unit)?,
     isSaving: Boolean,
     retakeLabel: String,
     onConfirm: () -> Unit,
@@ -219,6 +231,7 @@ private fun PolePhotoPreview(
     PoleMediaPreviewFrame(
         poleId = poleId,
         isSaving = isSaving,
+        footer = footer,
         retakeLabel = retakeLabel,
         confirmLabel = "Dùng ảnh này",
         onClose = onClose,

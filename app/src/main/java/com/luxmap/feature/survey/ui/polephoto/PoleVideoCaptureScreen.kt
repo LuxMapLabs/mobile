@@ -45,6 +45,9 @@ import androidx.media3.ui.PlayerView
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxLoadingRegion
+import com.luxmap.feature.profile.ui.luxmeter.LuxMeterPairingViewModel
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxCardViewModel
+import com.luxmap.feature.survey.ui.polephoto.lux.LuxMeasureSection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -92,6 +95,8 @@ fun PoleVideoCaptureRoute(
     source: PoleVideoCaptureSource = PoleVideoCaptureSource.CAMERA,
     onDone: () -> Unit,
     viewModel: PoleVideoCaptureViewModel = hiltViewModel(),
+    luxCardViewModel: LuxCardViewModel = hiltViewModel(),
+    luxPairingViewModel: LuxMeterPairingViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -161,7 +166,7 @@ fun PoleVideoCaptureRoute(
 
     val retryLocationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            previewFile?.let { viewModel.onVideoCaptured(it, onDone) }
+            previewFile?.let { viewModel.onVideoCaptured(it, luxCardViewModel.recordedReading, onDone) }
         }
 
     fun retryLocation() {
@@ -169,7 +174,7 @@ fun PoleVideoCaptureRoute(
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            viewModel.onVideoCaptured(file, onDone)
+            viewModel.onVideoCaptured(file, luxCardViewModel.recordedReading, onDone)
         } else {
             retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -209,12 +214,18 @@ fun PoleVideoCaptureRoute(
             PoleVideoPreview(
                 file = fileToPreview,
                 poleId = poleId,
+                footer =
+                    if (source == PoleVideoCaptureSource.CAMERA) {
+                        { LuxMeasureSection(luxCardViewModel, luxPairingViewModel, isEnabled = !isSaving) }
+                    } else {
+                        null
+                    },
                 isSaving = isSaving && !locationMissing,
                 retakeLabel = if (source == PoleVideoCaptureSource.GALLERY) "Chọn video khác" else "Quay lại",
                 keepRetakeLabelOnOneLine = source == PoleVideoCaptureSource.GALLERY,
                 onConfirm = {
                     isSaving = true
-                    viewModel.onVideoCaptured(fileToPreview, onDone)
+                    viewModel.onVideoCaptured(fileToPreview, luxCardViewModel.recordedReading, onDone)
                 },
                 onRetake = {
                     fileToPreview.delete()
@@ -250,6 +261,7 @@ fun PoleVideoCaptureRoute(
 private fun PoleVideoPreview(
     file: File,
     poleId: String,
+    footer: (@Composable () -> Unit)?,
     isSaving: Boolean,
     retakeLabel: String,
     keepRetakeLabelOnOneLine: Boolean,
@@ -283,6 +295,7 @@ private fun PoleVideoPreview(
     PoleMediaPreviewFrame(
         poleId = poleId,
         isSaving = isSaving,
+        footer = footer,
         retakeLabel = retakeLabel,
         keepRetakeLabelOnOneLine = keepRetakeLabelOnOneLine,
         confirmLabel = "Dùng video này",
