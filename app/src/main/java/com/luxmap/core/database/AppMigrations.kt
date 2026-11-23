@@ -111,3 +111,15 @@ val MIGRATION_25_26: Migration =
             )
         }
     }
+
+val MIGRATION_26_27: Migration =
+    object : Migration(26, 27) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_lux_reading (clientOpId TEXT NOT NULL, workOrderId TEXT NOT NULL, " +
+                    "poleId TEXT NOT NULL, photoId TEXT NOT NULL, measuredAt INTEGER NOT NULL, " +
+                    "luxValue REAL NOT NULL, meterModel TEXT NOT NULL, dataSource TEXT NOT NULL, " +
+                    "serverLuxId TEXT, createdAt INTEGER NOT NULL, PRIMARY KEY(clientOpId))",
+            )
+        }
+    }

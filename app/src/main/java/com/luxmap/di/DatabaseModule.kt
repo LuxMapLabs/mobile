@@ -11,7 +11,9 @@ import com.luxmap.core.database.MIGRATION_22_23
 import com.luxmap.core.database.MIGRATION_23_24
 import com.luxmap.core.database.MIGRATION_24_25
 import com.luxmap.core.database.MIGRATION_25_26
+import com.luxmap.core.database.MIGRATION_26_27
 import com.luxmap.core.sync.SyncQueueDao
+import com.luxmap.feature.survey.data.dao.LuxReadingDao
 import com.luxmap.feature.survey.data.dao.PoleGpsOrderCacheDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
@@ -46,6 +48,7 @@ object DatabaseModule {
                 MIGRATION_23_24,
                 MIGRATION_24_25,
                 MIGRATION_25_26,
+                MIGRATION_26_27,
             )
             .build()
 
@@ -80,4 +83,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePoleGpsDao(db: AppDatabase): PoleGpsDao = db.poleGpsDao()
+
+    @Provides
+    @Singleton
+    fun provideLuxReadingDao(db: AppDatabase): LuxReadingDao = db.luxReadingDao()
 }
