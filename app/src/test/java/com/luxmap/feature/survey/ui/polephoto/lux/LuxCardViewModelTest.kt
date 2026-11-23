@@ -232,4 +232,60 @@ class LuxCardViewModelTest {
 
             assertEquals(0, (vm.uiState.value as LuxCardUiState.Live).sampleCount)
         }
+
+    private fun failOnce() {
+        connection.value = BleConnectionState.Disconnected
+        connection.value = BleConnectionState.Connecting
+    }
+
+    @Test
+    fun `one failed attempt still shows connecting`() =
+        runTest {
+            val vm = viewModel()
+            vm.expand(hasPermission = true)
+
+            failOnce()
+
+            assertEquals(LuxCardUiState.Connecting, vm.uiState.value)
+        }
+
+    @Test
+    fun `two failed attempts show the meter as unreachable while retrying`() =
+        runTest {
+            val vm = viewModel()
+            vm.expand(hasPermission = true)
+
+            failOnce()
+            failOnce()
+
+            assertEquals(LuxCardUiState.Unreachable, vm.uiState.value)
+        }
+
+    @Test
+    fun `connecting after being unreachable goes back to live`() =
+        runTest {
+            val vm = viewModel()
+            vm.expand(hasPermission = true)
+            failOnce()
+            failOnce()
+
+            connection.value = BleConnectionState.Connected
+
+            assertTrue(vm.uiState.value is LuxCardUiState.Live)
+            connection.value = BleConnectionState.Disconnected
+            assertEquals(LuxCardUiState.Disconnected, vm.uiState.value)
+        }
+
+    @Test
+    fun `retry clears the unreachable state`() =
+        runTest {
+            val vm = viewModel()
+            vm.expand(hasPermission = true)
+            failOnce()
+            failOnce()
+
+            vm.retryConnect()
+
+            assertEquals(LuxCardUiState.Connecting, vm.uiState.value)
+        }
 }

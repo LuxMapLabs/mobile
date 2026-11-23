@@ -115,6 +115,7 @@ Why before the AI result: the AI result is not immediate (upload + processing, p
 | `Live(value, stable)` | big number + "lux · số đo tương đối" + stability hint + R7 posture line | "Ghi nhận" (enabled when stable) |
 | `Recorded(value, time)` | "Đã ghi 12.4 lux · 19:42" | "Đo lại" |
 | `Disconnected` | "Mất kết nối máy đo" | "Thử lại" |
+| `Unreachable` | after 2 failed attempts in a row: "Không kết nối được máy đo. Kiểm tra máy đo đã bật và ở gần điện thoại." (keeps retrying in the background, goes to `Live` as soon as it connects) | "Thử lại" |
 
 The card is collapsed by default, with the title "Đo lux (tuỳ chọn)". Expanding it starts the connection; leaving the screen disconnects. There is no background service, so no foreground-service permission is needed.
 

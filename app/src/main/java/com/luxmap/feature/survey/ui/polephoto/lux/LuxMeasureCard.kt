@@ -91,6 +91,13 @@ fun LuxMeasureCard(
                     Recorded(state = state, isEnabled = isEnabled, onRemeasure = onRemeasure)
                 LuxCardUiState.Disconnected ->
                     MessageWithAction("Mất kết nối máy đo.", "Thử lại", onRetryConnect, isEnabled)
+                LuxCardUiState.Unreachable ->
+                    MessageWithAction(
+                        "Không kết nối được máy đo. Kiểm tra máy đo đã bật và ở gần điện thoại.",
+                        "Thử lại",
+                        onRetryConnect,
+                        isEnabled,
+                    )
             }
         }
     }

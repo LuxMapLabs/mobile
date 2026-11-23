@@ -26,4 +26,6 @@ sealed interface LuxCardUiState {
     ) : LuxCardUiState
 
     data object Disconnected : LuxCardUiState
+
+    data object Unreachable : LuxCardUiState
 }

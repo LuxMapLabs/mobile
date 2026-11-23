@@ -35,6 +35,7 @@ class LuxCardViewModel
             val bluetoothOn: Boolean = true,
             val recorded: LuxCardUiState.Recorded? = null,
             val connectRequested: Boolean = false,
+            val failedAttempts: Int = 0,
         )
 
         private val window = LuxSamplingWindow(size = REQUIRED_SAMPLES)
@@ -56,8 +57,16 @@ class LuxCardViewModel
                 }
             }
             viewModelScope.launch {
+                var previous: BleConnectionState = client.connectionState.value
                 client.connectionState.collect { state ->
                     if (state != BleConnectionState.Connected) windowState.value = window.reset()
+                    when {
+                        state == BleConnectionState.Connected -> flags.update { it.copy(failedAttempts = 0) }
+                        previous == BleConnectionState.Connecting && state == BleConnectionState.Disconnected &&
+                            flags.value.connectRequested ->
+                            flags.update { it.copy(failedAttempts = it.failedAttempts + 1) }
+                    }
+                    previous = state
                 }
             }
             viewModelScope.launch {
@@ -82,6 +91,7 @@ class LuxCardViewModel
         }
 
         fun retryConnect() {
+            flags.update { it.copy(failedAttempts = 0) }
             connectIfReady()
         }
 
@@ -133,7 +143,6 @@ class LuxCardViewModel
                 paired == null -> LuxCardUiState.NotPaired
                 !current.hasPermission -> LuxCardUiState.PermissionMissing
                 !current.bluetoothOn -> LuxCardUiState.BluetoothOff
-                connection == BleConnectionState.Connecting -> LuxCardUiState.Connecting
                 connection == BleConnectionState.Connected ->
                     LuxCardUiState.Live(
                         latestLux = samples.latestLux,
@@ -141,11 +150,14 @@ class LuxCardViewModel
                         requiredSamples = REQUIRED_SAMPLES,
                         stableLux = samples.stableLux,
                     )
+                current.failedAttempts >= UNREACHABLE_AFTER_FAILURES -> LuxCardUiState.Unreachable
+                connection == BleConnectionState.Connecting -> LuxCardUiState.Connecting
                 current.connectRequested -> LuxCardUiState.Disconnected
                 else -> LuxCardUiState.Connecting
             }
 
         private companion object {
             const val REQUIRED_SAMPLES = 12
+            const val UNREACHABLE_AFTER_FAILURES = 2
         }
     }
