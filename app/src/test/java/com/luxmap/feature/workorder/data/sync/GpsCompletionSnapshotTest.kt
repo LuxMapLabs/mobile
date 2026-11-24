@@ -10,7 +10,9 @@ import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -25,6 +27,7 @@ class GpsCompletionSnapshotTest {
         """{"work_order_id":"WO-GPS","evidence_client_op_ids":["PHOTO-1"],
         "pole_locations":[{"pole_id":"P-1","lat":10.0,"lng":106.0,"accuracy_m":3.0,
         "captured_at":"2026-11-18T02:00:00Z"}]}"""
+    private val startedPayload = payload.replace("""]}""", """],"post_started":true}""")
 
     private fun prepare(status: String?) {
         coEvery { dao.completionByWorkOrderId("WO-GPS") } returns
@@ -118,15 +121,45 @@ class GpsCompletionSnapshotTest {
     fun `an accepted GPS report returned by manager is not automatically submitted again after restart`() =
         runTest {
             prepare("done")
-            coEvery { api.detail("WO-GPS") } returns
-                WorkOrderDetailDto(
-                    "WO-GPS", "GPS", "pole_gps_update", "in_progress", reportNote = "Đã đo vị trí cột",
-                    reviewNote = "Đo lại cột này",
-                    poleLocations = listOf(WorkOrderPoleLocationDto("P-1", 10.0, 106.0, 3.0, "2026-11-18T02:00:00Z")),
-                )
-            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            coEvery { api.detail("WO-GPS") } returns returnedIdenticalReport()
+            assertEquals(SyncOpResult.Done, handler.handle(startedPayload))
             coVerify(exactly = 0) { api.complete(any(), any()) }
         }
+
+    @Test
+    fun `an identical report the engineer submits again after a return is sent`() =
+        runTest {
+            prepare("done")
+            coEvery { api.detail("WO-GPS") } returns returnedIdenticalReport()
+            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            coVerify(exactly = 1) { api.complete("WO-GPS", any()) }
+            coVerify { dao.updateCompletionSubmitStatus("WO-GPS", "synced") }
+        }
+
+    @Test
+    fun `the first send is marked as started before the request so a retry knows`() =
+        runTest {
+            prepare("done")
+            val saved = slot<String>()
+            coEvery { dao.updateCompletionPayload("COMP-1", capture(saved)) } returns Unit
+            handler.handle(payload)
+            coVerifyOrder {
+                dao.updateCompletionPayload("COMP-1", any())
+                api.complete("WO-GPS", any())
+            }
+            assertTrue(saved.captured.contains("\"post_started\":true"))
+        }
+
+    private fun returnedIdenticalReport() =
+        WorkOrderDetailDto(
+            "WO-GPS",
+            "GPS",
+            "pole_gps_update",
+            "in_progress",
+            reportNote = "Đã đo vị trí cột",
+            reviewNote = "Đo lại cột này",
+            poleLocations = listOf(WorkOrderPoleLocationDto("P-1", 10.0, 106.0, 3.0, "2026-11-18T02:00:00Z")),
+        )
 
     @Test
     fun `a returned GPS order accepts a genuinely revised report`() =
