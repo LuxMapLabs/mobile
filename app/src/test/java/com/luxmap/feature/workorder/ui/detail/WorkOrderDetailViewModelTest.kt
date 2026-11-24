@@ -650,7 +650,15 @@ class WorkOrderDetailViewModelTest {
             val poleGpsRepository = mockk<PoleGpsRepository>(relaxed = true)
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             val measurement =
-                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+                PoleMeasurement(
+                    "P-1",
+                    10.0,
+                    106.0,
+                    3.0,
+                    Instant.ofEpochSecond(1),
+                    MeasurementSource.DEVICE,
+                    photoFilePath = "/p-1.jpg",
+                )
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
@@ -712,7 +720,15 @@ class WorkOrderDetailViewModelTest {
         runTest {
             val poleGpsRepository = mockk<PoleGpsRepository>()
             val measurement =
-                PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.DEVICE)
+                PoleMeasurement(
+                    "P-1",
+                    10.0,
+                    106.0,
+                    3.0,
+                    Instant.ofEpochSecond(1),
+                    MeasurementSource.DEVICE,
+                    photoFilePath = "/p-1.jpg",
+                )
             every { poleGpsRepository.observeMeasurements(WORK_ORDER_ID) } returns flowOf(listOf(measurement))
             every { poleGpsRepository.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             coEvery { poleGpsRepository.poleReferences(WORK_ORDER_ID) } returns emptyList()
@@ -748,6 +764,58 @@ class WorkOrderDetailViewModelTest {
             }
         }
 
+    private fun gpsState(
+        measurements: List<PoleMeasurement>,
+        evidence: List<LocalWorkOrderEvidenceEntity> = emptyList(),
+    ) = WorkOrderDetailUiState.Success(
+        detail = poleGpsDetail(poleIds = listOf("P-1", "P-2")),
+        localEvidence = evidence,
+        reportNote = "Đã đo xong các cột đèn",
+        poleMeasurements = measurements,
+    )
+
+    private val devicePole =
+        PoleMeasurement(
+            "P-1",
+            10.0,
+            106.0,
+            3.0,
+            Instant.ofEpochSecond(1),
+            MeasurementSource.DEVICE,
+            photoFilePath = "/p-1.jpg",
+        )
+    private val serverPole =
+        PoleMeasurement("P-2", 11.0, 106.0, 3.0, Instant.ofEpochSecond(1), MeasurementSource.SERVER)
+
+    private fun previousRoundPhoto(status: String) =
+        inspectionPhoto(WORK_ORDER_ID).copy(clientOpId = "round-1", poleId = "P-2", uploadStatus = status)
+
+    @Test
+    fun `canSubmit for pole_gps_update is false while a previously reported pole has no photo on this device`() {
+        val state = gpsState(listOf(devicePole, serverPole))
+        assertEquals(listOf("P-2"), state.polesMissingPhoto())
+        assertFalse(state.canSubmit())
+    }
+
+    @Test
+    fun `a previously reported pole counts its previous round photo`() {
+        val state = gpsState(listOf(devicePole, serverPole), listOf(previousRoundPhoto("synced")))
+        assertTrue(state.polesMissingPhoto().isEmpty())
+        assertTrue(state.canSubmit())
+    }
+
+    @Test
+    fun `a rejected photo does not count for its pole`() {
+        val state = gpsState(listOf(devicePole, serverPole), listOf(previousRoundPhoto("replaceable_error")))
+        assertEquals(listOf("P-2"), state.polesMissingPhoto())
+    }
+
+    @Test
+    fun `a pole no longer in the order never blocks submit`() {
+        val state = gpsState(listOf(devicePole, serverPole.copy(poleId = "P-9")))
+        assertTrue(state.polesMissingPhoto().isEmpty())
+    }
+
     @Test
     fun `retryAttachment delegates to the pole GPS repository with this work order and attachment id`() =
         runTest {
@@ -771,7 +839,12 @@ class WorkOrderDetailViewModelTest {
             val reports = mockk<WorkOrderCompletionRepository>(relaxed = true)
             every { gps.observeMeasurements(WORK_ORDER_ID) } returns
                 flowOf(
-                    listOf(PoleMeasurement("P-1", 10.0, 106.0, 3.0, Instant.EPOCH, MeasurementSource.DEVICE)),
+                    listOf(
+                        PoleMeasurement(
+                            "P-1", 10.0, 106.0, 3.0, Instant.EPOCH, MeasurementSource.DEVICE,
+                            photoFilePath = "/p-1.jpg",
+                        ),
+                    ),
                 )
             every { gps.observeAttachments(WORK_ORDER_ID) } returns flowOf(emptyList())
             val previous = LocalWorkOrderCompletionEntity(WORK_ORDER_ID, "Đã đo tọa độ", null, null, "OLD", "synced")

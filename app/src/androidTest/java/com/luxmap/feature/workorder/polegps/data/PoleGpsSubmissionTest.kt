@@ -8,6 +8,7 @@ import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
+import com.luxmap.feature.workorder.data.entity.LocalWorkOrderEvidenceEntity
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import io.mockk.coEvery
@@ -195,12 +196,40 @@ class PoleGpsSubmissionTest {
                     LocalPoleGpsMeasurementEntity("WO-1", "P-1", 10.0, 106.0, 3.0, at, MeasurementSourceColumn.SERVER),
                 ),
             )
+            db.workOrderCompletionDao().insertEvidence(
+                LocalWorkOrderEvidenceEntity(
+                    clientOpId = "PHOTO-ROUND-1",
+                    workOrderId = "WO-1",
+                    kind = "observation",
+                    filePath = "/round-1.jpg",
+                    capturedAt = at,
+                    lat = 10.0,
+                    lng = 106.0,
+                    uploadStatus = "synced",
+                    poleId = "P-1",
+                ),
+            )
             measure(poleId = "P-2", lat = 11.0)
             assertTrue(gps.stageCompletion(report))
             val submitted = payload()
             assertEquals(setOf("P-1", "P-2"), submitted.poleLocations!!.map { it.poleId }.toSet())
             assertEquals(10.0, submitted.poleLocations!!.single { it.poleId == "P-1" }.lat, 0.0)
             assertEquals(1, submitted.evidenceClientOpIds!!.size)
+        }
+
+    @Test
+    fun server_pole_without_any_photo_on_this_device_is_refused_and_nothing_is_queued() =
+        runTest {
+            db.poleGpsDao().insertServerMeasurements(
+                listOf(
+                    LocalPoleGpsMeasurementEntity("WO-1", "P-1", 10.0, 106.0, 3.0, at, MeasurementSourceColumn.SERVER),
+                ),
+            )
+            measure(poleId = "P-2", lat = 11.0)
+            val error = runCatching { gps.stageCompletion(report) }.exceptionOrNull()
+            assertTrue(error is IllegalStateException)
+            assertTrue(db.syncQueueDao().queuedRows().isEmpty())
+            assertNull(db.workOrderCompletionDao().completionByWorkOrderId("WO-1"))
         }
 
     @Test

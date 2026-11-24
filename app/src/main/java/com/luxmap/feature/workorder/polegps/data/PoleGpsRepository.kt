@@ -214,6 +214,11 @@ class PoleGpsRepository
                 ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
             }
             val evidence = completionDao.evidenceForCompletion(workOrderId, "observation")
+            measurements.filter { it.source == MeasurementSourceColumn.SERVER }.forEach { measurement ->
+                check(evidence.any { it.poleId == measurement.poleId }) {
+                    "Cột ${measurement.poleId} chưa có ảnh. Hãy chụp ảnh cột trước khi nộp."
+                }
+            }
             val operations = mutableListOf<SyncQueueEntity>()
             val ids =
                 measurements.filter { it.source == MeasurementSourceColumn.DEVICE }.map { measurement ->
