@@ -14,9 +14,13 @@ import io.mockk.coVerifyOrder
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import retrofit2.HttpException
+import retrofit2.Response
 
 class GpsCompletionSnapshotTest {
     private val api = mockk<WorkOrdersApi>(relaxed = true)
@@ -148,6 +152,45 @@ class GpsCompletionSnapshotTest {
                 api.complete("WO-GPS", any())
             }
             assertTrue(saved.captured.contains("\"post_started\":true"))
+        }
+
+    private fun rejectWith(body: String) {
+        coEvery { api.complete("WO-GPS", any()) } throws
+            HttpException(Response.error<Any>(409, body.toResponseBody("application/json".toMediaType())))
+    }
+
+    @Test
+    fun `a server refusal for missing pole photos marks those poles and reopens the report`() =
+        runTest {
+            prepare("done")
+            rejectWith(
+                """{"error":{"code":"POLE_EVIDENCE_REQUIRED","message":"Thiếu ảnh",
+                "details":{"work_order_id":"WO-GPS","pole_ids":["P-1"]}}}""",
+            )
+            val result = handler.handle(payload)
+            assertEquals(SyncOpResult.Failed("POLE_EVIDENCE_REQUIRED"), result)
+            coVerify { gps.markPhotosMissingOnServer("WO-GPS", listOf("P-1")) }
+            coVerify { dao.updateCompletionSubmitStatus("WO-GPS", "failed") }
+            coVerify(exactly = 0) { dao.updateCompletionSubmitStatus("WO-GPS", "conflict") }
+        }
+
+    @Test
+    fun `a missing pole photo refusal without details still reopens the report`() =
+        runTest {
+            prepare("done")
+            rejectWith("""{"error":{"code":"POLE_EVIDENCE_REQUIRED","message":"Thiếu ảnh"}}""")
+            assertEquals(SyncOpResult.Failed("POLE_EVIDENCE_REQUIRED"), handler.handle(payload))
+            coVerify { gps.markPhotosMissingOnServer("WO-GPS", emptyList()) }
+            coVerify { dao.updateCompletionSubmitStatus("WO-GPS", "failed") }
+        }
+
+    @Test
+    fun `another 409 keeps its own code as a conflict`() =
+        runTest {
+            prepare("done")
+            rejectWith("""{"error":{"code":"WORK_ORDER_NOT_IN_PROGRESS","message":"x"}}""")
+            assertEquals(SyncOpResult.Conflict("WORK_ORDER_NOT_IN_PROGRESS"), handler.handle(payload))
+            coVerify { dao.updateCompletionSubmitStatus("WO-GPS", "conflict") }
         }
 
     private fun returnedIdenticalReport() =

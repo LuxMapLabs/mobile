@@ -140,12 +140,18 @@ internal fun workOrderCtaState(
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.POLE_GPS_UPDATE -> {
             val measured = state.poleMeasurements.map { it.poleId }.toSet().size
             val missing = state.poleReferences.size - measured
+            val missingPhotos = state.polesMissingPhoto().size
             WorkOrderCtaState(
                 text = "Nộp báo cáo",
                 icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint = submitLock?.first ?: if (missing > 0) "Còn $missing cột chưa chụp" else null,
+                hint =
+                    submitLock?.first ?: when {
+                        missingPhotos > 0 -> "Còn $missingPhotos cột thiếu ảnh"
+                        missing > 0 -> "Còn $missing cột chưa chụp"
+                        else -> null
+                    },
                 hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 requiresConfirmation = true,
             )

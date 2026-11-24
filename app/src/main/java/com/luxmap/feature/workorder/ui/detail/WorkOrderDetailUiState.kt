@@ -50,8 +50,26 @@ fun WorkOrderDetailUiState.Success.canSubmit(): Boolean {
             noteValid &&
                 poleMeasurements.any {
                     it.source == MeasurementSource.DEVICE
-                }
+                } &&
+                polesMissingPhoto().isEmpty()
         else -> false
+    }
+}
+
+private val unusablePolePhotoStatuses = setOf("replaceable_error", "failed", "conflict")
+
+fun WorkOrderDetailUiState.Success.polesMissingPhoto(): List<String> =
+    poleMeasurements
+        .filter { it.poleId in detail.poleIds && !hasPolePhoto(it) }
+        .map { it.poleId }
+        .distinct()
+
+private fun WorkOrderDetailUiState.Success.hasPolePhoto(measurement: PoleMeasurement): Boolean {
+    if (measurement.photoMissingOnServer) return false
+    if (measurement.source == MeasurementSource.DEVICE && measurement.photoFilePath != null) return true
+    return localEvidence.any {
+        it.kind == "observation" && it.poleId == measurement.poleId &&
+            it.uploadStatus !in unusablePolePhotoStatuses
     }
 }
 

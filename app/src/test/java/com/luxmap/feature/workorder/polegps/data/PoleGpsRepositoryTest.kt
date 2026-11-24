@@ -85,6 +85,20 @@ class PoleGpsRepositoryTest {
         }
 
     @Test
+    fun `poles the server reported without a photo are flagged and exposed as missing`() =
+        runTest {
+            repository.markPhotosMissingOnServer("WO-1", listOf("P-1", "P-2"))
+            coVerify { dao.updateEvidenceUploadStatus("WO-1", "P-1", PHOTO_MISSING_ON_SERVER) }
+            coVerify { dao.updateEvidenceUploadStatus("WO-1", "P-2", PHOTO_MISSING_ON_SERVER) }
+            coEvery { dao.measurements("WO-1") } returns
+                listOf(
+                    row("P-1", MeasurementSourceColumn.DEVICE).copy(evidenceUploadStatus = PHOTO_MISSING_ON_SERVER),
+                    row("P-2", MeasurementSourceColumn.DEVICE).copy(evidenceUploadStatus = "queued"),
+                )
+            assertEquals(listOf(true, false), repository.allMeasurements("WO-1").map { it.photoMissingOnServer })
+        }
+
+    @Test
     fun `observed attachments expose a typed status`() =
         runTest {
             val entity =

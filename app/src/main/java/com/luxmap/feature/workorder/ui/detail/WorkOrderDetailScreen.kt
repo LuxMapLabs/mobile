@@ -606,6 +606,7 @@ private fun WorkOrderDetailContent(
                     attachments = state.poleAttachments,
                     references = state.poleReferences,
                     measurements = state.poleMeasurements,
+                    polesMissingPhoto = state.polesMissingPhoto().toSet(),
                     canCapture = canComplete && !isFormLocked,
                     showReport = canComplete,
                     reportNote = state.reportNote,

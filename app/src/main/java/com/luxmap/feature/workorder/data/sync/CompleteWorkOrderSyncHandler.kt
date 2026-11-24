@@ -1,7 +1,8 @@
 package com.luxmap.feature.workorder.data.sync
 
+import com.luxmap.core.network.ApiErrorBody
 import com.luxmap.core.network.WorkOrdersApi
-import com.luxmap.core.network.errorCodeOrNull
+import com.luxmap.core.network.errorBodyOrNull
 import com.luxmap.core.sync.SyncOpHandler
 import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
@@ -14,6 +15,10 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import retrofit2.HttpException
 import java.io.IOException
 import java.time.OffsetDateTime
@@ -119,15 +124,21 @@ class CompleteWorkOrderSyncHandler
                 dao.updateCompletionSubmitStatus(payload.workOrderId, "synced")
                 SyncOpResult.Done
             } catch (e: HttpException) {
+                val error = e.errorBodyOrNull()
                 when {
-                    e.code() == 409 && e.errorCodeOrNull() == "AFTER_EVIDENCE_REQUIRED" -> SyncOpResult.RetryLater
+                    e.code() == 409 && error?.code == "AFTER_EVIDENCE_REQUIRED" -> SyncOpResult.RetryLater
+                    e.code() == 409 && error?.code == POLE_EVIDENCE_REQUIRED -> {
+                        poleGpsRepository.markPhotosMissingOnServer(payload.workOrderId, error.poleIds())
+                        dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                        SyncOpResult.Failed(POLE_EVIDENCE_REQUIRED)
+                    }
                     e.code() == 409 -> {
                         dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
-                        SyncOpResult.Conflict(e.errorCodeOrNull() ?: "conflict")
+                        SyncOpResult.Conflict(error?.code ?: "conflict")
                     }
                     e.code() == 400 || e.code() == 404 -> {
                         dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
-                        SyncOpResult.Failed(e.errorCodeOrNull() ?: "HTTP ${e.code()}")
+                        SyncOpResult.Failed(error?.code ?: "HTTP ${e.code()}")
                     }
                     else -> SyncOpResult.RetryLater
                 }
@@ -140,6 +151,13 @@ class CompleteWorkOrderSyncHandler
             val terminalReviewErrors = setOf("failed", "conflict")
         }
     }
+
+private const val POLE_EVIDENCE_REQUIRED = "POLE_EVIDENCE_REQUIRED"
+
+private fun ApiErrorBody.poleIds(): List<String> =
+    ((details as? JsonObject)?.get("pole_ids") as? JsonArray)
+        ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        .orEmpty()
 
 private fun WorkOrderDetailDto.matchesGpsReport(
     completion: LocalWorkOrderCompletionEntity,

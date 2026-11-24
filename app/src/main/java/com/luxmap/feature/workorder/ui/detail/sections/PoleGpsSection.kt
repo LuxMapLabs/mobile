@@ -63,6 +63,7 @@ internal fun PoleGpsSection(
     measurements: List<PoleMeasurement>,
     canCapture: Boolean,
     showReport: Boolean,
+    polesMissingPhoto: Set<String> = emptySet(),
     reportNote: String,
     locked: Boolean,
     onOpenPdf: (String) -> Unit,
@@ -134,6 +135,7 @@ internal fun PoleGpsSection(
                     PoleGpsItem(
                         reference = reference,
                         measurement = measurement,
+                        missingPhoto = reference.poleId in polesMissingPhoto,
                         canCapture = canCapture,
                         onOpenMap = {
                             when {
@@ -208,6 +210,7 @@ private fun PdfAttachmentItem(
 private fun PoleGpsItem(
     reference: PoleReference,
     measurement: PoleMeasurement?,
+    missingPhoto: Boolean,
     canCapture: Boolean,
     onOpenMap: () -> Unit,
     onMeasure: () -> Unit,
@@ -229,12 +232,15 @@ private fun PoleGpsItem(
             showChevron = false,
             trailing = {
                 if (canCapture) {
-                    if (measurement == null) {
+                    if (measurement == null || missingPhoto) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                         ) {
-                            StatusBadge(text = "Chưa chụp", colors = WorkOrderStatus.OPEN.badgeColors())
+                            StatusBadge(
+                                text = if (measurement == null) "Chưa chụp" else "Thiếu ảnh",
+                                colors = WorkOrderStatus.OPEN.badgeColors(),
+                            )
                             FilledTonalButton(
                                 onClick = onMeasure,
                                 contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
@@ -278,12 +284,13 @@ private fun PoleGpsItem(
                 } else {
                     val badgeText =
                         when {
+                            measurement != null && missingPhoto -> "Thiếu ảnh"
                             measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
                             measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
                             else -> "Chưa bắt đầu"
                         }
                     val badgeColors =
-                        if (measurement != null) {
+                        if (measurement != null && !missingPhoto) {
                             WorkOrderStatus.VERIFIED.badgeColors()
                         } else {
                             WorkOrderStatus.OPEN.badgeColors()
