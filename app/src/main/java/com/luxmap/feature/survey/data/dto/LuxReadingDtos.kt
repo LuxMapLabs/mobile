@@ -11,6 +11,7 @@ data class CreateLuxReadingRequestDto(
     @SerialName("lux_value") val luxValue: Double,
     @SerialName("data_source") val dataSource: String,
     @SerialName("meter_model") val meterModel: String,
+    @SerialName("photo_id") val photoId: String? = null,
 )
 
 @Serializable
@@ -22,4 +23,5 @@ data class LuxReadingDto(
     @SerialName("lux_value") val luxValue: Double,
     @SerialName("data_source") val dataSource: String,
     @SerialName("meter_model") val meterModel: String? = null,
+    @SerialName("photo_id") val photoId: String? = null,
 )

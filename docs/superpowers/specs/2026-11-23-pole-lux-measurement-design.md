@@ -39,6 +39,8 @@ Known contract mismatch (to report to BE, not blocking): section 5.7 describes `
 
 ### 2.1 Backend change requested — link a lux reading to a pole photo
 
+**Shipped by BE 2026-11-24** (`luxmap_backend` PR #293, contract v1.23, drift LUX-PHOTO-1…5): field `photo_id` (optional, server `PPH-…` id), errors `404 POLE_PHOTO_NOT_FOUND`, `400 PHOTO_POLE_MISMATCH`, `409 PHOTO_LUX_ALREADY_LINKED` (one reading per photo). Responses echo `photo_id`; `PolePhotoItem` adds `lux_id`, `lux_value`, `lux_measured_at`. The text below is the original proposal, kept for history.
+
 Checked in source: `CreateLuxReadingRequest` (`LuxReadingContracts.cs`) has **no** photo field today, and an unknown body key is silently ignored, so mobile must not send one before BE adds it. The field name below is a **proposal**; mobile codes against whatever name BE confirms (contract version bump + `docs/contract-drift.md` entry).
 
 Proposal for BE:
@@ -152,13 +154,13 @@ The sync status comes from the `sync_queue` row, joined like the pole-photo rows
 
 ### 7.3 Sync
 - `UploadLuxReadingSyncHandler`, registered in `SyncModule`'s `Set<SyncOpHandler>`, same pattern as `UploadPolePhotoSyncHandler`.
-- **Dependency on the photo upload:** the server `photo_id` exists only after the photo/video upload succeeds. The lux op is enqueued with `dependsOnClientOpId` = the photo/video op's `client_op_id`, so it runs after it. At send time the handler reads `serverPhotoId` from `local_pole_photo` and puts it in the body.
+- **Dependency on the photo upload:** the server `photo_id` exists only after the photo/video upload succeeds. The lux op does **not** use `dependsOnClientOpId`, because `SyncQueueProcessor` fails every dependent op when its dependency fails, which would lose the reading. Instead the handler checks the photo itself: `serverPhotoId` set → send it as `photo_id`; photo op still `queued`/`syncing` → `WaitingForDependency`; photo op `failed`/`conflict`, or local photo row gone → send without `photo_id`.
 - If the photo/video op ends `failed` (permanent), the lux reading is **still sent, without `photo_id`**, so the measurement is not lost. The server then has only pole + time for that reading.
-- Before BE ships section 2.1, the handler sends no `photo_id` at all (one switch in the DTO mapping, removed when BE confirms).
+- If the server rejects the link (`POLE_PHOTO_NOT_FOUND`, `PHOTO_POLE_MISMATCH`, `PHOTO_LUX_ALREADY_LINKED`), the handler resends once without `photo_id`, so the reading is kept.
 - 201 / 200: save `server_lux_id`, then `done`.
 - 404 `POLE_NOT_FOUND`, 400: permanent `failed`.
 - Network errors and 5xx: retry with backoff.
-- No 409 case exists on this endpoint.
+- 409 only comes from `PHOTO_LUX_ALREADY_LINKED` (handled above); any other 409 is permanent `failed`.
 - New `LuxReadingsApi` (Retrofit) + `CreateLuxReadingRequestDto` / `LuxReadingDto` with exact snake_case field names.
 
 ### 7.4 Bluetooth
@@ -181,7 +183,7 @@ No new library: Android Bluetooth is a platform API.
 3. **Pairing row** in Profile.
 4. **Lux card** in the live photo/video preview step (not for gallery picks) + tests.
 5. **Display:** pole row line + result screen row + tests.
-6. **Send `photo_id`** — after BE confirms the field from section 2.1: DTO field, handler reads `serverPhotoId`, tests. Blocked on BE; PRs 1–5 do not wait for it.
+6. **Send `photo_id`** — done 2026-11-24 after BE shipped section 2.1: DTO field, handler reads `serverPhotoId`, tests.
 
 ## 10. Out of scope
 - Manual lux entry (old F07) and `calibration_rig` UI.
