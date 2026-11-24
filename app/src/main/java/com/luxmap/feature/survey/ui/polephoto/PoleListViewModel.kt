@@ -186,6 +186,7 @@ class PoleListViewModel
 
         private fun load() {
             viewModelScope.launch {
+                completionRepository.releaseReturnedCompletions(listOf(workOrderId))
                 poleListRepository.poles(workOrderId).fold(
                     onSuccess = { result ->
                         val poles = result.poles
