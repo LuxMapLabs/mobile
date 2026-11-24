@@ -68,6 +68,16 @@ class SurveyHubViewModel
             load()
         }
 
+        private var firstResumeSeen = false
+
+        fun onResumed() {
+            if (!firstResumeSeen) {
+                firstResumeSeen = true
+                return
+            }
+            load()
+        }
+
         // No reachable "Bat dau" for a survey work order otherwise: Home deliberately hides
         // survey orders (see HomeScreen.kt). Reuses the same generic POST /work-orders/{id}/start
         // WorkOrderDetailScreen (F09) already uses.

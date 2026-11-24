@@ -65,15 +65,14 @@ fun SurveyHubRoute(
     // The Hub's own ViewModel survives navigating into another screen (pole-photo list,
     // F03 readiness check) and back - its data would otherwise go stale after an action there
     // changes a route's status (e.g. "Bat dau tuyen", or "Hoan tat" completing a survey).
-    // Refetch on every ON_RESUME after the first one, same pattern as HomeScreen.kt.
+    // Refetch on every ON_RESUME after the first one. The ViewModel counts the resumes: this
+    // composable is disposed while another screen is on top, so a local flag would reset and swallow
+    // the refetch on return.
     val lifecycleOwner = LocalLifecycleOwner.current
-    var isFirstResume by remember { mutableStateOf(true) }
     DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    if (isFirstResume) isFirstResume = false else viewModel.refresh()
-                }
+                if (event == Lifecycle.Event.ON_RESUME) viewModel.onResumed()
             }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

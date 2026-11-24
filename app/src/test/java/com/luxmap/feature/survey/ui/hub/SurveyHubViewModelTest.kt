@@ -196,6 +196,33 @@ class SurveyHubViewModelTest {
         }
 
     @Test
+    fun `the first resume does not reload but every later resume does`() =
+        runTest {
+            val returnedRoute = route.copy(woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returnsMany
+                listOf(
+                    flowOf(AssignedRoutesResult(listOf(route), isStale = false)),
+                    flowOf(AssignedRoutesResult(listOf(returnedRoute), isStale = false)),
+                )
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
+            val viewModel = SurveyHubViewModel(repository, completionRepository)
+
+            viewModel.uiState.test {
+                awaitItem() // Loading
+                awaitItem() // Success (assigned)
+                viewModel.onResumed()
+                expectNoEvents()
+                viewModel.onResumed()
+                val success = awaitItem() as SurveyHubUiState.Success
+                assertEquals(listOf(returnedRoute), success.assignedRoutes)
+            }
+        }
+
+    @Test
     fun `onStartRoute calls the API then reloads to pick up the new status`() =
         runTest {
             val startedRoute = route.copy(woStatus = "in_progress")
