@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
@@ -143,13 +144,19 @@ class SurveyHubViewModel
                 emit(Result.failure(error))
             }
 
+        private suspend fun releaseReturned(result: AssignedRoutesResult) {
+            if (result.isStale) return
+            val inProgress = result.routes.filter { it.woStatus == "in_progress" }.map { it.workOrderId }
+            if (inProgress.isNotEmpty()) completionRepository.releaseReturnedCompletions(inProgress)
+        }
+
         private fun load() {
             loadJob?.cancel()
             loadJob =
                 viewModelScope.launch {
                     combine(
-                        repository.observeAssignedRoutes().isolated(),
-                        repository.observeAssignedPoleGpsOrders().isolated(),
+                        repository.observeAssignedRoutes().onEach { releaseReturned(it) }.isolated(),
+                        repository.observeAssignedPoleGpsOrders().onEach { releaseReturned(it) }.isolated(),
                         completionRepository.observeCompletedWorkOrderIds(),
                         completionRepository.observeCompletionSyncStates(),
                     ) { surveySource, gpsSource, completedIds, syncStates ->

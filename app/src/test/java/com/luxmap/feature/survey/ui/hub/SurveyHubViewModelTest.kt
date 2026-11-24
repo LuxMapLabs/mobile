@@ -6,8 +6,11 @@ import com.luxmap.feature.survey.data.AssignedSurveyRoute
 import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.CompletionSyncState
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
+import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +66,7 @@ class SurveyHubViewModelTest {
                 flowOf(AssignedRoutesResult(poleGpsOrders, false))
             }
         val completionRepository = mockk<WorkOrderCompletionRepository>()
+        coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
         every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(locallyCompletedWorkOrderIds)
         every { completionRepository.observeCompletionSyncStates() } returns flowOf(syncStates)
         return SurveyHubViewModel(repository, completionRepository)
@@ -156,6 +160,7 @@ class SurveyHubViewModelTest {
                 )
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -182,6 +187,7 @@ class SurveyHubViewModelTest {
                 )
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -235,6 +241,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -265,6 +272,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.success(Unit)
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -287,6 +295,7 @@ class SurveyHubViewModelTest {
             every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), false))
             coEvery { repository.startRoute("WO-1") } returns Result.failure(IllegalStateException("conflict"))
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -391,6 +400,7 @@ class SurveyHubViewModelTest {
             coEvery { repository.startRoute("WO-1") } coAnswers { started.await() }
             val syncStates = MutableStateFlow<Map<String, CompletionSyncState>>(emptyMap())
             val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
             every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
             every { completionRepository.observeCompletionSyncStates() } returns syncStates
             val viewModel = SurveyHubViewModel(repository, completionRepository)
@@ -421,5 +431,52 @@ class SurveyHubViewModelTest {
                     assertEquals(SurveyHubUiState.Loading, awaitItem())
                     assertEquals(SurveyHubUiState.Empty, awaitItem())
                 }
+        }
+
+    @Test
+    fun `releases local completions of in progress orders after a fresh fetch`() =
+        runTest {
+            val inProgress = route.copy(workOrderId = "WO-2", woStatus = "in_progress")
+            val gpsInProgress = route.copy(workOrderId = "WO-3", woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(listOf(route, inProgress), false))
+            every { repository.observeAssignedPoleGpsOrders() } returns
+                flowOf(AssignedRoutesResult(listOf(gpsInProgress), false))
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
+
+            SurveyHubViewModel(repository, completionRepository).uiState.test {
+                awaitItem()
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            coVerify { completionRepository.releaseReturnedCompletions(listOf("WO-2")) }
+            coVerify { completionRepository.releaseReturnedCompletions(listOf("WO-3")) }
+        }
+
+    @Test
+    fun `does not release local completions from a stale cache`() =
+        runTest {
+            val inProgress = route.copy(workOrderId = "WO-2", woStatus = "in_progress")
+            val repository = mockk<SurveyRepository>()
+            every { repository.observeAssignedRoutes() } returns
+                flowOf(AssignedRoutesResult(listOf(inProgress), true))
+            every { repository.observeAssignedPoleGpsOrders() } returns flowOf(AssignedRoutesResult(emptyList(), true))
+            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            coEvery { completionRepository.releaseReturnedCompletions(any()) } just Runs
+            every { completionRepository.observeCompletedWorkOrderIds() } returns flowOf(emptySet())
+            every { completionRepository.observeCompletionSyncStates() } returns flowOf(emptyMap())
+
+            SurveyHubViewModel(repository, completionRepository).uiState.test {
+                awaitItem()
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            coVerify(exactly = 0) { completionRepository.releaseReturnedCompletions(any()) }
         }
 }

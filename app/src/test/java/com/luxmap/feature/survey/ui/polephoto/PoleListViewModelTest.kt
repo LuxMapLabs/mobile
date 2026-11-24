@@ -15,6 +15,7 @@ import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +75,40 @@ class PoleListViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun `releases a completion the manager returned before showing the poles`() =
+        runTest {
+            val pole = PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(listOf(pole), isStale = false))
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
+            every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
+                )
+
+            vm.uiState.test {
+                assertEquals(PoleListUiState.Loading, awaitItem())
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            coVerifyOrder {
+                completionRepository.releaseReturnedCompletions(listOf(WORK_ORDER_ID))
+                poleListRepository.poles(WORK_ORDER_ID)
+            }
+        }
 
     @Test
     fun `emits Loading then Success with the sync status of each pole's latest photo`() =
@@ -853,7 +888,7 @@ class PoleListViewModelTest {
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
-            val completionRepository = mockk<WorkOrderCompletionRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(
                     PoleListResult(
@@ -893,7 +928,7 @@ class PoleListViewModelTest {
     private fun listViewModel(vararg readings: LuxReading): PoleListViewModel {
         val poleListRepository = mockk<PoleListRepository>()
         val polePhotoRepository = mockk<PolePhotoRepository>()
-        val completionRepository = mockk<WorkOrderCompletionRepository>()
+        val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
         coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
             Result.success(
                 PoleListResult(
