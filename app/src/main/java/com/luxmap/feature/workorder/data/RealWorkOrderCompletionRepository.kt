@@ -1,5 +1,6 @@
 package com.luxmap.feature.workorder.data
 
+import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
@@ -9,14 +10,18 @@ import com.luxmap.feature.workorder.data.sync.CompletionSyncPayload
 import com.luxmap.feature.workorder.data.sync.EvidenceSyncPayload
 import com.luxmap.feature.workorder.data.sync.FaultOutcome
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import retrofit2.HttpException
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -30,6 +35,7 @@ class RealWorkOrderCompletionRepository
         private val syncQueueManager: SyncQueueManager,
         private val syncQueueDao: SyncQueueDao,
         private val poleGpsRepository: PoleGpsRepository,
+        private val workOrdersApi: WorkOrdersApi,
     ) : WorkOrderCompletionRepository {
         override fun observeEvidence(workOrderId: String): Flow<LocalWorkOrderEvidenceEntity?> =
             dao.observeLatestEvidence(workOrderId)
@@ -81,6 +87,28 @@ class RealWorkOrderCompletionRepository
             previousClientOpId: String,
         ) {
             dao.deleteSyncedCompletion(workOrderId, previousClientOpId)
+        }
+
+        override suspend fun releaseReturnedCompletions(workOrderIds: Collection<String>) {
+            for (workOrderId in workOrderIds) {
+                val completion =
+                    dao.completionByWorkOrderId(workOrderId)?.takeIf { it.submitStatus == "synced" } ?: continue
+                val remote =
+                    try {
+                        workOrdersApi.detail(workOrderId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: IOException) {
+                        continue
+                    } catch (_: HttpException) {
+                        continue
+                    } catch (_: SerializationException) {
+                        continue
+                    }
+                if (remote.woStatus == "in_progress" && !remote.reviewNote.isNullOrBlank()) {
+                    dao.deleteSyncedCompletion(workOrderId, completion.clientOpId)
+                }
+            }
         }
 
         override suspend fun retryEvidenceSubmission(workOrderId: String): Boolean {

@@ -35,6 +35,8 @@ interface WorkOrderCompletionRepository {
         previousClientOpId: String,
     )
 
+    suspend fun releaseReturnedCompletions(workOrderIds: Collection<String>)
+
     suspend fun retryEvidenceSubmission(workOrderId: String): Boolean
 
     suspend fun reopenEvidenceSubmission(workOrderId: String): Boolean
