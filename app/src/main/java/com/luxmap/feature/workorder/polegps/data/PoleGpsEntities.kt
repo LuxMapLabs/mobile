@@ -11,6 +11,8 @@ object AttachmentStatusColumn {
     const val FAILED = "failed"
 }
 
+const val PHOTO_MISSING_ON_SERVER = "missing_on_server"
+
 object MeasurementSourceColumn {
     const val DEVICE = "device"
     const val SERVER = "server"

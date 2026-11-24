@@ -811,6 +811,17 @@ class WorkOrderDetailViewModelTest {
     }
 
     @Test
+    fun `a pole the server reported without a photo blocks submit even with a local photo`() {
+        val state =
+            gpsState(
+                listOf(devicePole.copy(photoMissingOnServer = true), serverPole),
+                listOf(previousRoundPhoto("synced"), previousRoundPhoto("synced").copy(poleId = "P-1")),
+            )
+        assertEquals(listOf("P-1"), state.polesMissingPhoto())
+        assertFalse(state.canSubmit())
+    }
+
+    @Test
     fun `a pole no longer in the order never blocks submit`() {
         val state = gpsState(listOf(devicePole, serverPole.copy(poleId = "P-9")))
         assertTrue(state.polesMissingPhoto().isEmpty())

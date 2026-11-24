@@ -39,6 +39,7 @@ data class PoleMeasurement(
     val source: MeasurementSource,
     val photoFilePath: String? = null,
     val corridor: CorridorCheck = CorridorCheck.Unknown,
+    val photoMissingOnServer: Boolean = false,
 )
 
 data class PoleGpsAttachment(
@@ -67,6 +68,7 @@ private fun LocalPoleGpsMeasurementEntity.toDomain(geomWkt: String?) =
         source = if (source == MeasurementSourceColumn.DEVICE) MeasurementSource.DEVICE else MeasurementSource.SERVER,
         photoFilePath = photoFilePath,
         corridor = corridorCheck(geomWkt, lat, lng),
+        photoMissingOnServer = evidenceUploadStatus == PHOTO_MISSING_ON_SERVER,
     )
 
 private fun LocalWorkOrderAttachmentEntity.toDomain() =
@@ -213,6 +215,9 @@ class PoleGpsRepository
                         measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
                 ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
             }
+            measurements.firstOrNull { it.evidenceUploadStatus == PHOTO_MISSING_ON_SERVER }?.let {
+                error("Máy chủ chưa có ảnh của cột ${it.poleId}. Hãy chụp lại cột này.")
+            }
             val evidence = completionDao.evidenceForCompletion(workOrderId, "observation")
             measurements.filter { it.source == MeasurementSourceColumn.SERVER }.forEach { measurement ->
                 check(evidence.any { it.poleId == measurement.poleId }) {
@@ -268,6 +273,13 @@ class PoleGpsRepository
                         PoleLocationRequestDto(it.poleId, it.lat, it.lng, it.accuracyM, it.capturedAt.toString())
                     },
             )
+        }
+
+        suspend fun markPhotosMissingOnServer(
+            workOrderId: String,
+            poleIds: List<String>,
+        ) {
+            poleIds.forEach { dao.updateEvidenceUploadStatus(workOrderId, it, PHOTO_MISSING_ON_SERVER) }
         }
 
         fun observeAttachments(workOrderId: String): Flow<List<PoleGpsAttachment>> =

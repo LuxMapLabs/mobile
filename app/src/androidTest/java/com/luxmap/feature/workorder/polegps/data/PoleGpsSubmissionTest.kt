@@ -233,6 +233,18 @@ class PoleGpsSubmissionTest {
         }
 
     @Test
+    fun pole_the_server_reported_without_a_photo_must_be_retaken_before_resubmitting() =
+        runTest {
+            measure()
+            gps.markPhotosMissingOnServer("WO-1", listOf("P-1"))
+            assertTrue(runCatching { gps.stageCompletion(report) }.exceptionOrNull() is IllegalStateException)
+            assertNull(db.workOrderCompletionDao().completionByWorkOrderId("WO-1"))
+            measure(lat = 10.5)
+            assertTrue(gps.stageCompletion(report))
+            assertEquals(10.5, payload().poleLocations!!.single().lat, 0.0)
+        }
+
+    @Test
     fun remeasured_server_pole_is_sent_once_with_its_new_coordinates() =
         runTest {
             db.poleGpsDao().insertServerMeasurements(

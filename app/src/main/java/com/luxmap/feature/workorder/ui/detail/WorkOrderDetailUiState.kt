@@ -64,12 +64,14 @@ fun WorkOrderDetailUiState.Success.polesMissingPhoto(): List<String> =
         .map { it.poleId }
         .distinct()
 
-private fun WorkOrderDetailUiState.Success.hasPolePhoto(measurement: PoleMeasurement): Boolean =
-    (measurement.source == MeasurementSource.DEVICE && measurement.photoFilePath != null) ||
-        localEvidence.any {
-            it.kind == "observation" && it.poleId == measurement.poleId &&
-                it.uploadStatus !in unusablePolePhotoStatuses
-        }
+private fun WorkOrderDetailUiState.Success.hasPolePhoto(measurement: PoleMeasurement): Boolean {
+    if (measurement.photoMissingOnServer) return false
+    if (measurement.source == MeasurementSource.DEVICE && measurement.photoFilePath != null) return true
+    return localEvidence.any {
+        it.kind == "observation" && it.poleId == measurement.poleId &&
+            it.uploadStatus !in unusablePolePhotoStatuses
+    }
+}
 
 internal fun WorkOrderDetailUiState.Success.hasInspectionPhoto(): Boolean =
     localEvidence.any { it.kind == "observation" }

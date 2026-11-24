@@ -284,12 +284,13 @@ private fun PoleGpsItem(
                 } else {
                     val badgeText =
                         when {
+                            measurement != null && missingPhoto -> "Thiếu ảnh"
                             measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
                             measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
                             else -> "Chưa bắt đầu"
                         }
                     val badgeColors =
-                        if (measurement != null) {
+                        if (measurement != null && !missingPhoto) {
                             WorkOrderStatus.VERIFIED.badgeColors()
                         } else {
                             WorkOrderStatus.OPEN.badgeColors()
