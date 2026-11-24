@@ -12,6 +12,7 @@ import com.luxmap.feature.workorder.data.dto.WorkOrderDetailDto
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import com.luxmap.feature.workorder.polegps.data.PoleGpsRepository
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
 import java.io.IOException
@@ -89,7 +90,8 @@ class CompleteWorkOrderSyncHandler
                     }
                     val accepted = remote.woStatus in setOf("done", "verified")
                     val returned = remote.woStatus == "in_progress" && !remote.reviewNote.isNullOrBlank()
-                    if ((accepted || returned) && remote.matchesGpsReport(completion, payload.poleLocations!!)) {
+                    val mayHaveBeenSent = accepted || (returned && payload.postStarted)
+                    if (mayHaveBeenSent && remote.matchesGpsReport(completion, payload.poleLocations!!)) {
                         // A manager may have returned an accepted report while the app was interrupted.
                         // Do not undo that decision by automatically POSTing the old report again.
                         dao.updateCompletionSubmitStatus(payload.workOrderId, "synced")
@@ -99,6 +101,10 @@ class CompleteWorkOrderSyncHandler
                         dao.updateCompletionSubmitStatus(payload.workOrderId, "conflict")
                         return SyncOpResult.Conflict("Máy chủ đã nhận một báo cáo GPS khác. Cần đối chiếu.")
                     }
+                }
+                if (payload.poleLocations != null && !payload.postStarted) {
+                    payload = payload.copy(postStarted = true)
+                    dao.updateCompletionPayload(completion.clientOpId, Json.encodeToString(payload))
                 }
                 api.complete(
                     id = payload.workOrderId,

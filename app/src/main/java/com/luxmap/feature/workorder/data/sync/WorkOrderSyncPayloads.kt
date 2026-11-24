@@ -21,4 +21,5 @@ data class CompletionSyncPayload(
     @SerialName("evidence_client_op_ids") val evidenceClientOpIds: List<String>? = null,
     @SerialName("pole_review_client_op_ids") val poleReviewClientOpIds: List<String>? = null,
     @SerialName("pole_locations") val poleLocations: List<PoleLocationRequestDto>? = null,
+    @SerialName("post_started") val postStarted: Boolean = false,
 )
