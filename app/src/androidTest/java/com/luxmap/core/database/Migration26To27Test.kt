@@ -31,7 +31,7 @@ class Migration26To27Test {
             }
             val after =
                 Room.databaseBuilder(context, AppDatabase::class.java, name)
-                    .addMigrations(MIGRATION_26_27)
+                    .addMigrations(MIGRATION_26_27, MIGRATION_27_28)
                     .build()
             assertEquals("SEG-1", after.poleGpsDao().route("W")!!.segmentId)
             val dao = after.luxReadingDao()
