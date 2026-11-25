@@ -84,14 +84,6 @@ private fun DrawScope.drawHeroArt(
             lineTo(armEnd, armY)
         }
     drawPath(pole, brand.onHeroVariant, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-    val cone =
-        Path().apply {
-            moveTo(armEnd - 2.dp.toPx(), armY + 5.dp.toPx())
-            lineTo(armEnd - 18.dp.toPx(), armY + 34.dp.toPx())
-            lineTo(armEnd + 14.dp.toPx(), armY + 34.dp.toPx())
-            close()
-        }
-    drawPath(cone, brand.lumen.copy(alpha = 0.45f))
     drawRoundRect(
         color = brand.lumen,
         topLeft = Offset(armEnd - 8.dp.toPx(), armY - 3.dp.toPx()),
