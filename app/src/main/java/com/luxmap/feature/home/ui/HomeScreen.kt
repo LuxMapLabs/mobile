@@ -194,6 +194,7 @@ private fun HomeContent(
                 segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
                 selected = selectedTab,
                 onSelect = onSelectTab,
+                branded = true,
             )
         }
         val visibleItems = remember(tasks, selectedTab, today) { tasks.sortedFor(selectedTab, today) }

@@ -194,6 +194,7 @@ private fun NotificationSuccessContent(
             selected = state.filter,
             onSelect = onFilterSelected,
             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+            branded = true,
         )
         val filteredItems =
             if (state.filter == NotificationFilter.UNREAD) {
