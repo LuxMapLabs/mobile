@@ -177,6 +177,7 @@ private fun Live(
         text = "Ghi nhận",
         onClick = onRecord,
         enabled = isEnabled && state.stableLux != null,
+        branded = true,
         modifier = Modifier.fillMaxWidth(),
     )
 }

@@ -619,6 +619,7 @@ private fun ReviewSubmitBar(
                     text = "Xác nhận",
                     onClick = { draft.selected?.let { onSubmit(it, draft.normalizedNote) } },
                     enabled = draft.canSubmit && !withdrawing,
+                    branded = true,
                     modifier = modifier,
                 )
             }
