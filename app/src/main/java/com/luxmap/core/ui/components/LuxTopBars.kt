@@ -118,7 +118,7 @@ private fun TitleBlock(
 }
 
 @Composable
-private fun NotificationAction(
+internal fun NotificationAction(
     unreadCount: Int,
     onClick: () -> Unit,
 ) {
