@@ -137,6 +137,7 @@ fun BottomActionBar(
                             onClick = onCtaClick,
                             enabled = ctaEnabled,
                             trailingIcon = ctaIcon,
+                            branded = true,
                             modifier = actionModifier,
                         )
                     },
@@ -147,6 +148,7 @@ fun BottomActionBar(
                     onClick = onCtaClick,
                     enabled = ctaEnabled,
                     trailingIcon = ctaIcon,
+                    branded = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

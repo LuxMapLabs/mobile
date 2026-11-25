@@ -369,6 +369,7 @@ private fun PoleListBottomBar(
                     text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất",
                     onClick = onTapComplete,
                     enabled = canComplete,
+                    branded = true,
                 )
             }
         }
