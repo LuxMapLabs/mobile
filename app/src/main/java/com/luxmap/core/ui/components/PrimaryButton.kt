@@ -1,5 +1,6 @@
 package com.luxmap.core.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
@@ -33,7 +34,11 @@ fun PrimaryButton(
     enabled: Boolean = true,
     isLoading: Boolean = false,
     trailingIcon: ImageVector? = null,
+    branded: Boolean = false,
 ) {
+    val brand = LuxTheme.brand
+    val container = if (branded) brand.lumen else MaterialTheme.colorScheme.primary
+    val content = if (branded) brand.onLumen else MaterialTheme.colorScheme.onPrimary
     Button(
         onClick = { if (!isLoading) onClick() },
         enabled = enabled,
@@ -44,18 +49,19 @@ fun PrimaryButton(
         shape = MaterialTheme.shapes.medium,
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = container,
+                contentColor = content,
                 disabledContainerColor = LuxTheme.colors.disabledContainer,
                 disabledContentColor = LuxTheme.colors.disabledContent,
             ),
+        border = if (branded && enabled) BorderStroke(1.dp, brand.onLumen) else null,
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge)
         if (isLoading) {
             Spacer(Modifier.width(Spacing.sm))
             CircularProgressIndicator(
                 modifier = Modifier.size(LoadingIndicatorSize),
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = content,
                 strokeWidth = LoadingIndicatorStrokeWidth,
             )
         } else if (trailingIcon != null) {
