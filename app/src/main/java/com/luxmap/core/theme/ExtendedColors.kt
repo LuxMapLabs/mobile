@@ -220,4 +220,9 @@ object LuxTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalLuxStatusColors.current
+
+    val brand: LuxBrandColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalLuxBrandColors.current
 }

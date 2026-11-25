@@ -78,6 +78,10 @@ bo góc                                → SHAPE_SURFACE.md §1 (MaterialTheme.s
 
 17. **T-07:** Header Đăng nhập dùng **navy phẳng, nhỏ gọn**, bỏ gradient, hình đèn trang trí và câu “Chào mừng trở lại”. Giữ LUXMAP, “Vận hành hiện trường”, trạng thái mạng; tiêu đề “Đăng nhập” đặt ở đầu form. Header cuộn cùng nội dung. Form theo Light/Night Field của theme.
 
+**Duyệt bổ sung (2026-11-25, sau buổi chấm đồ án):**
+
+18. **Brand visual refresh "Cột đèn" (A1), toàn bộ app.** Quyết định #5, #7, #8 và T-07 **giữ nguyên** (không gradient, không Expressive, không dynamic color). Thêm màu nhấn **Lumen `#FFC44D`** (chỉ trang trí thương hiệu) và 3 component `LuxHero`/`LuxTabHero`, `LuxStatTile`, `LuxLampIllustration`. Hero thay thanh tiêu đề trắng ở 3 tab gốc, thanh tiêu đề màn con chuyển sang navy. Bản đồ F12 chưa đổi vì T-09, T-10 chưa duyệt. Header Đăng nhập nay có hình học và cột đèn (mở rộng T-07, vẫn phẳng) và phủ cả vùng thanh trạng thái. Spec: `docs/superpowers/specs/2026-11-25-brand-visual-refresh-design.md`.
+
 Mọi nội dung khác trong vNext là **đề xuất**.
 
 ## 5. Điểm còn chờ xác nhận

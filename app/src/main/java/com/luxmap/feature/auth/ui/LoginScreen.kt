@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -82,6 +81,7 @@ import com.luxmap.core.theme.LoginColors
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxHero
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.auth.data.LoginFailureReason
 
@@ -160,18 +160,10 @@ internal fun LoginContent(
             modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
-                .statusBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState()),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(LoginColors.headerContainer)
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
+        LuxHero(applyStatusBarInset = true) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

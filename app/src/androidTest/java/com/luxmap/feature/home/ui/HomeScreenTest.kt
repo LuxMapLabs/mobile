@@ -9,11 +9,13 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.luxmap.core.common.DateFormatUtils
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.home.data.HomeData
@@ -191,6 +193,7 @@ class HomeScreenTest {
         composeTestRule.onNodeWithText("Đã nộp, chờ đồng bộ", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Đồng bộ lỗi", useUnmergedTree = true).assertExists()
         composeTestRule.onNodeWithText("Xung đột", useUnmergedTree = true).assertExists()
+        composeTestRule.onNode(hasScrollAction()).performScrollToNode(hasText("Đang thực hiện"))
         composeTestRule.onNodeWithText("Đang thực hiện", useUnmergedTree = true).assertExists()
     }
 

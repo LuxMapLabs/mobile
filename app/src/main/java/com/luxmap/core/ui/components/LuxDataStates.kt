@@ -1,6 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -36,8 +38,9 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.theme.Spacing
 
-private val StateIconBoxSize = 64.dp
-private val StateIconSize = 32.dp
+private val StateIllustrationSize = 112.dp
+private val StateBadgeSize = 40.dp
+private val StateBadgeIconSize = 22.dp
 
 enum class LuxErrorKind { NETWORK, GENERIC }
 
@@ -108,18 +111,25 @@ private fun StateLayout(
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Box(
-            modifier =
-                Modifier
-                    .size(StateIconBoxSize)
-                    .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large),
-            contentAlignment = Alignment.Center,
+            modifier = Modifier.size(StateIllustrationSize),
+            contentAlignment = Alignment.BottomEnd,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(StateIconSize),
-            )
+            LuxLampIllustration(size = StateIllustrationSize)
+            Box(
+                modifier =
+                    Modifier
+                        .size(StateBadgeSize)
+                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(StateBadgeIconSize),
+                )
+            }
         }
         Column(
             modifier =

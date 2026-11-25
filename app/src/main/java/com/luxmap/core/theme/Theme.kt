@@ -100,6 +100,7 @@ fun LuxMapTheme(
     CompositionLocalProvider(
         LocalLuxExtendedColors provides if (useDarkTheme) NightFieldExtendedColors else LightExtendedColors,
         LocalLuxStatusColors provides if (useDarkTheme) NightFieldStatusColors else LightStatusColors,
+        LocalLuxBrandColors provides if (useDarkTheme) NightFieldBrandColors else LightBrandColors,
     ) {
         MaterialTheme(
             colorScheme = if (useDarkTheme) LuxMapDarkColorScheme else LuxMapLightColorScheme,

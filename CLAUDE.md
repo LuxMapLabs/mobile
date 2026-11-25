@@ -321,6 +321,8 @@ Mỗi feature nhỏ hơn (`auth`, `home`, `map`, `notification`, `profile`...) c
 
 **Lịch sử (chỉ để tham khảo):** v2.0 → thử "Night Ledger" v2.1 (2026-10-11) → rollback về v2.0 (2026-10-14, PR #65–67) → vNext (2026-11-16, nhánh `style/design-system-vnext-tokens`). `docs/LuxMap_Mobile_Redesign_Spec_v0.1.md` và `docs/LuxMap_Mobile_Design_System_v2.1.md` **không còn là nguồn token**. 25 primitive v2.1 (`Paper/Ink/Lumen/Night`, `NightSurf*`…) vẫn còn khai báo trong `Color.kt` nhưng không dùng — chờ dọn ở giai đoạn dọn dẹp. `BrandHeroGradient` cũng còn trong code (các hero hiện tại) nhưng bị loại khỏi vNext; sẽ gỡ dần khi redesign từng màn. Đích sau đăng nhập là `Routes.Home` (đảo lại 2026-11-14), không liên quan token.
 
+**Cập nhật 2026-11-25 — Brand visual refresh "Cột đèn":** thêm `LuxTheme.brand` (hero navy, `lumen` `#FFC44D`, hình hoạ tiết). Lumen **chỉ là trang trí thương hiệu**, không làm chữ trên nền sáng và không thay màu trạng thái (quá hạn/cảnh báo giữ `LuxTheme.colors.*`). Tab gốc dùng `LuxTabHero`, header Đăng nhập dùng `LuxHero`, màn con dùng `LuxChildTopBar` (navy), trạng thái rỗng/lỗi có `LuxLampIllustration`. Vẫn không gradient. Bản đồ chưa đổi vì T-09/T-10 chưa duyệt. Spec/plan: `docs/superpowers/specs|plans/2026-11-25-brand-visual-refresh*`.
+
 ### Quy tắc dùng token trong code
 
 - `feature/` **chỉ** đọc `MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*`, `MaterialTheme.shapes.*`, `LuxTheme.colors.*` (success/warning/info/disabled/focus/due/overlay) và `LuxTheme.status.*` / các hàm `@Composable` `*.badgeColors()` — **không** import primitive (`Navy700`, `Gray500`, `Danger600`…) hay viết `Color(0x…)` trong màn hình. Code cũ còn vi phạm sẽ được sửa dần theo từng màn khi redesign.

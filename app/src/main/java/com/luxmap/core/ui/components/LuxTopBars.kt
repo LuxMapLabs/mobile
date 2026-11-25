@@ -25,6 +25,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -33,17 +34,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.LuxTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun luxTopBarColors(): TopAppBarColors =
-    TopAppBarDefaults.topAppBarColors(
-        containerColor = MaterialTheme.colorScheme.surface,
-        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        titleContentColor = MaterialTheme.colorScheme.onSurface,
-        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+private fun luxTopBarColors(): TopAppBarColors {
+    val brand = LuxTheme.brand
+    return TopAppBarDefaults.topAppBarColors(
+        containerColor = brand.hero,
+        scrolledContainerColor = brand.hero,
+        titleContentColor = brand.onHero,
+        navigationIconContentColor = brand.onHero,
+        actionIconContentColor = brand.onHero,
     )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +68,13 @@ fun LuxTabTopBar(
                     .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TitleBlock(title = title, subtitle = subtitle, isTabRoot = true, modifier = Modifier.weight(1f))
+            TitleBlock(
+                title = title,
+                subtitle = subtitle,
+                isTabRoot = true,
+                subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
             NotificationAction(unreadCount = unreadNotificationCount, onClick = onNotificationsClick)
         }
     }
@@ -79,9 +89,17 @@ fun LuxChildTopBar(
     subtitle: String? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    LightStatusBarIcons()
     TopAppBar(
         modifier = modifier,
-        title = { TitleBlock(title = title, subtitle = subtitle, isTabRoot = false) },
+        title = {
+            TitleBlock(
+                title = title,
+                subtitle = subtitle,
+                isTabRoot = false,
+                subtitleColor = LuxTheme.brand.onHeroVariant,
+            )
+        },
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
@@ -97,6 +115,7 @@ private fun TitleBlock(
     title: String,
     subtitle: String?,
     isTabRoot: Boolean,
+    subtitleColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -111,14 +130,14 @@ private fun TitleBlock(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subtitleColor,
             )
         }
     }
 }
 
 @Composable
-private fun NotificationAction(
+internal fun NotificationAction(
     unreadCount: Int,
     onClick: () -> Unit,
 ) {

@@ -304,3 +304,18 @@ Ngoại lệ chỉ cho header Login: navy phẳng, nhỏ gọn, không gradient;
 | `LoginColors.onHeader` | White `#FFFFFF` | White `#FFFFFF` | Wordmark, mô tả và icon/nhãn kết nối trên header |
 
 Cặp chữ/nền đạt **11.62:1** ở cả hai theme; không dùng `primary/onPrimary` cho khối này vì primary Night Field sáng hơn. Thanh trạng thái hệ thống giữ nền `surface`, nội dung header và form nằm ngoài vùng inset.
+
+## 🆕 Màu thương hiệu (2026-11-25)
+
+Truy cập qua `LuxTheme.brand`. Chỉ là trang trí thương hiệu, không mang ngữ nghĩa trạng thái. Cập nhật: header F01 nay dùng `hero` (Night Field là `#0E1E38`) và phủ cả vùng thanh trạng thái; `LoginColors.onHeader` vẫn dùng cho chữ.
+
+| Token | Light | Night Field | Vai trò |
+|---|---:|---:|---|
+| `hero` | `#1F3864` | `#0E1E38` | Nền hero và thanh tiêu đề màn con |
+| `onHero` | `#FFFFFF` | `#FFFFFF` | Chữ chính trên hero |
+| `onHeroVariant` | `#D9E2EF` | `#A9BCDD` | Chữ phụ, nét cột đèn |
+| `heroShapeA` / `heroShapeB` | `#2A4A7F` / `#33558F` | `#21375C` / `#2A4570` | Hình tròn hoạ tiết |
+| `lumen` | `#FFC44D` | `#FFC44D` | Điểm nhấn: đầu đèn, tia sáng |
+| `onLumen` | `#0E1E38` | `#0E1E38` | Chữ/icon trên nền Lumen |
+
+Quy tắc: Lumen không làm chữ hoặc icon đơn lẻ trên nền sáng (tương phản ≈ 1,6:1). Tương phản được khoá bởi `BrandColorsTest`.
