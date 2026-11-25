@@ -1,4 +1,4 @@
 <resources>
     <color name="luxmap_navy">#FF1F3864</color>
-    <color name="ic_launcher_background">#FF1F3864</color>
+    <color name="ic_launcher_background">#FFFFFFFF</color>
 </resources>
