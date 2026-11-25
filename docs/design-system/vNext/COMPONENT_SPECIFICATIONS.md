@@ -268,3 +268,21 @@ Nhãn loại lệnh **trung tính** (`kind.container` / `kind.content`) + icon t
 - **Anatomy:** tiêu đề (`titleLarge`) + **nút đóng `Close` 48dp** (quy tắc Modal Escape) · nội dung · footer action (nếu có, dùng Bottom Action Bar không pinned).
 - **Dùng cho:** chọn lý do hủy, chọn phương thức chụp, xác nhận nộp kèm tóm tắt, quick view trên bản đồ, lớp bản đồ.
 - **Quy tắc:** chiều cao vừa nội dung (không ép full). Nội dung dài thì cuộn **bên trong** sheet. Nút xác nhận cuối nội dung cuộn phải luôn tới được. Bài học từ test: dùng `performScrollTo()`.
+
+---
+
+## 🆕 Thương hiệu: hero, ô số liệu, minh hoạ (2026-11-25)
+
+### F1. `LuxHero` / `LuxTabHero`
+- **Mục đích:** khối đầu màn mang bản sắc LuxMap: nền navy phẳng (`LuxTheme.brand.hero`), 2 hình tròn hoạ tiết, nét cột đèn có đầu Lumen. Không gradient.
+- **Dùng cho:** tab gốc (Việc hôm nay, Khảo sát, Cá nhân) qua `LuxTabHero(title, unreadNotificationCount, onNotificationsClick, subtitle, content)`; header Đăng nhập qua `LuxHero`.
+- **Anatomy:** nhãn nhỏ "LUXMAP · VẬN HÀNH" (`labelMedium`) · tiêu đề (`headlineMedium`, `heading()`) · phụ đề (`bodyMedium`) · chuông thông báo · slot nội dung (ô số liệu).
+- **Màu:** chỉ `LuxTheme.brand.*`. Hero phủ cả vùng thanh trạng thái (`applyStatusBarInset`), icon thanh trạng thái chuyển sang sáng khi hero hiện (`LightStatusBarIcons`, bộ đếm tham chiếu).
+- **Anti-pattern:** không đặt ở màn camera, nộp báo cáo, bản đồ; không thêm gradient; không dùng Lumen làm chữ.
+
+### F2. `LuxStatTile`
+- **Mục đích:** ô số liệu (nhãn + số) đặt trong hero. Nền `surface`, viền `outlineVariant`, shape `medium`, ngữ nghĩa gộp một nút TalkBack.
+- **Màu số:** mặc định `onSurface`; ô cần cảnh báo truyền `LuxTheme.colors.dueOverdue`. **Không** dùng Lumen cho trạng thái.
+
+### F3. `LuxLampIllustration`
+- **Mục đích:** minh hoạ phẳng cột đèn cho trạng thái rỗng/lỗi (`StateLayout` trong `LuxDataStates.kt`), kèm huy hiệu icon 40dp ở góc dưới phải. Trang trí thuần (`clearAndSetSemantics`), tiêu đề và nội dung vẫn là phần được TalkBack đọc.
