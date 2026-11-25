@@ -501,7 +501,7 @@ class WorkOrderDetailScreenTest {
         val detail = inspectionDetail(emptyList()).copy(allowedActions = listOf("complete"))
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onCaptureEvidence = { opened = true })
 
-        composeRule.onNodeWithText("Ảnh hiện trường").assertExists()
+        composeRule.onNodeWithContentDescription("Ảnh hiện trường, bắt buộc").assertExists()
         composeRule.onNodeWithText("Thêm ảnh").performScrollTo().performClick()
         assertEquals(true, opened)
     }
@@ -730,7 +730,7 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun tapping_a_pole_row_opens_the_measure_screen_for_that_pole() {
+    fun tapping_measure_on_a_pole_row_opens_the_measure_screen_for_that_pole() {
         var measuredId: String? = null
         setContent(
             uiState =
@@ -740,8 +740,26 @@ class WorkOrderDetailScreenTest {
                 ),
             onMeasurePole = { measuredId = it },
         )
-        composeRule.onNodeWithText("P-1").performClick()
+        composeRule.onNodeWithText("Đo GPS").performScrollTo().performClick()
         assertEquals("P-1", measuredId)
+    }
+
+    @Test
+    fun tapping_a_pole_row_opens_that_pole_on_the_map_not_the_measure_screen() {
+        var mappedId: String? = null
+        var measuredId: String? = null
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(poleIds = listOf("P-1")),
+                    poleReferences = listOf(PoleReference("P-1", 4, 10.0, 106.0)),
+                ),
+            onOpenMap = { poleId, _, _, _ -> mappedId = poleId },
+            onMeasurePole = { measuredId = it },
+        )
+        composeRule.onNodeWithText("P-1").performScrollTo().performClick()
+        assertEquals("P-1", mappedId)
+        assertEquals(null, measuredId)
     }
 
     @Test
@@ -761,11 +779,36 @@ class WorkOrderDetailScreenTest {
                                 3.0,
                                 java.time.Instant.ofEpochSecond(1),
                                 com.luxmap.feature.workorder.polegps.data.MeasurementSource.DEVICE,
+                                photoFilePath = "/data/local/tmp/p1.jpg",
                             ),
                         ),
                 ),
         )
         composeRule.onNodeWithText("Nộp báo cáo").assertIsEnabled()
+    }
+
+    @Test
+    fun submit_stays_locked_while_a_measured_pole_has_no_photo() {
+        setContent(
+            uiState =
+                WorkOrderDetailUiState.Success(
+                    detail = poleGpsDetail(poleIds = listOf("P-1")),
+                    reportNote = "Đã đo 1 cột đèn hôm nay",
+                    poleReferences = listOf(PoleReference("P-1", 1, 10.0, 106.0)),
+                    poleMeasurements =
+                        listOf(
+                            PoleMeasurement(
+                                poleId = "P-1",
+                                lat = 10.0,
+                                lng = 106.0,
+                                accuracyM = 3.0,
+                                capturedAt = Instant.ofEpochSecond(1),
+                                source = MeasurementSource.DEVICE,
+                            ),
+                        ),
+                ),
+        )
+        composeRule.onNodeWithText("Nộp báo cáo").assertIsNotEnabled()
     }
 
     private fun corridorState(corridor: CorridorCheck) =
@@ -782,6 +825,7 @@ class WorkOrderDetailScreenTest {
                         accuracyM = 3.0,
                         capturedAt = Instant.ofEpochSecond(1),
                         source = MeasurementSource.DEVICE,
+                        photoFilePath = "/data/local/tmp/p1.jpg",
                         corridor = corridor,
                     ),
                 ),
