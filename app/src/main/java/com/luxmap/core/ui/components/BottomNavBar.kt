@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.luxmap.core.theme.BadgeTextStyle
+import com.luxmap.core.theme.LuxTheme
 
 data class BottomNavItem(
     val route: String,
@@ -34,9 +35,9 @@ fun BottomNavBar(
                 label = { Text(item.label, style = BadgeTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 colors =
                     NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedIconColor = LuxTheme.brand.onLumen,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        indicatorColor = LuxTheme.brand.lumen,
                         unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),

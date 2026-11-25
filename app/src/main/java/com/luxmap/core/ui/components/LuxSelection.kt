@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.Dimens
 import com.luxmap.core.theme.LuxMapTheme
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 
 data class LuxSegment<T>(val value: T, val label: String, val icon: ImageVector? = null)
@@ -44,7 +45,10 @@ fun <T> LuxSegmented(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    branded: Boolean = false,
 ) {
+    val activeContainer = if (branded) LuxTheme.brand.lumen else MaterialTheme.colorScheme.secondaryContainer
+    val activeContent = if (branded) LuxTheme.brand.onLumen else MaterialTheme.colorScheme.onSecondaryContainer
     val labelStyle =
         if (segments.size <= 2) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
@@ -61,8 +65,8 @@ fun <T> LuxSegmented(
                     ),
                 colors =
                     SegmentedButtonDefaults.colors(
-                        activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        activeContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        activeContainerColor = activeContainer,
+                        activeContentColor = activeContent,
                         activeBorderColor = MaterialTheme.colorScheme.outline,
                         inactiveContainerColor = MaterialTheme.colorScheme.surface,
                         inactiveContentColor = MaterialTheme.colorScheme.onSurface,
@@ -99,7 +103,12 @@ fun LuxFilterChip(
     count: Int? = null,
     enabled: Boolean = true,
     leadingDot: (@Composable () -> Unit)? = null,
+    branded: Boolean = false,
 ) {
+    val selectedContainer = if (branded) LuxTheme.brand.lumen else MaterialTheme.colorScheme.secondaryContainer
+    val selectedContent = if (branded) LuxTheme.brand.onLumen else MaterialTheme.colorScheme.onSecondaryContainer
+    val selectedBorder =
+        if (branded) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.secondaryContainer
     val spoken = if (count != null) "$label, $count" else label
     FilterChip(
         selected = selected,
@@ -135,16 +144,16 @@ fun LuxFilterChip(
             FilterChipDefaults.filterChipColors(
                 containerColor = MaterialTheme.colorScheme.surface,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                selectedContainerColor = selectedContainer,
+                selectedLabelColor = selectedContent,
+                selectedLeadingIconColor = selectedContent,
             ),
         border =
             FilterChipDefaults.filterChipBorder(
                 enabled = enabled,
                 selected = selected,
                 borderColor = MaterialTheme.colorScheme.outline,
-                selectedBorderColor = MaterialTheme.colorScheme.secondaryContainer,
+                selectedBorderColor = selectedBorder,
             ),
     )
 }
