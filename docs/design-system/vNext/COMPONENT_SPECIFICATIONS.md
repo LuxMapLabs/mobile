@@ -286,3 +286,8 @@ Nhãn loại lệnh **trung tính** (`kind.container` / `kind.content`) + icon t
 
 ### F3. `LuxLampIllustration`
 - **Mục đích:** minh hoạ phẳng cột đèn cho trạng thái rỗng/lỗi (`StateLayout` trong `LuxDataStates.kt`), kèm huy hiệu icon 40dp ở góc dưới phải. Trang trí thuần (`clearAndSetSemantics`), tiêu đề và nội dung vẫn là phần được TalkBack đọc.
+
+### F4. Trạng thái đang chọn mang thương hiệu (`branded`)
+- **Bottom Nav:** viên thuốc chỉ báo tab đang chọn là **Lumen**, icon trong đó `onLumen`, nhãn giữ `onSurface` (không dùng Lumen làm chữ).
+- **`LuxSegmented` / `LuxFilterChip`:** tham số `branded = true` cho mục đang chọn nền Lumen, chữ và dấu tick `onLumen`, viền `outline` giữ nguyên (3:1). Chỉ bật cho bộ lọc điều hướng (tab Sửa chữa/Kiểm tra ở Home, Tất cả/Chưa đọc ở Thông báo).
+- **Không bật** cho lựa chọn mang ý nghĩa nghiệp vụ (kết quả kiểm tra, Bật/Tắt của ảnh cột) vì nền vàng dễ bị đọc nhầm thành cảnh báo, và chưa bật cho chip bản đồ (T-09/T-10 chưa duyệt).
