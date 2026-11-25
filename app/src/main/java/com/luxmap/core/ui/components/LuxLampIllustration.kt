@@ -38,14 +38,6 @@ fun LuxLampIllustration(
                 lineTo(armEnd, armY)
             }
         drawPath(path, pole, style = Stroke(width = s * 0.035f, cap = StrokeCap.Round))
-        val cone =
-            Path().apply {
-                moveTo(armEnd - s * 0.02f, armY + s * 0.05f)
-                lineTo(s * 0.50f, s * 0.72f)
-                lineTo(s * 0.78f, s * 0.72f)
-                close()
-            }
-        drawPath(cone, lumen.copy(alpha = 0.35f))
         drawRoundRect(
             color = lumen,
             topLeft = Offset(armEnd - s * 0.08f, armY - s * 0.03f),
