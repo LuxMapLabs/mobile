@@ -4,17 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -22,7 +18,6 @@ import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -32,9 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -56,7 +49,8 @@ import com.luxmap.core.ui.components.LuxSegment
 import com.luxmap.core.ui.components.LuxSegmented
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
-import com.luxmap.core.ui.components.LuxTabTopBar
+import com.luxmap.core.ui.components.LuxStatTile
+import com.luxmap.core.ui.components.LuxTabHero
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.workorder.data.CompletionSyncState
 import java.time.Instant
@@ -136,6 +130,10 @@ fun HomeScreen(
     val today = remember { LocalDate.now() }
     var selectedTab by rememberSaveable { mutableStateOf<HomeTaskTab?>(null) }
     val resolvedTab = initialHomeTab(uiState, selectedTab)
+    val summary =
+        remember(uiState, today) {
+            (uiState as? HomeUiState.Success)?.data?.visibleTasks()?.homeSummary(today)
+        }
     LaunchedEffect(resolvedTab) {
         if (selectedTab == null) selectedTab = resolvedTab
     }
@@ -143,12 +141,14 @@ fun HomeScreen(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            LuxTabTopBar(
+            LuxTabHero(
                 title = "Việc hôm nay",
                 subtitle = homeGreeting(username, today, fullName),
                 unreadNotificationCount = unreadNotificationCount,
                 onNotificationsClick = onOpenNotifications,
-            )
+            ) {
+                if (summary != null) HomeSummaryTiles(summary = summary)
+            }
         },
         snackbarHost = { LuxSnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
@@ -185,13 +185,11 @@ private fun HomeContent(
 ) {
     val today = remember { LocalDate.now() }
     val tasks = remember(data) { data.visibleTasks() }
-    val summary = remember(tasks, today) { tasks.homeSummary(today) }
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            SummaryStatsRow(summary = summary)
             LuxSegmented(
                 segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
                 selected = selectedTab,
@@ -231,59 +229,22 @@ private fun HomeContent(
 }
 
 @Composable
-private fun SummaryStatsRow(summary: HomeSummary) {
+private fun HomeSummaryTiles(summary: HomeSummary) {
     val overdueColor =
         if (summary.overdue > 0) LuxTheme.colors.dueOverdue else MaterialTheme.colorScheme.onSurface
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        SummaryStatCell(
-            label = "Tổng",
-            value = summary.total,
-            valueColor = MaterialTheme.colorScheme.onSurface,
+        LuxStatTile(label = "Tổng", value = summary.total, modifier = Modifier.weight(1f))
+        LuxStatTile(
+            label = "Quá hạn",
+            value = summary.overdue,
+            modifier = Modifier.weight(1f),
+            valueColor = overdueColor,
         )
-        SummaryStatDivider()
-        SummaryStatCell(label = "Quá hạn", value = summary.overdue, valueColor = overdueColor)
-        SummaryStatDivider()
-        SummaryStatCell(
-            label = "Đang làm",
-            value = summary.inProgress,
-            valueColor = MaterialTheme.colorScheme.onSurface,
-        )
+        LuxStatTile(label = "Đang làm", value = summary.inProgress, modifier = Modifier.weight(1f))
     }
-}
-
-@Composable
-private fun RowScope.SummaryStatCell(
-    label: String,
-    value: Int,
-    valueColor: Color,
-) {
-    Row(
-        modifier = Modifier.weight(1f).padding(vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = "$value", style = MaterialTheme.typography.titleMedium, color = valueColor)
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun SummaryStatDivider() {
-    Box(
-        modifier =
-            Modifier
-                .padding(vertical = Spacing.xs)
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(MaterialTheme.colorScheme.outlineVariant),
-    )
 }
 
 @Composable
