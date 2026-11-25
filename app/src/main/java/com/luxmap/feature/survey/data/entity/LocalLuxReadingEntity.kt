@@ -16,4 +16,8 @@ data class LocalLuxReadingEntity(
     val dataSource: String,
     val serverLuxId: String? = null,
     val createdAt: Instant,
+    /** LUX-BASELINE stationary protocol; all null on readings recorded before it (sent as reference readings). */
+    val samplesJson: String? = null,
+    val moduleId: String? = null,
+    val sensorHeightM: Double? = null,
 )

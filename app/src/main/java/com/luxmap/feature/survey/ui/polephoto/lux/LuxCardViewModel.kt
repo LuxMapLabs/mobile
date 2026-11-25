@@ -36,6 +36,7 @@ class LuxCardViewModel
             val recorded: LuxCardUiState.Recorded? = null,
             val connectRequested: Boolean = false,
             val failedAttempts: Int = 0,
+            val moduleId: String? = null,
         )
 
         private val window = LuxSamplingWindow(size = REQUIRED_SAMPLES)
@@ -96,11 +97,12 @@ class LuxCardViewModel
         }
 
         fun record() {
-            val stableLux = windowState.value.stableLux ?: return
+            val window = windowState.value
+            val stableLux = window.stableLux ?: return
             client.disconnect()
             flags.update {
                 it.copy(
-                    recorded = LuxCardUiState.Recorded(stableLux, Instant.now()),
+                    recorded = LuxCardUiState.Recorded(stableLux, Instant.now(), window.samples, it.moduleId),
                     connectRequested = false,
                 )
             }
@@ -121,7 +123,7 @@ class LuxCardViewModel
                 val device = preferences.pairedDevice.first() ?: return@launch
                 if (bluetoothOn) {
                     windowState.value = window.reset()
-                    flags.update { it.copy(connectRequested = true) }
+                    flags.update { it.copy(connectRequested = true, moduleId = device.address) }
                     client.connect(device.address)
                 }
             }

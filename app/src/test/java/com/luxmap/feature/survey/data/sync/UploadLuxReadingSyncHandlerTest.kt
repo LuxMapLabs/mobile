@@ -51,19 +51,26 @@ class UploadLuxReadingSyncHandlerTest {
             serverPhotoId = serverPhotoId,
         )
 
-    private fun reading(serverLuxId: String? = null) =
-        LocalLuxReadingEntity(
-            clientOpId = "L1",
-            workOrderId = "WO-1",
-            poleId = "POLE-1",
-            photoId = "PHOTO-1",
-            measuredAt = Instant.parse("2026-11-23T12:42:00Z"),
-            luxValue = 12.3,
-            meterModel = "ESP32C3_LUX",
-            dataSource = "field",
-            serverLuxId = serverLuxId,
-            createdAt = Instant.parse("2026-11-23T12:42:00Z"),
-        )
+    private fun reading(
+        serverLuxId: String? = null,
+        samplesJson: String? = null,
+        moduleId: String? = null,
+        sensorHeightM: Double? = null,
+    ) = LocalLuxReadingEntity(
+        clientOpId = "L1",
+        workOrderId = "WO-1",
+        poleId = "POLE-1",
+        photoId = "PHOTO-1",
+        measuredAt = Instant.parse("2026-11-23T12:42:00Z"),
+        luxValue = 12.3,
+        meterModel = "ESP32C3_LUX",
+        dataSource = "field",
+        serverLuxId = serverLuxId,
+        createdAt = Instant.parse("2026-11-23T12:42:00Z"),
+        samplesJson = samplesJson,
+        moduleId = moduleId,
+        sensorHeightM = sensorHeightM,
+    )
 
     private fun response() =
         LuxReadingDto(
@@ -225,5 +232,44 @@ class UploadLuxReadingSyncHandlerTest {
 
             assertEquals(SyncOpResult.Failed("POLE_NOT_FOUND"), handler.handle(payload))
             coVerify(exactly = 1) { api.create(any()) }
+        }
+
+    @Test
+    fun `sends the stationary protocol of a reading that has one`() =
+        runTest {
+            coEvery { dao.byId("L1") } returns
+                reading(samplesJson = "[12.2,12.3,12.4]", moduleId = "AA:BB:CC:DD:EE:FF", sensorHeightM = 1.0)
+            val request = slot<CreateLuxReadingRequestDto>()
+            coEvery { api.create(capture(request)) } returns response()
+
+            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            val protocol = request.captured.protocol!!
+            assertEquals(listOf(12.2, 12.3, 12.4), protocol.samples)
+            assertEquals(1.0, protocol.sensorHeightM, 0.0)
+            assertEquals("AA:BB:CC:DD:EE:FF", protocol.moduleId)
+        }
+
+    @Test
+    fun `a reading recorded before the protocol is sent as a reference reading`() =
+        runTest {
+            coEvery { dao.byId("L1") } returns reading()
+            val request = slot<CreateLuxReadingRequestDto>()
+            coEvery { api.create(capture(request)) } returns response()
+
+            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            assertNull(request.captured.protocol)
+        }
+
+    @Test
+    fun `resends without a photo id when the photo was decided before the reading arrived`() =
+        runTest {
+            coEvery { dao.byId("L1") } returns reading()
+            coEvery { photoDao.byId("PHOTO-1") } returns photo(serverPhotoId = "PPH-000123")
+            val requests = mutableListOf<CreateLuxReadingRequestDto>()
+            coEvery { api.create(capture(requests)) } throws
+                httpException(409, "POLE_PHOTO_ALREADY_DECIDED") andThen response()
+
+            assertEquals(SyncOpResult.Done, handler.handle(payload))
+            assertEquals(listOf("PPH-000123", null), requests.map { it.photoId })
         }
 }

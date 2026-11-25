@@ -35,20 +35,34 @@ class LuxSamplingWindowTest {
     }
 
     @Test
-    fun `uses the absolute floor for very low readings`() {
+    fun `very low readings that swing more than the protocol allows are not stable`() {
+        // Same rule as the server (LUX-BASELINE): no absolute floor, or the server would refuse what the app accepted.
         val state = LuxSamplingWindow().addAll(0.1, 0.4, 0.2, 0.5, 0.3)
 
-        assertTrue(state.isStable)
-        assertEquals(0.3, state.stableLux)
+        assertFalse(state.isStable)
     }
 
     @Test
-    fun `uses the relative limit for high readings`() {
-        val stable = LuxSamplingWindow().addAll(100.0, 104.0, 108.0, 102.0, 106.0)
-        val unstable = LuxSamplingWindow().addAll(100.0, 104.0, 112.0, 102.0, 106.0)
+    fun `uses the protocol's relative spread of five percent`() {
+        val stable = LuxSamplingWindow().addAll(100.0, 101.0, 104.0, 102.0, 103.0)
+        val unstable = LuxSamplingWindow().addAll(100.0, 101.0, 106.0, 102.0, 103.0)
 
         assertTrue(stable.isStable)
         assertFalse(unstable.isStable)
+    }
+
+    @Test
+    fun `a stable window hands over its raw samples in the order measured`() {
+        val state = LuxSamplingWindow().addAll(30.0, 12.1, 12.2, 12.3, 12.2, 12.1)
+
+        assertEquals(listOf(12.1, 12.2, 12.3, 12.2, 12.1), state.samples)
+    }
+
+    @Test
+    fun `an unstable window hands over no samples`() {
+        val state = LuxSamplingWindow().addAll(10.0, 15.0, 11.0, 13.0, 12.0)
+
+        assertEquals(emptyList<Double>(), state.samples)
     }
 
     @Test
