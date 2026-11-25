@@ -46,7 +46,7 @@ import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
-import com.luxmap.core.ui.components.LuxTabTopBar
+import com.luxmap.core.ui.components.LuxTabHero
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -121,7 +121,7 @@ fun SurveyHubScreen(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            LuxTabTopBar(
+            LuxTabHero(
                 title = "Khảo sát",
                 subtitle = surveyHubDate(remember { LocalDate.now() }),
                 unreadNotificationCount = unreadNotificationCount,
