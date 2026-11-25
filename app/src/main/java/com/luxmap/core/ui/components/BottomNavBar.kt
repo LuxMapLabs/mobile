@@ -8,6 +8,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.luxmap.core.theme.BadgeTextStyle
 import com.luxmap.core.theme.LuxTheme
@@ -32,7 +33,15 @@ fun BottomNavBar(
                 selected = currentRoute == item.route,
                 onClick = { onItemSelected(item) },
                 icon = { Icon(imageVector = item.icon, contentDescription = null) },
-                label = { Text(item.label, style = BadgeTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = {
+                    Text(
+                        text = item.label,
+                        style = BadgeTextStyle,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 colors =
                     NavigationBarItemDefaults.colors(
                         selectedIconColor = LuxTheme.brand.onLumen,
