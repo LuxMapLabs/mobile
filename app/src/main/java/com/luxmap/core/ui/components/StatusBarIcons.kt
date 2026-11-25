@@ -42,6 +42,7 @@ private val sharedCounter =
         if (controller != null) {
             if (light) restoredLightStatusBars = controller.isAppearanceLightStatusBars
             controller.isAppearanceLightStatusBars = if (light) false else restoredLightStatusBars
+            if (!light) activeController = null
         }
     }
 
