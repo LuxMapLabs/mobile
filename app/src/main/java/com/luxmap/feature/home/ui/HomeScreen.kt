@@ -4,9 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -234,17 +236,17 @@ private fun HomeSummaryTiles(summary: HomeSummary) {
     val overdueColor =
         if (summary.overdue > 0) LuxTheme.colors.dueOverdue else MaterialTheme.colorScheme.onSurface
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        LuxStatTile(label = "Tổng", value = summary.total, modifier = Modifier.weight(1f))
+        LuxStatTile(label = "Tổng", value = summary.total, modifier = Modifier.weight(1f).fillMaxHeight())
         LuxStatTile(
             label = "Quá hạn",
             value = summary.overdue,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
             valueColor = overdueColor,
         )
-        LuxStatTile(label = "Đang làm", value = summary.inProgress, modifier = Modifier.weight(1f))
+        LuxStatTile(label = "Đang làm", value = summary.inProgress, modifier = Modifier.weight(1f).fillMaxHeight())
     }
 }
 
