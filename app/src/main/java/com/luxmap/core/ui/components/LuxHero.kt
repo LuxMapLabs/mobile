@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -47,6 +48,7 @@ fun LuxHero(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val brand = LuxTheme.brand
+    val topInsetPx = if (applyStatusBarInset) WindowInsets.statusBars.getTop(LocalDensity.current) else 0
     LightStatusBarIcons()
     Column(
         modifier =
@@ -54,7 +56,7 @@ fun LuxHero(
                 .fillMaxWidth()
                 .clipToBounds()
                 .background(brand.hero)
-                .drawBehind { drawHeroArt(brand) }
+                .drawBehind { drawHeroArt(brand, topInsetPx.toFloat()) }
                 .then(if (applyStatusBarInset) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier)
                 .padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(verticalSpacing),
@@ -62,15 +64,18 @@ fun LuxHero(
     )
 }
 
-private fun DrawScope.drawHeroArt(brand: LuxBrandColors) {
+private fun DrawScope.drawHeroArt(
+    brand: LuxBrandColors,
+    topInset: Float,
+) {
     val w = size.width
     val h = size.height
     drawCircle(brand.heroShapeA, radius = h * 0.9f, center = Offset(w + h * 0.1f, -h * 0.1f))
     drawCircle(brand.heroShapeB, radius = h * 0.42f, center = Offset(w - h * 0.2f, h * 0.65f))
     val baseX = w - 84.dp.toPx()
-    val armY = 20.dp.toPx()
+    val armY = topInset + 14.dp.toPx()
     val armEnd = baseX + 26.dp.toPx()
-    val poleBottom = minOf(h, 96.dp.toPx())
+    val poleBottom = minOf(h, armY + 76.dp.toPx())
     val pole =
         Path().apply {
             moveTo(baseX, poleBottom)
@@ -86,7 +91,7 @@ private fun DrawScope.drawHeroArt(brand: LuxBrandColors) {
             lineTo(armEnd + 14.dp.toPx(), armY + 34.dp.toPx())
             close()
         }
-    drawPath(cone, brand.lumen.copy(alpha = 0.3f))
+    drawPath(cone, brand.lumen.copy(alpha = 0.45f))
     drawRoundRect(
         color = brand.lumen,
         topLeft = Offset(armEnd - 8.dp.toPx(), armY - 3.dp.toPx()),
