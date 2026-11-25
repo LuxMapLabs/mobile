@@ -55,6 +55,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -258,7 +261,17 @@ fun WorkOrderDetailScreen(
                 } else {
                     "Chi tiết lệnh"
                 }
-            LuxChildTopBar(title = title, onBack = onBack)
+            Column {
+                LuxChildTopBar(title = title, onBack = onBack)
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .background(LuxTheme.brand.lumen)
+                            .testTag("lumen_strip"),
+                )
+            }
         },
         bottomBar = {
             if (uiState is WorkOrderDetailUiState.Success) {
@@ -509,6 +522,7 @@ private fun SubmitConfirmationSheet(
                     text = "Nộp báo cáo",
                     onClick = onConfirm,
                     trailingIcon = Icons.Filled.Send,
+                    branded = true,
                     modifier = actionModifier,
                 )
             },
@@ -742,6 +756,16 @@ private fun WorkOrderMessageTone.toBannerTone(): LuxBannerTone =
     }
 
 @Composable
+private fun Modifier.lumenAccentStart(): Modifier {
+    val color = LuxTheme.brand.lumen
+    val shape = MaterialTheme.shapes.medium
+    return clip(shape).drawWithContent {
+        drawContent()
+        drawRect(color = color, size = Size(width = 4.dp.toPx(), height = size.height))
+    }
+}
+
+@Composable
 private fun WorkOrderSummaryCard(
     detail: WorkOrderDetail,
     showSubmittedBadge: Boolean,
@@ -759,7 +783,7 @@ private fun WorkOrderSummaryCard(
             DueTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val scheduleValue = detail.scheduledDate?.let { DateFormatUtils.formatPlainDate(it) } ?: "Chưa có lịch"
-    LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary")) {
+    LuxCard(modifier = Modifier.fillMaxWidth().testTag("work_order_summary").lumenAccentStart()) {
         Text(
             text = detail.title,
             style = MaterialTheme.typography.titleMedium,
