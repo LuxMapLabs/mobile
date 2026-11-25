@@ -2,13 +2,9 @@ package com.luxmap.core.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Notifications
@@ -17,7 +13,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarColors
@@ -51,37 +46,6 @@ private fun luxTopBarColors(): TopAppBarColors {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LuxTabTopBar(
-    title: String,
-    unreadNotificationCount: Int,
-    onNotificationsClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-) {
-    Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(TopAppBarDefaults.windowInsets)
-                    .heightIn(min = 64.dp)
-                    .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TitleBlock(
-                title = title,
-                subtitle = subtitle,
-                isTabRoot = true,
-                subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
-            NotificationAction(unreadCount = unreadNotificationCount, onClick = onNotificationsClick)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun LuxChildTopBar(
     title: String,
     onBack: () -> Unit,
@@ -96,7 +60,6 @@ fun LuxChildTopBar(
             TitleBlock(
                 title = title,
                 subtitle = subtitle,
-                isTabRoot = false,
                 subtitleColor = LuxTheme.brand.onHeroVariant,
             )
         },
@@ -114,14 +77,13 @@ fun LuxChildTopBar(
 private fun TitleBlock(
     title: String,
     subtitle: String?,
-    isTabRoot: Boolean,
     subtitleColor: Color,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
         Text(
             text = title,
-            style = if (isTabRoot) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { heading() },
@@ -171,12 +133,6 @@ internal fun NotificationAction(
 private fun LuxTopBarsPreview() {
     LuxMapTheme {
         Column {
-            LuxTabTopBar(
-                title = "Việc hôm nay",
-                subtitle = "Thứ Hai, 16/11/2026",
-                unreadNotificationCount = 3,
-                onNotificationsClick = {},
-            )
             LuxChildTopBar(title = "Lệnh sửa chữa", subtitle = "WO-1042", onBack = {})
         }
     }

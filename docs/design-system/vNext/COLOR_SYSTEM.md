@@ -69,7 +69,7 @@ Giữ nguyên toàn bộ primitive v2.0 đang dùng. Chỉ thêm 🆕 khi lớp 
 | `Sky300` / `Sky950` / `Sky100` | `#7CC4F0` / `#0F3550` / `#CDE9FA` | `info`, `infoContainer`, `onInfoContainer` Night Field |
 
 ### 3.3 Primitive đề xuất loại bỏ khỏi code
-25 primitive "Night Ledger" v2.1 (`Paper`, `Ink`, `Ink2`, `Line`, `LineSoft`, `Lumen*`, `Night`, `NightSurf*`, `NightText*`, `LumenNight*`, `InfoContainerDark`) **không có trong vNext**. Xác minh 2026-11-16: không nơi nào ngoài `core/theme` dùng chúng, trừ `DisabledContent`, mà vNext thay bằng `color.disabledContent`. Việc xoá thuộc giai đoạn dọn dẹp, không làm trong tài liệu này. `BrandHeroGradient` / `Navy900` / `Blue600` cho gradient: **loại khỏi giao diện** theo quyết định #5. Primitive `Navy900`, `Blue600` vẫn giữ (Blue600 tái dùng làm tertiary Light).
+25 primitive "Night Ledger" v2.1 (`Paper`, `Ink`, `Ink2`, `Line`, `LineSoft`, `Lumen*`, `Night`, `NightSurf*`, `NightText*`, `LumenNight*`, `InfoContainerDark`) **không có trong vNext**. Xác minh 2026-11-16: không nơi nào ngoài `core/theme` dùng chúng, trừ `DisabledContent`, mà vNext thay bằng `color.disabledContent`. Việc xoá thuộc giai đoạn dọn dẹp, không làm trong tài liệu này. **Đã dọn 2026-11-25:** `BrandHeroGradient`, `Navy900` và 7 primitive không còn nơi dùng đã bị xoá khỏi `Color.kt`. `BrandHeroGradient` / `Navy900` / `Blue600` cho gradient: **loại khỏi giao diện** theo quyết định #5. Primitive `Navy900`, `Blue600` vẫn giữ (Blue600 tái dùng làm tertiary Light).
 
 ## 4. Semantic: Material 3 roles
 

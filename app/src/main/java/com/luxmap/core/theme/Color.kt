@@ -17,34 +17,26 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 
 // Primitive — giá trị màu gốc (mục 2.1 Design System v2.0)
 val Navy700 = Color(0xFF1F3864)
-val Navy50 = Color(0xFFEEF2F8)
 val Navy100 = Color(0xFFD9E2EF)
 val Navy800 = Color(0xFF172B4D)
 val Blue500 = Color(0xFF3E86C9)
 val Green400 = Color(0xFF5FC4B0)
-val Amber500 = Color(0xFFE9A23B)
-val Rose600 = Color(0xFFD64545)
 val Success600 = Color(0xFF059669)
-val Danger600 = Color(0xFFDC2626)
 val Gray25 = Color(0xFFF8FAFC)
 val Gray50 = Color(0xFFF1F5F9)
 val Gray200 = Color(0xFFE2E8F0)
 val Gray500 = Color(0xFF64748B)
 val Slate600 = Color(0xFF475569)
-val Gray700 = Color(0xFF334155)
 val Gray900 = Color(0xFF0F172A)
 val Dark950 = Color(0xFF0D0D0D)
 val Dark900 = Color(0xFF121212)
 val Dark800 = Color(0xFF1A1A1A)
 val Dark700 = Color(0xFF2A2A2A)
-val DarkText = Color(0xFFF5F5F5)
-val DarkMuted = Color(0xFFA0A0A0)
 val DarkSecondary = Color(0xFFB3B3B3)
 
 val DisabledContainer = Color(0xFFE2E8F0)
@@ -53,19 +45,7 @@ val DisabledContainerDark = Color(0xFF2A2A2A)
 val DisabledContentDark = Color(0xFFA0A0A0)
 val ErrorDark = Color(0xFFFF9A9A)
 
-// Extra primitives — section 3.1 of Global Design System v1.0, needed for the hero gradient
-// (F01 and other hero-style screens). Does not change the meaning of the existing tokens above.
-val Navy900 = Color(0xFF102443)
 val Blue600 = Color(0xFF2D6388)
-
-// Gradient — section 3.3 of Global Design System v1.0. Only for the single most prominent
-// hero area on a screen, never for badges or warning states (rule in the same section).
-val BrandHeroGradient =
-    Brush.verticalGradient(
-        0f to Navy900,
-        0.58f to Navy700,
-        1f to Blue600,
-    )
 
 val White = Color(0xFFFFFFFF)
 val Gray150 = Color(0xFFE8EDF3)

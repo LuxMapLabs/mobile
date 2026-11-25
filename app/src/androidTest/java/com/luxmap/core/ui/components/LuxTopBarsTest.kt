@@ -21,7 +21,7 @@ class LuxTopBarsTest {
     fun a_single_digit_unread_badge_is_a_circle() {
         composeRule.setContent {
             LuxMapTheme {
-                LuxTabTopBar(title = "Việc hôm nay", unreadNotificationCount = 3, onNotificationsClick = {})
+                LuxTabHero(title = "Việc hôm nay", unreadNotificationCount = 3, onNotificationsClick = {})
             }
         }
         val badge = composeRule.onNodeWithTag("notification_badge", useUnmergedTree = true).fetchSemanticsNode()
@@ -34,11 +34,11 @@ class LuxTopBarsTest {
     private val isHeading = SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading)
 
     @Test
-    fun the_tab_top_bar_title_is_a_heading_and_the_bell_reads_the_unread_count() {
+    fun the_tab_hero_title_is_a_heading_and_the_bell_reads_the_unread_count() {
         var opened = false
         composeRule.setContent {
             LuxMapTheme {
-                LuxTabTopBar(
+                LuxTabHero(
                     title = "Việc hôm nay",
                     unreadNotificationCount = 3,
                     onNotificationsClick = { opened = true },
@@ -56,7 +56,7 @@ class LuxTopBarsTest {
     @Test
     fun the_bell_has_a_plain_label_when_nothing_is_unread() {
         composeRule.setContent {
-            LuxMapTheme { LuxTabTopBar(title = "Khảo sát", unreadNotificationCount = 0, onNotificationsClick = {}) }
+            LuxMapTheme { LuxTabHero(title = "Khảo sát", unreadNotificationCount = 0, onNotificationsClick = {}) }
         }
         composeRule.onNodeWithContentDescription("Thông báo").assertExists()
     }
