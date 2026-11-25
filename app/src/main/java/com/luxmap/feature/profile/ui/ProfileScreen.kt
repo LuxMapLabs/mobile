@@ -51,7 +51,7 @@ import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSectionHeader
 import com.luxmap.core.ui.components.LuxSkeleton
-import com.luxmap.core.ui.components.LuxTabTopBar
+import com.luxmap.core.ui.components.LuxTabHero
 import com.luxmap.feature.profile.data.CurrentUserProfile
 import com.luxmap.feature.profile.ui.luxmeter.LuxMeterRoute
 import java.time.Instant
@@ -105,7 +105,7 @@ fun ProfileScreen(
         modifier = modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            LuxTabTopBar(
+            LuxTabHero(
                 title = "Cá nhân",
                 unreadNotificationCount = unreadNotificationCount,
                 onNotificationsClick = onOpenNotifications,
