@@ -19,15 +19,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Directions
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Directions
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Power
+import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -183,7 +183,7 @@ private fun PoleHeaderSection(detail: PoleDetail) {
         StatusBadge(
             text = detail.fixtureStatus.mapLabel(),
             colors = detail.fixtureStatus.badgeColors(),
-            icon = Icons.Filled.Lightbulb,
+            icon = Icons.Rounded.Lightbulb,
         )
         if (detail.determinedAt != null) {
             Spacer(Modifier.height(Spacing.sm))
@@ -258,7 +258,7 @@ private fun NavigateToPoleButton(
         text = "Đường đi",
         onClick = { if (lat != null && lng != null) onNavigateToPole(lat, lng) },
         enabled = lat != null && lng != null,
-        leadingIcon = Icons.Filled.Directions,
+        leadingIcon = Icons.Rounded.Directions,
         modifier = Modifier.fillMaxWidth(),
     )
 }
@@ -279,27 +279,27 @@ private fun FixtureInfoSection(detail: PoleDetail) {
         Text(text = "Thông tin nhanh", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(Spacing.sm))
         if (detail.fixtureType == null) {
-            InfoRow(icon = Icons.Filled.Bolt, label = "Bóng đèn", value = "Chưa lắp đèn")
+            InfoRow(icon = Icons.Rounded.Bolt, label = "Bóng đèn", value = "Chưa lắp đèn")
         } else {
-            InfoRow(icon = Icons.Filled.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
+            InfoRow(icon = Icons.Rounded.Bolt, label = "Công suất", value = "${detail.lampWatt}W")
             InfoRow(
-                icon = if (detail.powerSource == "solar") Icons.Filled.WbSunny else Icons.Filled.Power,
+                icon = if (detail.powerSource == "solar") Icons.Rounded.WbSunny else Icons.Rounded.Power,
                 label = "Nguồn điện",
                 value = if (detail.powerSource == "solar") "Năng lượng mặt trời" else "Lưới điện",
             )
             InfoRow(
-                icon = Icons.Filled.VerifiedUser,
+                icon = Icons.Rounded.VerifiedUser,
                 label = "Bảo hành",
                 value = "Đến ${DateFormatUtils.formatPlainDate(detail.warrantyExpiry)}",
             )
         }
         InfoRow(
-            icon = Icons.Filled.Wifi,
+            icon = Icons.Rounded.Wifi,
             label = "IoT",
             value = if (detail.hasIotNode) detail.toIotValueLabel() else "Không có",
         )
         InfoRow(
-            icon = Icons.Filled.LocationOn,
+            icon = Icons.Rounded.LocationOn,
             label = "Vị trí",
             value =
                 if (detail.lat != null && detail.lng != null) {
@@ -398,7 +398,7 @@ private fun FaultCard(fault: PoleDetailFault) {
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = Icons.Filled.Warning,
+                imageVector = Icons.Rounded.Warning,
                 contentDescription = null,
                 tint = iconTint,
                 modifier = Modifier.size(18.dp),

@@ -2,7 +2,7 @@ package com.luxmap.feature.map.ui
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.rounded.MyLocation
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -43,7 +43,7 @@ fun LocateMeButton(
                 color = MaterialTheme.colorScheme.primary,
             )
         } else {
-            Icon(imageVector = Icons.Filled.MyLocation, contentDescription = "Định vị vị trí hiện tại")
+            Icon(imageVector = Icons.Rounded.MyLocation, contentDescription = "Định vị vị trí hiện tại")
         }
     }
 }

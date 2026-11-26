@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,12 +54,12 @@ fun MapSearchBar(
                 if (onBack != null) {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Quay lại",
                         )
                     }
                 } else {
-                    Icon(imageVector = Icons.Filled.Search, contentDescription = null)
+                    Icon(imageVector = Icons.Rounded.Search, contentDescription = null)
                 }
             },
             trailingIcon = {
@@ -76,7 +76,7 @@ fun MapSearchBar(
                     }
                 IconButton(onClick = onFilterClick) {
                     Box {
-                        Icon(imageVector = Icons.Filled.Layers, contentDescription = description)
+                        Icon(imageVector = Icons.Rounded.Layers, contentDescription = description)
                         if (hiddenParts.isNotEmpty()) {
                             Box(
                                 modifier =

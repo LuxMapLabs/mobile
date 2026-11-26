@@ -17,20 +17,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.rounded.Assignment
+import androidx.compose.material.icons.rounded.Autorenew
+import androidx.compose.material.icons.rounded.Campaign
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsNone
+import androidx.compose.material.icons.rounded.ReportProblem
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -156,7 +156,7 @@ fun NotificationListScreen(
                         LuxEmptyState(
                             title = "Chưa có thông báo nào",
                             message = "Thông báo về việc được giao, khảo sát và sự cố sẽ xuất hiện ở đây.",
-                            icon = Icons.Filled.NotificationsNone,
+                            icon = Icons.Rounded.NotificationsNone,
                         )
 
                     is NotificationListUiState.Error ->
@@ -333,7 +333,7 @@ private fun NotificationRow(
             }
             if (isNavigable) {
                 Icon(
-                    imageVector = Icons.Filled.ChevronRight,
+                    imageVector = Icons.Rounded.ChevronRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("notification_chevron_${row.notificationId}"),
@@ -347,21 +347,21 @@ private fun NotificationRow(
 // several wire values onto one generic icon - matches the mockup's KIND table exactly.
 private fun NotificationType.icon(): ImageVector =
     when (this) {
-        NotificationType.WORK_ORDER_ASSIGNED -> Icons.Filled.Assignment
-        NotificationType.WORK_ORDER_RESCHEDULED -> Icons.Filled.Event
-        NotificationType.WORK_ORDER_OVERDUE -> Icons.Filled.Schedule
-        NotificationType.WORK_ORDER_RETURNED -> Icons.Filled.ErrorOutline
-        NotificationType.WORK_ORDER_UNASSIGNED -> Icons.Filled.Autorenew
-        NotificationType.WORK_ORDER_CANCELLED -> Icons.Filled.Cancel
-        NotificationType.WORK_ORDER_COMPLETED -> Icons.Filled.CheckCircle
-        NotificationType.WORK_ORDER_VERIFIED -> Icons.Filled.Verified
+        NotificationType.WORK_ORDER_ASSIGNED -> Icons.Rounded.Assignment
+        NotificationType.WORK_ORDER_RESCHEDULED -> Icons.Rounded.Event
+        NotificationType.WORK_ORDER_OVERDUE -> Icons.Rounded.Schedule
+        NotificationType.WORK_ORDER_RETURNED -> Icons.Rounded.ErrorOutline
+        NotificationType.WORK_ORDER_UNASSIGNED -> Icons.Rounded.Autorenew
+        NotificationType.WORK_ORDER_CANCELLED -> Icons.Rounded.Cancel
+        NotificationType.WORK_ORDER_COMPLETED -> Icons.Rounded.CheckCircle
+        NotificationType.WORK_ORDER_VERIFIED -> Icons.Rounded.Verified
         NotificationType.SURVEY_RETURNED,
         NotificationType.SURVEY_READY_FOR_REVIEW,
         NotificationType.SURVEY_PROCESSING_FAILED,
-        -> Icons.Filled.Videocam
-        NotificationType.FAULT_REPORTED -> Icons.Filled.ReportProblem
-        NotificationType.CITIZEN_REPORT_RECEIVED -> Icons.Filled.Campaign
-        NotificationType.UNKNOWN -> Icons.Filled.Notifications
+        -> Icons.Rounded.Videocam
+        NotificationType.FAULT_REPORTED -> Icons.Rounded.ReportProblem
+        NotificationType.CITIZEN_REPORT_RECEIVED -> Icons.Rounded.Campaign
+        NotificationType.UNKNOWN -> Icons.Rounded.Notifications
     }
 
 // type -> short Vietnamese category label shown next to the time (mockup's "kind" field) -
