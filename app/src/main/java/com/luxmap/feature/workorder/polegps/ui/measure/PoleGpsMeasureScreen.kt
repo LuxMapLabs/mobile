@@ -4,16 +4,15 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -37,12 +36,13 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.AppTopBar
 import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
-import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorState
 import com.luxmap.feature.survey.ui.polephoto.PoleMediaPreviewFrame
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
@@ -248,18 +248,38 @@ fun PoleGpsMeasureContent(
     onBack: () -> Unit,
     onRetryPermission: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Chụp ảnh cột đèn"
-        AppTopBar(title = title, onBack = onBack)
+        LuxChildTopBar(title = title, onBack = onBack)
         when (state) {
-            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị chụp ảnh...", showProgress = true)
+            PoleGpsMeasureUiState.Loading -> PreparingMessage("Đang chuẩn bị chụp ảnh...")
             PoleGpsMeasureUiState.Empty ->
-                CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
+                LuxEmptyState(
+                    title = "Không tìm thấy cột",
+                    message = "Cột này không thuộc lệnh này.",
+                    actionLabel = "Quay lại",
+                    onAction = onBack,
+                )
             is PoleGpsMeasureUiState.Error ->
-                CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
-            is PoleGpsMeasureUiState.Success ->
-                CenteredMessage("Đang mở camera...", showProgress = true)
+                LuxErrorState(
+                    onRetry = onRetryPermission,
+                    title = "Chưa chụp được ảnh",
+                    message = state.message,
+                )
+            is PoleGpsMeasureUiState.Success -> PreparingMessage("Đang mở camera...")
         }
+    }
+}
+
+@Composable
+private fun PreparingMessage(text: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -332,30 +352,6 @@ private fun MeasurementRow(
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-    }
-}
-
-@Composable
-private fun CenteredMessage(
-    text: String,
-    showProgress: Boolean = false,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
-) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        if (showProgress) {
-            Spacer(Modifier.height(Spacing.md))
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        }
-        if (actionLabel != null) {
-            Spacer(Modifier.height(Spacing.md))
-            PrimaryButton(text = actionLabel, onClick = onAction, modifier = Modifier.fillMaxWidth())
-        }
     }
 }
 
