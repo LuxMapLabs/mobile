@@ -203,7 +203,7 @@ private fun LuxValue(value: Double?) {
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(text = value?.let(::formatLux) ?: "—", style = MaterialTheme.typography.displaySmall)
         Text(
-            text = "lux · số đo tương đối",
+            text = "lux, số đo tương đối",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = Spacing.xs),

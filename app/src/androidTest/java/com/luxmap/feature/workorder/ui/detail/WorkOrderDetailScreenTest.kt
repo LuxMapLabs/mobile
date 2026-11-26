@@ -165,7 +165,7 @@ class WorkOrderDetailScreenTest {
         composeRule.onNodeWithText("Cột trong phạm vi lệnh (1)").assertExists()
         composeRule.onNodeWithText("POLE-0214").assertExists()
         composeRule.onNodeWithText("Toạ độ: 10.000000, 106.000000").assertExists()
-        composeRule.onNodeWithText("Danh sách đã lưu · chưa cập nhật").assertExists()
+        composeRule.onNodeWithText("Danh sách đã lưu, chưa cập nhật").assertExists()
         composeRule.onNodeWithContentDescription("Thông tin cột POLE-0214").performScrollTo().performClick()
         composeRule.onNodeWithText("Đường đi").assertExists()
         composeRule.onNodeWithText("Xem trên bản đồ").performClick()
@@ -194,7 +194,7 @@ class WorkOrderDetailScreenTest {
         val events = MutableSharedFlow<ReportSubmitEvent>(extraBufferCapacity = 1)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()), submitEvents = events)
         composeRule.runOnIdle { events.tryEmit(ReportSubmitEvent.SavedLocally) }
-        composeRule.onNodeWithText("Đã lưu báo cáo trên máy · sẽ gửi khi có mạng").assertExists()
+        composeRule.onNodeWithText("Đã lưu báo cáo trên máy, đang đồng bộ").assertExists()
         composeRule.onNodeWithText("Nộp báo cáo thành công", substring = true).assertDoesNotExist()
     }
 
@@ -657,9 +657,9 @@ class WorkOrderDetailScreenTest {
                 poleReferences = listOf(PoleReference("P-1", 2, 10.0, 106.0, item)),
             ),
         )
-        composeRule.onNodeWithText("Cột số 2 · S1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Cột số 2, S1", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Cạnh cầu", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("Đèn LED · 100W × 2", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Đèn LED, 100W × 2", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Gần trường/cầu", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("GPS cũ: 10.000000, 106.000000").assertExists()
     }

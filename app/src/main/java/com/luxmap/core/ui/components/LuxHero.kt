@@ -110,7 +110,7 @@ fun LuxTabHero(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f).padding(top = Spacing.sm, end = Spacing.xl)) {
                 Text(
-                    text = "LUXMAP · VẬN HÀNH",
+                    text = "LUXMAP VẬN HÀNH",
                     style = MaterialTheme.typography.labelMedium,
                     color = brand.onHeroVariant,
                 )

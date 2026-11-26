@@ -37,6 +37,7 @@ internal fun InspectionSection(
             faults = faults,
             onNavigateFault = onNavigateFault,
             onOpenPoleOnMap = onOpenPoleOnMap,
+            showLocation = false,
             footer = { fault ->
                 if (editable) {
                     FaultFooter {

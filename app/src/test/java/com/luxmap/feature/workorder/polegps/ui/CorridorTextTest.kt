@@ -14,7 +14,7 @@ class CorridorTextTest {
     @Test
     fun `outside is labelled as outside the corridor`() {
         assertEquals(
-            "Ngoài hành lang tuyến · cách tuyến 31.0 m / 25.0 m",
+            "Ngoài hành lang tuyến, cách tuyến 31.0 m / 25.0 m",
             corridorListLabel(CorridorCheck.Outside(31.0)),
         )
     }

@@ -48,6 +48,7 @@ internal fun FaultListCard(
     onNavigateFault: (lat: Double, lng: Double) -> Unit,
     modifier: Modifier = Modifier,
     onOpenPoleOnMap: ((poleId: String, lat: Double, lng: Double) -> Unit)? = null,
+    showLocation: Boolean = true,
     footer: @Composable (WorkOrderFaultDetail) -> Unit = {},
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -70,6 +71,7 @@ internal fun FaultListCard(
                         fault = fault,
                         onNavigate = { onNavigateFault(fault.lat, fault.lng) },
                         onOpenPoleOnMap = onOpenPoleOnMap,
+                        showLocation = showLocation,
                     )
                     footer(fault)
                 }
@@ -90,8 +92,9 @@ private fun FaultItem(
     fault: WorkOrderFaultDetail,
     onNavigate: () -> Unit,
     onOpenPoleOnMap: ((poleId: String, lat: Double, lng: Double) -> Unit)? = null,
+    showLocation: Boolean = true,
 ) {
-    val canOpenMap = !fault.poleId.isNullOrBlank() || fault.hasLocation()
+    val canOpenMap = showLocation && (!fault.poleId.isNullOrBlank() || fault.hasLocation())
     LuxListItem(
         headline = faultTypeLabel(fault.faultType),
         supporting = faultSupportingText(fault),
@@ -105,24 +108,26 @@ private fun FaultItem(
             },
         showChevron = false,
         trailing = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-            ) {
-                if (fault.hasLocation()) {
-                    IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
-                        Icon(
-                            imageVector = Icons.Rounded.Navigation,
-                            contentDescription = "Điều hướng",
-                            tint = MaterialTheme.colorScheme.primary,
+            if (showLocation) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
+                    if (fault.hasLocation()) {
+                        IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
+                            Icon(
+                                imageVector = Icons.Rounded.Navigation,
+                                contentDescription = "Điều hướng",
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Chưa có toạ độ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                } else {
-                    Text(
-                        text = "Chưa có toạ độ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         },

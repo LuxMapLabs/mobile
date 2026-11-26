@@ -15,7 +15,6 @@ import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.workorder.ui.detail.OrderPolesUiState
-import java.util.Locale
 
 // GET /work-orders/{id}/poles returns the poles of the assigned segments plus the poles holding the
 // order's faults, so for an inspection with no fault this is the whole segment — not "the poles to
@@ -28,7 +27,6 @@ internal fun OrderPolesSection(
     state: OrderPolesUiState,
     faultPoleIds: Set<String>,
     onRetry: () -> Unit,
-    onOpenMap: (String, Double?, Double?, Boolean) -> Unit,
 ) {
     LuxCard {
         val count = (state as? OrderPolesUiState.Success)?.poles?.size ?: 0
@@ -41,7 +39,7 @@ internal fun OrderPolesSection(
                 TextButton(onClick = onRetry) { Text("Thử lại") }
             }
             is OrderPolesUiState.Success -> {
-                if (state.isStale) Text("Danh sách đã lưu · chưa cập nhật", style = MaterialTheme.typography.bodySmall)
+                if (state.isStale) Text("Danh sách đã lưu, chưa cập nhật", style = MaterialTheme.typography.bodySmall)
                 val withFault = state.poles.count { it.poleId in faultPoleIds }
                 if (withFault > 0) {
                     Text("$withFault cột có sự cố của lệnh, xếp đầu", style = MaterialTheme.typography.bodySmall)
@@ -68,15 +66,9 @@ internal fun OrderPolesSection(
                             nearSensitivePoi = pole.nearSensitivePoi,
                             lat = pole.lat,
                             lng = pole.lng,
-                            onOpenMap = { onOpenMap(pole.poleId, pole.lat, pole.lng, false) },
+                            onOpenMap = {},
+                            showLocation = false,
                         )
-                        if (pole.lat != null && pole.lng != null) {
-                            Text(
-                                String.format(Locale.ROOT, "Toạ độ: %.6f, %.6f", pole.lat, pole.lng),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
                     }
                 }
             }

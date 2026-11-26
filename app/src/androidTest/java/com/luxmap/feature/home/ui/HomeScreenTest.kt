@@ -97,7 +97,7 @@ class HomeScreenTest {
         val scheduled = LocalDate.now().minusDays(3).toString()
         setContent(uiState = successWith(item("WO-LOCK", scheduled = scheduled, due = LocalDate.now().toString())))
         composeTestRule.onNodeWithText(
-            "Đã khoá · quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}",
+            "Đã khoá, quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}",
             useUnmergedTree = true,
         ).assertExists()
         composeTestRule.onNodeWithText("Hạn hôm nay", useUnmergedTree = true).assertDoesNotExist()

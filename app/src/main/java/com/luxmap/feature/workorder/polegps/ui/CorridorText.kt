@@ -8,7 +8,7 @@ fun corridorListLabel(check: CorridorCheck): String? =
     when (check) {
         is CorridorCheck.Inside -> "Cách tuyến ${metres(check.distanceM)} / ${metres(ROUTE_CORRIDOR_METRES)}"
         is CorridorCheck.Outside ->
-            "Ngoài hành lang tuyến · cách tuyến ${metres(check.distanceM)} / ${metres(ROUTE_CORRIDOR_METRES)}"
+            "Ngoài hành lang tuyến, cách tuyến ${metres(check.distanceM)} / ${metres(ROUTE_CORRIDOR_METRES)}"
         CorridorCheck.Unknown -> null
     }
 

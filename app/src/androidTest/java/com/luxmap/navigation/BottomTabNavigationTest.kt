@@ -58,4 +58,44 @@ class BottomTabNavigationTest {
             }
         }
     }
+
+    @Test
+    fun survey_tab_leaves_map_opened_from_a_work_order() {
+        composeRule.setContent {
+            navigator = rememberNavController()
+            NavHost(navController = navigator, startDestination = Routes.Login.route) {
+                composable(Routes.Login.route) { Text("Login") }
+                composable(Routes.Home.route) { Text("Home") }
+                composable(
+                    route = Routes.Survey.route,
+                    arguments =
+                        listOf(
+                            navArgument("highlightWorkOrderId") {
+                                type = NavType.StringType
+                                nullable = true
+                            },
+                        ),
+                ) { Text("Survey") }
+                composable(Routes.WorkOrderDetail.route) { Text("Detail") }
+                composable(Routes.Map.route) { Text("Map") }
+                composable(Routes.Profile.route) { Text("Profile") }
+            }
+        }
+        composeRule.runOnIdle {
+            navigator.navigate(Routes.Home.route) {
+                popUpTo(Routes.Login.route) { inclusive = true }
+            }
+            navigator.navigateToBottomTab(Routes.Survey.route)
+            navigator.navigate(Routes.WorkOrderDetail.createRoute("WO-1"))
+            navigator.navigate(Routes.Map.createRoute(focusPoleId = "POLE-1"))
+            assertEquals(Routes.Map.route, navigator.currentDestination?.route)
+
+            navigator.navigateToBottomTab(Routes.Survey.route)
+            assertEquals(Routes.Survey.route, navigator.currentDestination?.route)
+
+            navigator.navigateToBottomTab(Routes.Home.route)
+            navigator.navigateToBottomTab(Routes.Survey.route)
+            assertEquals(Routes.Survey.route, navigator.currentDestination?.route)
+        }
+    }
 }

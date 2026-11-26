@@ -61,8 +61,8 @@ class PoleListScreenTest {
                 )
             }
         }
-        composeRule.onNodeWithText("Cột số 2 · S1", useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText("Đèn LED · 100W × 2", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Cột số 2, S1", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("Đèn LED, 100W × 2", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("Gần trường/cầu", useUnmergedTree = true).assertExists()
         composeRule.onNodeWithContentDescription("Thông tin cột POLE-1").performClick()
         assertTrue(composeRule.onAllNodesWithText("Trước cổng trường").fetchSemanticsNodes().isNotEmpty())
@@ -634,7 +634,7 @@ class PoleListScreenTest {
     fun a_row_marks_a_lux_reading_that_failed_to_sync() {
         showRow(PoleLuxInfo(0.83, isSyncFailed = true))
 
-        composeRule.onNodeWithText("0,83 lux · chưa gửi được", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithText("0,83 lux, chưa gửi được", useUnmergedTree = true).assertExists()
     }
 
     @Test
