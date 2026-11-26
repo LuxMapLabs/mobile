@@ -23,19 +23,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.FactCheck
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.StickyNote2
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.FactCheck
+import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.ReportProblem
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.rounded.StickyNote2
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -390,25 +390,25 @@ private fun submitSummaryRows(
         val outcomes = state.faultOutcomes.values
         listOf(
             SubmitSummaryRow(
-                Icons.Filled.Error,
+                Icons.Rounded.Error,
                 AssetCondition.OUT.badgeColors().text,
                 "Có sự cố",
                 outcomes.count { it == "fault_present" }.toString(),
             ),
             SubmitSummaryRow(
-                Icons.Filled.CheckCircle,
+                Icons.Rounded.CheckCircle,
                 AssetCondition.NORMAL.badgeColors().text,
                 "Không có sự cố",
                 outcomes.count { it == "fault_absent" }.toString(),
             ),
             SubmitSummaryRow(
-                Icons.Filled.Help,
+                Icons.Rounded.Help,
                 AssetCondition.DIM.badgeColors().text,
                 "Chưa xác định",
                 outcomes.count { it == "inconclusive" }.toString(),
             ),
             SubmitSummaryRow(
-                Icons.Filled.PhotoCamera,
+                Icons.Rounded.PhotoCamera,
                 primary,
                 "Ảnh hiện trường",
                 "${state.localEvidence.count { it.kind == "observation" }} ảnh",
@@ -418,31 +418,36 @@ private fun submitSummaryRows(
         val measured = state.poleMeasurements.map { it.poleId }.toSet().size
         val outside = state.poleMeasurements.count { it.corridor is CorridorCheck.Outside }
         listOf(
-            SubmitSummaryRow(Icons.Filled.Navigation, primary, "Cột đã chụp", "$measured/${state.poleReferences.size}"),
             SubmitSummaryRow(
-                Icons.Filled.Warning,
+                Icons.Rounded.Navigation,
+                primary,
+                "Cột đã chụp",
+                "$measured/${state.poleReferences.size}",
+            ),
+            SubmitSummaryRow(
+                Icons.Rounded.Warning,
                 if (outside > 0) MaterialTheme.colorScheme.error else primary,
                 "Ngoài hành lang 25 m",
                 "$outside cột",
             ),
-            SubmitSummaryRow(Icons.Filled.StickyNote2, primary, "Tệp PDF", state.poleAttachments.size.toString()),
-            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Rounded.StickyNote2, primary, "Tệp PDF", state.poleAttachments.size.toString()),
+            SubmitSummaryRow(Icons.Rounded.EditNote, primary, "Ghi chú", state.reportNote.trim().ifEmpty { "—" }),
         )
     } else {
         listOf(
             SubmitSummaryRow(
-                Icons.Filled.ReportProblem,
+                Icons.Rounded.ReportProblem,
                 MaterialTheme.colorScheme.onSurfaceVariant,
                 "Sự cố đã sửa",
                 state.detail.faults.size.toString(),
             ),
             SubmitSummaryRow(
-                Icons.Filled.PhotoCamera,
+                Icons.Rounded.PhotoCamera,
                 primary,
                 "Ảnh nghiệm thu",
                 "${state.localEvidence.count { it.kind == "after" }} ảnh",
             ),
-            SubmitSummaryRow(Icons.Filled.EditNote, primary, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
+            SubmitSummaryRow(Icons.Rounded.EditNote, primary, "Kết quả", state.reportNote.trim().ifEmpty { "—" }),
         )
     }
 }
@@ -523,7 +528,7 @@ private fun SubmitConfirmationSheet(
                 PrimaryButton(
                     text = "Nộp báo cáo",
                     onClick = onConfirm,
-                    trailingIcon = Icons.Filled.Send,
+                    trailingIcon = Icons.Rounded.Send,
                     branded = true,
                     modifier = actionModifier,
                 )
@@ -860,7 +865,7 @@ private fun SummaryAlertLine(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Icon(
-            imageVector = Icons.Filled.Schedule,
+            imageVector = Icons.Rounded.Schedule,
             contentDescription = null,
             tint = color,
             modifier = Modifier.size(16.dp),
@@ -941,20 +946,20 @@ private val PRE_START_ITEMS =
     mapOf(
         WorkOrderTaskKind.REPAIR to
             listOf(
-                PreStartItem(Icons.Filled.PhotoCamera, "Ảnh sau sửa chữa", "Chụp rõ chóa đèn sau khi sửa", true),
-                PreStartItem(Icons.Filled.EditNote, "Kết quả sửa chữa", "Tối thiểu 10 ký tự", true),
-                PreStartItem(Icons.Filled.Inventory2, "Vật tư đã thay", "Ghi lại nếu có thay vật tư", false),
+                PreStartItem(Icons.Rounded.PhotoCamera, "Ảnh sau sửa chữa", "Chụp rõ chóa đèn sau khi sửa", true),
+                PreStartItem(Icons.Rounded.EditNote, "Kết quả sửa chữa", "Tối thiểu 10 ký tự", true),
+                PreStartItem(Icons.Rounded.Inventory2, "Vật tư đã thay", "Ghi lại nếu có thay vật tư", false),
             ),
         WorkOrderTaskKind.INSPECTION to
             listOf(
                 PreStartItem(
-                    Icons.Filled.FactCheck,
+                    Icons.Rounded.FactCheck,
                     "Kết quả từng sự cố",
                     "Có sự cố / Không có / Chưa rõ cho từng sự cố",
                     true,
                 ),
-                PreStartItem(Icons.Filled.PhotoCamera, "Ảnh hiện trường", "Thêm ít nhất 1 ảnh", true),
-                PreStartItem(Icons.Filled.EditNote, "Ghi chú kiểm tra", "Tối thiểu 10 ký tự", true),
+                PreStartItem(Icons.Rounded.PhotoCamera, "Ảnh hiện trường", "Thêm ít nhất 1 ảnh", true),
+                PreStartItem(Icons.Rounded.EditNote, "Ghi chú kiểm tra", "Tối thiểu 10 ký tự", true),
             ),
     )
 

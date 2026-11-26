@@ -10,10 +10,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -61,10 +61,10 @@ import kotlinx.coroutines.isActive
 // The 4 tabs of the main area, in the order given by spec section A5.
 private val bottomNavItems =
     listOf(
-        BottomNavItem(Routes.Home.route, "Hôm nay", Icons.Filled.Home),
-        BottomNavItem(Routes.Survey.route, "Khảo sát", Icons.Filled.CameraAlt),
-        BottomNavItem(Routes.Map.route, "Bản đồ", Icons.Filled.Map),
-        BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Filled.Person),
+        BottomNavItem(Routes.Home.route, "Hôm nay", Icons.Rounded.Home),
+        BottomNavItem(Routes.Survey.route, "Khảo sát", Icons.Rounded.CameraAlt),
+        BottomNavItem(Routes.Map.route, "Bản đồ", Icons.Rounded.Map),
+        BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Rounded.Person),
     )
 
 // Fade-through between screens: the old screen fades out fast, then the new one fades in. Short

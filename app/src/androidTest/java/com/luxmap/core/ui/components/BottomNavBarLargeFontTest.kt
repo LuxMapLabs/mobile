@@ -3,10 +3,10 @@ package com.luxmap.core.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -28,10 +28,10 @@ class BottomNavBarLargeFontTest {
 
     private val items =
         listOf(
-            BottomNavItem("home", "Hôm nay", Icons.Filled.Home),
-            BottomNavItem("survey", "Khảo sát", Icons.Filled.PhotoCamera),
-            BottomNavItem("map", "Bản đồ", Icons.Filled.Map),
-            BottomNavItem("profile", "Cá nhân", Icons.Filled.Person),
+            BottomNavItem("home", "Hôm nay", Icons.Rounded.Home),
+            BottomNavItem("survey", "Khảo sát", Icons.Rounded.PhotoCamera),
+            BottomNavItem("map", "Bản đồ", Icons.Rounded.Map),
+            BottomNavItem("profile", "Cá nhân", Icons.Rounded.Person),
         )
 
     @Test

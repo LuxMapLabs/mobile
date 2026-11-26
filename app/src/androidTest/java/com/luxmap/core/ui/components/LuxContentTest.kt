@@ -1,7 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material3.Text
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -43,7 +43,7 @@ class LuxContentTest {
                     overline = "Sửa chữa WO-1042",
                     headline = "Tuyến ĐH-12",
                     supporting = "Hạn hôm nay",
-                    leadingIcon = Icons.Filled.Build,
+                    leadingIcon = Icons.Rounded.Build,
                     onClick = { tapped = true },
                 )
             }

@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -77,7 +77,7 @@ fun PoleGpsPdfViewerContent(
                         LuxEmptyState(
                             title = "Chưa mở được file",
                             message = state.message,
-                            icon = Icons.Filled.ErrorOutline,
+                            icon = Icons.Rounded.ErrorOutline,
                         )
                     }
                 is PoleGpsPdfViewerUiState.Ready -> PdfPages(state.filePath)
@@ -122,7 +122,7 @@ private fun PdfPages(filePath: String) {
     }
     when {
         openError != null ->
-            LuxEmptyState(title = "Chưa mở được file", message = openError!!, icon = Icons.Filled.ErrorOutline)
+            LuxEmptyState(title = "Chưa mở được file", message = openError!!, icon = Icons.Rounded.ErrorOutline)
         renderer == null -> OpeningMessage()
         else -> PdfPagerBody(renderer!!)
     }

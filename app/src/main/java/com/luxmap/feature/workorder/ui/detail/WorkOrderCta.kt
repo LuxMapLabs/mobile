@@ -2,11 +2,11 @@ package com.luxmap.feature.workorder.ui.detail
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.HourglassTop
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.HourglassTop
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,7 +64,7 @@ internal fun workOrderCtaState(
             detail.cancellationRequestStatus == "pending" ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
+                icon = Icons.Rounded.Lock,
                 enabled = false,
                 onClick = {},
                 hint = "Đang chờ duyệt yêu cầu hủy",
@@ -73,7 +73,7 @@ internal fun workOrderCtaState(
         "start" in detail.allowedActions && scheduleWindow.canActOnSchedule ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
-                icon = Icons.Filled.PlayArrow,
+                icon = Icons.Rounded.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
             )
@@ -85,7 +85,7 @@ internal fun workOrderCtaState(
         "start" in detail.allowedActions && scheduleWindow.isOverdueToComplete ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
+                icon = Icons.Rounded.Lock,
                 enabled = false,
                 onClick = {},
                 hint = "Đã khoá do quá hạn",
@@ -94,7 +94,7 @@ internal fun workOrderCtaState(
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
-                icon = Icons.Filled.Lock,
+                icon = Icons.Rounded.Lock,
                 enabled = false,
                 onClick = {},
                 hint = "Mở vào " + DateFormatUtils.formatPlainDate(scheduleWindow.unlocksOn.toString()),
@@ -103,14 +103,14 @@ internal fun workOrderCtaState(
         "complete" in detail.allowedActions && state.hasActiveLocalCompletion() ->
             WorkOrderCtaState(
                 text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
-                icon = Icons.Filled.HourglassTop,
+                icon = Icons.Rounded.HourglassTop,
                 enabled = false,
                 onClick = {},
             )
         "complete" in detail.allowedActions && kind == WorkOrderTaskKind.REPAIR ->
             WorkOrderCtaState(
                 text = "Hoàn thành lệnh",
-                icon = if (canSubmitNow) Icons.Filled.Check else Icons.Filled.Lock,
+                icon = if (canSubmitNow) Icons.Rounded.Check else Icons.Rounded.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
                 hint = submitLock?.first ?: missingRequirementsHint(repairRequirements(state)),
@@ -122,7 +122,7 @@ internal fun workOrderCtaState(
             val missingCount = detail.faults.size - recordedCount
             WorkOrderCtaState(
                 text = "Nộp báo cáo kiểm tra",
-                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
+                icon = if (canSubmitNow) Icons.Rounded.Send else Icons.Rounded.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
                 hint =
@@ -143,7 +143,7 @@ internal fun workOrderCtaState(
             val missingPhotos = state.polesMissingPhoto().size
             WorkOrderCtaState(
                 text = "Nộp báo cáo",
-                icon = if (canSubmitNow) Icons.Filled.Send else Icons.Filled.Lock,
+                icon = if (canSubmitNow) Icons.Rounded.Send else Icons.Rounded.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
                 hint =
@@ -159,7 +159,7 @@ internal fun workOrderCtaState(
         workOrderStatusFromWire(detail.woStatus) == WorkOrderStatus.DONE && "start" !in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Đã nộp báo cáo",
-                icon = Icons.Filled.HourglassTop,
+                icon = Icons.Rounded.HourglassTop,
                 enabled = false,
                 onClick = {},
                 hint = "Chờ Quản lý duyệt",

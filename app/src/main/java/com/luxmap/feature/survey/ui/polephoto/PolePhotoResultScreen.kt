@@ -23,15 +23,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -173,7 +173,7 @@ fun PolePhotoResultScreen(
                             LuxEmptyState(
                                 title = "AI chưa phân loại được ảnh này",
                                 message = "Model AI gặp lỗi khi xử lý, ảnh vẫn đã lưu trên hệ thống.",
-                                icon = Icons.Filled.SmartToy,
+                                icon = Icons.Rounded.SmartToy,
                             )
 
                         is PolePhotoResultUiState.Error ->
@@ -354,7 +354,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
                         modifier = Modifier.size(56.dp).background(colors.background, MaterialTheme.shapes.medium),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(imageVector = Icons.Filled.Lightbulb, contentDescription = null, tint = colors.text)
+                        Icon(imageVector = Icons.Rounded.Lightbulb, contentDescription = null, tint = colors.text)
                     }
                     Text(
                         text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
@@ -379,7 +379,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
                     ) {
                         if (band != ConfidenceBand.HIGH) {
                             Icon(
-                                imageVector = Icons.Filled.Warning,
+                                imageVector = Icons.Rounded.Warning,
                                 contentDescription = null,
                                 tint = bandColors.text,
                                 modifier = Modifier.size(16.dp),
@@ -406,7 +406,7 @@ private fun FieldLuxRow(lux: Double) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         Icon(
-            imageVector = Icons.Filled.WbSunny,
+            imageVector = Icons.Rounded.WbSunny,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -448,7 +448,7 @@ private fun TechnicalDetails(
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                imageVector = if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -557,7 +557,7 @@ private fun ReviewCard(
                 LuxSegmented(
                     segments =
                         listOf(
-                            LuxSegment("on", "Đèn sáng", Icons.Filled.Lightbulb),
+                            LuxSegment("on", "Đèn sáng", Icons.Rounded.Lightbulb),
                             LuxSegment("off", "Đèn tắt", Icons.Outlined.Lightbulb),
                         ),
                     selected = draft.selected,
@@ -741,7 +741,7 @@ private fun PhotoViewerDialog(
                         ),
             )
             IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.sm)) {
-                Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng ảnh", tint = Color.White)
+                Icon(imageVector = Icons.Rounded.Close, contentDescription = "Đóng ảnh", tint = Color.White)
             }
         }
     }
@@ -759,7 +759,7 @@ private fun VideoPreviewPlaceholder() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                imageVector = Icons.Filled.Videocam,
+                imageVector = Icons.Rounded.Videocam,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

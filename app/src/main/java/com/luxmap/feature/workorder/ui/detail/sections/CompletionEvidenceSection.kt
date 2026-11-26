@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -160,7 +160,7 @@ private fun PhotoTile(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Close,
+                            imageVector = Icons.Rounded.Close,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.inverseOnSurface,
                             modifier = Modifier.size(16.dp),
@@ -205,7 +205,7 @@ private fun AddPhotoTile(onClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
-            imageVector = Icons.Filled.PhotoCamera,
+            imageVector = Icons.Rounded.PhotoCamera,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(28.dp),
@@ -242,5 +242,5 @@ private fun String.toTileState(): TileState =
         "replaceable_error" -> TileState("Cần thay ảnh", SyncStatus.FAILED.icon(), SyncStatus.FAILED)
         "failed" -> TileState("Không tải được", SyncStatus.FAILED.icon(), SyncStatus.FAILED)
         "conflict" -> TileState("Xung đột", SyncStatus.CONFLICT.icon(), SyncStatus.CONFLICT)
-        else -> TileState("Ảnh nháp", Icons.Filled.EditNote, null)
+        else -> TileState("Ảnh nháp", Icons.Rounded.EditNote, null)
     }
