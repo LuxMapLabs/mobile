@@ -10,12 +10,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,14 +25,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.BottomActionBar
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.core.ui.components.PrimaryButton
 import java.io.File
 
 @Composable
@@ -86,7 +95,12 @@ fun EvidenceCaptureRoute(
     }
 
     BackHandler(enabled = true) { close() }
-    Scaffold(topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) }) { padding ->
+    Scaffold(
+        topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) },
+        bottomBar = {
+            BottomActionBar(ctaText = "Xong", onCtaClick = { close() }, ctaEnabled = !state.busy)
+        },
+    ) { padding ->
         Column(
             modifier =
                 Modifier
@@ -97,34 +111,54 @@ fun EvidenceCaptureRoute(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             val available = !state.busy && state.awaitingLocation == 0 && pendingPath == null
-            OutlinedButton(
-                onClick = {
-                    launchError = null
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        launchCamera()
-                    } else {
-                        cameraPermissions.launch(
-                            arrayOf(
-                                Manifest.permission.CAMERA,
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            ),
-                        )
-                    }
-                },
-                enabled = available,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Chụp ảnh") }
-            if (state.busy) {
-                CircularProgressIndicator()
-                Text("Đang chuẩn bị ảnh…")
+            LuxCard {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PhotoCamera,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp),
+                    )
+                    Text(
+                        text = "Chụp ảnh bằng chứng. Vị trí hiện tại được gắn vào từng ảnh.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    PrimaryButton(
+                        text = if (state.busy) "Đang chuẩn bị ảnh…" else "Chụp ảnh",
+                        onClick = {
+                            launchError = null
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                launchCamera()
+                            } else {
+                                cameraPermissions.launch(
+                                    arrayOf(
+                                        Manifest.permission.CAMERA,
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    ),
+                                )
+                            }
+                        },
+                        enabled = available,
+                        isLoading = state.busy,
+                        branded = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
-            launchError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (state.added > 0) Text("Đã thêm ${state.added} ảnh.")
-            if (state.failed > 0) Text("Không thêm được ${state.failed} ảnh.", color = MaterialTheme.colorScheme.error)
-            Button(onClick = { close() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Xong") }
+            launchError?.let { LuxBanner(message = it, tone = LuxBannerTone.ERROR) }
+            if (state.added > 0) LuxBanner(message = "Đã thêm ${state.added} ảnh.", tone = LuxBannerTone.SUCCESS)
+            if (state.failed > 0) {
+                LuxBanner(message = "Không thêm được ${state.failed} ảnh.", tone = LuxBannerTone.ERROR)
+            }
         }
     }
 
