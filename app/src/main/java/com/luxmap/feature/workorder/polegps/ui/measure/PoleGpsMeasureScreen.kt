@@ -2,6 +2,7 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,11 +44,16 @@ import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxSecondaryButton
+import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.feature.survey.ui.polephoto.PoleMediaPreviewFrame
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.ROUTE_CORRIDOR_METRES
 import com.luxmap.feature.workorder.polegps.ui.corridorPreviewLabel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -72,6 +81,68 @@ fun PoleGpsMeasureRoute(
     LocationWatchingEffect(hasLocationPermission, viewModel)
     val locationMissing by viewModel.locationMissing.collectAsState()
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
+    var photoSource by rememberSaveable { mutableStateOf<PhotoSource?>(null) }
+    var galleryError by rememberSaveable { mutableStateOf<String?>(null) }
+    val galleryFix by viewModel.galleryFix.collectAsState()
+    val galleryRejection by viewModel.galleryRejection.collectAsState()
+    val scope = rememberCoroutineScope()
+    val fromGallery = photoSource == PhotoSource.GALLERY
+
+    val openDocumentLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri == null) {
+                onBack()
+                return@rememberLauncherForActivityResult
+            }
+            scope.launch {
+                val file = viewModel.outputFile(context.filesDir)
+                val copied =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(uri)!!.use { input ->
+                                file.outputStream().use { input.copyTo(it) }
+                            }
+                        }.isSuccess
+                    }
+                if (copied) {
+                    previewPath = file.absolutePath
+                    viewModel.onGalleryPhotoPicked(file, onBack)
+                } else {
+                    file.delete()
+                    galleryError = "Không đọc được ảnh đã chọn. Hãy chọn ảnh khác."
+                }
+            }
+        }
+
+    val mediaLocationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                openDocumentLauncher.launch(arrayOf("image/*"))
+            } else {
+                galleryError = "Cần cho phép LuxMap đọc vị trí trong ảnh để lấy GPS từ thư viện."
+            }
+        }
+
+    fun launchGallery() {
+        galleryError = null
+        val needsPermission =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_MEDIA_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            mediaLocationLauncher.launch(Manifest.permission.ACCESS_MEDIA_LOCATION)
+        } else {
+            openDocumentLauncher.launch(arrayOf("image/*"))
+        }
+    }
+
+    fun pickAnotherGalleryPhoto() {
+        viewModel.dismissGalleryRejection()
+        viewModel.dismissWarning()
+        previewFile?.delete()
+        previewPath = null
+        launchGallery()
+    }
 
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -170,33 +241,53 @@ fun PoleGpsMeasureRoute(
         onBack()
     }
 
-    LaunchedEffect(Unit) {
-        if (pendingPath == null && previewPath == null) requestPermissionsAndStart()
-    }
-
     val fileToPreview = previewFile
     if (fileToPreview != null) {
+        val shownFix = if (fromGallery) galleryFix else currentFix
         PhotoPreview(
             file = fileToPreview,
             poleLabel = (state as? PoleGpsMeasureUiState.Success)?.poleLabel ?: "Cột đèn",
             onClose = ::discardPhoto,
             isSaving = isSaving,
-            fix = currentFix,
+            fix = shownFix,
             onConfirm = {
-                hasLocationPermission =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-                    PackageManager.PERMISSION_GRANTED
-                viewModel.onPhotoCaptured(fileToPreview, hasLocationPermission, onBack)
+                if (fromGallery) {
+                    viewModel.confirmGalleryPhoto()
+                } else {
+                    hasLocationPermission =
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                        PackageManager.PERMISSION_GRANTED
+                    viewModel.onPhotoCaptured(fileToPreview, hasLocationPermission, onBack)
+                }
             },
             onRetake = {
-                fileToPreview.delete()
-                previewPath = null
-                viewModel.dismissWarning()
-                launchCamera()
+                if (fromGallery) {
+                    pickAnotherGalleryPhoto()
+                } else {
+                    fileToPreview.delete()
+                    previewPath = null
+                    viewModel.dismissWarning()
+                    launchCamera()
+                }
             },
-            corridor = currentFix?.let(viewModel::corridorFor),
-            previousDistanceM = currentFix?.let(viewModel::distanceFromPrevious),
+            corridor = shownFix?.let(viewModel::corridorFor),
+            previousDistanceM = shownFix?.let(viewModel::distanceFromPrevious),
+            retakeLabel = if (fromGallery) "Chọn ảnh khác" else "Chụp lại",
+            fromGallery = fromGallery,
         )
+        galleryRejection?.let { reason ->
+            LuxConfirmDialog(
+                title = "Không dùng được ảnh này",
+                message = reason,
+                confirmLabel = "Chọn ảnh khác",
+                onConfirm = ::pickAnotherGalleryPhoto,
+                onDismiss = {
+                    viewModel.dismissGalleryRejection()
+                    discardPhoto()
+                },
+                dismissLabel = "Bỏ ảnh",
+            )
+        }
         confirmation?.let { candidate ->
             LowAccuracyConfirmation(
                 fix = candidate,
@@ -227,16 +318,20 @@ fun PoleGpsMeasureRoute(
                 confirmLabel = "Vẫn lưu vị trí này",
                 onConfirm = viewModel::confirmOutsideCorridor,
                 onDismiss = {
-                    fileToPreview.delete()
-                    previewPath = null
-                    viewModel.dismissWarning()
-                    launchCamera()
+                    if (fromGallery) {
+                        pickAnotherGalleryPhoto()
+                    } else {
+                        fileToPreview.delete()
+                        previewPath = null
+                        viewModel.dismissWarning()
+                        launchCamera()
+                    }
                 },
-                dismissLabel = "Chụp lại",
+                dismissLabel = if (fromGallery) "Chọn ảnh khác" else "Chụp lại",
                 onDismissRequest = viewModel::dismissWarning,
             )
         }
-        if (locationMissing) {
+        if (locationMissing && !fromGallery) {
             LuxConfirmDialog(
                 title = "Chưa lấy được vị trí",
                 message = "Đo vị trí cột cần GPS thật. Bật định vị rồi thử lại, hoặc bỏ ảnh này.",
@@ -246,8 +341,75 @@ fun PoleGpsMeasureRoute(
                 dismissLabel = "Bỏ ảnh",
             )
         }
+    } else if (photoSource == null) {
+        PhotoSourceChooser(
+            onBack = onBack,
+            onCamera = {
+                photoSource = PhotoSource.CAMERA
+                requestPermissionsAndStart()
+            },
+            onGallery = {
+                photoSource = PhotoSource.GALLERY
+                viewModel.onPermissionGranted()
+                launchGallery()
+            },
+        )
     } else {
-        PoleGpsMeasureContent(state = state, onBack = onBack, onRetryPermission = ::retryPermissions)
+        PoleGpsMeasureContent(
+            state = state,
+            onBack = onBack,
+            onRetryPermission = if (fromGallery) ::launchGallery else ::retryPermissions,
+            openingLabel = if (fromGallery) "Đang mở thư viện ảnh..." else "Đang mở camera...",
+        )
+        galleryError?.let { message ->
+            LuxConfirmDialog(
+                title = "Chưa chọn được ảnh",
+                message = message,
+                confirmLabel = "Thử lại",
+                onConfirm = ::launchGallery,
+                onDismiss = onBack,
+                dismissLabel = "Quay lại",
+            )
+        }
+    }
+}
+
+private enum class PhotoSource { CAMERA, GALLERY }
+
+@Composable
+private fun PhotoSourceChooser(
+    onBack: () -> Unit,
+    onCamera: () -> Unit,
+    onGallery: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        LuxChildTopBar(title = "Đo GPS cột", onBack = onBack)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Text(
+                text = "Lấy vị trí cột từ ảnh chụp mới hoặc từ ảnh gốc có sẵn trong máy.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            PrimaryButton(
+                text = "Chụp ảnh",
+                onClick = onCamera,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            LuxSecondaryButton(
+                text = "Chọn từ thư viện",
+                onClick = onGallery,
+                modifier = Modifier.fillMaxWidth(),
+                leadingIcon = Icons.Rounded.PhotoLibrary,
+            )
+            Text(
+                text = "Ảnh thư viện phải là ảnh gốc có vị trí GPS. Ảnh gửi qua ứng dụng chat thường đã mất vị trí.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -256,6 +418,7 @@ fun PoleGpsMeasureContent(
     state: PoleGpsMeasureUiState,
     onBack: () -> Unit,
     onRetryPermission: () -> Unit,
+    openingLabel: String = "Đang mở camera...",
 ) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Chụp ảnh cột đèn"
@@ -275,7 +438,7 @@ fun PoleGpsMeasureContent(
                     title = "Chưa chụp được ảnh",
                     message = state.message,
                 )
-            is PoleGpsMeasureUiState.Success -> PreparingMessage("Đang mở camera...")
+            is PoleGpsMeasureUiState.Success -> PreparingMessage(openingLabel)
         }
     }
 }
@@ -303,20 +466,22 @@ internal fun PhotoPreview(
     onClose: () -> Unit,
     corridor: CorridorCheck? = null,
     previousDistanceM: Double? = null,
+    retakeLabel: String = "Chụp lại",
+    fromGallery: Boolean = false,
 ) {
     PoleMediaPreviewFrame(
         poleId = poleLabel,
         isSaving = isSaving,
-        retakeLabel = "Chụp lại",
+        retakeLabel = retakeLabel,
         confirmLabel = "Dùng ảnh này",
         onClose = onClose,
         onRetake = onRetake,
         onConfirm = onConfirm,
-        footer = { MeasurementSummary(fix, corridor, previousDistanceM) },
+        footer = { MeasurementSummary(fix, corridor, previousDistanceM, fromGallery) },
     ) {
         AsyncImage(
             model = file,
-            contentDescription = "Ảnh cột đèn vừa chụp",
+            contentDescription = if (fromGallery) "Ảnh cột đèn chọn từ thư viện" else "Ảnh cột đèn vừa chụp",
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize(),
         )
@@ -328,6 +493,7 @@ private fun MeasurementSummary(
     fix: GpsFix?,
     corridor: CorridorCheck?,
     previousDistanceM: Double?,
+    fromGallery: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         if (corridor is CorridorCheck.Outside) {
@@ -335,8 +501,15 @@ private fun MeasurementSummary(
         }
         LuxCard(contentPadding = PaddingValues(Spacing.md)) {
             fix?.let {
-                MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
-                MeasurementRow("Thời gian mẫu", SAMPLE_TIME_FORMAT.format(it.capturedAt))
+                if (fromGallery) {
+                    MeasurementRow("Nguồn vị trí", "GPS trong ảnh")
+                    MeasurementRow("Toạ độ", "%.6f, %.6f".format(Locale.ROOT, it.lat, it.lng))
+                    MeasurementRow("Sai số ước lượng", "±%.0f m".format(Locale.ROOT, it.accuracyM))
+                    MeasurementRow("Thời gian chụp", SAMPLE_TIME_FORMAT.format(it.capturedAt))
+                } else {
+                    MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
+                    MeasurementRow("Thời gian mẫu", SAMPLE_TIME_FORMAT.format(it.capturedAt))
+                }
             }
             if (corridor != null && corridor !is CorridorCheck.Outside) {
                 MeasurementRow("Hành lang tuyến", corridorPreviewLabel(corridor))

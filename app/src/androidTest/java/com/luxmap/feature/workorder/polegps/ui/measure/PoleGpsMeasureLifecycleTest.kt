@@ -175,6 +175,7 @@ class PoleGpsMeasureLifecycleTest {
                 }
             }
         }
+        rule.onNodeWithText("Chụp ảnh").performClick()
         rule.onNodeWithText("Cần cấp quyền vị trí", substring = true).assertExists()
         rule.runOnIdle {
             assertEquals(0, cameraLaunches)
@@ -281,6 +282,7 @@ class PoleGpsMeasureLifecycleTest {
                 }
             }
         }
+        rule.onNodeWithText("Chụp ảnh").performClick()
         rule.runOnIdle {
             assertEquals(1, cameras)
             registry.dispatchResult(cameraRequest, true)
