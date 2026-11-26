@@ -81,11 +81,11 @@ internal fun homeScheduleLock(
     if (item.woStatus !in setOf("assigned", "in_progress")) return null
     val window = workOrderScheduleWindow(item.scheduledDate, today)
     return when {
-        window.isOverdueToComplete -> "Đã khoá · quá lịch ${DateFormatUtils.formatPlainDate(item.scheduledDate!!)}"
+        window.isOverdueToComplete -> "Đã khoá, quá lịch ${DateFormatUtils.formatPlainDate(item.scheduledDate!!)}"
         item.woStatus == "assigned" && !window.canActOnSchedule ->
-            "Đã khoá · mở ${DateFormatUtils.formatPlainDate(window.unlocksOn.toString())}"
+            "Đã khoá, mở ${DateFormatUtils.formatPlainDate(window.unlocksOn.toString())}"
         item.woStatus == "in_progress" && window.submitOpensOn != null ->
-            "Đã khoá · nộp từ ${DateFormatUtils.formatPlainDate(window.submitOpensOn.toString())}"
+            "Đã khoá, nộp từ ${DateFormatUtils.formatPlainDate(window.submitOpensOn.toString())}"
         else -> null
     }
 }

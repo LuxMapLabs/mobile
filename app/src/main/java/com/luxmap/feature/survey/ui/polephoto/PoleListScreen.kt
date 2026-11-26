@@ -446,7 +446,7 @@ private fun PoleRow(
                 pole.lux?.let { lux ->
                     val value = "${formatLux(lux.luxValue)} lux"
                     StatusBadge(
-                        text = if (lux.isSyncFailed) "$value · chưa gửi được" else value,
+                        text = if (lux.isSyncFailed) "$value, chưa gửi được" else value,
                         colors = if (lux.isSyncFailed) SyncStatus.FAILED.badgeColors() else LuxTheme.status.kind,
                         icon = Icons.Rounded.WbSunny,
                         modifier = Modifier.testTag("pole_lux_${pole.poleId}"),

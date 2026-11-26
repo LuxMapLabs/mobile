@@ -15,7 +15,7 @@ fun polePositionLabel(
 ): String? {
     val segment = segmentId?.takeIf { it.isNotBlank() }
     val number = position?.let { "Cột số $it" }
-    return listOfNotNull(number, segment).joinToString(" · ").ifEmpty { null }
+    return listOfNotNull(number, segment).joinToString(", ").ifEmpty { null }
 }
 
 // fixture_type is a locked enum (Contract section 1): led_road_lamp is its only value. An unknown
@@ -37,7 +37,7 @@ fun poleLampLabel(
             lampCount != null -> "$lampCount bóng"
             else -> ""
         }
-    return listOfNotNull(type, lamp.takeIf { it.isNotEmpty() }).joinToString(" · ").ifEmpty { null }
+    return listOfNotNull(type, lamp.takeIf { it.isNotEmpty() }).joinToString(", ").ifEmpty { null }
 }
 
 // Initial great-circle bearing from the phone to the pole, rather than the phone's heading.
@@ -80,7 +80,7 @@ fun poleDistanceLabel(
             ) + 360
         ) % 360
     val directions = listOf("Bắc", "Đông Bắc", "Đông", "Đông Nam", "Nam", "Tây Nam", "Tây", "Tây Bắc")
-    return "$distance · ${directions[((bearing + 22.5) / 45).toInt() % 8]}"
+    return "$distance, ${directions[((bearing + 22.5) / 45).toInt() % 8]}"
 }
 
 private fun validCoordinate(

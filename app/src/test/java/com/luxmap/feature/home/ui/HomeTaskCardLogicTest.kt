@@ -34,7 +34,7 @@ class HomeTaskCardLogicTest {
         val scheduled = "2026-11-13"
         assertTrue(workOrderScheduleWindow(scheduled, TODAY).isOverdueToComplete)
         assertEquals(
-            HomeTaskBadge.Locked("Đã khoá · quá lịch 13/11/2026"),
+            HomeTaskBadge.Locked("Đã khoá, quá lịch 13/11/2026"),
             homeTaskBadge(item(due = TODAY.toString(), scheduled = scheduled), null, TODAY),
         )
     }
