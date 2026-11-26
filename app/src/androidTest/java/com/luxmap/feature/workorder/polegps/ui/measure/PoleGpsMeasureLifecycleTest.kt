@@ -19,6 +19,7 @@ import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.platform.app.InstrumentationRegistry
 import com.luxmap.core.camera.PhotoGpsExif
+import com.luxmap.core.camera.PhotoLocationReader
 import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.feature.workorder.polegps.data.GpsClock
 import com.luxmap.feature.workorder.polegps.data.GpsFix
@@ -60,7 +61,8 @@ class PoleGpsMeasureLifecycleTest {
             vm =
                 PoleGpsMeasureViewModel(
                     SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
-                    mockk<PoleGpsRepository>(relaxed = true), source, mockk<PhotoGpsExif>(relaxed = true), GpsClock(),
+                    mockk<PoleGpsRepository>(relaxed = true), source, mockk<PhotoGpsExif>(relaxed = true),
+                    mockk<PhotoLocationReader>(relaxed = true), GpsClock(),
                 )
         }
         rule.setContent { if (visible.value) LocationWatchingEffect(permission.value, vm) }
@@ -116,7 +118,8 @@ class PoleGpsMeasureLifecycleTest {
             vm =
                 PoleGpsMeasureViewModel(
                     SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
-                    repository, source, mockk<PhotoGpsExif>(relaxed = true), GpsClock(),
+                    repository, source, mockk<PhotoGpsExif>(relaxed = true),
+                    mockk<PhotoLocationReader>(relaxed = true), GpsClock(),
                 )
         }
         val registry =
@@ -222,7 +225,7 @@ class PoleGpsMeasureLifecycleTest {
             vm =
                 PoleGpsMeasureViewModel(
                     SavedStateHandle(mapOf("workOrderId" to "WO-1", "poleId" to "P-1")),
-                    repository, source, exif, clock,
+                    repository, source, exif, mockk<PhotoLocationReader>(relaxed = true), clock,
                 )
         }
         val registry =

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.core.camera.PhotoGpsExif
+import com.luxmap.core.camera.PhotoLocationReader
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsClock
 import com.luxmap.feature.workorder.polegps.data.GpsFix
@@ -36,6 +37,7 @@ class PoleGpsMeasureViewModel
         private val repository: PoleGpsRepository,
         private val fixSource: GpsFixSource,
         private val exif: PhotoGpsExif,
+        private val photoLocation: PhotoLocationReader,
         private val clock: GpsClock,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle["workOrderId"])
@@ -58,6 +60,58 @@ class PoleGpsMeasureViewModel
         private var savedPhoto: String? = null
         private val _locationMissing = MutableStateFlow(false)
         val locationMissing: StateFlow<Boolean> = _locationMissing.asStateFlow()
+        private val _galleryFix = MutableStateFlow<GpsFix?>(null)
+        val galleryFix: StateFlow<GpsFix?> = _galleryFix.asStateFlow()
+        private val _galleryRejection = MutableStateFlow<String?>(null)
+        val galleryRejection: StateFlow<String?> = _galleryRejection.asStateFlow()
+
+        fun onGalleryPhotoPicked(
+            file: File,
+            onDone: () -> Unit,
+        ) {
+            if (_isSaving.value || savedPhoto == file.absolutePath) return
+            stopWatchingLocation()
+            _locationMissing.value = false
+            _galleryFix.value = null
+            _galleryRejection.value = null
+            val location = runCatching { photoLocation.read(file) }.getOrNull()
+            val capturedAt = location?.capturedAt
+            _galleryRejection.value =
+                when {
+                    location == null -> "Ảnh này không có vị trí GPS. Hãy chọn ảnh gốc chụp bằng camera có bật vị trí."
+                    capturedAt == null -> "Ảnh này không có giờ chụp. Hãy chọn ảnh gốc chụp bằng camera."
+                    else -> null
+                }
+            if (location == null || capturedAt == null) return
+            pendingPhoto = file
+            pendingDone = onDone
+            _galleryFix.value =
+                GpsFix(location.lat, location.lng, GALLERY_ACCURACY_METRES, capturedAt, clock.elapsedRealtimeNanos())
+        }
+
+        fun confirmGalleryPhoto() {
+            if (_isSaving.value) return
+            val fix = _galleryFix.value ?: return
+            val file = pendingPhoto ?: return
+            val onDone = pendingDone ?: return
+            _isSaving.value = true
+            captureJob =
+                viewModelScope.launch {
+                    try {
+                        proceed(file, fix, onDone)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        _galleryRejection.value = "Không lưu được ảnh này. Vui lòng thử lại."
+                    } finally {
+                        _isSaving.value = false
+                    }
+                }
+        }
+
+        fun dismissGalleryRejection() {
+            _galleryRejection.value = null
+        }
 
         fun startWatchingLocation() {
             if (locationJob?.isActive == true) return
@@ -80,6 +134,7 @@ class PoleGpsMeasureViewModel
             pendingCorridorFix = null
             pendingPhoto = null
             pendingDone = null
+            _galleryFix.value = null
             _isSaving.value = false
         }
 
@@ -264,13 +319,20 @@ class PoleGpsMeasureViewModel
             onDone: () -> Unit,
             requireFresh: Boolean = true,
         ) {
-            if (!fix.passes(requireFresh) || savedPhoto == file.absolutePath) {
+            val fromGallery = _galleryFix.value != null
+            val fresh = requireFresh && !fromGallery
+            if (!fix.passes(fresh) || savedPhoto == file.absolutePath) {
                 _locationMissing.value = true
                 return
             }
-            exif.write(file, fix.lat, fix.lng)
-            val (lat, lng) = exif.read(file) ?: (fix.lat to fix.lng)
-            require(fix.copy(lat = lat, lng = lng).passes(requireFresh))
+            val (lat, lng) =
+                if (fromGallery) {
+                    fix.lat to fix.lng
+                } else {
+                    exif.write(file, fix.lat, fix.lng)
+                    exif.read(file) ?: (fix.lat to fix.lng)
+                }
+            require(fix.copy(lat = lat, lng = lng).passes(fresh))
             repository.saveCapturedPhoto(
                 workOrderId = workOrderId,
                 poleId = poleId,
@@ -291,5 +353,6 @@ class PoleGpsMeasureViewModel
 
         companion object {
             const val FIX_TIMEOUT_MILLIS = 10_000L
+            const val GALLERY_ACCURACY_METRES = 20.0
         }
     }
