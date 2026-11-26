@@ -44,9 +44,10 @@ fun LuxConfirmDialog(
     dismissLabel: String = "Huỷ",
     destructive: Boolean = false,
     confirmModifier: Modifier = Modifier,
+    onDismissRequest: () -> Unit = onDismiss,
 ) {
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(

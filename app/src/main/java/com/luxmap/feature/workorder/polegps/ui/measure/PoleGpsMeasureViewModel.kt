@@ -233,6 +233,12 @@ class PoleGpsMeasureViewModel
             }
         }
 
+        fun dismissWarning() {
+            _pendingConfirmation.value = null
+            _pendingCorridor.value = null
+            pendingCorridorFix = null
+        }
+
         fun retryMeasurement() {
             val file = pendingPhoto ?: return
             val onDone = pendingDone ?: return

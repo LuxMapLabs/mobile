@@ -436,6 +436,24 @@ class PoleGpsMeasureViewModelTest {
         }
 
     @Test
+    fun `dismissing the corridor warning closes it without saving or measuring again`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            fixesFlow = flowOf(GpsFix(10.0005, 106.0005, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onPhotoCaptured(File("p1.jpg"), hasLocationPermission = true) {}
+            assertTrue(vm.pendingCorridor.value is CorridorCheck.Outside)
+
+            vm.dismissWarning()
+
+            assertNull(vm.pendingCorridor.value)
+            assertNull(vm.pendingConfirmation.value)
+            assertFalse(vm.isSaving.value)
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+        }
+
+    @Test
     fun `a fix inside the corridor saves without asking`() =
         runTest {
             coEvery { repository.routeGeometry("WO-1") } returns route
