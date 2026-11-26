@@ -263,17 +263,7 @@ fun WorkOrderDetailScreen(
                 } else {
                     "Chi tiết lệnh"
                 }
-            Column {
-                LuxChildTopBar(title = title, onBack = onBack)
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .background(LuxTheme.brand.lumen)
-                            .testTag("lumen_strip"),
-                )
-            }
+            LuxChildTopBar(title = title, onBack = onBack)
         },
         bottomBar = {
             if (uiState is WorkOrderDetailUiState.Success) {
