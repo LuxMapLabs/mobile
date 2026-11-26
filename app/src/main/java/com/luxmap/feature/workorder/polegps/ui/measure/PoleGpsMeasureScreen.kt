@@ -195,6 +195,7 @@ fun PoleGpsMeasureRoute(
             onRetake = {
                 fileToPreview.delete()
                 previewPath = null
+                viewModel.dismissWarning()
                 launchCamera()
             },
             corridor = currentFix?.let(viewModel::corridorFor),
@@ -215,6 +216,7 @@ fun PoleGpsMeasureRoute(
                     }
                 },
                 onRetry = viewModel::retryMeasurement,
+                onDismissRequest = viewModel::dismissWarning,
             )
         }
         corridorWarning?.let { outside ->
@@ -228,8 +230,14 @@ fun PoleGpsMeasureRoute(
                     ) + "Quản lý có thể trả lại báo cáo. Hãy đứng sát cột rồi đo lại nếu có thể.",
                 confirmLabel = "Vẫn lưu vị trí này",
                 onConfirm = viewModel::confirmOutsideCorridor,
-                onDismiss = viewModel::retryMeasurement,
-                dismissLabel = "Đo lại",
+                onDismiss = {
+                    fileToPreview.delete()
+                    previewPath = null
+                    viewModel.dismissWarning()
+                    launchCamera()
+                },
+                dismissLabel = "Chụp lại",
+                onDismissRequest = viewModel::dismissWarning,
             )
         }
         if (locationMissing) {
@@ -391,6 +399,7 @@ internal fun LowAccuracyConfirmation(
     fix: GpsFix,
     onConfirm: () -> Unit,
     onRetry: () -> Unit,
+    onDismissRequest: () -> Unit = onRetry,
 ) {
     LuxConfirmDialog(
         title = "Sai số GPS lớn",
@@ -401,5 +410,6 @@ internal fun LowAccuracyConfirmation(
         onConfirm = onConfirm,
         onDismiss = onRetry,
         dismissLabel = "Đo lại",
+        onDismissRequest = onDismissRequest,
     )
 }
