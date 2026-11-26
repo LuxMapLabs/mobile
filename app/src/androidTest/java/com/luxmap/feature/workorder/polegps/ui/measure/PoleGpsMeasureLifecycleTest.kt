@@ -15,7 +15,6 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.platform.app.InstrumentationRegistry
@@ -291,7 +290,7 @@ class PoleGpsMeasureLifecycleTest {
         }
         // Restored preview retains the photo; disposal never writes an invented position.
         coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
-        rule.onNodeWithText("Chụp lại").performScrollTo().performClick()
+        rule.onNodeWithText("Chụp lại").performClick()
         rule.runOnIdle {
             assertEquals(2, cameras)
             registry.dispatchResult(cameraRequest, false)
