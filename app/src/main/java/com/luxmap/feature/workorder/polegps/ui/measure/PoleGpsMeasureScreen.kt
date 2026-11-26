@@ -4,24 +4,19 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,13 +36,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.AppTopBar
-import com.luxmap.core.ui.components.LuxActionPair
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.survey.ui.polephoto.PoleMediaPreviewFrame
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.ROUTE_CORRIDOR_METRES
@@ -181,6 +177,8 @@ fun PoleGpsMeasureRoute(
     if (fileToPreview != null) {
         PhotoPreview(
             file = fileToPreview,
+            poleLabel = (state as? PoleGpsMeasureUiState.Success)?.poleLabel ?: "Cột đèn",
+            onClose = ::discardPhoto,
             isSaving = isSaving,
             fix = currentFix,
             onConfirm = {
@@ -268,78 +266,73 @@ fun PoleGpsMeasureContent(
 @Composable
 internal fun PhotoPreview(
     file: File,
+    poleLabel: String,
     isSaving: Boolean,
     fix: GpsFix?,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
+    onClose: () -> Unit,
     corridor: CorridorCheck? = null,
     previousDistanceM: Double? = null,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    PoleMediaPreviewFrame(
+        poleId = poleLabel,
+        isSaving = isSaving,
+        retakeLabel = "Chụp lại",
+        confirmLabel = "Dùng ảnh này",
+        onClose = onClose,
+        onRetake = onRetake,
+        onConfirm = onConfirm,
+        footer = { MeasurementSummary(fix, corridor, previousDistanceM) },
     ) {
         AsyncImage(
             model = file,
             contentDescription = "Ảnh cột đèn vừa chụp",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(RoundedCornerShape(Radius.card)),
+            modifier =
+                Modifier
+                    .aspectRatio(3f / 4f, matchHeightConstraintsFirst = true)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
         )
-        fix?.let {
-            Text("Sai số GPS: ±%.1f m".format(Locale.ROOT, it.accuracyM), style = MaterialTheme.typography.bodyLarge)
-            Text("Thời gian mẫu: ${it.capturedAt}", style = MaterialTheme.typography.bodyMedium)
-        }
-        corridor?.let {
-            Text(
-                corridorPreviewLabel(it),
-                style = MaterialTheme.typography.bodyLarge,
-                color =
-                    if (it is CorridorCheck.Outside) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-            )
-        }
-        previousDistanceLabel(previousDistanceM)?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        CaptureActions(enabled = !isSaving, isSaving = isSaving, onRetake = onRetake, onConfirm = onConfirm)
     }
 }
 
 @Composable
-private fun CaptureActions(
-    enabled: Boolean,
-    isSaving: Boolean,
-    onRetake: () -> Unit,
-    onConfirm: () -> Unit,
+private fun MeasurementSummary(
+    fix: GpsFix?,
+    corridor: CorridorCheck?,
+    previousDistanceM: Double?,
 ) {
-    LuxActionPair(
-        modifier = Modifier.navigationBarsPadding(),
-        secondary = { actionModifier ->
-            OutlinedButton(
-                onClick = onRetake,
-                enabled = enabled,
-                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) { Text("Chụp lại") }
-        },
-        primary = { actionModifier ->
-            Button(
-                onClick = onConfirm,
-                enabled = enabled,
-                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Dùng ảnh này")
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (corridor is CorridorCheck.Outside) {
+            LuxBanner(message = corridorPreviewLabel(corridor), tone = LuxBannerTone.WARNING)
+        }
+        LuxCard(contentPadding = PaddingValues(Spacing.md)) {
+            fix?.let {
+                MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
+                MeasurementRow("Thời gian mẫu", it.capturedAt.toString())
             }
-        },
-    )
+            if (corridor != null && corridor !is CorridorCheck.Outside) {
+                MeasurementRow("Hành lang tuyến", corridorPreviewLabel(corridor))
+            }
+            previousDistanceLabel(previousDistanceM)?.let { MeasurementRow("So với lần đo trước", it) }
+        }
+    }
+}
+
+@Composable
+private fun MeasurementRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+    }
 }
 
 @Composable
