@@ -44,7 +44,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalPoleGpsRouteEntity::class,
         LocalLuxReadingEntity::class,
     ],
-    version = 28,
+    version = 29,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)

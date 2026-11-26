@@ -504,10 +504,11 @@ private fun MeasurementSummary(
                 if (fromGallery) {
                     MeasurementRow("Nguồn vị trí", "GPS trong ảnh")
                     MeasurementRow("Toạ độ", "%.6f, %.6f".format(Locale.ROOT, it.lat, it.lng))
-                    MeasurementRow("Sai số ước lượng", "±%.0f m".format(Locale.ROOT, it.accuracyM))
                     MeasurementRow("Thời gian chụp", SAMPLE_TIME_FORMAT.format(it.capturedAt))
                 } else {
-                    MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
+                    it.accuracyM?.let { accuracy ->
+                        MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, accuracy))
+                    }
                     MeasurementRow("Thời gian mẫu", SAMPLE_TIME_FORMAT.format(it.capturedAt))
                 }
             }
@@ -569,7 +570,7 @@ internal fun LowAccuracyConfirmation(
     LuxConfirmDialog(
         title = "Sai số GPS lớn",
         message =
-            "Sai số GPS: ±%.1f m\nThời gian mẫu: %s\n".format(Locale.ROOT, fix.accuracyM, fix.capturedAt) +
+            "Sai số GPS: ±%.1f m\nThời gian mẫu: %s\n".format(Locale.ROOT, fix.accuracyM ?: 0.0, fix.capturedAt) +
                 "Có thể chờ tín hiệu tốt hơn và đo lại, hoặc xác nhận lưu vị trí này.",
         confirmLabel = "Vẫn lưu vị trí này",
         onConfirm = onConfirm,

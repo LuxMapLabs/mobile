@@ -239,3 +239,66 @@ class AppMigrations18To19Test {
         }
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class Migration28To29Test {
+    private lateinit var db: SupportSQLiteDatabase
+
+    @Before
+    fun openVersion28() {
+        val config =
+            SupportSQLiteOpenHelper.Configuration
+                .builder(ApplicationProvider.getApplicationContext())
+                .name(null)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(28) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "CREATE TABLE local_pole_gps_measurement (workOrderId TEXT NOT NULL, " +
+                                    "poleId TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, " +
+                                    "accuracyM REAL NOT NULL, capturedAt INTEGER NOT NULL, source TEXT NOT NULL, " +
+                                    "photoFilePath TEXT, evidenceClientOpId TEXT, evidenceUploadStatus TEXT, " +
+                                    "PRIMARY KEY(workOrderId, poleId))",
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    },
+                ).build()
+        db = FrameworkSQLiteOpenHelperFactory().create(config).writableDatabase
+        db.execSQL(
+            "INSERT INTO local_pole_gps_measurement VALUES ('WO-1', 'P-1', 10.5, 106.5, 3.0, 99, 'device', " +
+                "'/p.jpg', 'OP-1', 'pending')",
+        )
+        MIGRATION_28_29.migrate(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    @Test
+    fun existing_measurement_keeps_its_data() {
+        db.query("SELECT accuracyM, photoFilePath, evidenceUploadStatus FROM local_pole_gps_measurement").use {
+            assertTrue(it.moveToFirst())
+            assertEquals(3.0, it.getDouble(0), 0.0)
+            assertEquals("/p.jpg", it.getString(1))
+            assertEquals("pending", it.getString(2))
+        }
+    }
+
+    @Test
+    fun accuracy_can_now_be_null() {
+        db.execSQL(
+            "INSERT INTO local_pole_gps_measurement (workOrderId, poleId, lat, lng, accuracyM, capturedAt, source) " +
+                "VALUES ('WO-1', 'P-2', 10.5, 106.5, NULL, 99, 'device')",
+        )
+        db.query("SELECT accuracyM FROM local_pole_gps_measurement WHERE poleId = 'P-2'").use {
+            assertTrue(it.moveToFirst())
+            assertTrue(it.isNull(0))
+        }
+    }
+}

@@ -86,7 +86,7 @@ class PoleGpsMeasureViewModel
             pendingPhoto = file
             pendingDone = onDone
             _galleryFix.value =
-                GpsFix(location.lat, location.lng, GALLERY_ACCURACY_METRES, capturedAt, clock.elapsedRealtimeNanos())
+                GpsFix(location.lat, location.lng, null, capturedAt, clock.elapsedRealtimeNanos())
         }
 
         fun confirmGalleryPhoto() {
@@ -353,6 +353,5 @@ class PoleGpsMeasureViewModel
 
         companion object {
             const val FIX_TIMEOUT_MILLIS = 10_000L
-            const val GALLERY_ACCURACY_METRES = 20.0
         }
     }

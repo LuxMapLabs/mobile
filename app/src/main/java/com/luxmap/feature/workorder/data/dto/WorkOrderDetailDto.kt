@@ -63,7 +63,7 @@ data class WorkOrderPoleLocationDto(
     @SerialName("pole_id") val poleId: String,
     val lat: Double,
     val lng: Double,
-    @SerialName("accuracy_m") val accuracyM: Double,
+    @SerialName("accuracy_m") val accuracyM: Double? = null,
     @SerialName("captured_at") val capturedAt: String,
 )
 

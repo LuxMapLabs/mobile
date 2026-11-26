@@ -132,3 +132,23 @@ val MIGRATION_27_28: Migration =
             db.execSQL("ALTER TABLE local_lux_reading ADD COLUMN sensorHeightM REAL")
         }
     }
+
+val MIGRATION_28_29: Migration =
+    object : Migration(28, 29) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE local_pole_gps_measurement_new (workOrderId TEXT NOT NULL, " +
+                    "poleId TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, accuracyM REAL, " +
+                    "capturedAt INTEGER NOT NULL, source TEXT NOT NULL, photoFilePath TEXT, " +
+                    "evidenceClientOpId TEXT, evidenceUploadStatus TEXT, PRIMARY KEY(workOrderId, poleId))",
+            )
+            db.execSQL(
+                "INSERT INTO local_pole_gps_measurement_new (workOrderId, poleId, lat, lng, accuracyM, " +
+                    "capturedAt, source, photoFilePath, evidenceClientOpId, evidenceUploadStatus) " +
+                    "SELECT workOrderId, poleId, lat, lng, accuracyM, capturedAt, source, photoFilePath, " +
+                    "evidenceClientOpId, evidenceUploadStatus FROM local_pole_gps_measurement",
+            )
+            db.execSQL("DROP TABLE local_pole_gps_measurement")
+            db.execSQL("ALTER TABLE local_pole_gps_measurement_new RENAME TO local_pole_gps_measurement")
+        }
+    }
