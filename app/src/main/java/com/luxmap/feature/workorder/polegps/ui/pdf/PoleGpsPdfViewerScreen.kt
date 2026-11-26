@@ -1,7 +1,10 @@
 package com.luxmap.feature.workorder.polegps.ui.pdf
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,22 +25,25 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorState
-import com.luxmap.core.ui.components.LuxSecondaryButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -131,16 +137,9 @@ private fun PdfPages(filePath: String) {
 @Composable
 private fun PdfPagerBody(renderer: PdfPageRenderer) {
     val pagerState = rememberPagerState(pageCount = { renderer.pageCount })
-    var resetToken by remember { mutableIntStateOf(0) }
-    var zoomed by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            PdfPage(
-                renderer = renderer,
-                pageIndex = page,
-                resetToken = resetToken,
-                onZoomChanged = { zoomed = it },
-            )
+            PdfPage(renderer = renderer, pageIndex = page)
         }
         Surface(
             color = MaterialTheme.colorScheme.inverseSurface,
@@ -154,13 +153,6 @@ private fun PdfPagerBody(renderer: PdfPageRenderer) {
                 modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
             )
         }
-        if (zoomed) {
-            LuxSecondaryButton(
-                text = "Đặt lại thu phóng",
-                onClick = { resetToken++ },
-                modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.md),
-            )
-        }
     }
 }
 
@@ -168,28 +160,43 @@ private fun PdfPagerBody(renderer: PdfPageRenderer) {
 private fun PdfPage(
     renderer: PdfPageRenderer,
     pageIndex: Int,
-    resetToken: Int,
-    onZoomChanged: (Boolean) -> Unit,
 ) {
     var bitmap by remember(pageIndex) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
-    LaunchedEffect(resetToken) {
-        scale = 1f
-        offset = Offset.Zero
-    }
-    LaunchedEffect(scale) { onZoomChanged(scale > 1f) }
     LaunchedEffect(pageIndex) {
         bitmap = withContext(Dispatchers.IO) { renderer.renderPage(pageIndex) }
     }
+    var size by remember { mutableStateOf(IntSize.Zero) }
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
+                .clipToBounds()
+                .onSizeChanged { size = it }
                 .pointerInput(pageIndex) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 4f)
-                        offset += pan
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val cancelled = event.changes.any { it.isConsumed }
+                            if (!cancelled) {
+                                val zoom = event.calculateZoom()
+                                val pan = event.calculatePan()
+                                if (zoom != 1f || scale > 1f) {
+                                    val newScale = (scale * zoom).coerceIn(1f, 4f)
+                                    val maxX = size.width * (newScale - 1f) / 2f
+                                    val maxY = size.height * (newScale - 1f) / 2f
+                                    scale = newScale
+                                    offset =
+                                        Offset(
+                                            (offset.x + pan.x).coerceIn(-maxX, maxX),
+                                            (offset.y + pan.y).coerceIn(-maxY, maxY),
+                                        )
+                                    event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                }
+                            }
+                        } while (!cancelled && event.changes.any { it.pressed })
                     }
                 },
         contentAlignment = Alignment.Center,
@@ -198,8 +205,9 @@ private fun PdfPage(
             androidx.compose.foundation.Image(
                 bitmap = it.asImageBitmap(),
                 contentDescription = "Trang ${pageIndex + 1}",
+                contentScale = ContentScale.FillWidth,
                 modifier =
-                    Modifier.graphicsLayer(
+                    Modifier.fillMaxWidth().graphicsLayer(
                         scaleX = scale,
                         scaleY = scale,
                         translationX = offset.x,
