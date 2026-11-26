@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -48,9 +49,13 @@ import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.ROUTE_CORRIDOR_METRES
 import com.luxmap.feature.workorder.polegps.ui.corridorPreviewLabel
-import com.luxmap.feature.workorder.polegps.ui.previousDistanceLabel
 import java.io.File
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val SAMPLE_TIME_FORMAT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
 
 @Composable
 fun PoleGpsMeasureRoute(
@@ -331,12 +336,14 @@ private fun MeasurementSummary(
         LuxCard(contentPadding = PaddingValues(Spacing.md)) {
             fix?.let {
                 MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
-                MeasurementRow("Thời gian mẫu", it.capturedAt.toString())
+                MeasurementRow("Thời gian mẫu", SAMPLE_TIME_FORMAT.format(it.capturedAt))
             }
             if (corridor != null && corridor !is CorridorCheck.Outside) {
                 MeasurementRow("Hành lang tuyến", corridorPreviewLabel(corridor))
             }
-            previousDistanceLabel(previousDistanceM)?.let { MeasurementRow("So với lần đo trước", it) }
+            previousDistanceM?.let {
+                MeasurementRow("Lệch so với lần đo trước", "%.1f m".format(Locale.ROOT, it))
+            }
         }
     }
 }
@@ -348,10 +355,21 @@ private fun MeasurementRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
