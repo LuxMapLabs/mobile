@@ -8,11 +8,14 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +37,8 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.PrimaryButton
+
+private const val MEDIA_ASPECT_RATIO = 3f / 4f
 
 @Composable
 fun PoleMediaPreviewFrame(
@@ -77,21 +82,26 @@ fun PoleMediaPreviewFrame(
                 )
             }
         }
-        Box(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(Spacing.lg),
-            contentAlignment = Alignment.Center,
-            content = media,
-        )
-        if (warning != null) {
-            Text(
-                text = warning,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = Spacing.lg),
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().aspectRatio(MEDIA_ASPECT_RATIO).background(Color.Black),
+                contentAlignment = Alignment.Center,
+                content = media,
             )
-        }
-        if (footer != null) {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) { footer() }
+            if (warning != null) {
+                Text(
+                    text = warning,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = Spacing.lg),
+                )
+            }
+            if (footer != null) {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) { footer() }
+            }
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg)) {
             val stackActions =
