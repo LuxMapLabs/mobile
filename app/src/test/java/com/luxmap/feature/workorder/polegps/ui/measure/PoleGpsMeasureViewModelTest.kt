@@ -2,6 +2,8 @@ package com.luxmap.feature.workorder.polegps.ui.measure
 
 import androidx.lifecycle.SavedStateHandle
 import com.luxmap.core.camera.PhotoGpsExif
+import com.luxmap.core.camera.PhotoLocation
+import com.luxmap.core.camera.PhotoLocationReader
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsClock
 import com.luxmap.feature.workorder.polegps.data.GpsFix
@@ -39,6 +41,7 @@ import java.time.Instant
 class PoleGpsMeasureViewModelTest {
     private val repository = mockk<PoleGpsRepository>(relaxed = true)
     private val exif = mockk<PhotoGpsExif>(relaxed = true)
+    private val photoLocation = mockk<PhotoLocationReader>()
     private var fixesFlow: Flow<GpsFix> = flowOf(GpsFix(10.1, 106.1, 4.0, Instant.ofEpochSecond(1), 1_000_000_000L))
     private var nowNanos = 1_000_000_000L
     private val clock =
@@ -67,6 +70,7 @@ class PoleGpsMeasureViewModelTest {
             repository,
             source,
             exif,
+            photoLocation,
             clock,
         )
 
@@ -195,6 +199,7 @@ class PoleGpsMeasureViewModelTest {
                     repository,
                     trackedSource,
                     exif,
+                    photoLocation,
                     clock,
                 )
             vm.startWatchingLocation()
@@ -517,5 +522,90 @@ class PoleGpsMeasureViewModelTest {
             coEvery { repository.poleReference("WO-1", "P-1") } returns PoleReference("P-1", 3, null, null)
             val missing = viewModel().also { it.onPermissionGranted() }
             assertNull(missing.distanceFromPrevious(fix))
+        }
+
+    private val galleryFile = File("gallery.jpg")
+    private val galleryTime = Instant.parse("2026-09-28T14:59:34Z")
+
+    @Test
+    fun `a gallery photo is saved with its own exif position and time, even when picked long ago`() =
+        runTest {
+            every { photoLocation.read(galleryFile) } returns PhotoLocation(10.0, 106.0005, galleryTime)
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            var done = false
+            vm.onGalleryPhotoPicked(galleryFile) { done = true }
+            assertEquals(GpsFix(10.0, 106.0005, 20.0, galleryTime, 1_000_000_000L), vm.galleryFix.value)
+
+            nowNanos = 120_000_000_000L
+            vm.confirmGalleryPhoto()
+
+            coVerify {
+                repository.saveCapturedPhoto("WO-1", "P-1", galleryFile.absolutePath, 10.0, 106.0005, 20.0, galleryTime)
+            }
+            verify(exactly = 0) { exif.write(any(), any(), any()) }
+            assertTrue(done)
+            assertFalse(vm.locationMissing.value)
+        }
+
+    @Test
+    fun `a gallery photo without gps is rejected and nothing is saved`() =
+        runTest {
+            every { photoLocation.read(galleryFile) } returns null
+            val vm = viewModel()
+            vm.onGalleryPhotoPicked(galleryFile) {}
+            vm.confirmGalleryPhoto()
+            assertTrue(vm.galleryRejection.value!!.contains("không có vị trí"))
+            assertNull(vm.galleryFix.value)
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+            vm.dismissGalleryRejection()
+            assertNull(vm.galleryRejection.value)
+        }
+
+    @Test
+    fun `a gallery photo without a capture time is rejected`() =
+        runTest {
+            every { photoLocation.read(galleryFile) } returns PhotoLocation(10.0, 106.0, null)
+            val vm = viewModel()
+            vm.onGalleryPhotoPicked(galleryFile) {}
+            assertTrue(vm.galleryRejection.value!!.contains("giờ chụp"))
+            assertNull(vm.galleryFix.value)
+        }
+
+    @Test
+    fun `an unreadable gallery photo is rejected instead of crashing`() =
+        runTest {
+            every { photoLocation.read(galleryFile) } throws IllegalStateException("broken")
+            val vm = viewModel()
+            vm.onGalleryPhotoPicked(galleryFile) {}
+            assertTrue(vm.galleryRejection.value!!.contains("không có vị trí"))
+        }
+
+    @Test
+    fun `a gallery photo outside the corridor asks first and then saves without touching its exif`() =
+        runTest {
+            coEvery { repository.routeGeometry("WO-1") } returns route
+            every { photoLocation.read(galleryFile) } returns PhotoLocation(10.0005, 106.0005, galleryTime)
+            val vm = viewModel()
+            vm.onPermissionGranted()
+            vm.onGalleryPhotoPicked(galleryFile) {}
+            vm.confirmGalleryPhoto()
+            assertTrue(vm.pendingCorridor.value is CorridorCheck.Outside)
+            coVerify(exactly = 0) { repository.saveCapturedPhoto(any(), any(), any(), any(), any(), any(), any()) }
+
+            vm.confirmOutsideCorridor()
+
+            coVerify {
+                repository.saveCapturedPhoto(
+                    "WO-1",
+                    "P-1",
+                    galleryFile.absolutePath,
+                    10.0005,
+                    106.0005,
+                    20.0,
+                    galleryTime,
+                )
+            }
+            verify(exactly = 0) { exif.write(any(), any(), any()) }
         }
 }
