@@ -28,7 +28,7 @@ class CameraOnlyEvidenceTest {
                 mockk<LocationTracker>(relaxed = true),
             )
         composeRule.setContent {
-            LuxMapTheme { EvidenceCaptureRoute(onDone = {}, viewModel = viewModel) }
+            LuxMapTheme { EvidenceCaptureRoute(onDone = {}, viewModel = viewModel, autoStart = false) }
         }
         composeRule.onNodeWithText("Chụp ảnh").assertIsDisplayed()
         composeRule.onNodeWithText("Chọn từ thư viện").assertDoesNotExist()

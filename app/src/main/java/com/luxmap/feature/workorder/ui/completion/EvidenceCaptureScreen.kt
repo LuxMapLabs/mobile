@@ -7,7 +7,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,11 +17,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,11 +51,19 @@ import java.io.File
 fun EvidenceCaptureRoute(
     onDone: () -> Unit,
     viewModel: EvidenceCaptureViewModel = hiltViewModel(),
+    autoStart: Boolean = true,
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     var pendingPath by rememberSaveable { mutableStateOf<String?>(null) }
     var launchError by rememberSaveable { mutableStateOf<String?>(null) }
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+
+    fun close() {
+        if (state.busy) return
+        viewModel.skipPhotosWithoutLocation()
+        onDone()
+    }
 
     val takePicture =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -61,6 +73,7 @@ fun EvidenceCaptureRoute(
                 viewModel.onPhotoCaptured(file, onDone)
             } else {
                 file?.delete()
+                close()
             }
         }
 
@@ -88,19 +101,47 @@ fun EvidenceCaptureRoute(
             viewModel.useCurrentLocation()
         }
 
-    fun close() {
-        if (state.busy) return
-        viewModel.skipPhotosWithoutLocation()
-        onDone()
+    fun startCapture() {
+        launchError = null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            launchCamera()
+        } else {
+            cameraPermissions.launch(
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }
     }
 
+    LaunchedEffect(Unit) {
+        if (autoStart && !autoStarted) {
+            autoStarted = true
+            startCapture()
+        }
+    }
+
+    val showControls =
+        !autoStart || launchError != null || state.failed > 0 || state.awaitingLocation > 0 || state.added > 0
     BackHandler(enabled = true) { close() }
     Scaffold(
         topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) },
         bottomBar = {
-            BottomActionBar(ctaText = "Xong", onCtaClick = { close() }, ctaEnabled = !state.busy)
+            if (showControls) {
+                BottomActionBar(ctaText = "Xong", onCtaClick = { close() }, ctaEnabled = !state.busy)
+            }
         },
     ) { padding ->
+        if (!showControls) {
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+            return@Scaffold
+        }
         Column(
             modifier =
                 Modifier
@@ -131,22 +172,7 @@ fun EvidenceCaptureRoute(
                     )
                     PrimaryButton(
                         text = if (state.busy) "Đang chuẩn bị ảnh…" else "Chụp ảnh",
-                        onClick = {
-                            launchError = null
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                                PackageManager.PERMISSION_GRANTED
-                            ) {
-                                launchCamera()
-                            } else {
-                                cameraPermissions.launch(
-                                    arrayOf(
-                                        Manifest.permission.CAMERA,
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    ),
-                                )
-                            }
-                        },
+                        onClick = ::startCapture,
                         enabled = available,
                         isLoading = state.busy,
                         branded = true,
