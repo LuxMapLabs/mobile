@@ -52,6 +52,7 @@ fun PoleIdentificationDetails(
     modifier: Modifier = Modifier,
     phoneLat: Double? = null,
     phoneLng: Double? = null,
+    showLocation: Boolean = true,
 ) {
     var expanded by rememberSaveable(poleId) { mutableStateOf(false) }
     val context = LocalContext.current
@@ -64,8 +65,10 @@ fun PoleIdentificationDetails(
                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             lampLabel?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            poleDistanceLabel(phoneLat, phoneLng, lat, lng)?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall)
+            if (showLocation) {
+                poleDistanceLabel(phoneLat, phoneLng, lat, lng)?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall)
+                }
             }
             if (nearSensitivePoi == true) StatusBadge(text = "Gần trường/cầu", colors = LuxTheme.status.kind)
         }
@@ -83,14 +86,16 @@ fun PoleIdentificationDetails(
                 positionLabel?.let { Text(it) }
                 note?.takeIf { it.isNotBlank() }?.let { Text(it) }
                 lampLabel?.let { Text(it) }
-                TextButton(
-                    onClick = {
-                        expanded = false
-                        onOpenMap()
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                ) { Text("Xem trên bản đồ") }
-                if (lat != null && lng != null) {
+                if (showLocation) {
+                    TextButton(
+                        onClick = {
+                            expanded = false
+                            onOpenMap()
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text("Xem trên bản đồ") }
+                }
+                if (showLocation && lat != null && lng != null) {
                     TextButton(
                         onClick = { openInMaps(context, lat, lng) },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),

@@ -116,7 +116,6 @@ import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionOutcomeBadge
 import com.luxmap.feature.workorder.ui.detail.sections.InspectionSection
-import com.luxmap.feature.workorder.ui.detail.sections.OrderPolesSection
 import com.luxmap.feature.workorder.ui.detail.sections.PoleGpsSection
 import com.luxmap.feature.workorder.ui.detail.sections.RepairCompletionSection
 import com.luxmap.feature.workorder.ui.detail.sections.SurveySection
@@ -246,7 +245,7 @@ fun WorkOrderDetailScreen(
         submitEvents.collect { event ->
             snackbarHostState.showSnackbar(
                 when (event) {
-                    ReportSubmitEvent.SavedLocally -> "Đã lưu báo cáo trên máy · sẽ gửi khi có mạng"
+                    ReportSubmitEvent.SavedLocally -> "Đã lưu báo cáo trên máy, đang đồng bộ"
                     is ReportSubmitEvent.Failed -> "Không lưu được báo cáo: ${event.reason}"
                 },
             )
@@ -598,14 +597,6 @@ private fun WorkOrderDetailContent(
             if (messages.notes.isNotEmpty()) {
                 WorkOrderNotesCard(notes = messages.notes)
             }
-            if (kind == WorkOrderTaskKind.INSPECTION || kind == WorkOrderTaskKind.REPAIR) {
-                OrderPolesSection(
-                    state = state.orderPoles,
-                    faultPoleIds = detail.faults.mapNotNull { it.poleId }.toSet(),
-                    onRetry = onRetryPoles,
-                    onOpenMap = onOpenMap,
-                )
-            }
             if (kind == WorkOrderTaskKind.SURVEY) {
                 SurveySection(
                     started = status == WorkOrderStatus.IN_PROGRESS,
@@ -667,6 +658,7 @@ private fun WorkOrderDetailContent(
                     onOpenPoleOnMap = { poleId, lat, lng ->
                         onOpenMap(poleId, lat.takeIf { it != 0.0 }, lng.takeIf { it != 0.0 }, false)
                     },
+                    showLocation = false,
                     footer = { fault ->
                         fault.inspectionOutcome?.let { outcome ->
                             FaultFooter { InspectionOutcomeBadge(outcome) }
