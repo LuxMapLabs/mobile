@@ -86,15 +86,6 @@ sealed interface Routes {
         fun createRoute(workOrderId: String) = "work-order/$workOrderId"
     }
 
-    data object WorkOrderEvidenceCapture : Routes {
-        override val route = "work-order/{workOrderId}/complete/evidence?kind={kind}"
-
-        fun createRoute(
-            workOrderId: String,
-            kind: String,
-        ) = "work-order/$workOrderId/complete/evidence?kind=$kind"
-    }
-
     data object PoleGpsMeasure : Routes {
         override val route = "work-order/{workOrderId}/pole-gps/{poleId}"
 

@@ -133,4 +133,33 @@ class EvidenceCaptureViewModelTest {
             assertEquals(0, vm.state.value.awaitingLocation)
             assertEquals(1, vm.state.value.added)
         }
+
+    @Test
+    fun `beginCapture gives each capture a fresh clientOpId and the requested kind`() =
+        runTest {
+            val repository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            val locationTracker = mockk<LocationTracker>()
+            io.mockk.coEvery { locationTracker.getCurrentLocation() } returns LatLng(10.97, 106.49)
+            val vm = EvidenceCaptureViewModel(savedStateHandle(), repository, locationTracker)
+            val firstId = vm.clientOpId
+
+            vm.beginCapture(EvidenceKind.OBSERVATION)
+            val secondId = vm.clientOpId
+            val file = vm.outputFile(kotlin.io.path.createTempDirectory().toFile()).apply { writeText("jpeg") }
+            vm.onPhotoCaptured(file) {}
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assert(firstId != secondId)
+            coVerify {
+                repository.captureEvidence(
+                    workOrderId = WORK_ORDER_ID,
+                    kind = EvidenceKind.OBSERVATION,
+                    clientOpId = secondId,
+                    filePath = file.absolutePath,
+                    lat = 10.97,
+                    lng = 106.49,
+                    capturedAt = any(),
+                )
+            }
+        }
 }

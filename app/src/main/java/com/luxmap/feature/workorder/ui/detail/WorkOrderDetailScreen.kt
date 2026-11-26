@@ -110,6 +110,7 @@ import com.luxmap.feature.workorder.data.EvidenceKind
 import com.luxmap.feature.workorder.data.WorkOrderDetail
 import com.luxmap.feature.workorder.data.WorkOrderFaultDetail
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
+import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureHost
 import com.luxmap.feature.workorder.ui.detail.sections.CompletionEvidenceSection
 import com.luxmap.feature.workorder.ui.detail.sections.FaultFooter
 import com.luxmap.feature.workorder.ui.detail.sections.FaultListCard
@@ -127,7 +128,6 @@ import java.time.LocalDate
 @Composable
 fun WorkOrderDetailRoute(
     onBack: () -> Unit,
-    onCaptureEvidence: (EvidenceKind) -> Unit,
     onStartSurvey: (workOrderId: String) -> Unit,
     onOpenPdf: (attachmentId: String) -> Unit = {},
     onMeasurePole: (poleId: String) -> Unit = {},
@@ -138,6 +138,8 @@ fun WorkOrderDetailRoute(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var evidenceRequest by remember { mutableStateOf<EvidenceKind?>(null) }
+    EvidenceCaptureHost(request = evidenceRequest, onRequestHandled = { evidenceRequest = null })
     val lifecycleOwner = LocalLifecycleOwner.current
     val leave: () -> Unit = {
         scope.launch {
@@ -184,8 +186,8 @@ fun WorkOrderDetailRoute(
         onCaptureEvidence = {
             val state = uiState as? WorkOrderDetailUiState.Success
             when (state?.detail?.taskKind) {
-                "inspection" -> viewModel.prepareEvidenceCapture { onCaptureEvidence(EvidenceKind.OBSERVATION) }
-                "repair" -> viewModel.prepareEvidenceCapture { onCaptureEvidence(EvidenceKind.AFTER) }
+                "inspection" -> viewModel.prepareEvidenceCapture { evidenceRequest = EvidenceKind.OBSERVATION }
+                "repair" -> viewModel.prepareEvidenceCapture { evidenceRequest = EvidenceKind.AFTER }
                 else -> Unit
             }
         },
