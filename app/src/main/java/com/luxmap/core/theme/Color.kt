@@ -152,7 +152,7 @@ enum class WorkOrderStatus { OPEN, ASSIGNED, IN_PROGRESS, DONE, VERIFIED, CANCEL
 fun WorkOrderStatus.label(): String =
     when (this) {
         WorkOrderStatus.OPEN -> "Mở"
-        WorkOrderStatus.ASSIGNED -> "Đã giao"
+        WorkOrderStatus.ASSIGNED -> "Chưa bắt đầu"
         WorkOrderStatus.IN_PROGRESS -> "Đang thực hiện"
         WorkOrderStatus.DONE -> "Hoàn tất"
         WorkOrderStatus.VERIFIED -> "Đã nghiệm thu"

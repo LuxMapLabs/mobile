@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.SyncStatus
+import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.WorkOrderTaskKind
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.icon
@@ -74,7 +75,9 @@ private fun CardHeader(item: HubItem) {
             StatusBadge(text = sync.label(), colors = sync.badgeColors(), icon = sync.icon())
         } else {
             val status = workOrderStatusFromWire(item.order.woStatus)
-            StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+            if (status != WorkOrderStatus.ASSIGNED && status != WorkOrderStatus.OPEN) {
+                StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+            }
         }
     }
 }
