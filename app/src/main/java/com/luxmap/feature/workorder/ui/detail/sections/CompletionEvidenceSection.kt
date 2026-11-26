@@ -124,21 +124,23 @@ private fun PhotoTile(
                         .clickable(role = Role.Button, onClick = onOpen),
                 contentScale = ContentScale.Crop,
             )
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(Spacing.xs)
-                        .size(RemoveVisualSize)
-                        .background(badge.background, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = state.icon,
-                    contentDescription = null,
-                    tint = badge.text,
-                    modifier = Modifier.size(16.dp),
-                )
+            if (state.sync != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(Spacing.xs)
+                            .size(RemoveVisualSize)
+                            .background(badge.background, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = state.icon,
+                        contentDescription = null,
+                        tint = badge.text,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
             }
             if (removable) {
                 Box(
@@ -167,12 +169,14 @@ private fun PhotoTile(
                 }
             }
         }
-        Text(
-            text = state.label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-        )
+        if (state.sync != null) {
+            Text(
+                text = state.label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+            )
+        }
     }
 }
 

@@ -129,7 +129,7 @@ fun EvidenceCaptureRoute(
         !autoStart || launchError != null || state.failed > 0 || state.awaitingLocation > 0 || state.added > 0
     BackHandler(enabled = true) { close() }
     Scaffold(
-        topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) },
+        topBar = { if (showControls) LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) },
         bottomBar = {
             if (showControls) {
                 BottomActionBar(ctaText = "Xong", onCtaClick = { close() }, ctaEnabled = !state.busy)
@@ -138,7 +138,7 @@ fun EvidenceCaptureRoute(
     ) { padding ->
         if (!showControls) {
             Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                if (state.busy) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
             return@Scaffold
         }
