@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,8 +38,8 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 
-private val ListLeadingBoxSize = 40.dp
-private val ListLeadingIconSize = 24.dp
+private val ListLeadingBoxSize = 44.dp
+private val ListLeadingIconSize = 26.dp
 private val OneLineItemHeight = 56.dp
 private val TwoLineItemHeight = 72.dp
 private val ThreeLineItemHeight = 88.dp
@@ -147,13 +147,13 @@ fun LuxListItem(
                 modifier =
                     Modifier
                         .size(ListLeadingBoxSize)
-                        .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.small),
+                        .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(ListLeadingIconSize),
                 )
             }
@@ -183,7 +183,7 @@ fun LuxListItem(
         trailing?.invoke()
         if (showChevron) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -202,7 +202,7 @@ private fun LuxContentPreview() {
                     overline = "Sửa chữa WO-1042",
                     headline = "Tuyến ĐH-12 (Xã Tân Phú)",
                     supporting = "Hạn hôm nay",
-                    leadingIcon = Icons.Filled.Build,
+                    leadingIcon = Icons.Rounded.Build,
                     onClick = {},
                     trailing = {
                         StatusBadge(

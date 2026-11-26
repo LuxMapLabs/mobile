@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +33,7 @@ fun InlineErrorText(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Filled.ErrorOutline,
+            imageVector = Icons.Rounded.ErrorOutline,
             contentDescription = null,
             tint = color,
             modifier = Modifier.size(Spacing.xl),

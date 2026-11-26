@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,7 +37,7 @@ internal fun QuickViewHeader(
             }
         }
         IconButton(onClick = onClose) {
-            Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng")
+            Icon(imageVector = Icons.Rounded.Close, contentDescription = "Đóng")
         }
     }
 }

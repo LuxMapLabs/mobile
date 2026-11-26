@@ -18,20 +18,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.HourglassEmpty
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.rounded.HourglassEmpty
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.PhotoLibrary
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.VideoLibrary
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -304,11 +304,11 @@ private fun ReportMethodSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            ReportMethodOption(icon = Icons.Filled.PhotoCamera, label = "Chụp ảnh", onClick = onChoosePhoto)
-            ReportMethodOption(icon = Icons.Filled.PhotoLibrary, label = "Chọn từ thư viện", onClick = onChooseGallery)
-            ReportMethodOption(icon = Icons.Filled.Videocam, label = "Quay video", onClick = onChooseVideo)
+            ReportMethodOption(icon = Icons.Rounded.PhotoCamera, label = "Chụp ảnh", onClick = onChoosePhoto)
+            ReportMethodOption(icon = Icons.Rounded.PhotoLibrary, label = "Chọn từ thư viện", onClick = onChooseGallery)
+            ReportMethodOption(icon = Icons.Rounded.Videocam, label = "Quay video", onClick = onChooseVideo)
             ReportMethodOption(
-                icon = Icons.Filled.VideoLibrary,
+                icon = Icons.Rounded.VideoLibrary,
                 label = "Video từ thư viện",
                 onClick = onChooseVideoGallery,
             )
@@ -335,7 +335,7 @@ private fun ReportMethodOption(
         Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Text(text = label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         Icon(
-            imageVector = Icons.Filled.ChevronRight,
+            imageVector = Icons.Rounded.ChevronRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -448,7 +448,7 @@ private fun PoleRow(
                     StatusBadge(
                         text = if (lux.isSyncFailed) "$value · chưa gửi được" else value,
                         colors = if (lux.isSyncFailed) SyncStatus.FAILED.badgeColors() else LuxTheme.status.kind,
-                        icon = Icons.Filled.WbSunny,
+                        icon = Icons.Rounded.WbSunny,
                         modifier = Modifier.testTag("pole_lux_${pole.poleId}"),
                     )
                 }
@@ -457,20 +457,20 @@ private fun PoleRow(
         when {
             action is PoleRowAction.OpenAiResult ->
                 Icon(
-                    imageVector = Icons.Filled.ChevronRight,
+                    imageVector = Icons.Rounded.ChevronRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("pole_chevron_${pole.poleId}"),
                 )
             action is PoleRowAction.OpenReportSheet && pole.syncStatus == null ->
                 Icon(
-                    imageVector = Icons.Filled.CameraAlt,
+                    imageVector = Icons.Rounded.CameraAlt,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
             action is PoleRowAction.OpenReportSheet ->
                 Icon(
-                    imageVector = Icons.Filled.Replay,
+                    imageVector = Icons.Rounded.Replay,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.testTag("pole_retake_${pole.poleId}"),
@@ -481,9 +481,9 @@ private fun PoleRow(
 
 private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
     when (this) {
-        PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Filled.Lightbulb)
+        PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Rounded.Lightbulb)
         PoleAiVerdict.OFF -> Triple(AssetCondition.OUT, "Đèn tắt", Icons.Outlined.Lightbulb)
-        PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "Không xác định", Icons.Filled.Help)
+        PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "Không xác định", Icons.Rounded.Help)
     }
 
 @Composable
@@ -499,8 +499,8 @@ private fun PoleProgress.badge(): Triple<BadgeColors, String, ImageVector> {
         PoleProgress.SYNCING -> sync(SyncStatus.SYNCING)
         PoleProgress.QUEUED_OFFLINE -> sync(SyncStatus.QUEUED_OFFLINE)
         PoleProgress.QUEUED_ONLINE -> sync(SyncStatus.QUEUED_ONLINE)
-        PoleProgress.REVIEW_SAVED -> Triple(LuxTheme.status.kind, "Đã xác nhận", Icons.Filled.EditNote)
-        PoleProgress.AWAITING_DECISION -> Triple(LuxTheme.status.kind, "Chờ duyệt", Icons.Filled.HourglassEmpty)
+        PoleProgress.REVIEW_SAVED -> Triple(LuxTheme.status.kind, "Đã xác nhận", Icons.Rounded.EditNote)
+        PoleProgress.AWAITING_DECISION -> Triple(LuxTheme.status.kind, "Chờ duyệt", Icons.Rounded.HourglassEmpty)
         PoleProgress.UPLOADED -> sync(SyncStatus.DONE, "Đã tải lên")
     }
 }

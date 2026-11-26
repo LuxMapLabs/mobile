@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.MyLocation
+import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -55,7 +55,7 @@ fun PoleQuickViewBottomSheet(
                 StatusBadge(
                     text = "GPS đề xuất — chưa duyệt",
                     colors = WorkOrderStatus.IN_PROGRESS.badgeColors(),
-                    icon = Icons.Filled.MyLocation,
+                    icon = Icons.Rounded.MyLocation,
                 )
                 LuxBanner(
                     title = "Tọa độ chưa duyệt",
@@ -68,7 +68,7 @@ fun PoleQuickViewBottomSheet(
                 StatusBadge(
                     text = pole.fixtureStatus.mapLabel(),
                     colors = pole.fixtureStatus.badgeColors(),
-                    icon = Icons.Filled.Lightbulb,
+                    icon = Icons.Rounded.Lightbulb,
                 )
             }
             Column {
@@ -100,7 +100,7 @@ fun PoleQuickViewBottomSheet(
                     LuxSecondaryButton(
                         text = "Đường đi",
                         onClick = onNavigate ?: { openInMaps(context, pole.lat, pole.lng) },
-                        leadingIcon = Icons.Filled.Navigation,
+                        leadingIcon = Icons.Rounded.Navigation,
                         modifier = actionModifier,
                     )
                 },

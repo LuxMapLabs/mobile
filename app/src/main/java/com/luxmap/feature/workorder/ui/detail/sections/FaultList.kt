@@ -9,16 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.PowerOff
-import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.SensorsOff
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.WbTwilight
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.Help
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.PowerOff
+import androidx.compose.material.icons.rounded.ReportProblem
+import androidx.compose.material.icons.rounded.SensorsOff
+import androidx.compose.material.icons.rounded.TrendingDown
+import androidx.compose.material.icons.rounded.WbTwilight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -112,7 +112,7 @@ private fun FaultItem(
                 if (fault.hasLocation()) {
                     IconButton(onClick = onNavigate, modifier = Modifier.size(Dimens.minTouchTarget)) {
                         Icon(
-                            imageVector = Icons.Filled.Navigation,
+                            imageVector = Icons.Rounded.Navigation,
                             contentDescription = "Điều hướng",
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -131,21 +131,21 @@ private fun FaultItem(
 
 private fun faultTypeIcon(faultType: String): ImageVector =
     when (faultType) {
-        "lamp_out" -> Icons.Filled.Lightbulb
-        "lamp_dim" -> Icons.Filled.WbTwilight
-        "segment_outage" -> Icons.Filled.PowerOff
-        "node_offline" -> Icons.Filled.SensorsOff
-        "runtime_decline" -> Icons.Filled.TrendingDown
-        else -> Icons.Filled.ReportProblem
+        "lamp_out" -> Icons.Rounded.Lightbulb
+        "lamp_dim" -> Icons.Rounded.WbTwilight
+        "segment_outage" -> Icons.Rounded.PowerOff
+        "node_offline" -> Icons.Rounded.SensorsOff
+        "runtime_decline" -> Icons.Rounded.TrendingDown
+        else -> Icons.Rounded.ReportProblem
     }
 
 @Composable
 internal fun InspectionOutcomeBadge(outcome: String) {
     val (condition, icon) =
         when (outcome) {
-            "fault_present" -> AssetCondition.OUT to Icons.Filled.Error
-            "fault_absent" -> AssetCondition.NORMAL to Icons.Filled.CheckCircle
-            else -> AssetCondition.UNKNOWN to Icons.Filled.Help
+            "fault_present" -> AssetCondition.OUT to Icons.Rounded.Error
+            "fault_absent" -> AssetCondition.NORMAL to Icons.Rounded.CheckCircle
+            else -> AssetCondition.UNKNOWN to Icons.Rounded.Help
         }
     StatusBadge(text = inspectionOutcomeLabel(outcome), colors = condition.badgeColors(), icon = icon)
 }

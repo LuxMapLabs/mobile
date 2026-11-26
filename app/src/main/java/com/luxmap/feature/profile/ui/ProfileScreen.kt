@@ -18,9 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Wifi
-import androidx.compose.material.icons.filled.WifiOff
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -289,14 +289,14 @@ private fun StatusSection(
         LuxCard {
             Column {
                 StatusRow(
-                    icon = if (isOnline) Icons.Filled.Wifi else Icons.Filled.WifiOff,
+                    icon = if (isOnline) Icons.Rounded.Wifi else Icons.Rounded.WifiOff,
                     label = "Kết nối mạng",
                     value = if (isOnline) "Trực tuyến" else "Ngoại tuyến",
                     valueColor = if (isOnline) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 StatusRow(
-                    icon = Icons.Filled.Sync,
+                    icon = Icons.Rounded.Sync,
                     label = "Đồng bộ dữ liệu",
                     value = profileSyncSummary(pendingSyncCount, errorSyncCount, lastSyncedAt),
                     valueColor =
@@ -329,7 +329,7 @@ private fun StatusRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
         }
         Text(text = value, style = MaterialTheme.typography.bodyMedium, color = valueColor)

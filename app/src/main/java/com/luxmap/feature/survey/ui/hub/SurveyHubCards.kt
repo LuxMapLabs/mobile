@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -60,7 +60,7 @@ private fun CardHeader(item: HubItem) {
             Icon(
                 imageVector = kind.icon(),
                 contentDescription = null,
-                tint = kind.badgeColors().text,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
             Text(
@@ -113,7 +113,7 @@ private fun CardBody(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Schedule,
+                        imageVector = Icons.Rounded.Schedule,
                         contentDescription = null,
                         tint = LuxTheme.colors.dueOverdue,
                         modifier = Modifier.size(16.dp),

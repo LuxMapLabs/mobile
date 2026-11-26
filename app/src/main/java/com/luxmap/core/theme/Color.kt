@@ -1,20 +1,20 @@
 package com.luxmap.core.theme
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Assignment
+import androidx.compose.material.icons.rounded.Autorenew
+import androidx.compose.material.icons.rounded.Build
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
@@ -112,11 +112,11 @@ fun SyncStatus.label(): String =
 
 fun SyncStatus.icon(): ImageVector =
     when (this) {
-        SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE -> Icons.Filled.Schedule
-        SyncStatus.SYNCING -> Icons.Filled.Sync
-        SyncStatus.FAILED -> Icons.Filled.ErrorOutline
-        SyncStatus.CONFLICT -> Icons.Filled.Warning
-        SyncStatus.DONE -> Icons.Filled.CloudDone
+        SyncStatus.QUEUED_OFFLINE, SyncStatus.QUEUED_ONLINE -> Icons.Rounded.Schedule
+        SyncStatus.SYNCING -> Icons.Rounded.Sync
+        SyncStatus.FAILED -> Icons.Rounded.ErrorOutline
+        SyncStatus.CONFLICT -> Icons.Rounded.Warning
+        SyncStatus.DONE -> Icons.Rounded.CloudDone
     }
 
 enum class WorkOrderPriority { LOW, NORMAL, HIGH, URGENT }
@@ -161,11 +161,11 @@ fun WorkOrderStatus.label(): String =
 
 fun WorkOrderStatus.icon(): ImageVector =
     when (this) {
-        WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED -> Icons.Filled.Assignment
-        WorkOrderStatus.IN_PROGRESS -> Icons.Filled.Autorenew
-        WorkOrderStatus.DONE -> Icons.Filled.CheckCircle
-        WorkOrderStatus.VERIFIED -> Icons.Filled.Verified
-        WorkOrderStatus.CANCELLED -> Icons.Filled.Cancel
+        WorkOrderStatus.OPEN, WorkOrderStatus.ASSIGNED -> Icons.Rounded.Assignment
+        WorkOrderStatus.IN_PROGRESS -> Icons.Rounded.Autorenew
+        WorkOrderStatus.DONE -> Icons.Rounded.CheckCircle
+        WorkOrderStatus.VERIFIED -> Icons.Rounded.Verified
+        WorkOrderStatus.CANCELLED -> Icons.Rounded.Cancel
     }
 
 @Composable
@@ -199,10 +199,10 @@ fun WorkOrderTaskKind.label(): String =
 
 fun WorkOrderTaskKind.icon(): ImageVector =
     when (this) {
-        WorkOrderTaskKind.INSPECTION -> Icons.Filled.Search
-        WorkOrderTaskKind.REPAIR -> Icons.Filled.Build
-        WorkOrderTaskKind.SURVEY -> Icons.Filled.Videocam
-        WorkOrderTaskKind.POLE_GPS_UPDATE -> Icons.Filled.LocationOn
+        WorkOrderTaskKind.INSPECTION -> Icons.Rounded.Search
+        WorkOrderTaskKind.REPAIR -> Icons.Rounded.Build
+        WorkOrderTaskKind.SURVEY -> Icons.Rounded.Videocam
+        WorkOrderTaskKind.POLE_GPS_UPDATE -> Icons.Rounded.LocationOn
     }
 
 @Composable

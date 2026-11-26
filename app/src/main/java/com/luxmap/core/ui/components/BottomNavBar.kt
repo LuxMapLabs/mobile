@@ -47,7 +47,7 @@ fun BottomNavBar(
                         selectedIconColor = LuxTheme.brand.onLumen,
                         selectedTextColor = MaterialTheme.colorScheme.onSurface,
                         indicatorColor = LuxTheme.brand.lumen,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurface,
                         unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
             )

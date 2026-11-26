@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,7 +63,7 @@ fun PoleMediaPreviewFrame(
         ) {
             IconButton(onClick = onClose, enabled = !isSaving) {
                 Icon(
-                    imageVector = Icons.Filled.Close,
+                    imageVector = Icons.Rounded.Close,
                     contentDescription = "Đóng",
                     tint = MaterialTheme.colorScheme.onSurface,
                 )

@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Navigation
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -143,10 +143,10 @@ private fun RowScope.ButtonContent(
 private fun LuxButtonsPreview() {
     LuxMapTheme {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            LuxSecondaryButton(text = "Chỉ đường", onClick = {}, leadingIcon = Icons.Filled.Navigation)
+            LuxSecondaryButton(text = "Chỉ đường", onClick = {}, leadingIcon = Icons.Rounded.Navigation)
             LuxSecondaryButton(text = "Chỉ đường", onClick = {}, enabled = false)
             LuxTextButton(text = "Xem thêm", onClick = {})
-            LuxDestructiveButton(text = "Đăng xuất", onClick = {}, leadingIcon = Icons.AutoMirrored.Filled.Logout)
+            LuxDestructiveButton(text = "Đăng xuất", onClick = {}, leadingIcon = Icons.AutoMirrored.Rounded.Logout)
             LuxDestructiveButton(text = "Yêu cầu hủy", onClick = {}, filled = false)
         }
     }

@@ -13,12 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -186,7 +186,7 @@ private fun PdfAttachmentItem(
     LuxListItem(
         headline = attachment.fileName,
         supporting = supporting,
-        leadingIcon = Icons.Filled.Description,
+        leadingIcon = Icons.Rounded.Description,
         onClick = onTap,
         showChevron = false,
         trailing =
@@ -194,7 +194,7 @@ private fun PdfAttachmentItem(
                 {
                     IconButton(onClick = onDownload) {
                         Icon(
-                            imageVector = Icons.Filled.Download,
+                            imageVector = Icons.Rounded.Download,
                             contentDescription = "Tải file ${attachment.fileName} về máy",
                             tint = MaterialTheme.colorScheme.primary,
                         )
@@ -227,7 +227,7 @@ private fun PoleGpsItem(
     ) {
         LuxListItem(
             headline = reference.poleId,
-            leadingIcon = Icons.Filled.LocationOn,
+            leadingIcon = Icons.Rounded.LocationOn,
             onClick = onOpenMap,
             showChevron = false,
             trailing =
@@ -240,7 +240,7 @@ private fun PoleGpsItem(
                                 modifier = Modifier.heightIn(min = Dimens.minTouchTarget),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.CameraAlt,
+                                    imageVector = Icons.Rounded.CameraAlt,
                                     contentDescription = null,
                                     modifier = Modifier.size(14.dp),
                                 )
@@ -253,7 +253,7 @@ private fun PoleGpsItem(
                                 modifier = Modifier.size(Dimens.minTouchTarget),
                             ) {
                                 Icon(
-                                    imageVector = Icons.Filled.Replay,
+                                    imageVector = Icons.Rounded.Replay,
                                     contentDescription = "Đo lại GPS cột ${reference.poleId}",
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
@@ -328,7 +328,7 @@ private fun PoleGpsItem(
                 ) {
                     if (outside) {
                         Icon(
-                            imageVector = Icons.Filled.Warning,
+                            imageVector = Icons.Rounded.Warning,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(16.dp),

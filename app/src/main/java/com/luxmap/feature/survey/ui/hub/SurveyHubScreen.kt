@@ -14,8 +14,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.rounded.Event
+import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -160,7 +160,7 @@ fun SurveyHubScreen(
                     LuxEmptyState(
                         title = "Chưa có dữ liệu đã lưu",
                         message = "Kết nối mạng để tải danh sách. Mở lệnh và tải PDF trước khi đi hiện trường.",
-                        icon = Icons.Filled.EventAvailable,
+                        icon = Icons.Rounded.EventAvailable,
                         actionLabel = "Thử lại",
                         onAction = onRetry,
                     )
@@ -169,7 +169,7 @@ fun SurveyHubScreen(
                     LuxEmptyState(
                         title = "Chưa có việc khảo sát được giao",
                         message = "Khi Quản lý giao tuyến khảo sát hoặc lệnh đo GPS cột, lệnh sẽ hiện ở đây.",
-                        icon = Icons.Filled.EventAvailable,
+                        icon = Icons.Rounded.EventAvailable,
                         actionLabel = "Làm mới",
                         onAction = onRetry,
                     )

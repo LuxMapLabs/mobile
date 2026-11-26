@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.PowerOff
+import androidx.compose.material.icons.automirrored.rounded.HelpOutline
+import androidx.compose.material.icons.rounded.Navigation
+import androidx.compose.material.icons.rounded.Power
+import androidx.compose.material.icons.rounded.PowerOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -88,7 +88,7 @@ fun CabinetQuickViewBottomSheet(
             LuxSecondaryButton(
                 text = "Đường đi",
                 onClick = onNavigate ?: { openInMaps(context, cabinet.lat, cabinet.lng) },
-                leadingIcon = Icons.Filled.Navigation,
+                leadingIcon = Icons.Rounded.Navigation,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -114,9 +114,9 @@ private fun FeederRow(feeder: CabinetFeeder) {
         }
         val (iotStatus, icon) =
             when (feeder.power) {
-                FeederPower.ON -> IotStatus.ONLINE to Icons.Filled.Power
-                FeederPower.OFF -> IotStatus.OFFLINE to Icons.Filled.PowerOff
-                FeederPower.UNKNOWN -> IotStatus.NONE to Icons.AutoMirrored.Filled.HelpOutline
+                FeederPower.ON -> IotStatus.ONLINE to Icons.Rounded.Power
+                FeederPower.OFF -> IotStatus.OFFLINE to Icons.Rounded.PowerOff
+                FeederPower.UNKNOWN -> IotStatus.NONE to Icons.AutoMirrored.Rounded.HelpOutline
             }
         StatusBadge(text = feeder.power.label(), colors = LuxTheme.status.iot.getValue(iotStatus), icon = icon)
     }

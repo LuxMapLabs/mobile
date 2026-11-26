@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -284,7 +284,7 @@ private fun HomeEmpty(onRetry: () -> Unit) {
     LuxEmptyState(
         title = "Chưa có việc được giao",
         message = "Khi Quản lý giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.",
-        icon = Icons.Filled.EventAvailable,
+        icon = Icons.Rounded.EventAvailable,
         actionLabel = "Làm mới",
         onAction = onRetry,
     )

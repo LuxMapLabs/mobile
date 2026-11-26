@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.BluetoothSearching
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.BluetoothSearching
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,9 +52,9 @@ fun LuxMeterSection(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Sensors,
+                    imageVector = Icons.Rounded.Sensors,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "Cảm biến lux", style = MaterialTheme.typography.bodyLarge)
@@ -65,7 +65,7 @@ fun LuxMeterSection(
                     )
                 }
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -138,7 +138,7 @@ private fun DeviceLists(
         LuxSecondaryButton(
             text = "Tìm thiết bị",
             onClick = onScan,
-            leadingIcon = Icons.Filled.BluetoothSearching,
+            leadingIcon = Icons.Rounded.BluetoothSearching,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -199,7 +199,7 @@ private fun DeviceRow(
         }
         if (isSelected) {
             Icon(
-                imageVector = Icons.Filled.CheckCircle,
+                imageVector = Icons.Rounded.CheckCircle,
                 contentDescription = "Đang dùng",
                 tint = MaterialTheme.colorScheme.primary,
             )

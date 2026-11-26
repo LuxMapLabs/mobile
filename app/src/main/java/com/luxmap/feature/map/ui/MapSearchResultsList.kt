@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ElectricBolt
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.rounded.ElectricBolt
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,7 +75,7 @@ fun MapSearchResultsList(
             item { ResultGroupHeader(label = "Cột") }
             items(results.poles, key = { it.poleId }) { pole ->
                 ResultRow(
-                    icon = Icons.Filled.Lightbulb,
+                    icon = Icons.Rounded.Lightbulb,
                     title = pole.poleId,
                     subtitle = pole.fixtureStatus.label(),
                     onClick = { onPoleClick(pole) },
@@ -86,7 +86,7 @@ fun MapSearchResultsList(
             item { ResultGroupHeader(label = "Tuyến") }
             items(results.segments, key = { it.segmentId }) { segment ->
                 ResultRow(
-                    icon = Icons.Filled.Route,
+                    icon = Icons.Rounded.Route,
                     title = segment.name,
                     subtitle = segment.segmentId,
                     onClick = { onSegmentClick(segment) },
@@ -97,7 +97,7 @@ fun MapSearchResultsList(
             item { ResultGroupHeader(label = "Tủ điện") }
             items(results.cabinets, key = { it.cabinetId }) { cabinet ->
                 ResultRow(
-                    icon = Icons.Filled.ElectricBolt,
+                    icon = Icons.Rounded.ElectricBolt,
                     title = cabinet.name,
                     subtitle = cabinet.cabinetId,
                     onClick = { onCabinetClick(cabinet) },

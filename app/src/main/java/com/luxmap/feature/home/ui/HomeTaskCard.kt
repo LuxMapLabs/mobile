@@ -11,11 +11,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.EventAvailable
-import androidx.compose.material.icons.filled.EventBusy
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.EventBusy
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -136,13 +136,13 @@ private fun HomeTaskBadgeView(badge: HomeTaskBadge) {
             StatusBadge(
                 text = badge.text,
                 colors = BadgeColors(MaterialTheme.colorScheme.errorContainer, LuxTheme.colors.dueOverdue),
-                icon = Icons.Filled.Lock,
+                icon = Icons.Rounded.Lock,
             )
         HomeTaskBadge.Overdue ->
             StatusBadge(
                 text = "Quá hạn",
                 colors = BadgeColors(MaterialTheme.colorScheme.errorContainer, LuxTheme.colors.dueOverdue),
-                icon = Icons.Filled.EventBusy,
+                icon = Icons.Rounded.EventBusy,
             )
         is HomeTaskBadge.Status -> {
             val status = workOrderStatusFromWire(badge.woStatus)
@@ -192,7 +192,7 @@ fun HomeTaskCard(
                     Icon(
                         imageVector = kind.icon(),
                         contentDescription = null,
-                        tint = kind.badgeColors().text,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
                     Text(
@@ -233,19 +233,19 @@ fun HomeTaskCard(
             ) {
                 val neutral = MaterialTheme.colorScheme.onSurfaceVariant
                 if (dates.scheduled == null && dates.due == null) {
-                    DateText(Icons.Filled.EventAvailable, "Chưa có lịch", neutral)
+                    DateText(Icons.Rounded.EventAvailable, "Chưa có lịch", neutral)
                 }
-                dates.scheduled?.let { DateText(Icons.Filled.EventAvailable, it, neutral) }
+                dates.scheduled?.let { DateText(Icons.Rounded.EventAvailable, it, neutral) }
                 dates.due?.takeUnless { badge is HomeTaskBadge.Locked }?.let {
                     DateText(
-                        if (dates.isOverdue) Icons.Filled.EventBusy else Icons.Filled.Schedule,
+                        if (dates.isOverdue) Icons.Rounded.EventBusy else Icons.Rounded.Schedule,
                         it,
                         dueColor,
                     )
                 }
             }
             Icon(
-                imageVector = Icons.Filled.ChevronRight,
+                imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

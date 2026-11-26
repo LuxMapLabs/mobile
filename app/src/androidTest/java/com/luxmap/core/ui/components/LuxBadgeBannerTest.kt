@@ -1,7 +1,7 @@
 package com.luxmap.core.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -24,7 +24,7 @@ class LuxBadgeBannerTest {
     fun a_status_badge_is_at_least_28dp_tall() {
         composeRule.setContent {
             LuxMapTheme {
-                StatusBadge(text = "Đã đồng bộ", colors = SyncStatus.DONE.badgeColors(), icon = Icons.Filled.CloudDone)
+                StatusBadge(text = "Đã đồng bộ", colors = SyncStatus.DONE.badgeColors(), icon = Icons.Rounded.CloudDone)
             }
         }
         composeRule.onNodeWithText("Đã đồng bộ").assertHeightIsAtLeast(28.dp)

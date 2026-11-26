@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Sensors
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -118,13 +118,13 @@ private fun CollapsedHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        Icon(imageVector = Icons.Filled.Sensors, contentDescription = null)
+        Icon(imageVector = Icons.Rounded.Sensors, contentDescription = null)
         Text(
             text = "Đo lux (tuỳ chọn)",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        Icon(imageVector = Icons.Filled.ExpandMore, contentDescription = null)
+        Icon(imageVector = Icons.Rounded.ExpandMore, contentDescription = null)
     }
 }
 

@@ -27,14 +27,14 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.WifiOff
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
@@ -221,7 +221,7 @@ internal fun LoginContent(
                 label = { Text("Tên đăng nhập hoặc email", style = MaterialTheme.typography.labelMedium) },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 placeholder = { Text("Tên đăng nhập hoặc email") },
-                leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
                 shape = MaterialTheme.shapes.medium,
@@ -256,7 +256,7 @@ internal fun LoginContent(
                 label = { Text("Mật khẩu", style = MaterialTheme.typography.labelMedium) },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 placeholder = { Text("Nhập mật khẩu") },
-                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
                 singleLine = true,
                 enabled = !isSubmitting,
                 shape = MaterialTheme.shapes.medium,
@@ -283,7 +283,7 @@ internal fun LoginContent(
                 trailingIcon = {
                     IconButton(onClick = onTogglePasswordVisibility) {
                         val icon =
-                            if (isPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility
+                            if (isPasswordVisible) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility
                         Icon(
                             imageVector = icon,
                             contentDescription =
@@ -325,7 +325,7 @@ internal fun LoginContent(
                 onClick = onLogin,
                 enabled = !isSubmitting,
                 isLoading = uiState is LoginUiState.LoggingIn,
-                trailingIcon = if (isSubmitting) null else Icons.AutoMirrored.Filled.ArrowForward,
+                trailingIcon = if (isSubmitting) null else Icons.AutoMirrored.Rounded.ArrowForward,
                 modifier = Modifier.fillMaxWidth(),
             )
 
