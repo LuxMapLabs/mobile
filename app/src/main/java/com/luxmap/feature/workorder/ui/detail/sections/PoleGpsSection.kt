@@ -230,17 +230,10 @@ private fun PoleGpsItem(
             leadingIcon = Icons.Filled.LocationOn,
             onClick = onOpenMap,
             showChevron = false,
-            trailing = {
+            trailing =
                 if (canCapture) {
-                    if (measurement == null || missingPhoto) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            StatusBadge(
-                                text = if (measurement == null) "Chưa chụp" else "Thiếu ảnh",
-                                colors = WorkOrderStatus.OPEN.badgeColors(),
-                            )
+                    {
+                        if (measurement == null || missingPhoto) {
                             FilledTonalButton(
                                 onClick = onMeasure,
                                 contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = 0.dp),
@@ -254,21 +247,7 @@ private fun PoleGpsItem(
                                 Spacer(modifier = Modifier.width(Spacing.xs))
                                 Text("Đo GPS", style = MaterialTheme.typography.labelSmall)
                             }
-                        }
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            val badgeText =
-                                if (measurement.source == MeasurementSource.DEVICE) "Đã đo" else "Đã báo trước"
-                            val badgeColors =
-                                if (measurement.source == MeasurementSource.DEVICE) {
-                                    WorkOrderStatus.VERIFIED.badgeColors()
-                                } else {
-                                    WorkOrderStatus.OPEN.badgeColors()
-                                }
-                            StatusBadge(text = badgeText, colors = badgeColors)
+                        } else {
                             IconButton(
                                 onClick = onMeasure,
                                 modifier = Modifier.size(Dimens.minTouchTarget),
@@ -282,22 +261,34 @@ private fun PoleGpsItem(
                         }
                     }
                 } else {
-                    val badgeText =
-                        when {
-                            measurement != null && missingPhoto -> "Thiếu ảnh"
-                            measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
-                            measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
-                            else -> "Chưa bắt đầu"
-                        }
-                    val badgeColors =
-                        if (measurement != null && !missingPhoto) {
-                            WorkOrderStatus.VERIFIED.badgeColors()
-                        } else {
-                            WorkOrderStatus.OPEN.badgeColors()
-                        }
-                    StatusBadge(text = badgeText, colors = badgeColors)
+                    null
+                },
+        )
+        val measured = measurement != null && !missingPhoto
+        val badgeText =
+            when {
+                canCapture && measurement == null -> "Chưa chụp"
+                measurement != null && missingPhoto -> "Thiếu ảnh"
+                measurement?.source == MeasurementSource.DEVICE -> "Đã đo"
+                measurement?.source == MeasurementSource.SERVER -> "Đã báo trước"
+                else -> "Chưa bắt đầu"
+            }
+        val badgeColors =
+            if (canCapture) {
+                if (measured && measurement?.source == MeasurementSource.DEVICE) {
+                    WorkOrderStatus.VERIFIED.badgeColors()
+                } else {
+                    WorkOrderStatus.OPEN.badgeColors()
                 }
-            },
+            } else if (measured) {
+                WorkOrderStatus.VERIFIED.badgeColors()
+            } else {
+                WorkOrderStatus.OPEN.badgeColors()
+            }
+        StatusBadge(
+            text = badgeText,
+            colors = badgeColors,
+            modifier = Modifier.padding(horizontal = Spacing.lg),
         )
         reference.identification?.let { item ->
             PoleIdentificationDetails(
