@@ -50,7 +50,7 @@ class WorkOrderPoleGpsDtoTest {
         assertEquals(listOf("P-1", "P-2"), dto.poleIds)
         assertEquals("/api/v1/work-orders/WO-1/attachments/A-1", dto.attachments.single().downloadUrl)
         assertEquals(2048L, dto.attachments.single().byteCount)
-        assertEquals(4.5, dto.poleLocations.single().accuracyM, 0.0)
+        assertEquals(4.5, dto.poleLocations.single().accuracyM!!, 0.0)
     }
 
     @Test

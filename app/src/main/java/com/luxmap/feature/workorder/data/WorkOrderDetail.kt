@@ -38,7 +38,7 @@ data class WorkOrderPoleLocation(
     val poleId: String,
     val lat: Double,
     val lng: Double,
-    val accuracyM: Double,
+    val accuracyM: Double?,
     val capturedAt: Instant,
 )
 

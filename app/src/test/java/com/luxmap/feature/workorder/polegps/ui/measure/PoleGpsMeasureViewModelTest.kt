@@ -535,13 +535,13 @@ class PoleGpsMeasureViewModelTest {
             vm.onPermissionGranted()
             var done = false
             vm.onGalleryPhotoPicked(galleryFile) { done = true }
-            assertEquals(GpsFix(10.0, 106.0005, 20.0, galleryTime, 1_000_000_000L), vm.galleryFix.value)
+            assertEquals(GpsFix(10.0, 106.0005, null, galleryTime, 1_000_000_000L), vm.galleryFix.value)
 
             nowNanos = 120_000_000_000L
             vm.confirmGalleryPhoto()
 
             coVerify {
-                repository.saveCapturedPhoto("WO-1", "P-1", galleryFile.absolutePath, 10.0, 106.0005, 20.0, galleryTime)
+                repository.saveCapturedPhoto("WO-1", "P-1", galleryFile.absolutePath, 10.0, 106.0005, null, galleryTime)
             }
             verify(exactly = 0) { exif.write(any(), any(), any()) }
             assertTrue(done)
@@ -602,7 +602,7 @@ class PoleGpsMeasureViewModelTest {
                     galleryFile.absolutePath,
                     10.0005,
                     106.0005,
-                    20.0,
+                    null,
                     galleryTime,
                 )
             }

@@ -34,7 +34,7 @@ data class PoleMeasurement(
     val poleId: String,
     val lat: Double,
     val lng: Double,
-    val accuracyM: Double,
+    val accuracyM: Double?,
     val capturedAt: Instant,
     val source: MeasurementSource,
     val photoFilePath: String? = null,
@@ -133,7 +133,7 @@ class PoleGpsRepository
             filePath: String,
             lat: Double,
             lng: Double,
-            accuracyM: Double,
+            accuracyM: Double?,
             capturedAt: Instant,
         ) {
             dao.upsertDeviceMeasurement(
@@ -212,7 +212,7 @@ class PoleGpsRepository
                 check(
                     measurement.lat.isFinite() && measurement.lat in -90.0..90.0 &&
                         measurement.lng.isFinite() && measurement.lng in -180.0..180.0 &&
-                        measurement.accuracyM.isFinite() && measurement.accuracyM >= 0,
+                        measurement.accuracyM.let { it == null || (it.isFinite() && it >= 0) },
                 ) { "Tọa độ cột không hợp lệ. Hãy đo lại." }
             }
             measurements.firstOrNull { it.evidenceUploadStatus == PHOTO_MISSING_ON_SERVER }?.let {

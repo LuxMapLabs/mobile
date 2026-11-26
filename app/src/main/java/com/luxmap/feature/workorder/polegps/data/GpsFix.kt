@@ -6,7 +6,7 @@ import java.time.Instant
 data class GpsFix(
     val lat: Double,
     val lng: Double,
-    val accuracyM: Double,
+    val accuracyM: Double?,
     val capturedAt: Instant,
     val elapsedRealtimeNanos: Long,
 )
