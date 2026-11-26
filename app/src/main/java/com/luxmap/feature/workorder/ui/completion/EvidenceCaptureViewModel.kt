@@ -29,21 +29,34 @@ internal data class EvidenceCaptureState(
 class EvidenceCaptureViewModel
     @Inject
     constructor(
-        savedStateHandle: SavedStateHandle,
+        private val savedStateHandle: SavedStateHandle,
         private val repository: WorkOrderCompletionRepository,
         private val locationTracker: LocationTracker,
     ) : ViewModel() {
         private val workOrderId: String = checkNotNull(savedStateHandle[WORK_ORDER_ID_ARG])
-        private val kind =
+        private var kind =
             EvidenceKind.entries.firstOrNull { it.wireValue == savedStateHandle.get<String>("kind") }
                 ?: EvidenceKind.AFTER
-        val clientOpId: String =
+        var clientOpId: String =
             savedStateHandle.get<String>("cameraOperationId") ?: UUID.randomUUID().toString().also {
                 savedStateHandle["cameraOperationId"] = it
             }
+            private set
         private val missingLocation = mutableListOf<PendingCameraPhoto>()
         private val _state = MutableStateFlow(EvidenceCaptureState())
         internal val state = _state.asStateFlow()
+
+        fun beginCapture(captureKind: EvidenceKind) {
+            kind = captureKind
+            clientOpId = UUID.randomUUID().toString().also { savedStateHandle["cameraOperationId"] = it }
+            missingLocation.forEach { it.file.delete() }
+            missingLocation.clear()
+            _state.value = EvidenceCaptureState()
+        }
+
+        internal fun dismissFeedback() {
+            _state.value = _state.value.copy(failed = 0)
+        }
 
         fun outputFile(filesDir: File): File = evidenceFile(filesDir, clientOpId)
 
@@ -122,7 +135,7 @@ class EvidenceCaptureViewModel
             _state.value =
                 previous.copy(
                     awaitingLocation = 0,
-                    failed = previous.failed + previous.awaitingLocation,
+                    failed = previous.failed,
                     locationUnavailable = false,
                 )
         }

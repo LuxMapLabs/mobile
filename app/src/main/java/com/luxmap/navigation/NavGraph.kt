@@ -54,7 +54,6 @@ import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
 import com.luxmap.feature.workorder.polegps.ui.measure.PoleGpsMeasureRoute
 import com.luxmap.feature.workorder.polegps.ui.pdf.PoleGpsPdfViewerRoute
-import com.luxmap.feature.workorder.ui.completion.EvidenceCaptureRoute
 import com.luxmap.feature.workorder.ui.detail.WorkOrderDetailRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -407,9 +406,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 val workOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
-                    onCaptureEvidence = { kind ->
-                        navController.navigate(Routes.WorkOrderEvidenceCapture.createRoute(workOrderId, kind.wireValue))
-                    },
                     onStartSurvey = {
                         navController.navigate(Routes.Survey.createRoute(workOrderId))
                     },
@@ -430,19 +426,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         )
                     },
                 )
-            }
-            composable(
-                route = Routes.WorkOrderEvidenceCapture.route,
-                arguments =
-                    listOf(
-                        navArgument("workOrderId") { type = NavType.StringType },
-                        navArgument("kind") {
-                            type = NavType.StringType
-                            defaultValue = "after"
-                        },
-                    ),
-            ) {
-                EvidenceCaptureRoute(onDone = { navController.popBackStack() })
             }
             composable(
                 route = Routes.PoleGpsMeasure.route,

@@ -4,24 +4,18 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,25 +30,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.luxmap.core.theme.Dimens
-import com.luxmap.core.theme.Radius
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.AppTopBar
-import com.luxmap.core.ui.components.LuxActionPair
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
+import com.luxmap.core.ui.components.LuxCard
+import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
-import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.feature.survey.ui.polephoto.PoleMediaPreviewFrame
 import com.luxmap.feature.workorder.polegps.data.CorridorCheck
 import com.luxmap.feature.workorder.polegps.data.GpsFix
 import com.luxmap.feature.workorder.polegps.data.ROUTE_CORRIDOR_METRES
 import com.luxmap.feature.workorder.polegps.ui.corridorPreviewLabel
-import com.luxmap.feature.workorder.polegps.ui.previousDistanceLabel
 import java.io.File
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private val SAMPLE_TIME_FORMAT: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss").withZone(ZoneId.systemDefault())
 
 @Composable
 fun PoleGpsMeasureRoute(
@@ -181,6 +182,8 @@ fun PoleGpsMeasureRoute(
     if (fileToPreview != null) {
         PhotoPreview(
             file = fileToPreview,
+            poleLabel = (state as? PoleGpsMeasureUiState.Success)?.poleLabel ?: "Cột đèn",
+            onClose = ::discardPhoto,
             isSaving = isSaving,
             fix = currentFix,
             onConfirm = {
@@ -250,119 +253,123 @@ fun PoleGpsMeasureContent(
     onBack: () -> Unit,
     onRetryPermission: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val title = if (state is PoleGpsMeasureUiState.Success) state.poleLabel else "Chụp ảnh cột đèn"
-        AppTopBar(title = title, onBack = onBack)
+        LuxChildTopBar(title = title, onBack = onBack)
         when (state) {
-            PoleGpsMeasureUiState.Loading -> CenteredMessage("Đang chuẩn bị chụp ảnh...", showProgress = true)
+            PoleGpsMeasureUiState.Loading -> PreparingMessage("Đang chuẩn bị chụp ảnh...")
             PoleGpsMeasureUiState.Empty ->
-                CenteredMessage("Cột này không thuộc lệnh này.", actionLabel = "Quay lại", onAction = onBack)
+                LuxEmptyState(
+                    title = "Không tìm thấy cột",
+                    message = "Cột này không thuộc lệnh này.",
+                    actionLabel = "Quay lại",
+                    onAction = onBack,
+                )
             is PoleGpsMeasureUiState.Error ->
-                CenteredMessage(state.message, actionLabel = "Thử lại", onAction = onRetryPermission)
-            is PoleGpsMeasureUiState.Success ->
-                CenteredMessage("Đang mở camera...", showProgress = true)
+                LuxErrorState(
+                    onRetry = onRetryPermission,
+                    title = "Chưa chụp được ảnh",
+                    message = state.message,
+                )
+            is PoleGpsMeasureUiState.Success -> PreparingMessage("Đang mở camera...")
         }
+    }
+}
+
+@Composable
+private fun PreparingMessage(text: String) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
 @Composable
 internal fun PhotoPreview(
     file: File,
+    poleLabel: String,
     isSaving: Boolean,
     fix: GpsFix?,
     onConfirm: () -> Unit,
     onRetake: () -> Unit,
+    onClose: () -> Unit,
     corridor: CorridorCheck? = null,
     previousDistanceM: Double? = null,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg),
+    PoleMediaPreviewFrame(
+        poleId = poleLabel,
+        isSaving = isSaving,
+        retakeLabel = "Chụp lại",
+        confirmLabel = "Dùng ảnh này",
+        onClose = onClose,
+        onRetake = onRetake,
+        onConfirm = onConfirm,
+        footer = { MeasurementSummary(fix, corridor, previousDistanceM) },
     ) {
         AsyncImage(
             model = file,
             contentDescription = "Ảnh cột đèn vừa chụp",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().aspectRatio(3f / 4f).clip(RoundedCornerShape(Radius.card)),
+            modifier =
+                Modifier
+                    .aspectRatio(3f / 4f, matchHeightConstraintsFirst = true)
+                    .clip(MaterialTheme.shapes.medium)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
         )
-        fix?.let {
-            Text("Sai số GPS: ±%.1f m".format(Locale.ROOT, it.accuracyM), style = MaterialTheme.typography.bodyLarge)
-            Text("Thời gian mẫu: ${it.capturedAt}", style = MaterialTheme.typography.bodyMedium)
-        }
-        corridor?.let {
-            Text(
-                corridorPreviewLabel(it),
-                style = MaterialTheme.typography.bodyLarge,
-                color =
-                    if (it is CorridorCheck.Outside) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-            )
-        }
-        previousDistanceLabel(previousDistanceM)?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        CaptureActions(enabled = !isSaving, isSaving = isSaving, onRetake = onRetake, onConfirm = onConfirm)
     }
 }
 
 @Composable
-private fun CaptureActions(
-    enabled: Boolean,
-    isSaving: Boolean,
-    onRetake: () -> Unit,
-    onConfirm: () -> Unit,
+private fun MeasurementSummary(
+    fix: GpsFix?,
+    corridor: CorridorCheck?,
+    previousDistanceM: Double?,
 ) {
-    LuxActionPair(
-        modifier = Modifier.navigationBarsPadding(),
-        secondary = { actionModifier ->
-            OutlinedButton(
-                onClick = onRetake,
-                enabled = enabled,
-                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) { Text("Chụp lại") }
-        },
-        primary = { actionModifier ->
-            Button(
-                onClick = onConfirm,
-                enabled = enabled,
-                modifier = actionModifier.heightIn(min = Dimens.minTouchTarget),
-                shape = RoundedCornerShape(Radius.control),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(modifier = Modifier.height(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Dùng ảnh này")
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        if (corridor is CorridorCheck.Outside) {
+            LuxBanner(message = corridorPreviewLabel(corridor), tone = LuxBannerTone.WARNING)
+        }
+        LuxCard(contentPadding = PaddingValues(Spacing.md)) {
+            fix?.let {
+                MeasurementRow("Sai số GPS", "±%.1f m".format(Locale.ROOT, it.accuracyM))
+                MeasurementRow("Thời gian mẫu", SAMPLE_TIME_FORMAT.format(it.capturedAt))
             }
-        },
-    )
+            if (corridor != null && corridor !is CorridorCheck.Outside) {
+                MeasurementRow("Hành lang tuyến", corridorPreviewLabel(corridor))
+            }
+            previousDistanceM?.let {
+                MeasurementRow("Lệch so với lần đo trước", "%.1f m".format(Locale.ROOT, it))
+            }
+        }
+    }
 }
 
 @Composable
-private fun CenteredMessage(
-    text: String,
-    showProgress: Boolean = false,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
+private fun MeasurementRow(
+    label: String,
+    value: String,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.lg),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        if (showProgress) {
-            Spacer(Modifier.height(Spacing.md))
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        }
-        if (actionLabel != null) {
-            Spacer(Modifier.height(Spacing.md))
-            PrimaryButton(text = actionLabel, onClick = onAction, modifier = Modifier.fillMaxWidth())
-        }
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

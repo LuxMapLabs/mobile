@@ -3,53 +3,52 @@ package com.luxmap.feature.workorder.ui.completion
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
+import com.luxmap.feature.workorder.data.EvidenceKind
 import java.io.File
 
 @Composable
-fun EvidenceCaptureRoute(
-    onDone: () -> Unit,
+fun EvidenceCaptureHost(
+    request: EvidenceKind?,
+    onRequestHandled: () -> Unit,
     viewModel: EvidenceCaptureViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
     var pendingPath by rememberSaveable { mutableStateOf<String?>(null) }
     var launchError by rememberSaveable { mutableStateOf<String?>(null) }
+    var activeKind by rememberSaveable { mutableStateOf(EvidenceKind.AFTER.wireValue) }
 
     val takePicture =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             val file = pendingPath?.let(::File)
             pendingPath = null
             if (success && file != null) {
-                viewModel.onPhotoCaptured(file, onDone)
+                viewModel.onPhotoCaptured(file) {}
             } else {
                 file?.delete()
             }
@@ -79,54 +78,33 @@ fun EvidenceCaptureRoute(
             viewModel.useCurrentLocation()
         }
 
-    fun close() {
-        if (state.busy) return
-        viewModel.skipPhotosWithoutLocation()
-        onDone()
-    }
-
-    BackHandler(enabled = true) { close() }
-    Scaffold(topBar = { LuxChildTopBar(title = "Thêm ảnh", onBack = { close() }) }) { padding ->
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(Spacing.lg),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    fun startCapture() {
+        launchError = null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
         ) {
-            val available = !state.busy && state.awaitingLocation == 0 && pendingPath == null
-            OutlinedButton(
-                onClick = {
-                    launchError = null
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        launchCamera()
-                    } else {
-                        cameraPermissions.launch(
-                            arrayOf(
-                                Manifest.permission.CAMERA,
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            ),
-                        )
-                    }
-                },
-                enabled = available,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Chụp ảnh") }
-            if (state.busy) {
-                CircularProgressIndicator()
-                Text("Đang chuẩn bị ảnh…")
-            }
-            launchError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            if (state.added > 0) Text("Đã thêm ${state.added} ảnh.")
-            if (state.failed > 0) Text("Không thêm được ${state.failed} ảnh.", color = MaterialTheme.colorScheme.error)
-            Button(onClick = { close() }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("Xong") }
+            launchCamera()
+        } else {
+            cameraPermissions.launch(
+                arrayOf(
+                    Manifest.permission.CAMERA,
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
         }
     }
+
+    LaunchedEffect(request) {
+        if (request != null) {
+            activeKind = request.wireValue
+            viewModel.beginCapture(request)
+            onRequestHandled()
+            startCapture()
+        }
+    }
+
+    if (state.busy) SavingDialog()
 
     if (state.awaitingLocation > 0 && !state.busy) {
         LuxConfirmDialog(
@@ -155,5 +133,42 @@ fun EvidenceCaptureRoute(
                 }
             },
         )
+    }
+
+    val feedback =
+        launchError
+            ?: if (state.failed > 0) "Không thêm được ${state.failed} ảnh. Vui lòng chụp lại." else null
+    if (feedback != null && state.awaitingLocation == 0 && !state.busy) {
+        LuxConfirmDialog(
+            title = "Chưa thêm được ảnh",
+            message = feedback,
+            dismissLabel = "Đóng",
+            confirmLabel = "Thử lại",
+            onDismiss = {
+                launchError = null
+                viewModel.dismissFeedback()
+            },
+            onConfirm = {
+                viewModel.dismissFeedback()
+                EvidenceKind.entries.firstOrNull { it.wireValue == activeKind }?.let(viewModel::beginCapture)
+                startCapture()
+            },
+        )
+    }
+}
+
+@Composable
+private fun SavingDialog() {
+    Dialog(onDismissRequest = {}) {
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
+            Column(
+                modifier = Modifier.padding(Spacing.xl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                Text(text = "Đang lưu ảnh…", style = MaterialTheme.typography.bodyLarge)
+            }
+        }
     }
 }
