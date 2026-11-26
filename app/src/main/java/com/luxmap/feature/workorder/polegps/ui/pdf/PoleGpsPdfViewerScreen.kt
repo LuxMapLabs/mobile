@@ -1,5 +1,6 @@
 package com.luxmap.feature.workorder.polegps.ui.pdf
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,27 +10,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
-import com.luxmap.core.ui.components.AppTopBar
-import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.core.ui.components.LuxChildTopBar
+import com.luxmap.core.ui.components.LuxEmptyState
+import com.luxmap.core.ui.components.LuxErrorState
+import com.luxmap.core.ui.components.LuxSecondaryButton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
@@ -51,18 +60,27 @@ fun PoleGpsPdfViewerContent(
     onBack: () -> Unit,
     onRetry: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize()) {
-        AppTopBar(title = "Xem file PDF", onBack = onBack)
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
+        LuxChildTopBar(
+            title = "Tuyến đường",
+            onBack = onBack,
+            subtitle = (state as? PoleGpsPdfViewerUiState.Ready)?.fileName,
+        )
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (state) {
-                PoleGpsPdfViewerUiState.Loading -> CenteredPdfMessage("Đang mở file PDF...", showProgress = true)
-                PoleGpsPdfViewerUiState.Empty -> CenteredPdfMessage("Không tìm thấy file này.")
+                PoleGpsPdfViewerUiState.Loading -> OpeningMessage()
+                PoleGpsPdfViewerUiState.Empty ->
+                    LuxEmptyState(title = "Chưa có file", message = "Không tìm thấy file này.")
                 is PoleGpsPdfViewerUiState.Error ->
-                    CenteredPdfMessage(
-                        state.message,
-                        actionLabel = if (state.canRetry) "Thử lại" else null,
-                        onAction = onRetry,
-                    )
+                    if (state.canRetry) {
+                        LuxErrorState(onRetry = onRetry, title = "Chưa mở được file", message = state.message)
+                    } else {
+                        LuxEmptyState(
+                            title = "Chưa mở được file",
+                            message = state.message,
+                            icon = Icons.Filled.ErrorOutline,
+                        )
+                    }
                 is PoleGpsPdfViewerUiState.Ready -> PdfPages(state.filePath)
             }
         }
@@ -70,22 +88,18 @@ fun PoleGpsPdfViewerContent(
 }
 
 @Composable
-private fun CenteredPdfMessage(
-    text: String,
-    showProgress: Boolean = false,
-    actionLabel: String? = null,
-    onAction: () -> Unit = {},
-) {
+private fun OpeningMessage() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        if (showProgress) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        if (actionLabel != null) {
-            PrimaryButton(text = actionLabel, onClick = onAction, modifier = Modifier.fillMaxWidth())
-        }
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        Text(
+            text = "Đang mở file PDF...",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -108,8 +122,9 @@ private fun PdfPages(filePath: String) {
         }
     }
     when {
-        openError != null -> CenteredPdfMessage(openError!!)
-        renderer == null -> CenteredPdfMessage("Đang mở file PDF...", showProgress = true)
+        openError != null ->
+            LuxEmptyState(title = "Chưa mở được file", message = openError!!, icon = Icons.Filled.ErrorOutline)
+        renderer == null -> OpeningMessage()
         else -> PdfPagerBody(renderer!!)
     }
 }
@@ -117,15 +132,36 @@ private fun PdfPages(filePath: String) {
 @Composable
 private fun PdfPagerBody(renderer: PdfPageRenderer) {
     val pagerState = rememberPagerState(pageCount = { renderer.pageCount })
-    Column(Modifier.fillMaxSize()) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth().weight(1f)) { page ->
-            PdfPage(renderer = renderer, pageIndex = page)
+    var resetToken by remember { mutableIntStateOf(0) }
+    var zoomed by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            PdfPage(
+                renderer = renderer,
+                pageIndex = page,
+                resetToken = resetToken,
+                onZoomChanged = { zoomed = it },
+            )
         }
-        Text(
-            text = "Trang ${pagerState.currentPage + 1}/${renderer.pageCount}",
-            modifier = Modifier.fillMaxWidth().padding(Spacing.sm),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
+        Surface(
+            color = LuxTheme.colors.overlayOnMedia,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(Spacing.lg),
+        ) {
+            Text(
+                text = "Trang ${pagerState.currentPage + 1}/${renderer.pageCount}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+            )
+        }
+        if (zoomed) {
+            LuxSecondaryButton(
+                text = "Đặt lại thu phóng",
+                onClick = { resetToken++ },
+                modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.md),
+            )
+        }
     }
 }
 
@@ -133,10 +169,17 @@ private fun PdfPagerBody(renderer: PdfPageRenderer) {
 private fun PdfPage(
     renderer: PdfPageRenderer,
     pageIndex: Int,
+    resetToken: Int,
+    onZoomChanged: (Boolean) -> Unit,
 ) {
     var bitmap by remember(pageIndex) { mutableStateOf<android.graphics.Bitmap?>(null) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(resetToken) {
+        scale = 1f
+        offset = Offset.Zero
+    }
+    LaunchedEffect(scale) { onZoomChanged(scale > 1f) }
     LaunchedEffect(pageIndex) {
         bitmap = withContext(Dispatchers.IO) { renderer.renderPage(pageIndex) }
     }
