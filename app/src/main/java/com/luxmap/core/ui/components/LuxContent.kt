@@ -38,8 +38,8 @@ import com.luxmap.core.theme.WorkOrderStatus
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.theme.label
 
-private val ListLeadingBoxSize = 40.dp
-private val ListLeadingIconSize = 24.dp
+private val ListLeadingBoxSize = 44.dp
+private val ListLeadingIconSize = 26.dp
 private val OneLineItemHeight = 56.dp
 private val TwoLineItemHeight = 72.dp
 private val ThreeLineItemHeight = 88.dp
@@ -147,13 +147,13 @@ fun LuxListItem(
                 modifier =
                     Modifier
                         .size(ListLeadingBoxSize)
-                        .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.small),
+                        .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.small),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(ListLeadingIconSize),
                 )
             }

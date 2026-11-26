@@ -126,7 +126,7 @@ private fun StateLayout(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(StateBadgeIconSize),
                 )
             }
