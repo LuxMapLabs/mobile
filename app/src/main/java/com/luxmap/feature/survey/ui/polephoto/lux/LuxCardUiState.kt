@@ -23,6 +23,9 @@ sealed interface LuxCardUiState {
     data class Recorded(
         val lux: Double,
         val measuredAt: Instant,
+        /** The raw window and the module it came from: sent as the stationary `protocol` (LUX-BASELINE). */
+        val samples: List<Double> = emptyList(),
+        val moduleId: String? = null,
     ) : LuxCardUiState
 
     data object Disconnected : LuxCardUiState

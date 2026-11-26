@@ -132,4 +132,39 @@ class RealLuxReadingRepositoryTest {
         assertEquals("A2", readings.latestForPhoto("P1")?.clientOpId)
         assertNull(readings.latestForPhoto("P9"))
     }
+
+    @Test
+    fun `a reading with its window and module is stored as a protocol reading at the window's exact median`() =
+        runTest {
+            val saved = slot<LocalLuxReadingEntity>()
+
+            repository.record(
+                "WO-1",
+                "POLE-1",
+                "PHOTO-1",
+                12.35,
+                Instant.parse("2026-11-23T12:42:00Z"),
+                samples = listOf(12.3, 12.4, 12.31, 12.39, 12.35),
+                moduleId = "AA:BB:CC:DD:EE:FF",
+            )
+
+            coVerify { dao.insert(capture(saved)) }
+            assertEquals(12.35, saved.captured.luxValue, 0.0)
+            assertEquals("[12.3,12.4,12.31,12.39,12.35]", saved.captured.samplesJson)
+            assertEquals("AA:BB:CC:DD:EE:FF", saved.captured.moduleId)
+            assertEquals(1.0, saved.captured.sensorHeightM!!, 0.0)
+        }
+
+    @Test
+    fun `a reading without its window stays a reference reading`() =
+        runTest {
+            val saved = slot<LocalLuxReadingEntity>()
+
+            repository.record("WO-1", "POLE-1", "PHOTO-1", 12.3, Instant.parse("2026-11-23T12:42:00Z"))
+
+            coVerify { dao.insert(capture(saved)) }
+            assertNull(saved.captured.samplesJson)
+            assertNull(saved.captured.moduleId)
+            assertNull(saved.captured.sensorHeightM)
+        }
 }

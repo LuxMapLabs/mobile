@@ -123,3 +123,12 @@ val MIGRATION_26_27: Migration =
             )
         }
     }
+
+val MIGRATION_27_28: Migration =
+    object : Migration(27, 28) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_lux_reading ADD COLUMN samplesJson TEXT")
+            db.execSQL("ALTER TABLE local_lux_reading ADD COLUMN moduleId TEXT")
+            db.execSQL("ALTER TABLE local_lux_reading ADD COLUMN sensorHeightM REAL")
+        }
+    }

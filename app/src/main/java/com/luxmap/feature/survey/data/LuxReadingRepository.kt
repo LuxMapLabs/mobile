@@ -19,6 +19,8 @@ interface LuxReadingRepository {
         photoId: String,
         luxValue: Double,
         measuredAt: Instant,
+        samples: List<Double> = emptyList(),
+        moduleId: String? = null,
     ): LuxReading
 
     fun observeReadings(workOrderId: String): Flow<List<LuxReading>>

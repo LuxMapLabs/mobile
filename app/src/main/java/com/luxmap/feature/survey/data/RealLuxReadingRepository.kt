@@ -1,5 +1,7 @@
 package com.luxmap.feature.survey.data
 
+import com.luxmap.core.ble.LuxProtocol
+import com.luxmap.core.ble.LuxSamplingWindow
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.LuxReadingDao
@@ -30,7 +32,12 @@ class RealLuxReadingRepository
             photoId: String,
             luxValue: Double,
             measuredAt: Instant,
+            samples: List<Double>,
+            moduleId: String?,
         ): LuxReading {
+            // LUX-BASELINE: with its raw window and module the reading is a protocol reading the server judges against the
+            // pole's own baseline; lux_value must then be the window's exact median (the card shows it rounded).
+            val protocol = samples.isNotEmpty() && !moduleId.isNullOrBlank()
             val entity =
                 LocalLuxReadingEntity(
                     clientOpId = UUID.randomUUID().toString(),
@@ -38,10 +45,13 @@ class RealLuxReadingRepository
                     poleId = poleId,
                     photoId = photoId,
                     measuredAt = measuredAt,
-                    luxValue = luxValue,
+                    luxValue = if (protocol) LuxSamplingWindow.median(samples) else luxValue,
                     meterModel = METER_MODEL,
                     dataSource = DATA_SOURCE,
                     createdAt = Instant.now(),
+                    samplesJson = if (protocol) Json.encodeToString(samples) else null,
+                    moduleId = if (protocol) moduleId else null,
+                    sensorHeightM = if (protocol) LuxProtocol.SENSOR_HEIGHT_M else null,
                 )
             dao.insert(entity)
             syncQueueManager.enqueue(

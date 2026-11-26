@@ -64,7 +64,15 @@ class PolePhotoCaptureViewModel
                     }.getOrNull()
                 if (saved != null && lux != null) {
                     runCatching {
-                        luxReadingRepository.record(workOrderId, poleId, saved.photoId, lux.lux, lux.measuredAt)
+                        luxReadingRepository.record(
+                            workOrderId,
+                            poleId,
+                            saved.photoId,
+                            lux.lux,
+                            lux.measuredAt,
+                            lux.samples,
+                            lux.moduleId,
+                        )
                     }
                 }
                 onDone()

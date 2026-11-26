@@ -8,6 +8,7 @@ import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.survey.data.dao.LuxReadingDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.CreateLuxReadingRequestDto
+import com.luxmap.feature.survey.data.dto.LuxProtocolDto
 import com.luxmap.feature.survey.data.entity.LocalLuxReadingEntity
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -84,6 +85,7 @@ class UploadLuxReadingSyncHandler
                         dataSource = reading.dataSource,
                         meterModel = reading.meterModel,
                         photoId = serverPhotoId,
+                        protocol = reading.protocol(),
                     ),
                 )
             dao.updateServerLuxId(reading.clientOpId, response.luxId)
@@ -99,6 +101,11 @@ class UploadLuxReadingSyncHandler
                 else -> SyncOpResult.RetryLater
             }
 
+        private fun LocalLuxReadingEntity.protocol(): LuxProtocolDto? {
+            val samples = samplesJson?.let { Json.decodeFromString<List<Double>>(it) } ?: return null
+            return LuxProtocolDto(samples, sensorHeightM ?: return null, moduleId ?: return null)
+        }
+
         private sealed interface PhotoLink {
             data object None : PhotoLink
 
@@ -112,6 +119,11 @@ class UploadLuxReadingSyncHandler
         companion object {
             const val OP_TYPE = "upload_lux_reading"
             private val PHOTO_LINK_ERRORS =
-                setOf("POLE_PHOTO_NOT_FOUND", "PHOTO_POLE_MISMATCH", "PHOTO_LUX_ALREADY_LINKED")
+                setOf(
+                    "POLE_PHOTO_NOT_FOUND",
+                    "PHOTO_POLE_MISMATCH",
+                    "PHOTO_LUX_ALREADY_LINKED",
+                    "POLE_PHOTO_ALREADY_DECIDED",
+                )
         }
     }
