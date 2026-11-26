@@ -9,11 +9,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,17 +43,21 @@ private val BannerIconSize = 20.dp
 private fun LuxBannerTone.style(): BannerStyle =
     when (this) {
         LuxBannerTone.INFO ->
-            BannerStyle(LuxTheme.colors.infoContainer, LuxTheme.colors.onInfoContainer, Icons.Filled.Info)
+            BannerStyle(LuxTheme.colors.infoContainer, LuxTheme.colors.onInfoContainer, Icons.Rounded.Info)
         LuxBannerTone.WARNING ->
-            BannerStyle(LuxTheme.colors.warningContainer, LuxTheme.colors.onWarningContainer, Icons.Filled.WarningAmber)
+            BannerStyle(
+                LuxTheme.colors.warningContainer,
+                LuxTheme.colors.onWarningContainer,
+                Icons.Rounded.WarningAmber,
+            )
         LuxBannerTone.ERROR ->
             BannerStyle(
                 MaterialTheme.colorScheme.errorContainer,
                 MaterialTheme.colorScheme.onErrorContainer,
-                Icons.Filled.ErrorOutline,
+                Icons.Rounded.ErrorOutline,
             )
         LuxBannerTone.SUCCESS ->
-            BannerStyle(LuxTheme.colors.successContainer, LuxTheme.colors.onSuccessContainer, Icons.Filled.CheckCircle)
+            BannerStyle(LuxTheme.colors.successContainer, LuxTheme.colors.onSuccessContainer, Icons.Rounded.CheckCircle)
         LuxBannerTone.NEUTRAL ->
             BannerStyle(
                 MaterialTheme.colorScheme.surfaceContainer,

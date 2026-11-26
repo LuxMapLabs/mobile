@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,7 +49,7 @@ fun LuxEmptyState(
     title: String,
     message: String,
     modifier: Modifier = Modifier,
-    icon: ImageVector = Icons.Filled.Inbox,
+    icon: ImageVector = Icons.Rounded.Inbox,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
@@ -71,13 +71,13 @@ fun LuxErrorState(
     onSecondaryAction: (() -> Unit)? = null,
 ) {
     StateLayout(
-        icon = if (kind == LuxErrorKind.NETWORK) Icons.Filled.CloudOff else Icons.Filled.ErrorOutline,
+        icon = if (kind == LuxErrorKind.NETWORK) Icons.Rounded.CloudOff else Icons.Rounded.ErrorOutline,
         title = title,
         message = message,
         modifier = modifier,
         announce = true,
     ) {
-        LuxSecondaryButton(text = "Thử lại", onClick = onRetry, leadingIcon = Icons.Filled.Refresh)
+        LuxSecondaryButton(text = "Thử lại", onClick = onRetry, leadingIcon = Icons.Rounded.Refresh)
         if (secondaryActionLabel != null && onSecondaryAction != null) {
             LuxTextButton(text = secondaryActionLabel, onClick = onSecondaryAction)
         }

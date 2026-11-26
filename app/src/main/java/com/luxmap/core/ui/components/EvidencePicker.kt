@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.rounded.AddAPhoto
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -98,7 +98,7 @@ private fun FilledTile(
             )
         }
         Icon(
-            imageVector = Icons.Filled.CheckCircle,
+            imageVector = Icons.Rounded.CheckCircle,
             contentDescription = null,
             tint = Success600,
             modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.xs).size(18.dp),
@@ -134,7 +134,7 @@ private fun AddTile(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            imageVector = Icons.Filled.AddAPhoto,
+            imageVector = Icons.Rounded.AddAPhoto,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = contentAlpha),
         )

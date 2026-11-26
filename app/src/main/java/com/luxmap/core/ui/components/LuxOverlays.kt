@@ -12,7 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -126,7 +126,7 @@ fun LuxBottomSheet(
                     modifier = Modifier.weight(1f).semantics { heading() },
                 )
                 IconButton(onClick = close) {
-                    Icon(imageVector = Icons.Filled.Close, contentDescription = "Đóng")
+                    Icon(imageVector = Icons.Rounded.Close, contentDescription = "Đóng")
                 }
             }
             Column(

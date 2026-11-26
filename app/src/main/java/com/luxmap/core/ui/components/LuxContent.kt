@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Build
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -183,7 +183,7 @@ fun LuxListItem(
         trailing?.invoke()
         if (showChevron) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -202,7 +202,7 @@ private fun LuxContentPreview() {
                     overline = "Sửa chữa WO-1042",
                     headline = "Tuyến ĐH-12 (Xã Tân Phú)",
                     supporting = "Hạn hôm nay",
-                    leadingIcon = Icons.Filled.Build,
+                    leadingIcon = Icons.Rounded.Build,
                     onClick = {},
                     trailing = {
                         StatusBadge(
