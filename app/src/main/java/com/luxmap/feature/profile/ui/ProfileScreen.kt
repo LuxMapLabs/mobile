@@ -329,7 +329,7 @@ private fun StatusRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(text = label, style = MaterialTheme.typography.bodyLarge)
         }
         Text(text = value, style = MaterialTheme.typography.bodyMedium, color = valueColor)

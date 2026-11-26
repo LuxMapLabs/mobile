@@ -995,7 +995,7 @@ private fun PreStartRequirementsPreview(kind: WorkOrderTaskKind) {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = item.title, style = BodyStrongTextStyle, color = MaterialTheme.colorScheme.onSurface)

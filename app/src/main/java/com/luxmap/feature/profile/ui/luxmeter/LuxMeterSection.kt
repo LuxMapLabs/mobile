@@ -54,7 +54,7 @@ fun LuxMeterSection(
                 Icon(
                     imageVector = Icons.Rounded.Sensors,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.primary,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "Cảm biến lux", style = MaterialTheme.typography.bodyLarge)

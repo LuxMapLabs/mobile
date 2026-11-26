@@ -192,7 +192,7 @@ fun HomeTaskCard(
                     Icon(
                         imageVector = kind.icon(),
                         contentDescription = null,
-                        tint = kind.badgeColors().text,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp),
                     )
                     Text(
