@@ -77,7 +77,6 @@ import java.time.format.DateTimeParseException
 fun NotificationListRoute(
     onBack: () -> Unit,
     onOpenWorkOrder: (workOrderId: String) -> Unit,
-    onOpenSurveyHub: (workOrderId: String) -> Unit = {},
     viewModel: NotificationListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -86,7 +85,6 @@ fun NotificationListRoute(
         viewModel.navigate.collect { event ->
             when (event) {
                 is NotificationNavigationEvent.OpenWorkOrderDetail -> onOpenWorkOrder(event.workOrderId)
-                is NotificationNavigationEvent.OpenSurveyHub -> onOpenSurveyHub(event.workOrderId)
             }
         }
     }

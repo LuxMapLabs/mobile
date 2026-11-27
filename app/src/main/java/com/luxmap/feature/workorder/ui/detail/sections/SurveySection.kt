@@ -25,20 +25,20 @@ internal fun SurveySection(
         LuxCard(modifier = Modifier.fillMaxWidth()) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 Text(
-                    text = "Lệnh khảo sát được thực hiện ở tab Khảo sát: chụp ảnh từng cột đèn trên tuyến.",
+                    text = "Chụp ảnh hoặc quay video từng cột đèn trên tuyến.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (started) {
                     LuxSecondaryButton(
-                        text = "Mở tab Khảo sát",
+                        text = "Mở danh sách cột",
                         onClick = onOpenSurvey,
                         leadingIcon = Icons.Rounded.PhotoCamera,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (canStart) {
                     Text(
-                        text = "Bấm Bắt đầu ở cuối màn hình, ứng dụng sẽ chuyển sang tab Khảo sát.",
+                        text = "Bấm Bắt đầu ở cuối màn hình để mở danh sách cột cần chụp.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

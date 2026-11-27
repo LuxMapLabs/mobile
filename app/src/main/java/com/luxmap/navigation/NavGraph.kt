@@ -248,12 +248,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.PolePhotoResult.createRoute(polePhotoWorkOrderId, photoId))
                     },
                     onDone = { navController.popBackStack() },
-                    onSurveyCompleted = {
-                        navController.navigate(Routes.Survey.createRoute(polePhotoWorkOrderId)) {
-                            popUpTo(Routes.Home.route)
-                            launchSingleTop = true
-                        }
-                    },
+                    onSurveyCompleted = { navController.popBackStack() },
                 )
             }
             composable(
@@ -400,9 +395,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
-                    onOpenSurveyHub = { workOrderId ->
-                        navController.navigate(Routes.Survey.createRoute(workOrderId))
-                    },
                 )
             }
             composable(
@@ -419,7 +411,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
                     onStartSurvey = {
-                        navController.navigate(Routes.Survey.createRoute(workOrderId))
+                        navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
                     },
                     onOpenPdf = { attachmentId ->
                         navController.navigate(Routes.PoleGpsPdfViewer.createRoute(workOrderId, attachmentId))
