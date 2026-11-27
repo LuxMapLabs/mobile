@@ -297,7 +297,7 @@ private fun HomeLoading() {
 private fun HomeEmpty(onRetry: () -> Unit) {
     LuxEmptyState(
         title = "Chưa có việc được giao",
-        message = "Khi Quản lý giao lệnh sửa chữa hoặc kiểm tra, lệnh sẽ hiện ở đây.",
+        message = "Khi Quản lý giao lệnh sửa chữa, kiểm tra hoặc khảo sát, lệnh sẽ hiện ở đây.",
         icon = Icons.Rounded.EventAvailable,
         actionLabel = "Làm mới",
         onAction = onRetry,
