@@ -126,6 +126,14 @@ class WorkOrderDetailViewModel
                             poleReferencesState.value = poleGpsRepository.poleReferences(workOrderId)
                         }
                         detailState.value = detail
+                        // Started without signal: reload once the start reaches the server, so the
+                        // "Đã bắt đầu khi không có mạng" notice goes away on its own.
+                        if (detail.startPendingSync) {
+                            launch {
+                                detailRepository.awaitStartSent(workOrderId)
+                                load()
+                            }
+                        }
                         // Saves the route's poles on the device while there is signal, so the
                         // survey can still be walked if it drops later.
                         if (detail.taskKind == "survey") launch { poleListRepository.poles(workOrderId) }
@@ -247,6 +255,12 @@ class WorkOrderDetailViewModel
                     onSuccess = { detail ->
                         updateSuccess { it.copy(detail = detail, isStarting = false, startError = null) }
                         detailState.value = detail
+                        if (detail.startPendingSync) {
+                            viewModelScope.launch {
+                                detailRepository.awaitStartSent(workOrderId)
+                                load()
+                            }
+                        }
                         if (detail.taskKind == "survey") {
                             _startedSurveyWorkOrderId.tryEmit(workOrderId)
                         }

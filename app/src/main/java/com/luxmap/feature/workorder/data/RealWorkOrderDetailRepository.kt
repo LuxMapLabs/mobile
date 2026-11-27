@@ -66,6 +66,8 @@ class RealWorkOrderDetailRepository
                 cached.startedOffline().toWorkOrderDetail().copy(startPendingSync = true)
             }
 
+        override suspend fun awaitStartSent(workOrderId: String) = syncQueueManager.awaitStartSent(workOrderId)
+
         override suspend fun requestCancellation(
             workOrderId: String,
             reason: String,

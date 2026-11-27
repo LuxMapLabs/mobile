@@ -1,6 +1,7 @@
 package com.luxmap.core.sync
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,6 +24,11 @@ class SyncQueueManager
         suspend fun pendingStartOf(workOrderId: String): String? {
             val opId = startOpId(workOrderId)
             return opId.takeIf { dao.statusOf(it).let { status -> status != null && status != "done" } }
+        }
+
+        // Suspends until the offline start of this work order has reached the server.
+        suspend fun awaitStartSent(workOrderId: String) {
+            dao.observeStatusesFor(listOf(startOpId(workOrderId))).first { rows -> rows.all { it.status == "done" } }
         }
 
         suspend fun triggerSync() {
