@@ -44,8 +44,12 @@ private fun pole(id: String) =
         fixtureStatus = "normal",
     )
 
-private fun poleListRepository(poleIds: List<String> = emptyList()): PoleListRepository =
+private fun poleListRepository(
+    poleIds: List<String> = emptyList(),
+    cachedIds: List<String> = emptyList(),
+): PoleListRepository =
     mockk {
+        coEvery { cachedPoles(WORK_ORDER_ID) } returns cachedIds.map(::pole)
         coEvery { poles(WORK_ORDER_ID) } returns
             Result.success(PoleListResult(poleIds.map(::pole), isStale = false))
     }
@@ -372,5 +376,25 @@ class PolePhotoCaptureViewModelTest {
 
             coVerify { repository.skipPole(WORK_ORDER_ID, POLE_ID, "Không tìm thấy cột") }
             assertNull(next)
+        }
+
+    @Test
+    fun `the route card reads the pole saved on the device without waiting for the network`() =
+        runTest {
+            val poles = mockk<PoleListRepository>()
+            coEvery { poles.cachedPoles(WORK_ORDER_ID) } returns listOf(pole("POLE-0"), pole(POLE_ID))
+            val vm =
+                PolePhotoCaptureViewModel(
+                    savedStateHandle(routeMode = true),
+                    mockk(relaxed = true),
+                    mockk(),
+                    mockk(relaxed = true),
+                    poles,
+                )
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(POLE_ID, vm.pole.value?.poleId)
+            assertEquals(RouteProgress(index = 2, total = 2), vm.progress.value)
+            coVerify(exactly = 0) { poles.poles(any()) }
         }
 }

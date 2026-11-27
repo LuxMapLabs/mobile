@@ -23,4 +23,7 @@ data class PoleListResult(
 
 interface PoleListRepository {
     suspend fun poles(workOrderId: String): Result<PoleListResult>
+
+    // The list last saved on this device, no network: empty when it was never fetched.
+    suspend fun cachedPoles(workOrderId: String): List<PoleListItem>
 }

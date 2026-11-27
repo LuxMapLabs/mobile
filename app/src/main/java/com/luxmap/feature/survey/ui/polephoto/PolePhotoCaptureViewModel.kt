@@ -152,8 +152,17 @@ class PolePhotoCaptureViewModel
             }
         }
 
-        private suspend fun loadRoutePoles(): List<PoleListItem> =
-            routePoles ?: poleListRepository.poles(workOrderId).getOrNull()?.poles.orEmpty().also { routePoles = it }
+        // The pole list screen saved this route on the device just before route capture
+        // started, so read that first: waiting on the network here left the next-pole card
+        // blank for 10-20 s on a weak rural connection (UX review, 2026-11-27).
+        private suspend fun loadRoutePoles(): List<PoleListItem> {
+            routePoles?.let { return it }
+            val poles =
+                poleListRepository.cachedPoles(workOrderId).ifEmpty {
+                    poleListRepository.poles(workOrderId).getOrNull()?.poles.orEmpty()
+                }
+            return poles.also { routePoles = it }
+        }
 
         // The next pole along the route with neither a photo nor a skip, wrapping around to the
         // start so a pole passed over earlier is not forgotten. Null outside route mode.
