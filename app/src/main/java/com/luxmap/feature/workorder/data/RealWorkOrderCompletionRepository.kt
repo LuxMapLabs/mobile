@@ -203,7 +203,13 @@ class RealWorkOrderCompletionRepository
                 return
             }
             val reviewIds = if (taskKind == "survey") dao.pendingLatestPoleReviewIds(workOrderId) else null
-            val payload = CompletionSyncPayload(workOrderId, poleReviewClientOpIds = reviewIds)
+            val mediaIds = if (taskKind == "survey") dao.latestPoleMediaIds(workOrderId) else null
+            val payload =
+                CompletionSyncPayload(
+                    workOrderId,
+                    poleReviewClientOpIds = reviewIds,
+                    poleMediaClientOpIds = mediaIds,
+                )
             dao.insertOrReplaceCompletion(completion)
             syncQueueManager.enqueue(
                 opType = "complete_work_order",

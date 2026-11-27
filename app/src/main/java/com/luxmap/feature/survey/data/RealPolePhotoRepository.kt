@@ -6,6 +6,7 @@ import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoItemDto
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import com.luxmap.feature.survey.data.sync.PolePhotoSyncPayload
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -45,6 +46,7 @@ class RealPolePhotoRepository
             filePath: String,
             lat: Double,
             lng: Double,
+            observation: String?,
         ): LocalPolePhotoEntity {
             val entity =
                 LocalPolePhotoEntity(
@@ -55,8 +57,11 @@ class RealPolePhotoRepository
                     capturedAt = Instant.now(),
                     lat = lat,
                     lng = lng,
+                    engineerObservation = observation,
+                    draftFinalCvState = observation?.takeIf { it == "on" || it == "off" },
                 )
             dao.insert(entity)
+            dao.deleteSkip(workOrderId, poleId)
             syncQueueManager.enqueue(
                 opType = "upload_pole_photo",
                 payloadJson = json.encodeToString(PolePhotoSyncPayload(entity.photoId)),
@@ -110,10 +115,22 @@ class RealPolePhotoRepository
                     opType = "submit_pole_photo_review",
                     payloadJson = json.encodeToString(PolePhotoSyncPayload(photo.photoId)),
                     clientOpId = "${photo.photoId}:review",
+                    // An observation picked at capture time can be staged before the photo has
+                    // uploaded; the review needs the server photo id, so wait for that upload.
+                    dependsOnClientOpId = photo.photoId.takeIf { photo.serverPhotoId == null },
                 )
             }
             return pending.size
         }
+
+        override fun observeSkips(workOrderId: String): Flow<List<LocalSurveyPoleSkipEntity>> =
+            dao.observeSkips(workOrderId)
+
+        override suspend fun skipPole(
+            workOrderId: String,
+            poleId: String,
+            reason: String,
+        ) = dao.upsertSkip(LocalSurveyPoleSkipEntity(workOrderId, poleId, reason, Instant.now()))
 
         override suspend fun fetchResult(
             workOrderId: String,

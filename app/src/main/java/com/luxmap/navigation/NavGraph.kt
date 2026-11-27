@@ -50,6 +50,7 @@ import com.luxmap.feature.survey.ui.polephoto.PoleListViewModel
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureSource
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoResultRoute
+import com.luxmap.feature.survey.ui.polephoto.PoleSurveySummaryRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleVideoCaptureSource
 import com.luxmap.feature.workorder.polegps.ui.measure.PoleGpsMeasureRoute
@@ -223,7 +224,36 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.PolePhotoResult.createRoute(polePhotoWorkOrderId, photoId))
                     },
                     onDone = { navController.popBackStack() },
-                    onSurveyCompleted = { navController.popBackStack() },
+                    onStartRoute = { firstPoleId ->
+                        navController.navigate(
+                            Routes.PolePhotoCapture.createRoute(polePhotoWorkOrderId, firstPoleId, route = true),
+                        )
+                    },
+                    onOpenSummary = {
+                        navController.navigate(Routes.PolePhotoSummary.createRoute(polePhotoWorkOrderId))
+                    },
+                )
+            }
+            composable(
+                route = Routes.PolePhotoSummary.route,
+                arguments = listOf(navArgument("workOrderId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val summaryWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
+                // Shares the list screen's PoleListViewModel, same as PolePhotoResult below.
+                val parentEntry =
+                    remember(backStackEntry) {
+                        navController.getBackStackEntry(Routes.PolePhotoList.createRoute(summaryWorkOrderId))
+                    }
+                PoleSurveySummaryRoute(
+                    viewModel = hiltViewModel(parentEntry),
+                    onBack = { navController.popBackStack() },
+                    onRetake = { poleId ->
+                        navController.navigate(Routes.PolePhotoCapture.createRoute(summaryWorkOrderId, poleId))
+                    },
+                    // Back to the work order the survey was opened from, past the pole list.
+                    onSurveyCompleted = {
+                        navController.popBackStack(Routes.PolePhotoList.route, inclusive = true)
+                    },
                 )
             }
             composable(
@@ -271,8 +301,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             type = NavType.StringType
                             defaultValue = "camera"
                         },
+                        navArgument("route") {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
                     ),
             ) { backStackEntry ->
+                val captureWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
                 val capturePoleId = backStackEntry.arguments?.getString("poleId") ?: return@composable
                 val captureSource =
                     PolePhotoCaptureSource.entries.firstOrNull {
@@ -282,6 +317,13 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     poleId = capturePoleId,
                     source = captureSource,
                     onDone = { navController.popBackStack() },
+                    onNextPole = { nextPoleId ->
+                        navController.navigate(
+                            Routes.PolePhotoCapture.createRoute(captureWorkOrderId, nextPoleId, route = true),
+                        ) {
+                            popUpTo(backStackEntry.destination.id) { inclusive = true }
+                        }
+                    },
                 )
             }
             composable(

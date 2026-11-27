@@ -43,7 +43,10 @@ fun poleRowAction(
 ): PoleRowAction {
     val photoId = row.serverPhotoId
     return when {
-        row.syncStatus == SyncStatus.DONE && photoId != null -> PoleRowAction.OpenAiResult(photoId)
+        // A photo the engineer labelled at capture is not reviewed against the AI per pole; the
+        // AI only shows up on the end-of-route check. Videos keep the AI result review.
+        row.observation == null && row.syncStatus == SyncStatus.DONE && photoId != null ->
+            PoleRowAction.OpenAiResult(photoId)
         isCompleted -> PoleRowAction.None
         else -> PoleRowAction.OpenReportSheet
     }

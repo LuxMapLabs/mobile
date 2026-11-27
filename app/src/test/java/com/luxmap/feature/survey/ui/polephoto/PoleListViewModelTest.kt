@@ -11,6 +11,7 @@ import com.luxmap.feature.survey.data.PoleListRepository
 import com.luxmap.feature.survey.data.PoleListResult
 import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
 import io.mockk.coEvery
@@ -85,6 +86,7 @@ class PoleListViewModelTest {
             val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
             coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
                 Result.success(PoleListResult(listOf(pole), isStale = false))
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -128,6 +130,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -155,6 +158,7 @@ class PoleListViewModelTest {
                             serverPhotoId = "SERVER-PH-POLE-1",
                             syncStatus = SyncStatus.DONE,
                             identification = pole1,
+                            filePath = "/data/POLE-1.jpg",
                         ),
                         PoleListRowState(
                             "POLE-2",
@@ -188,6 +192,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -223,7 +228,7 @@ class PoleListViewModelTest {
     // Found on a real device 2026-10-29: tapping "Hoan tat" gave no feedback at all. This event
     // lets the Route show a toast right on this screen instead of navigating away silently.
     @Test
-    fun `onComplete submits when the reviewed pole is confirmed and another pole was skipped`() =
+    fun `onComplete submits when one pole is confirmed and the other was skipped with a reason`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -238,6 +243,8 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns
+                flowOf(listOf(LocalSurveyPoleSkipEntity(WORK_ORDER_ID, "POLE-2", "Bị che", Instant.EPOCH)))
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -263,7 +270,8 @@ class PoleListViewModelTest {
                 completionRepository.submitCompletion(
                     workOrderId = WORK_ORDER_ID,
                     taskKind = "survey",
-                    reportNote = "Đã xác nhận kết quả khảo sát 1 cột đèn.",
+                    reportNote =
+                        "Đã khảo sát 1/2 cột: sáng 0, tắt 0, không rõ 0. Bỏ qua 1 cột: POLE-2 (Bị che).",
                     materialsUsed = null,
                     faultOutcomes = null,
                 )
@@ -287,6 +295,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns
@@ -318,7 +327,7 @@ class PoleListViewModelTest {
         }
 
     @Test
-    fun `onComplete submits when no pole needed a photo`() =
+    fun `onComplete blocks while a pole has neither a photo nor a skip`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()
             val polePhotoRepository = mockk<PolePhotoRepository>()
@@ -330,6 +339,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -351,15 +361,7 @@ class PoleListViewModelTest {
             vm.onComplete()
             dispatcher.scheduler.advanceUntilIdle()
 
-            coVerify(exactly = 1) {
-                completionRepository.submitCompletion(
-                    workOrderId = WORK_ORDER_ID,
-                    taskKind = "survey",
-                    reportNote = "Đã xác nhận kết quả khảo sát 0 cột đèn.",
-                    materialsUsed = null,
-                    faultOutcomes = null,
-                )
-            }
+            coVerify(exactly = 0) { completionRepository.submitCompletion(any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -375,6 +377,7 @@ class PoleListViewModelTest {
                         isStale = true,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observeUploadStatuses(emptyList()) } returns flowOf(emptyMap())
             every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
@@ -685,6 +688,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -726,6 +730,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -765,6 +770,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -805,6 +811,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(
                     listOf(
@@ -896,6 +903,7 @@ class PoleListViewModelTest {
                         isStale = false,
                     ),
                 )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
             every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
                 flowOf(listOf(photo("POLE-1", serverPhotoId = "S-1", aiStatus = "available", cvState = "off")))
             every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -936,6 +944,7 @@ class PoleListViewModelTest {
                     isStale = false,
                 ),
             )
+        every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
         every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
             flowOf(listOf(photo("POLE-1", serverPhotoId = "S-1", aiStatus = "available", cvState = "on")))
         every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
@@ -1017,6 +1026,50 @@ class PoleListViewModelTest {
                 awaitItem()
                 val result = awaitItem() as PolePhotoResultUiState.Success
                 assertEquals(0.83, result.luxValue)
+            }
+        }
+
+    @Test
+    fun `a photo labelled at capture shows the engineer's label, not the AI's, and counts as covered`() =
+        runTest {
+            val pole = PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(PoleListResult(listOf(pole), isStale = false))
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
+                flowOf(
+                    listOf(
+                        photo("POLE-1", serverPhotoId = "S-1", aiStatus = "available", cvState = "on")
+                            .copy(engineerObservation = "off", confidence = 0.9),
+                    ),
+                )
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done"))
+            every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
+                )
+
+            vm.uiState.test {
+                awaitItem() // Loading
+                val success = awaitItem() as PoleListUiState.Success
+                val row = success.poles.single()
+                assertEquals(Observation.OFF, row.observation)
+                assertEquals(null, row.aiVerdict)
+                assertEquals(true, success.canComplete)
+                assertEquals(
+                    listOf(AiMismatch("POLE-1", 1, "/data/POLE-1.jpg", Observation.OFF, "on", 0.9)),
+                    success.aiMismatches,
+                )
             }
         }
 }

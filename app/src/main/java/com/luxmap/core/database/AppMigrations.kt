@@ -179,3 +179,15 @@ val MIGRATION_31_32: Migration =
             db.execSQL("DROP TABLE IF EXISTS local_assigned_pole_gps_order")
         }
     }
+
+val MIGRATION_32_33: Migration =
+    object : Migration(32, 33) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_pole_photo ADD COLUMN engineerObservation TEXT")
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_survey_pole_skip (workOrderId TEXT NOT NULL, " +
+                    "poleId TEXT NOT NULL, reason TEXT NOT NULL, skippedAt INTEGER NOT NULL, " +
+                    "PRIMARY KEY(workOrderId, poleId))",
+            )
+        }
+    }

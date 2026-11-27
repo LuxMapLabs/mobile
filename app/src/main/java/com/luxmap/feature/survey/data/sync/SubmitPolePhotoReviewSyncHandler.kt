@@ -6,6 +6,7 @@ import com.luxmap.core.sync.SyncOpHandler
 import com.luxmap.core.sync.SyncOpResult
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.dto.PolePhotoReviewRequestDto
+import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import retrofit2.HttpException
@@ -36,7 +37,10 @@ class SubmitPolePhotoReviewSyncHandler
                     api.reviewPolePhoto(
                         photo.workOrderId,
                         serverPhotoId,
-                        PolePhotoReviewRequestDto(finalCvState = draftFinalCvState, reviewNote = photo.draftReviewNote),
+                        PolePhotoReviewRequestDto(
+                            finalCvState = draftFinalCvState,
+                            reviewNote = photo.draftReviewNote ?: observationNote(photo, draftFinalCvState),
+                        ),
                     )
                 dao.updateAiResult(
                     photoId = photo.photoId,
@@ -65,5 +69,18 @@ class SubmitPolePhotoReviewSyncHandler
             } catch (e: IOException) {
                 SyncOpResult.RetryLater
             }
+        }
+
+        // The server requires a note whenever the label differs from the AI's cv_state. A label the
+        // engineer picked at the pole before seeing any AI result explains itself, so say that
+        // instead of making them type a reason.
+        private fun observationNote(
+            photo: LocalPolePhotoEntity,
+            finalCvState: String,
+        ): String? =
+            OBSERVATION_NOTE.takeIf { photo.engineerObservation == finalCvState && photo.cvState != finalCvState }
+
+        private companion object {
+            const val OBSERVATION_NOTE = "Kỹ sư quan sát trực tiếp tại cột, chọn trước khi có kết quả AI."
         }
     }

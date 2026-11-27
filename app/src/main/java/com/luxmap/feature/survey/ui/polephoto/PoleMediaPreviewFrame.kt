@@ -55,6 +55,47 @@ fun PoleMediaPreviewFrame(
     footer: (@Composable () -> Unit)? = null,
     media: @Composable BoxScope.() -> Unit,
 ) {
+    PoleMediaPreviewScaffold(
+        poleId = poleId,
+        isSaving = isSaving,
+        onClose = onClose,
+        warning = warning,
+        footer = footer,
+        media = media,
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg)) {
+            val stackActions =
+                keepRetakeLabelOnOneLine && !retakeLabelFitsHalfWidth(retakeLabel, maxWidth)
+            LuxActionPair(
+                stackActions = stackActions,
+                secondary = {
+                    LuxSecondaryButton(text = retakeLabel, onClick = onRetake, enabled = !isSaving, modifier = it)
+                },
+                primary = {
+                    PrimaryButton(
+                        text = if (isSaving) "Đang lưu…" else confirmLabel,
+                        onClick = onConfirm,
+                        enabled = confirmEnabled && !isSaving,
+                        isLoading = isSaving,
+                        modifier = it,
+                    )
+                },
+            )
+        }
+    }
+}
+
+// Same frame as PoleMediaPreviewFrame, with the caller's own action area at the bottom.
+@Composable
+fun PoleMediaPreviewScaffold(
+    poleId: String,
+    isSaving: Boolean,
+    onClose: () -> Unit,
+    warning: String? = null,
+    footer: (@Composable () -> Unit)? = null,
+    media: @Composable BoxScope.() -> Unit,
+    actions: @Composable () -> Unit,
+) {
     BackHandler { if (!isSaving) onClose() }
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
@@ -103,25 +144,7 @@ fun PoleMediaPreviewFrame(
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg)) { footer() }
             }
         }
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg)) {
-            val stackActions =
-                keepRetakeLabelOnOneLine && !retakeLabelFitsHalfWidth(retakeLabel, maxWidth)
-            LuxActionPair(
-                stackActions = stackActions,
-                secondary = {
-                    LuxSecondaryButton(text = retakeLabel, onClick = onRetake, enabled = !isSaving, modifier = it)
-                },
-                primary = {
-                    PrimaryButton(
-                        text = if (isSaving) "Đang lưu…" else confirmLabel,
-                        onClick = onConfirm,
-                        enabled = confirmEnabled && !isSaving,
-                        isLoading = isSaving,
-                        modifier = it,
-                    )
-                },
-            )
-        }
+        actions()
     }
 }
 

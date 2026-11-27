@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.EditNote
@@ -43,7 +44,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -71,7 +71,6 @@ import com.luxmap.core.ui.components.LuxBanner
 import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
-import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxEmptyState
 import com.luxmap.core.ui.components.LuxErrorKind
 import com.luxmap.core.ui.components.LuxErrorState
@@ -91,16 +90,14 @@ fun PoleListRoute(
     onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit,
     onViewAiResult: (serverPhotoId: String) -> Unit,
     onDone: () -> Unit,
+    onStartRoute: (firstPoleId: String) -> Unit = {},
+    onOpenSummary: () -> Unit = {},
     onOpenMap: (String, Double?, Double?) -> Unit = { _, _, _ -> },
-    onSurveyCompleted: () -> Unit = onDone,
     viewModel: PoleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(Unit) {
-        viewModel.surveyCompleted.collect { onSurveyCompleted() }
-    }
 
     PoleListScreen(
         snackbarHostState = snackbarHostState,
@@ -112,7 +109,9 @@ fun PoleListRoute(
         // device, 2026-10-29), so tapping the back arrow after capturing just 1 photo would
         // mark the whole survey complete even if the user only meant to leave.
         onBack = onDone,
-        onComplete = viewModel::onComplete,
+        onStartRoute = onStartRoute,
+        onOpenSummary = onOpenSummary,
+        onSkipPole = viewModel::onSkipPole,
         onRetry = viewModel::onRetry,
         onOpenMap = onOpenMap,
         onViewAiResult = onViewAiResult,
@@ -126,7 +125,9 @@ fun PoleListScreen(
     onCapturePole: (poleId: String, source: PolePhotoCaptureSource) -> Unit,
     onCaptureVideo: (poleId: String, source: PoleVideoCaptureSource) -> Unit = { _, _ -> },
     onBack: () -> Unit,
-    onComplete: () -> Unit = {},
+    onStartRoute: (firstPoleId: String) -> Unit = {},
+    onOpenSummary: () -> Unit = {},
+    onSkipPole: (poleId: String, reason: String) -> Unit = { _, _ -> },
     onRetry: () -> Unit = {},
     onViewAiResult: (serverPhotoId: String) -> Unit = {},
     onOpenMap: (String, Double?, Double?) -> Unit = { _, _, _ -> },
@@ -137,18 +138,19 @@ fun PoleListScreen(
     // Khao Sat v4 mock's "Hoan tat khao sat tuyen?" confirm sheet - added 2026-10-29, this used
     // to call onComplete() and navigate away in the same tap, no confirmation and no way to tell
     // afterward that it worked (see CLAUDE.md).
-    var showCompleteConfirm by rememberSaveable { mutableStateOf(false) }
     var reportMethodSheetPoleId by rememberSaveable { mutableStateOf<String?>(null) }
+    var skipReasonPoleId by rememberSaveable { mutableStateOf<String?>(null) }
     Scaffold(
         snackbarHost = { LuxSnackbarHost(snackbarHostState) },
         topBar = { LuxChildTopBar(title = "Chụp ảnh cột đèn", onBack = onBack, subtitle = workOrderId) },
         bottomBar = {
             if (state is PoleListUiState.Success) {
                 PoleListBottomBar(
-                    left = state.unconfirmedCount,
-                    canComplete = state.canComplete,
+                    total = state.poles.size,
+                    remaining = state.remainingCount,
                     isCompleted = state.isCompleted,
-                    onTapComplete = { showCompleteConfirm = true },
+                    onStartRoute = { state.firstRemainingPoleId?.let(onStartRoute) },
+                    onTapComplete = onOpenSummary,
                 )
             }
         },
@@ -169,7 +171,7 @@ fun PoleListScreen(
                         }
 
                     is PoleListUiState.Success -> {
-                        val nextIndex = state.poles.indexOfFirst { it.syncStatus == null }
+                        val nextIndex = state.poles.indexOfFirst { !it.isCovered }
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.md),
@@ -241,21 +243,6 @@ fun PoleListScreen(
         }
     }
 
-    if (showCompleteConfirm && state is PoleListUiState.Success && state.canComplete) {
-        LuxConfirmDialog(
-            title = "Hoàn tất khảo sát tuyến?",
-            message = "Đã xác nhận kết quả của ${state.confirmedCount} cột. Gửi khảo sát để duyệt?",
-            confirmLabel = "Hoàn tất",
-            dismissLabel = "Kiểm tra lại",
-            confirmModifier = Modifier.testTag("confirm_survey_complete"),
-            onDismiss = { showCompleteConfirm = false },
-            onConfirm = {
-                showCompleteConfirm = false
-                onComplete()
-            },
-        )
-    }
-
     val methodSheetPoleId = reportMethodSheetPoleId
     if (methodSheetPoleId != null) {
         ReportMethodSheet(
@@ -277,6 +264,22 @@ fun PoleListScreen(
                 reportMethodSheetPoleId = null
                 onCaptureVideo(methodSheetPoleId, PoleVideoCaptureSource.GALLERY)
             },
+            onChooseSkip = {
+                reportMethodSheetPoleId = null
+                skipReasonPoleId = methodSheetPoleId
+            },
+        )
+    }
+
+    val skipPoleId = skipReasonPoleId
+    if (skipPoleId != null) {
+        SkipReasonSheet(
+            poleId = skipPoleId,
+            onDismiss = { skipReasonPoleId = null },
+            onPick = { reason ->
+                skipReasonPoleId = null
+                onSkipPole(skipPoleId, reason)
+            },
         )
     }
 }
@@ -290,6 +293,7 @@ private fun ReportMethodSheet(
     onChooseGallery: () -> Unit,
     onChooseVideo: () -> Unit,
     onChooseVideoGallery: () -> Unit,
+    onChooseSkip: () -> Unit,
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState()) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = Spacing.lg)) {
@@ -312,6 +316,7 @@ private fun ReportMethodSheet(
                 label = "Video từ thư viện",
                 onClick = onChooseVideoGallery,
             )
+            ReportMethodOption(icon = Icons.Rounded.Block, label = "Bỏ qua cột này", onClick = onChooseSkip)
         }
     }
 }
@@ -344,9 +349,10 @@ private fun ReportMethodOption(
 
 @Composable
 private fun PoleListBottomBar(
-    left: Int,
-    canComplete: Boolean,
+    total: Int,
+    remaining: Int,
     isCompleted: Boolean,
+    onStartRoute: () -> Unit,
     onTapComplete: () -> Unit,
 ) {
     Surface(color = MaterialTheme.colorScheme.surface) {
@@ -359,18 +365,33 @@ private fun PoleListBottomBar(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Còn lại",
+                        text = if (remaining > 0) "Còn lại" else "Đã đủ",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(text = "$left cột có kết quả chưa xác nhận", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = if (remaining > 0) "$remaining/$total cột chưa chụp" else "$total/$total cột",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 }
-                PrimaryButton(
-                    text = if (isCompleted) "Đã hoàn tất" else "Hoàn tất",
-                    onClick = onTapComplete,
-                    enabled = canComplete,
-                    branded = true,
-                )
+                when {
+                    isCompleted -> PrimaryButton(text = "Đã hoàn tất", onClick = {}, enabled = false, branded = true)
+                    remaining > 0 ->
+                        PrimaryButton(
+                            text = if (remaining == total) "Bắt đầu chụp" else "Chụp tiếp",
+                            onClick = onStartRoute,
+                            trailingIcon = Icons.Rounded.CameraAlt,
+                            branded = true,
+                            modifier = Modifier.testTag("start_route_capture"),
+                        )
+                    else ->
+                        PrimaryButton(
+                            text = "Hoàn tất",
+                            onClick = onTapComplete,
+                            branded = true,
+                            modifier = Modifier.testTag("open_survey_summary"),
+                        )
+                }
             }
         }
     }
@@ -435,6 +456,17 @@ private fun PoleRow(
                 horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
+                pole.observation?.let { observation ->
+                    val (condition, label, icon) = observation.badge()
+                    StatusBadge(text = label, colors = condition.badgeColors(), icon = icon)
+                }
+                pole.skipReason?.let { reason ->
+                    StatusBadge(
+                        text = "Bỏ qua: $reason",
+                        colors = AssetCondition.UNKNOWN.badgeColors(),
+                        icon = Icons.Rounded.Block,
+                    )
+                }
                 pole.aiVerdict?.let { verdict ->
                     val (condition, label, icon) = verdict.badge()
                     StatusBadge(text = label, colors = condition.badgeColors(), icon = icon)
@@ -478,6 +510,13 @@ private fun PoleRow(
         }
     }
 }
+
+private fun Observation.badge(): Triple<AssetCondition, String, ImageVector> =
+    when (this) {
+        Observation.ON -> Triple(AssetCondition.NORMAL, "Bạn: Sáng", icon)
+        Observation.OFF -> Triple(AssetCondition.OUT, "Bạn: Tắt", icon)
+        Observation.UNSURE -> Triple(AssetCondition.UNKNOWN, "Bạn: Không rõ", icon)
+    }
 
 private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
     when (this) {

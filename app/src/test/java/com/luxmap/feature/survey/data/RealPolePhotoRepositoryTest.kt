@@ -303,9 +303,11 @@ class RealPolePhotoRepositoryTest {
                     opType = "submit_pole_photo_review",
                     payloadJson = "{\"photo_id\":\"PHOTO-1\"}",
                     clientOpId = "PHOTO-1:review",
+                    // Not uploaded yet, so the review waits for the photo's upload op.
+                    dependsOnClientOpId = "PHOTO-1",
                 )
             }
-            coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), "PHOTO-2:review") }
+            coVerify(exactly = 0) { syncQueueManager.enqueue(any(), any(), "PHOTO-2:review", any()) }
         }
 
     @Test
