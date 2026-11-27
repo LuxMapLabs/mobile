@@ -120,4 +120,46 @@ class RealAuthRepositoryTest {
             val failure = result.exceptionOrNull() as? LoginFailedException
             assertEquals(LoginFailureReason.InvalidCredentials, failure?.reason)
         }
+
+    @Test
+    fun `a blocked login says how long to wait from Retry-After`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            val blocked =
+                HttpException(
+                    Response.error<Any>(
+                        "".toResponseBody("application/json".toMediaType()),
+                        okhttp3.Response.Builder()
+                            .code(429)
+                            .message("Too Many Requests")
+                            .protocol(okhttp3.Protocol.HTTP_1_1)
+                            .header("Retry-After", "610")
+                            .request(okhttp3.Request.Builder().url("http://localhost/").build())
+                            .build(),
+                    ),
+                )
+            coEvery { authApi.login(any()) } throws blocked
+            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true))
+
+            val failure = repository.login("crew", "x", rememberMe = true).exceptionOrNull() as? LoginFailedException
+
+            assertEquals(LoginFailureReason.RateLimited, failure?.reason)
+            assertEquals(
+                "Đăng nhập sai quá nhiều lần nên tạm bị khoá. Đợi khoảng 11 phút rồi thử lại.",
+                failure?.message,
+            )
+        }
+
+    @Test
+    fun `a blocked login without Retry-After still says it is a temporary block`() =
+        runTest {
+            val authApi = mockk<AuthApi>()
+            coEvery { authApi.login(any()) } throws httpException(429, "RATE_LIMITED")
+            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true))
+
+            val failure = repository.login("crew", "x", rememberMe = true).exceptionOrNull() as? LoginFailedException
+
+            assertEquals(LoginFailureReason.RateLimited, failure?.reason)
+            assertEquals("Đăng nhập sai quá nhiều lần nên tạm bị khoá. Đợi ít phút rồi thử lại.", failure?.message)
+        }
 }

@@ -109,6 +109,16 @@ class RealAuthRepository
             error: HttpException,
             isGoogle: Boolean,
         ): LoginFailedException =
+            if (error.code() == HTTP_TOO_MANY_REQUESTS) {
+                LoginFailedException(LoginFailureReason.RateLimited, rateLimitedMessage(error))
+            } else {
+                failureForErrorCode(error, isGoogle)
+            }
+
+        private fun failureForErrorCode(
+            error: HttpException,
+            isGoogle: Boolean,
+        ): LoginFailedException =
             when (errorCodeFrom(error)) {
                 "INVALID_CREDENTIALS" ->
                     if (isGoogle) {
@@ -128,6 +138,14 @@ class RealAuthRepository
                     )
             }
 
+        // The server sends how long the block lasts in Retry-After (seconds). Saying so stops the
+        // user from tapping again and again, which only keeps the block going.
+        private fun rateLimitedMessage(error: HttpException): String {
+            val seconds = error.response()?.headers()?.get("Retry-After")?.toLongOrNull()
+            val wait = seconds?.let { "khoảng ${maxOf(1, (it + 59) / 60)} phút" } ?: "ít phút"
+            return "Đăng nhập sai quá nhiều lần nên tạm bị khoá. Đợi $wait rồi thử lại."
+        }
+
         private fun errorCodeFrom(error: HttpException): String? =
             runCatching {
                 val body = error.response()?.errorBody()?.string() ?: return null
@@ -136,6 +154,7 @@ class RealAuthRepository
 
         private companion object {
             val errorJson = Json { ignoreUnknownKeys = true }
+            const val HTTP_TOO_MANY_REQUESTS = 429
             const val NETWORK_ERROR_MESSAGE = "Kết nối thất bại. Vui lòng kiểm tra lại."
             const val GENERIC_ERROR_MESSAGE = "Đăng nhập thất bại. Vui lòng thử lại."
             const val GENERIC_GOOGLE_ERROR_MESSAGE = "Đăng nhập bằng Google thất bại. Vui lòng thử lại."
