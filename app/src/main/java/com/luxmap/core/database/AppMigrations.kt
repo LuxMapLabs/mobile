@@ -152,3 +152,30 @@ val MIGRATION_28_29: Migration =
             db.execSQL("ALTER TABLE local_pole_gps_measurement_new RENAME TO local_pole_gps_measurement")
         }
     }
+
+val MIGRATION_29_30: Migration =
+    object : Migration(29, 30) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_history_item (ownerUserId TEXT NOT NULL, " +
+                    "workOrderId TEXT NOT NULL, title TEXT NOT NULL, taskKind TEXT NOT NULL, " +
+                    "woStatus TEXT NOT NULL, communeId TEXT NOT NULL, updatedAt TEXT NOT NULL, " +
+                    "scheduledDate TEXT, position INTEGER NOT NULL, PRIMARY KEY(ownerUserId, workOrderId))",
+            )
+        }
+    }
+
+val MIGRATION_30_31: Migration =
+    object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_history_item ADD COLUMN fetchedAt INTEGER")
+        }
+    }
+
+val MIGRATION_31_32: Migration =
+    object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS local_assigned_survey_route")
+            db.execSQL("DROP TABLE IF EXISTS local_assigned_pole_gps_order")
+        }
+    }

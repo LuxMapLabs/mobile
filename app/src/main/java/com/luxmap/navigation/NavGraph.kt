@@ -10,7 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Person
@@ -38,13 +38,13 @@ import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
+import com.luxmap.feature.history.ui.HistoryRoute
 import com.luxmap.feature.home.ui.HomeRoute
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
 import com.luxmap.feature.notification.ui.NotificationBadgeViewModel
 import com.luxmap.feature.notification.ui.NotificationListRoute
 import com.luxmap.feature.profile.ui.ProfileRoute
-import com.luxmap.feature.survey.ui.hub.SurveyHubRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleListRoute
 import com.luxmap.feature.survey.ui.polephoto.PoleListViewModel
 import com.luxmap.feature.survey.ui.polephoto.PolePhotoCaptureRoute
@@ -62,7 +62,7 @@ import kotlinx.coroutines.isActive
 private val bottomNavItems =
     listOf(
         BottomNavItem(Routes.Home.route, "Hôm nay", Icons.Rounded.Home),
-        BottomNavItem(Routes.Survey.route, "Khảo sát", Icons.Rounded.CameraAlt),
+        BottomNavItem(Routes.History.route, "Lịch sử", Icons.Rounded.History),
         BottomNavItem(Routes.Map.route, "Bản đồ", Icons.Rounded.Map),
         BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Rounded.Person),
     )
@@ -188,22 +188,9 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenNotifications = { navController.navigate(Routes.Notification.route) },
                 )
             }
-            composable(
-                route = Routes.Survey.route,
-                arguments =
-                    listOf(
-                        navArgument("highlightWorkOrderId") {
-                            type = NavType.StringType
-                            nullable = true
-                        },
-                    ),
-            ) { backStackEntry ->
-                SurveyHubRoute(
-                    highlightWorkOrderId = backStackEntry.arguments?.getString("highlightWorkOrderId"),
-                    onCapturePolePhotos = { workOrderId ->
-                        navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
-                    },
-                    onOpenWorkOrderDetail = { workOrderId ->
+            composable(Routes.History.route) {
+                HistoryRoute(
+                    onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
                     unreadNotificationCount = unreadNotificationCount,
@@ -236,12 +223,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                         navController.navigate(Routes.PolePhotoResult.createRoute(polePhotoWorkOrderId, photoId))
                     },
                     onDone = { navController.popBackStack() },
-                    onSurveyCompleted = {
-                        navController.navigate(Routes.Survey.createRoute(polePhotoWorkOrderId)) {
-                            popUpTo(Routes.Home.route)
-                            launchSingleTop = true
-                        }
-                    },
+                    onSurveyCompleted = { navController.popBackStack() },
                 )
             }
             composable(
@@ -388,9 +370,6 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
-                    onOpenSurveyHub = { workOrderId ->
-                        navController.navigate(Routes.Survey.createRoute(workOrderId))
-                    },
                 )
             }
             composable(
@@ -407,7 +386,7 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                 WorkOrderDetailRoute(
                     onBack = { navController.popBackStack() },
                     onStartSurvey = {
-                        navController.navigate(Routes.Survey.createRoute(workOrderId))
+                        navController.navigate(Routes.PolePhotoList.createRoute(workOrderId))
                     },
                     onOpenPdf = { attachmentId ->
                         navController.navigate(Routes.PoleGpsPdfViewer.createRoute(workOrderId, attachmentId))

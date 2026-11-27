@@ -22,7 +22,7 @@ class MapNetworkException(cause: IOException) : IOException("Không có kết n�
 
 // Calls the real GET /auth/me (for map_bounds) + GET /map/poles + GET /map/segments — one fixed
 // bbox per map open, not a bbox per pan/zoom (FM-15 "Hướng B", see the design spec). Follows the
-// same userApi.me() pattern RealHomeRepository/RealSurveyRepository/RealProfileRepository
+// same userApi.me() pattern RealHomeRepository/RealProfileRepository
 // already use — no shared current-user cache exists in the app, so this is one more fresh call,
 // matching the established convention rather than adding new caching infrastructure.
 @Singleton

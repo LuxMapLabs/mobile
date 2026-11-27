@@ -19,7 +19,7 @@ data class BottomNavItem(
     val icon: ImageVector,
 )
 
-// 4 tab: Việc hôm nay · Khảo sát · Bản đồ · Cá nhân (mục A5 đặc tả) — danh sách item
+// 4 tab: Việc hôm nay · Lịch sử · Bản đồ · Cá nhân — danh sách item
 // do navigation/ truyền vào khi wire thật, tránh đoán trước icon/thứ tự tab ở đây.
 @Composable
 fun BottomNavBar(

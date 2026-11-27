@@ -763,8 +763,13 @@ private fun WorkOrderSummaryCard(
     val status = workOrderStatusFromWire(detail.woStatus)
     val kind = workOrderTaskKindFromWire(detail.taskKind)
     val today = LocalDate.now()
-    val due = dueSummary(detail.dueDate, today)
-    val isScheduleOverdue = workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
+    val isClosed = detail.isClosed()
+    val due =
+        dueSummary(detail.dueDate, today).let {
+            if (isClosed) it.copy(statusText = null, isOverdue = false, isToday = false) else it
+        }
+    val isScheduleOverdue =
+        !isClosed && workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
     val dueColor =
         when (dueTone(due, isScheduleOverdue)) {
             DueTone.ALERT -> LuxTheme.colors.dueOverdue

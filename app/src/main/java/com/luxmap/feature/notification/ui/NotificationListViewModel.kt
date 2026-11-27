@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.luxmap.feature.notification.data.NotificationItem
 import com.luxmap.feature.notification.data.NotificationRepository
-import com.luxmap.feature.workorder.data.WorkOrderDetailRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,15 +11,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.IOException
 import javax.inject.Inject
 
 sealed interface NotificationNavigationEvent {
     data class OpenWorkOrderDetail(val workOrderId: String) : NotificationNavigationEvent
-
-    data class OpenSurveyHub(val workOrderId: String) : NotificationNavigationEvent
 }
 
 @HiltViewModel
@@ -28,7 +24,6 @@ class NotificationListViewModel
     @Inject
     constructor(
         private val repository: NotificationRepository,
-        private val workOrderDetailRepository: WorkOrderDetailRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<NotificationListUiState>(NotificationListUiState.Loading)
         val uiState: StateFlow<NotificationListUiState> = _uiState.asStateFlow()
@@ -43,18 +38,7 @@ class NotificationListViewModel
         fun onItemClick(row: NotificationListRowState) {
             onMarkRead(row.notificationId)
             val workOrderId = notificationNavigationTarget(row) ?: return
-            viewModelScope.launch {
-                val taskKind =
-                    runCatching { workOrderDetailRepository.observeWorkOrderDetail(workOrderId).first()?.taskKind }
-                        .getOrNull()
-                _navigate.tryEmit(
-                    if (taskKind == "survey") {
-                        NotificationNavigationEvent.OpenSurveyHub(workOrderId)
-                    } else {
-                        NotificationNavigationEvent.OpenWorkOrderDetail(workOrderId)
-                    },
-                )
-            }
+            _navigate.tryEmit(NotificationNavigationEvent.OpenWorkOrderDetail(workOrderId))
         }
 
         fun onRetry() {

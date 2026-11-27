@@ -36,29 +36,29 @@ private val TOKENS =
 
 class RealAuthRepositoryTest {
     @Test
-    fun `new login clears previous identity and survey list but no pending work tables`() =
+    fun `new login clears previous identity and history cache but no pending work tables`() =
         runTest {
             val auth = mockk<AuthApi>()
             val tokens = mockk<TokenStore>(relaxed = true)
-            val surveys = mockk<com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao>(relaxed = true)
+            val history = mockk<com.luxmap.feature.history.data.dao.HistoryCacheDao>(relaxed = true)
             coEvery { auth.login(any()) } returns TOKENS
-            val result = RealAuthRepository(auth, tokens, surveys).login("B", "password", true)
+            val result = RealAuthRepository(auth, tokens, history).login("B", "password", true)
             assertTrue(result.isSuccess)
             coVerify(exactly = 1) { tokens.clearCachedUserId() }
-            coVerify(exactly = 1) { surveys.deleteAll() }
+            coVerify(exactly = 1) { history.clear() }
         }
 
     @Test
-    fun `offline logout clears identity and survey list`() =
+    fun `offline logout clears identity and history cache`() =
         runTest {
             val auth = mockk<AuthApi>()
             val tokens = mockk<TokenStore>(relaxed = true)
-            val surveys = mockk<com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao>(relaxed = true)
+            val history = mockk<com.luxmap.feature.history.data.dao.HistoryCacheDao>(relaxed = true)
             coEvery { tokens.currentTokens() } returns com.luxmap.core.security.SessionTokens("a", "r", 1)
             coEvery { auth.logout(any()) } throws java.io.IOException("offline")
-            RealAuthRepository(auth, tokens, surveys).logout()
+            RealAuthRepository(auth, tokens, history).logout()
             coVerify(exactly = 1) { tokens.clear() }
-            coVerify(exactly = 1) { surveys.deleteAll() }
+            coVerify(exactly = 1) { history.clear() }
         }
 
     @Test

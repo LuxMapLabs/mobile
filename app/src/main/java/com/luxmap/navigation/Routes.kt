@@ -11,13 +11,8 @@ sealed interface Routes {
         override val route = "home"
     }
 
-    data object Survey : Routes {
-        // highlightWorkOrderId is an optional query param (same reasoning as SurveyCapture's
-        // workOrderId below) - most entries into the Hub have nothing to highlight.
-        override val route = "survey?highlightWorkOrderId={highlightWorkOrderId}"
-
-        fun createRoute(highlightWorkOrderId: String? = null) =
-            if (highlightWorkOrderId != null) "survey?highlightWorkOrderId=$highlightWorkOrderId" else "survey"
+    data object History : Routes {
+        override val route = "history"
     }
 
     data object PolePhotoList : Routes {

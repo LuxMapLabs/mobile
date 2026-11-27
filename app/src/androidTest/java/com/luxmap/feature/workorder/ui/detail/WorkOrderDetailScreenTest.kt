@@ -697,7 +697,7 @@ class WorkOrderDetailScreenTest {
         var opened: String? = null
         val detail = repairDetail(woStatus = "in_progress").copy(taskKind = "survey", faults = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail), onOpenSurvey = { opened = it })
-        composeRule.onNodeWithText("Mở tab Khảo sát").performClick()
+        composeRule.onNodeWithText("Mở danh sách cột").performClick()
         assertEquals("WO-1042", opened)
     }
 
@@ -708,7 +708,7 @@ class WorkOrderDetailScreenTest {
                 .copy(taskKind = "survey", faults = emptyList())
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
         composeRule.onNodeWithText("Bấm Bắt đầu", substring = true).assertExists()
-        composeRule.onNodeWithText("Mở tab Khảo sát").assertDoesNotExist()
+        composeRule.onNodeWithText("Mở danh sách cột").assertDoesNotExist()
     }
 
     @Test

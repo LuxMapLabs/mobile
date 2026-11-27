@@ -4,7 +4,7 @@ import com.luxmap.core.network.UserApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Calls the real GET /auth/me (see UserApi) - same endpoint RealHomeRepository/RealSurveyRepository
+// Calls the real GET /auth/me (see UserApi) - same endpoint RealHomeRepository/RealHistoryRepository
 // already use for the caller's user_id, read here instead for the display fields (BE-07 contract).
 @Singleton
 class RealProfileRepository
