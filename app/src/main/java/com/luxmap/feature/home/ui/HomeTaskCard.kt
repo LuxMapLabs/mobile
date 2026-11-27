@@ -55,6 +55,9 @@ sealed interface HomeTaskBadge {
 
     data class Locked(val text: String) : HomeTaskBadge
 
+    // Past its scheduled date but still workable: a warning, not a lock.
+    data class Late(val text: String) : HomeTaskBadge
+
     data object Overdue : HomeTaskBadge
 
     data class Status(val woStatus: String) : HomeTaskBadge
@@ -66,12 +69,24 @@ fun homeTaskBadge(
     today: LocalDate,
 ): HomeTaskBadge {
     val lock = homeScheduleLock(item, today)
+    val late = homeScheduleLate(item, today)
     return when {
         syncState != null -> HomeTaskBadge.Sync(syncState)
         lock != null -> HomeTaskBadge.Locked(lock)
+        late != null -> HomeTaskBadge.Late(late)
         dueDateLabel(item.dueDate, today).isOverdue -> HomeTaskBadge.Overdue
         else -> HomeTaskBadge.Status(item.woStatus)
     }
+}
+
+internal fun homeScheduleLate(
+    item: WorkOrderSummaryItem,
+    today: LocalDate,
+): String? {
+    if (item.woStatus !in setOf("assigned", "in_progress")) return null
+    val scheduled = item.scheduledDate ?: return null
+    if (!workOrderScheduleWindow(scheduled, today).isPastSchedule) return null
+    return "Quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}"
 }
 
 internal fun homeScheduleLock(
@@ -81,7 +96,6 @@ internal fun homeScheduleLock(
     if (item.woStatus !in setOf("assigned", "in_progress")) return null
     val window = workOrderScheduleWindow(item.scheduledDate, today)
     return when {
-        window.isOverdueToComplete -> "Đã khoá, quá lịch ${DateFormatUtils.formatPlainDate(item.scheduledDate!!)}"
         item.woStatus == "assigned" && !window.canActOnSchedule ->
             "Đã khoá, mở ${DateFormatUtils.formatPlainDate(window.unlocksOn.toString())}"
         item.woStatus == "in_progress" && window.submitOpensOn != null ->
@@ -132,6 +146,12 @@ private fun HomeTaskBadgeView(badge: HomeTaskBadge) {
             val text = if (badge.state == CompletionSyncState.PENDING) "Đã nộp, chờ đồng bộ" else status.label()
             StatusBadge(text = text, colors = status.badgeColors(), icon = status.icon())
         }
+        is HomeTaskBadge.Late ->
+            StatusBadge(
+                text = badge.text,
+                colors = BadgeColors(MaterialTheme.colorScheme.surfaceContainerHigh, LuxTheme.colors.dueToday),
+                icon = Icons.Rounded.EventBusy,
+            )
         is HomeTaskBadge.Locked ->
             StatusBadge(
                 text = badge.text,

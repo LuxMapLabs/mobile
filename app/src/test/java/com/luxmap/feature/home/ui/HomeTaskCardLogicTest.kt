@@ -32,9 +32,9 @@ class HomeTaskCardLogicTest {
     @Test
     fun `expired schedule takes precedence over due today`() {
         val scheduled = "2026-11-13"
-        assertTrue(workOrderScheduleWindow(scheduled, TODAY).isOverdueToComplete)
+        assertTrue(workOrderScheduleWindow(scheduled, TODAY).isPastSchedule)
         assertEquals(
-            HomeTaskBadge.Locked("Đã khoá, quá lịch 13/11/2026"),
+            HomeTaskBadge.Late("Quá lịch 13/11/2026"),
             homeTaskBadge(item(due = TODAY.toString(), scheduled = scheduled), null, TODAY),
         )
     }

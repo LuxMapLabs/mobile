@@ -50,19 +50,19 @@ class WorkOrderMessagesTest {
     }
 
     @Test
-    fun `an in progress order past its scheduled date shows the locked form as an error`() {
+    fun `an in progress order past its scheduled date warns but stays workable`() {
         val result = messages(detail(woStatus = "in_progress", scheduledDate = "2026-11-15"))
-        assertEquals("Quá hạn nộp báo cáo", result.prominent?.title)
-        assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
-        assertEquals("Biểu mẫu đã khoá. Liên hệ Quản lý.", result.prominent?.body)
+        assertEquals("Đã quá lịch", result.prominent?.title)
+        assertEquals(WorkOrderMessageTone.WARNING, result.prominent?.tone)
+        assertEquals("Bạn vẫn làm và nộp báo cáo được. Quản lý sẽ thấy phiếu này trễ lịch.", result.prominent?.body)
     }
 
     @Test
-    fun `an assigned order past its scheduled date shows overdue to start`() {
+    fun `an assigned order past its scheduled date warns but can still be started`() {
         val result = messages(detail(woStatus = "assigned", scheduledDate = "2026-11-15"))
-        assertEquals("Quá hạn bắt đầu", result.prominent?.title)
-        assertEquals(WorkOrderMessageTone.ERROR, result.prominent?.tone)
-        assertEquals("Liên hệ Quản lý để được giao lại.", result.prominent?.body)
+        assertEquals("Đã quá lịch", result.prominent?.title)
+        assertEquals(WorkOrderMessageTone.WARNING, result.prominent?.tone)
+        assertEquals("Bạn vẫn bắt đầu được. Quản lý sẽ thấy phiếu này trễ lịch.", result.prominent?.body)
     }
 
     @Test
@@ -122,7 +122,7 @@ class WorkOrderMessagesTest {
                     note = "Ưu tiên trước mưa",
                 ),
             )
-        assertEquals("Quá hạn nộp báo cáo", result.prominent?.title)
+        assertEquals("Đã quá lịch", result.prominent?.title)
         assertEquals(listOf("Quản lý yêu cầu bổ sung", "Ghi chú giao việc"), result.notes.map { it.label })
     }
 

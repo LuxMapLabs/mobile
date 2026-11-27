@@ -549,9 +549,6 @@ private fun WorkOrderDetailContent(
     val status = workOrderStatusFromWire(detail.woStatus)
     val hasActiveLocalCompletion = state.hasActiveLocalCompletion()
     val canComplete = "complete" in detail.allowedActions && !hasActiveLocalCompletion
-    // "complete" in allowedActions implies wo_status = in_progress (WorkOrderRules on the
-    // backend), so this already means "started but overdue to submit", not "overdue to start".
-    val isFormLocked = workOrderScheduleWindow(detail.scheduledDate, today = LocalDate.now()).isOverdueToComplete
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Column(
             modifier =
@@ -609,10 +606,10 @@ private fun WorkOrderDetailContent(
                     references = state.poleReferences,
                     measurements = state.poleMeasurements,
                     polesMissingPhoto = state.polesMissingPhoto().toSet(),
-                    canCapture = canComplete && !isFormLocked,
+                    canCapture = canComplete,
                     showReport = canComplete,
                     reportNote = state.reportNote,
-                    locked = isFormLocked || state.isSubmitting,
+                    locked = state.isSubmitting,
                     onOpenPdf = onOpenPdf,
                     onMeasurePole = onMeasurePole,
                     onRetryAttachment = onRetryAttachment,
@@ -626,7 +623,7 @@ private fun WorkOrderDetailContent(
                     selectedOutcomes = state.faultOutcomes,
                     reportNote = state.reportNote,
                     editable = canComplete,
-                    locked = isFormLocked || state.isSubmitting,
+                    locked = state.isSubmitting,
                     onNavigateFault = onNavigateFault,
                     onFaultOutcomeSelected = onFaultOutcomeSelected,
                     onReportNoteChanged = onReportNoteChanged,
@@ -641,7 +638,7 @@ private fun WorkOrderDetailContent(
                             title = "Ảnh hiện trường",
                             required = true,
                             photos = photos,
-                            editable = canComplete && !isFormLocked && !state.isSubmitting,
+                            editable = canComplete && !state.isSubmitting,
                             onAdd = onCaptureEvidence,
                             onRemove = onRemoveEvidence,
                         )
@@ -674,7 +671,7 @@ private fun WorkOrderDetailContent(
                         photos = photos,
                         reportNote = state.reportNote,
                         materialsUsed = state.materialsUsed,
-                        locked = !canComplete || isFormLocked || state.isSubmitting,
+                        locked = !canComplete || state.isSubmitting,
                         onReportNoteChanged = onReportNoteChanged,
                         onMaterialsUsedChanged = onMaterialsUsedChanged,
                         onCaptureEvidence = onCaptureEvidence,
@@ -685,7 +682,7 @@ private fun WorkOrderDetailContent(
             if ("complete" in detail.allowedActions && state.localCompletion?.submitStatus == "failed") {
                 EvidenceRecoveryActions(
                     state = state,
-                    allowReplacement = !isFormLocked,
+                    allowReplacement = true,
                     onRecover = onRecoverEvidence,
                 )
             }
@@ -769,7 +766,7 @@ private fun WorkOrderSummaryCard(
             if (isClosed) it.copy(statusText = null, isOverdue = false, isToday = false) else it
         }
     val isScheduleOverdue =
-        !isClosed && workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
+        !isClosed && workOrderScheduleWindow(detail.scheduledDate, today).isPastSchedule
     val dueColor =
         when (dueTone(due, isScheduleOverdue)) {
             DueTone.ALERT -> LuxTheme.colors.dueOverdue

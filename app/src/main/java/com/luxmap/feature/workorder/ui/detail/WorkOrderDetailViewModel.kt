@@ -33,7 +33,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.io.IOException
-import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -404,8 +403,7 @@ class WorkOrderDetailViewModel
         }
 
         private fun WorkOrderDetailUiState.Success.isDraftEditable(): Boolean =
-            "complete" in detail.allowedActions && !hasActiveLocalCompletion() && !justSubmitted &&
-                !workOrderScheduleWindow(detail.scheduledDate, LocalDate.now()).isOverdueToComplete
+            "complete" in detail.allowedActions && !hasActiveLocalCompletion() && !justSubmitted
 
         private suspend fun restoreDraft() {
             try {
