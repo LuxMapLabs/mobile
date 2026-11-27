@@ -3,6 +3,8 @@ package com.luxmap.core.database
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.luxmap.core.offline.LocalOfflineSnapshotEntity
+import com.luxmap.core.offline.OfflineSnapshotDao
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.feature.history.data.dao.HistoryCacheDao
@@ -42,6 +44,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalLuxReadingEntity::class,
         LocalHistoryItemEntity::class,
         LocalSurveyPoleSkipEntity::class,
+        LocalOfflineSnapshotEntity::class,
     ],
     version = 33,
     exportSchema = false,
@@ -63,4 +66,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun luxReadingDao(): LuxReadingDao
 
     abstract fun historyCacheDao(): HistoryCacheDao
+
+    abstract fun offlineSnapshotDao(): OfflineSnapshotDao
 }

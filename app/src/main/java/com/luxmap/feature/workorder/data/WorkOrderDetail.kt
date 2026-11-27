@@ -24,6 +24,9 @@ data class WorkOrderDetail(
     val poleIds: List<String> = emptyList(),
     val attachments: List<WorkOrderAttachment> = emptyList(),
     val poleLocations: List<WorkOrderPoleLocation> = emptyList(),
+    // Started on this device without signal: the start is queued and sent when the network
+    // returns. The order is shown as in progress meanwhile.
+    val startPendingSync: Boolean = false,
 )
 
 data class WorkOrderAttachment(

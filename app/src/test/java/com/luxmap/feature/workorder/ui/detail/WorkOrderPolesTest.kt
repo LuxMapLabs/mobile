@@ -43,9 +43,9 @@ class WorkOrderPolesTest {
         }
 
     @Test
-    fun `survey and unknown kinds do not fetch detail poles`() =
+    fun `unknown kinds do not fetch detail poles`() =
         runTest {
-            for (kind in listOf("survey", "unknown")) {
+            for (kind in listOf("unknown")) {
                 val fixture = DetailViewModelFixture()
                 fixture.create(fixture.detail(kind))
                 advanceUntilIdle()

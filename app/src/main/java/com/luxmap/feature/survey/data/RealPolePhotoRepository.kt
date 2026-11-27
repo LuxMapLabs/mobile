@@ -66,6 +66,7 @@ class RealPolePhotoRepository
                 opType = "upload_pole_photo",
                 payloadJson = json.encodeToString(PolePhotoSyncPayload(entity.photoId)),
                 clientOpId = entity.photoId,
+                dependsOnClientOpId = syncQueueManager.pendingStartOf(workOrderId),
             )
             return entity
         }
@@ -93,6 +94,7 @@ class RealPolePhotoRepository
                 opType = "upload_pole_video",
                 payloadJson = json.encodeToString(PolePhotoSyncPayload(entity.photoId)),
                 clientOpId = entity.photoId,
+                dependsOnClientOpId = syncQueueManager.pendingStartOf(workOrderId),
             )
             return entity
         }

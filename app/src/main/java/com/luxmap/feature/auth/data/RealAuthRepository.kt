@@ -1,6 +1,7 @@
 package com.luxmap.feature.auth.data
 
 import com.luxmap.core.network.AuthApi
+import com.luxmap.core.offline.OfflineSnapshotDao
 import com.luxmap.core.security.TokenStore
 import com.luxmap.feature.history.data.dao.HistoryCacheDao
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,7 @@ class RealAuthRepository
         private val authApi: AuthApi,
         private val tokenStore: TokenStore,
         private val historyCacheDao: HistoryCacheDao,
+        private val offlineSnapshotDao: OfflineSnapshotDao,
     ) : AuthRepository {
         override suspend fun login(
             identifier: String,
@@ -32,6 +34,7 @@ class RealAuthRepository
                     onSuccess = { tokens ->
                         tokenStore.clearCachedUserId()
                         historyCacheDao.clear()
+                        offlineSnapshotDao.clear()
                         tokenStore.saveSession(
                             tokens.access_token,
                             tokens.refresh_token,
@@ -55,6 +58,7 @@ class RealAuthRepository
                     onSuccess = { tokens ->
                         tokenStore.clearCachedUserId()
                         historyCacheDao.clear()
+                        offlineSnapshotDao.clear()
                         tokenStore.saveSession(
                             tokens.access_token,
                             tokens.refresh_token,
@@ -77,6 +81,7 @@ class RealAuthRepository
             }
             tokenStore.clear()
             historyCacheDao.clear()
+            offlineSnapshotDao.clear()
             return Result.success(Unit)
         }
 

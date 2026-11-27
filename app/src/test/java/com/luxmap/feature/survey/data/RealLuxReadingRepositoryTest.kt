@@ -5,6 +5,7 @@ import com.luxmap.core.sync.SyncQueueEntity
 import com.luxmap.core.sync.SyncQueueManager
 import com.luxmap.feature.survey.data.dao.LuxReadingDao
 import com.luxmap.feature.survey.data.entity.LocalLuxReadingEntity
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -19,7 +20,8 @@ import java.time.Instant
 
 class RealLuxReadingRepositoryTest {
     private val dao = mockk<LuxReadingDao>(relaxed = true)
-    private val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+    private val syncQueueManager =
+        mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
     private val syncQueueDao = mockk<SyncQueueDao>()
     private val repository = RealLuxReadingRepository(dao, syncQueueManager, syncQueueDao)
 

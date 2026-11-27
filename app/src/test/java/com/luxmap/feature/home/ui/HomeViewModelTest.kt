@@ -1,6 +1,7 @@
 package com.luxmap.feature.home.ui
 
 import app.cash.turbine.test
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.home.data.HomeData
 import com.luxmap.feature.home.data.HomeMetrics
@@ -70,12 +71,15 @@ private fun homeData(vararg items: WorkOrderSummaryItem) =
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
+    private val network = MutableStateFlow(true)
+    private val online = mockk<ConnectivityObserver> { every { isOnline } returns network }
+
     @Test
     fun `retains the existing profile full name when tasks are empty and while refreshing`() =
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(homeData().copy(fullName = "Nguyễn Văn Bình"))
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
                 assertEquals(HomeUiState.Empty, awaitItem())
@@ -104,7 +108,7 @@ class HomeViewModelTest {
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(homeData())
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -118,7 +122,7 @@ class HomeViewModelTest {
             val repair = summaryItem("R1", "repair").copy(woStatus = "in_progress")
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returnsMany listOf(flowOf(homeData()), flowOf(homeData(repair)))
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -139,7 +143,7 @@ class HomeViewModelTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns
                 flowOf(homeData(summaryItem("S1", "survey"), summaryItem("G1", "pole_gps_update")))
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -154,7 +158,7 @@ class HomeViewModelTest {
             val data = homeData(summaryItem("R1", "repair"))
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(data)
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -168,7 +172,7 @@ class HomeViewModelTest {
             val states = MutableStateFlow(mapOf("WO-1" to CompletionSyncState.PENDING))
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(homeData(summaryItem("WO-1", "repair")))
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(states), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(states), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -193,7 +197,7 @@ class HomeViewModelTest {
                     flow { throw IOException("timeout") },
                     flow { throw IllegalStateException("boom") },
                 )
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -213,7 +217,7 @@ class HomeViewModelTest {
             every { completion.observeCompletionSyncStates() } returnsMany listOf(oldStates, newStates)
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flowOf(homeData(summaryItem("WO-1", "repair")))
-            val viewModel = HomeViewModel(repository, completion, fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, completion, fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -234,7 +238,7 @@ class HomeViewModelTest {
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns flow { throw IllegalStateException("network down") }
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -253,7 +257,7 @@ class HomeViewModelTest {
                     flow { throw IllegalStateException("network down") },
                     flowOf(data),
                 )
-            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository())
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
@@ -265,5 +269,28 @@ class HomeViewModelTest {
                 val success = awaitItem() as HomeUiState.Success
                 assertEquals(data, success.data)
             }
+        }
+
+    @Test
+    fun `a failed Home reloads by itself when the network comes back`() =
+        runTest {
+            val repository = mockk<HomeRepository>()
+            var calls = 0
+            every { repository.observeHomeData() } returns
+                flow {
+                    calls++
+                    if (calls == 1) throw IOException("offline")
+                    emit(homeData().copy(fullName = "Bình"))
+                }
+            network.value = false
+            val viewModel = HomeViewModel(repository, fakeCompletionRepository(), fakeAuthRepository(), online)
+            dispatcher.scheduler.advanceUntilIdle()
+            assertEquals(true, viewModel.uiState.value is HomeUiState.Error)
+
+            network.value = true
+            dispatcher.scheduler.advanceUntilIdle()
+
+            assertEquals(2, calls)
+            assertEquals("Bình", viewModel.fullName.value)
         }
 }

@@ -16,6 +16,15 @@ class SyncQueueManager
         val errorCount: Flow<Int> = dao.observeErrorCount()
         val lastSyncedAt: Flow<Instant?> = dao.observeLastSyncedAt()
 
+        // A work order started without signal has a queued start op (see StartWorkOrderSyncHandler).
+        // Everything else sent for that order - photos, lux readings, evidence, the completion -
+        // must wait for it, or the server refuses it as not in progress. Returns that op's
+        // clientOpId to pass as dependsOnClientOpId, or null once the start has gone through.
+        suspend fun pendingStartOf(workOrderId: String): String? {
+            val opId = startOpId(workOrderId)
+            return opId.takeIf { dao.statusOf(it).let { status -> status != null && status != "done" } }
+        }
+
         suspend fun triggerSync() {
             syncTrigger.triggerNow()
         }
@@ -41,5 +50,11 @@ class SyncQueueManager
                 ),
             )
             triggerSync()
+        }
+
+        companion object {
+            const val START_WORK_ORDER_OP = "start_work_order"
+
+            fun startOpId(workOrderId: String) = "start:$workOrderId"
         }
     }

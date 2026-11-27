@@ -4,6 +4,8 @@ import app.cash.turbine.test
 import com.luxmap.core.network.UserApi
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.network.dto.PagedResultDto
+import com.luxmap.core.offline.LocalOfflineSnapshotEntity
+import com.luxmap.core.offline.OfflineSnapshotDao
 import com.luxmap.feature.auth.data.CommuneSummaryDto
 import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.workorder.data.dto.WorkOrderItemDto
@@ -11,14 +13,29 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 import java.time.LocalDate
 
 private const val USER_ID = "USER-1"
 
 class RealHomeRepositoryTest {
+    private val snapshots =
+        object : OfflineSnapshotDao {
+            val saved = mutableMapOf<String, LocalOfflineSnapshotEntity>()
+
+            override suspend fun get(key: String) = saved[key]
+
+            override suspend fun put(snapshot: LocalOfflineSnapshotEntity) {
+                saved[snapshot.key] = snapshot
+            }
+
+            override suspend fun clear() = saved.clear()
+        }
+
     private fun repository(items: List<WorkOrderItemDto>): RealHomeRepository {
         val userApi = mockk<UserApi>()
         coEvery { userApi.me() } returns
@@ -35,7 +52,7 @@ class RealHomeRepositoryTest {
         coEvery {
             workOrdersApi.list(assignedTo = USER_ID, woStatus = "assigned,in_progress", page = 1, pageSize = 200)
         } returns PagedResultDto(page = 1, pageSize = 200, total = items.size, items = items)
-        return RealHomeRepository(userApi, workOrdersApi)
+        return RealHomeRepository(userApi, workOrdersApi, snapshots)
     }
 
     private fun workOrder(
@@ -187,6 +204,23 @@ class RealHomeRepositoryTest {
                 assertEquals("in_progress", item.woStatus)
                 assertEquals("2026-10-01", item.dueDate)
                 assertTrue(item.priorityScore == 87.5)
+                awaitComplete()
+            }
+        }
+
+    @Test
+    fun `without signal Home shows the last list saved on the device, marked as cached`() =
+        runTest {
+            repository(listOf(workOrder("WO-1", title = "Khảo sát tuyến"))).observeHomeData().test {
+                assertNull(awaitItem().cachedAt)
+                awaitComplete()
+            }
+            val offlineUser = mockk<UserApi> { coEvery { me() } throws IOException("offline") }
+
+            RealHomeRepository(offlineUser, mockk(), snapshots).observeHomeData().test {
+                val data = awaitItem()
+                assertNotNull(data.cachedAt)
+                assertEquals("Khảo sát tuyến", data.clusters.single().items.single().title)
                 awaitComplete()
             }
         }

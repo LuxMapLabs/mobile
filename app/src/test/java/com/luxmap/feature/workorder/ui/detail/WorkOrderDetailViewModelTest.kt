@@ -684,7 +684,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `a survey order never refreshes the pole list`() =
+    fun `a survey order saves its pole list on the device once for offline use`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>(relaxed = true)
             val vm =
@@ -695,7 +695,7 @@ class WorkOrderDetailViewModelTest {
                 awaitItem()
             }
 
-            coVerify(exactly = 0) { poleListRepository.poles(any()) }
+            coVerify(exactly = 1) { poleListRepository.poles(WORK_ORDER_ID) }
         }
 
     @Test
