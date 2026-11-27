@@ -39,6 +39,8 @@ AGENTS.md
 .env
 .env.*
 !.env.example
+*.jks
+*.keystore
 
 appsettings.Development.local.json
 appsettings.Production.json

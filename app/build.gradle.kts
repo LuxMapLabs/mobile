@@ -18,6 +18,10 @@ val localProperties =
         if (file.exists()) file.inputStream().use { load(it) }
     }
 
+fun releaseSecret(name: String): String? = System.getenv(name) ?: localProperties.getProperty(name)
+
+val releaseKeystorePath = releaseSecret("RELEASE_KEYSTORE_PATH")
+
 android {
     namespace = "com.luxmap"
     compileSdk = 35
@@ -26,8 +30,8 @@ android {
         applicationId = "com.luxmap"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -42,8 +46,20 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
+    signingConfigs {
+        if (releaseKeystorePath != null) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseSecret("RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = releaseSecret("RELEASE_KEY_ALIAS")
+                keyPassword = releaseSecret("RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
