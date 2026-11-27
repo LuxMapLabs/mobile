@@ -33,9 +33,8 @@ import com.luxmap.core.theme.Spacing
 import com.luxmap.core.theme.badgeColors
 import com.luxmap.core.ui.clearFocusOnTapOutside
 
-// Shared by F09 (WorkOrderDetailScreen) and the Survey Hub route cards - both call the same
-// generic POST /work-orders/{id}/request-cancellation, so the reason sheet is not duplicated
-// per feature (CLAUDE.md WO-CANCEL-REQUEST).
+// Used by F09 (WorkOrderDetailScreen) for the generic POST /work-orders/{id}/request-cancellation
+// (CLAUDE.md WO-CANCEL-REQUEST).
 private val CANCEL_REASON_OPTIONS =
     listOf(
         "Thời tiết không cho phép",

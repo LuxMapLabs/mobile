@@ -46,9 +46,6 @@ class RealWorkOrderCompletionRepository
         override fun observeCompletion(workOrderId: String): Flow<LocalWorkOrderCompletionEntity?> =
             dao.observeCompletion(workOrderId)
 
-        override fun observeCompletedWorkOrderIds(): Flow<Set<String>> =
-            dao.observeAllCompletions().map { completions -> completions.map { it.workOrderId }.toSet() }
-
         override suspend fun captureEvidence(
             workOrderId: String,
             kind: EvidenceKind,

@@ -130,6 +130,16 @@ Xác nhận trực tiếp bằng cách đọc source `luxmap_backend`: `AuthCont
 - Web Client ID (OAuth "Web application", không phải Android) để trong `BuildConfig.GOOGLE_WEB_CLIENT_ID` — public by nature (ship trong mọi APK gọi Google Sign-In) nên để làm giá trị mặc định ngay trong `app/build.gradle.kts`, không phải secret riêng trong `local.properties`. Phải khớp đúng 1 giá trị trong `GOOGLE_CLIENT_IDS` phía BE.
 - Test: `RealAuthRepositoryTest.kt` (case đăng nhập Google thành công/thất bại/lỗi mạng), `LoginViewModelTest.kt` (case bấm nút, huỷ account-picker, lỗi). **Đã kiểm tra tay trên máy thật (SM-A075F), thành công** — ngoài Web Client ID có sẵn, còn cần tạo thêm 1 OAuth Client loại **Android** trong cùng project Google Cloud Console (package `com.luxmap.local`, SHA-1 của debug keystore máy build) mới lấy được ID token qua Credential Manager; tài khoản test tạo qua `POST /admin/users` (Web GIS), đặt mật khẩu qua mail mời, rồi đăng nhập Google khớp đúng email đó mới thành công.
 
+### Tab Lịch sử + bỏ tab Khảo sát — THÊM 2026-11-27, đã code ở mobile
+
+Quyết định trực tiếp với chủ dự án (2026-11-27). Thanh dưới còn 4 tab: **Hôm nay · Lịch sử · Bản đồ · Cá nhân**.
+
+- **Hôm nay** hiện cả lệnh `survey` và `pole_gps_update`. Tab con Khảo sát/GPS cột chỉ hiện khi có lệnh loại đó; Sửa chữa/Kiểm tra luôn hiện.
+- **Hub Khảo sát đã xoá** (`feature/survey/ui/hub/`, `SurveyRepository`, 2 bảng cache `local_assigned_survey_route`/`local_assigned_pole_gps_order`, `MIGRATION_31_32` DROP TABLE). Lệnh khảo sát đi qua F09: Bắt đầu/Yêu cầu hủy dùng chung `allowed_actions`, sau khi Bắt đầu hoặc bấm "Mở danh sách cột" thì vào `PolePhotoList`; "Hoàn tất" ở danh sách cột quay về F09. Thông báo về mọi loại lệnh đều mở F09. Việc mở lại báo cáo bị Quản lý trả về: `PoleListViewModel` (survey) và F09 (`pole_gps_update`) đã tự làm, không còn phụ thuộc Hub.
+- **Lịch sử** (`feature/history/`): `GET /work-orders?assigned_to=me&wo_status=done,verified,cancelled` (endpoint có sẵn, không cần BE mới), trang đầu 200 lệnh, giữ thứ tự server (`created_at` giảm dần). Cache Room `local_history_item` lọc theo `ownerUserId`, lưu `fetchedAt` để banner offline ghi đúng giờ tải; xoá khi đăng nhập/đăng xuất (`RealAuthRepository`). Ngày hiển thị là `updated_at`.
+- **Đã gửi BE (2026-11-27), chưa có trả lời:** thêm `completed_at`/`closed_at` vào item của `GET /work-orders` và tham số sắp xếp theo ngày đóng. Khi có thì đổi Lịch sử sang field đó.
+- F09 với lệnh `verified`/`cancelled`: bỏ badge/khung "Đã nộp, chờ duyệt" của completion cục bộ và cảnh báo quá hạn (`WorkOrderDetail.isClosed()`).
+
 ### Xin hủy lệnh (WO-CANCEL-REQUEST) — THÊM 2026-10-27, code được ngay, đã viết ở mobile
 
 Xác nhận trực tiếp bằng cách đọc source `luxmap_backend` (nhánh `dev`, tới commit `aa0d0ba`): migration `20261026100552_AddWorkOrderCancellationRequests`, `WorkOrdersController.cs` (`request-cancellation`/`reject-cancellation`), `WorkOrderRules.cs`, `WorkOrderService.cs`, test `WorkOrderCancellationTests.cs`, và `docs/api-contract-v1.1.md` mục "Xin hủy / từ chối nhận lịch — v1.19, WO-CANCEL-REQUEST". Backend tự ghi là **SELF-SIGNED** (chốt D-1…D-14 ngày 26/10/2026), nền tạm tới FW kế tiếp, WP5/WP6 còn phải xác nhận — coi là nguồn đúng để code theo, cập nhật lại mục này nếu BE đổi sau vòng duyệt đó.
@@ -234,7 +244,7 @@ app/src/main/java/com/luxmap/
         SyncIndicator.kt
         GpsAccuracyIndicator.kt
         CameraReadinessPanel.kt
-        BottomNavBar.kt        # 4 tab: Việc hôm nay · Khảo sát · Bản đồ · Cá nhân
+        BottomNavBar.kt        # 4 tab: Việc hôm nay · Lịch sử · Bản đồ · Cá nhân
     network/
       ApiClient.kt            # Retrofit + OkHttp instance, base URL, JWT interceptor
     database/
@@ -288,13 +298,13 @@ app/src/main/java/com/luxmap/
         HomeViewModel.kt
         HomeUiState.kt
 
-    survey/                   # Hub Khảo sát: giao tuyến (task_kind=survey) + chụp ảnh/video từng cột
-                               # + hiển thị pole_gps_update - KHÔNG còn F03-F06 (xem mục 2026-11-15, đã xoá)
-      data/
-        SurveyRepository.kt
-        RealSurveyRepository.kt
+    history/                  # Tab Lịch sử: lệnh done/verified/cancelled, lọc theo loại (2026-11-27)
+      data/                    # RealHistoryRepository + cache Room local_history_item
       ui/
-        hub/                  # Hub Khảo sát (danh sách tuyến + pole_gps_update + chuyến nhập tài sản)
+
+    survey/                   # Chụp ảnh/video từng cột (task_kind=survey) - Hub/tab Khảo sát ĐÃ XOÁ 2026-11-27
+      data/                    # PolePhoto/PoleList/LuxReading repository
+      ui/
         polephoto/             # Chụp ảnh/video ngắn từng cột đèn (quyết định 2026-10-15, còn giữ)
 
     workorder/                 # F08–F10 — lệnh sửa chữa
