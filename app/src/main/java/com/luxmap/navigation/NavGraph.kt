@@ -305,6 +305,11 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                             type = NavType.BoolType
                             defaultValue = false
                         },
+                        navArgument("saved") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
                     ),
             ) { backStackEntry ->
                 val captureWorkOrderId = backStackEntry.arguments?.getString("workOrderId") ?: return@composable
@@ -317,9 +322,19 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
                     poleId = capturePoleId,
                     source = captureSource,
                     onDone = { navController.popBackStack() },
-                    onNextPole = { nextPoleId ->
+                    onOpenMap = { pole ->
                         navController.navigate(
-                            Routes.PolePhotoCapture.createRoute(captureWorkOrderId, nextPoleId, route = true),
+                            Routes.Map.createRoute(focusPoleId = pole.poleId, focusLat = pole.lat, focusLng = pole.lng),
+                        )
+                    },
+                    onNextPole = { nextPoleId, handoff ->
+                        navController.navigate(
+                            Routes.PolePhotoCapture.createRoute(
+                                captureWorkOrderId,
+                                nextPoleId,
+                                route = true,
+                                saved = handoff,
+                            ),
                         ) {
                             popUpTo(backStackEntry.destination.id) { inclusive = true }
                         }

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LightStatusBarIcons
 import com.luxmap.core.ui.components.LuxActionPair
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.PrimaryButton
@@ -96,6 +97,7 @@ fun PoleMediaPreviewScaffold(
     media: @Composable BoxScope.() -> Unit,
     actions: @Composable () -> Unit,
 ) {
+    LightStatusBarIcons()
     BackHandler { if (!isSaving) onClose() }
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(

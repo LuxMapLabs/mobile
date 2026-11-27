@@ -10,27 +10,45 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.luxmap.core.theme.LuxTheme
 import com.luxmap.core.theme.Spacing
+import com.luxmap.core.ui.components.LightStatusBarIcons
+import com.luxmap.core.ui.components.LuxBanner
+import com.luxmap.core.ui.components.LuxBannerTone
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxTextButton
+import com.luxmap.core.ui.components.PoleIdentificationDetails
 import com.luxmap.core.ui.components.PrimaryButton
+import com.luxmap.feature.survey.data.PoleListItem
 
 // The Field Engineer's own label for a pole photo, picked right after the shutter.
 enum class Observation(val wireValue: String, val label: String, val icon: ImageVector) {
@@ -58,7 +76,8 @@ fun routeTitle(
 ): String = progress?.let { "Cột ${it.index}/${it.total} · $poleId" } ?: poleId
 
 // Bottom of the photo preview: saving the photo IS picking what the engineer saw, so there is
-// no separate "Dùng ảnh này" step and no AI result to wait for.
+// no separate "Dùng ảnh này" step and no AI result to wait for. Sáng/Tắt are the two big,
+// filled answers (gloves, one hand, at night); "Không rõ" is the deliberate third option below.
 @Composable
 fun ObservationActions(
     isSaving: Boolean,
@@ -66,6 +85,12 @@ fun ObservationActions(
     onObserve: (Observation) -> Unit,
     onRetake: () -> Unit,
 ) {
+    val haptics = LocalHapticFeedback.current
+
+    fun observe(observation: Observation) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        onObserve(observation)
+    }
     Column(
         modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -76,16 +101,30 @@ fun ObservationActions(
             color = MaterialTheme.colorScheme.onSurface,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Observation.entries.forEach { observation ->
-                LuxSecondaryButton(
-                    text = observation.label,
-                    leadingIcon = observation.icon,
-                    onClick = { onObserve(observation) },
-                    enabled = !isSaving,
-                    modifier = Modifier.weight(1f).testTag("observe_${observation.wireValue}"),
-                )
-            }
+            ObservationButton(
+                observation = Observation.ON,
+                container = LuxTheme.brand.lumen,
+                content = LuxTheme.brand.onLumen,
+                enabled = !isSaving,
+                onClick = ::observe,
+                modifier = Modifier.weight(1f),
+            )
+            ObservationButton(
+                observation = Observation.OFF,
+                container = MaterialTheme.colorScheme.surfaceContainerHighest,
+                content = MaterialTheme.colorScheme.onSurface,
+                enabled = !isSaving,
+                onClick = ::observe,
+                modifier = Modifier.weight(1f),
+            )
         }
+        LuxSecondaryButton(
+            text = Observation.UNSURE.label,
+            leadingIcon = Observation.UNSURE.icon,
+            onClick = { observe(Observation.UNSURE) },
+            enabled = !isSaving,
+            modifier = Modifier.fillMaxWidth().testTag("observe_${Observation.UNSURE.wireValue}"),
+        )
         LuxTextButton(
             text = retakeLabel,
             onClick = onRetake,
@@ -95,43 +134,141 @@ fun ObservationActions(
     }
 }
 
-// Shown in route mode when the camera was closed without a photo: the engineer either retries,
-// marks the pole as skipped with a reason, or stops and goes back to the pole list.
 @Composable
-fun RoutePolePrompt(
-    title: String,
+private fun ObservationButton(
+    observation: Observation,
+    container: Color,
+    content: Color,
+    enabled: Boolean,
+    onClick: (Observation) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = { onClick(observation) },
+        enabled = enabled,
+        shape = MaterialTheme.shapes.medium,
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = content),
+        modifier = modifier.heightIn(min = 72.dp).testTag("observe_${observation.wireValue}"),
+    ) {
+        Icon(imageVector = observation.icon, contentDescription = null, modifier = Modifier.size(28.dp))
+        Text(
+            text = observation.label,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            modifier = Modifier.padding(start = Spacing.sm),
+        )
+    }
+}
+
+fun RouteHandoff.message(): String =
+    when (outcome) {
+        RouteHandoff.SKIPPED -> "Đã bỏ qua $poleId"
+        else -> "Đã lưu $poleId · ${Observation.fromWire(outcome)?.label.orEmpty()}"
+    }
+
+// Route mode shows this before every camera launch: which pole is next, enough to recognise it
+// on the street (segment, note, fixture, map), and that the previous pole was saved. One extra
+// tap per pole, traded for not photographing the wrong lamp - the system camera cannot show
+// the pole id itself.
+@Composable
+fun RoutePoleCard(
+    poleId: String,
+    progress: RouteProgress?,
+    pole: PoleListItem?,
+    previous: RouteHandoff?,
+    cameraWasClosed: Boolean,
     onCapture: () -> Unit,
     onSkip: () -> Unit,
     onStop: () -> Unit,
+    onOpenMap: () -> Unit,
 ) {
+    LightStatusBarIcons()
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
+        if (progress != null) {
+            Text(
+                text = "Cột ${progress.index}/${progress.total}",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LinearProgressIndicator(
+                progress = { (progress.index - 1).toFloat() / progress.total },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (previous != null && !cameraWasClosed) {
+            LuxBanner(
+                message = previous.message(),
+                tone = if (previous.outcome == RouteHandoff.SKIPPED) LuxBannerTone.NEUTRAL else LuxBannerTone.SUCCESS,
+                modifier = Modifier.testTag("route_previous"),
+            )
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.CenterVertically),
+        ) {
+            Text(
+                text = if (cameraWasClosed) "Chưa có ảnh cho cột này" else "Cột tiếp theo",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = poleId,
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (pole != null) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    PoleIdentificationDetails(
+                        poleId = pole.poleId,
+                        position = pole.position,
+                        segmentId = pole.segmentId,
+                        note = pole.note,
+                        fixtureType = pole.fixtureType,
+                        lampWatt = pole.lampWatt,
+                        lampCount = pole.lampCount,
+                        fixtureCount = pole.fixtureCount,
+                        nearSensitivePoi = pole.nearSensitivePoi,
+                        lat = pole.lat,
+                        lng = pole.lng,
+                        onOpenMap = onOpenMap,
+                    )
+                }
+                if (pole.lat != null && pole.lng != null) {
+                    LuxSecondaryButton(
+                        text = "Xem trên bản đồ",
+                        leadingIcon = Icons.Rounded.Map,
+                        onClick = onOpenMap,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        PrimaryButton(
+            text = "Chụp cột này",
+            onClick = onCapture,
+            trailingIcon = Icons.Rounded.PhotoCamera,
+            branded = true,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("route_capture"),
         )
-        Text(
-            text = "Chưa có ảnh cho cột này.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        PrimaryButton(text = "Chụp cột này", onClick = onCapture, modifier = Modifier.fillMaxWidth())
         LuxSecondaryButton(
             text = "Bỏ qua cột này",
             onClick = onSkip,
             modifier = Modifier.fillMaxWidth().testTag("route_skip"),
         )
-        LuxTextButton(text = "Dừng, về danh sách cột", onClick = onStop)
+        LuxTextButton(
+            text = "Dừng, về danh sách cột",
+            onClick = onStop,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
     }
 }
 

@@ -76,6 +76,8 @@ sealed interface PoleListUiState {
         val canComplete: Boolean get() = !isCompleted && poles.isNotEmpty() && remainingCount == 0
         val aiMismatches: List<AiMismatch> get() = poles.mapNotNull { it.aiMismatch() }
 
+        val aiReadCount: Int get() = poles.count { it.observation != null && it.aiStatus != null }
+
         // Labelled photos the AI has not read yet (still queued, or offline).
         val awaitingAiCount: Int get() = poles.count { it.observation != null && it.aiStatus == null }
     }

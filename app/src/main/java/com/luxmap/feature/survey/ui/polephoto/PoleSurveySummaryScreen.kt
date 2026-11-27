@@ -101,7 +101,7 @@ fun PoleSurveySummaryScreen(
                     )
                 }
             }
-            if (mismatches.isEmpty()) {
+            if (mismatches.isEmpty() && state.aiReadCount > 0) {
                 item {
                     LuxBanner(
                         message = "AI đồng ý với bạn ở tất cả ảnh đã đọc.",

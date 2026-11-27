@@ -75,7 +75,8 @@ class PoleSurveySummaryScreenTest {
             listOf(labelled("POLE-1", Observation.ON, cvState = null, aiStatus = null)),
             onSubmit = { submitted = true },
         )
-        composeRule.onNodeWithText("AI đồng ý với bạn ở tất cả ảnh đã đọc.").assertExists()
+        // Nothing was read yet, so there is no agreement to claim.
+        composeRule.onNodeWithText("AI đồng ý với bạn ở tất cả ảnh đã đọc.").assertDoesNotExist()
         composeRule.onNodeWithText("Gửi khảo sát").performClick()
         composeRule.onNodeWithTag("confirm_survey_complete").performClick()
         assertEquals(true, submitted)

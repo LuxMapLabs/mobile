@@ -176,7 +176,7 @@ class PolePhotoCaptureViewModelTest {
         }
 
     @Test
-    fun `onPhotoCaptured still calls onDone when the repository write throws`() =
+    fun `a photo that could not be written keeps the preview open and flags the failure`() =
         runTest {
             val repository = mockk<PolePhotoRepository>()
             coEvery {
@@ -204,7 +204,8 @@ class PolePhotoCaptureViewModelTest {
             vm.onPhotoCaptured(File("x.jpg"), "on") { done = true }
             dispatcher.scheduler.advanceUntilIdle()
 
-            assertTrue(done)
+            assertFalse(done)
+            assertTrue(vm.saveFailed.value)
         }
 
     private val luxReading = LuxCardUiState.Recorded(12.3, Instant.parse("2026-11-24T12:00:00Z"))
@@ -315,7 +316,7 @@ class PolePhotoCaptureViewModelTest {
             dispatcher.scheduler.advanceUntilIdle()
 
             coVerify(exactly = 0) { luxRepository.record(any(), any(), any(), any(), any()) }
-            assertTrue(done)
+            assertFalse(done)
         }
 
     @Test
