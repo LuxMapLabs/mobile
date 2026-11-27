@@ -97,7 +97,6 @@ android {
             applicationIdSuffix = ".server"
             versionNameSuffix = "-server"
             buildConfigField("String", "API_BASE_URL", "\"https://luxmap.com.vn/\"")
-            resValue("string", "app_name", "LuxMap Server")
         }
     }
 
