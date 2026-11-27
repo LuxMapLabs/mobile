@@ -3,7 +3,7 @@ package com.luxmap.navigation
 import androidx.navigation.NavController
 
 private val tabRoutes =
-    setOf(Routes.Home.route, Routes.Survey.route, Routes.Map.route, Routes.Profile.route)
+    setOf(Routes.Home.route, Routes.Survey.route, Routes.History.route, Routes.Map.route, Routes.Profile.route)
 
 internal fun NavController.navigateToBottomTab(route: String) {
     if (route == currentDestination?.route) return

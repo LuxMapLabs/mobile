@@ -11,6 +11,10 @@ sealed interface Routes {
         override val route = "home"
     }
 
+    data object History : Routes {
+        override val route = "history"
+    }
+
     data object Survey : Routes {
         // highlightWorkOrderId is an optional query param (same reasoning as SurveyCapture's
         // workOrderId below) - most entries into the Hub have nothing to highlight.

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.Person
@@ -38,6 +39,7 @@ import com.luxmap.core.ui.components.BottomNavBar
 import com.luxmap.core.ui.components.BottomNavItem
 import com.luxmap.feature.auth.ui.LoginScreen
 import com.luxmap.feature.auth.ui.SessionViewModel
+import com.luxmap.feature.history.ui.HistoryRoute
 import com.luxmap.feature.home.ui.HomeRoute
 import com.luxmap.feature.map.ui.MapScreen
 import com.luxmap.feature.map.ui.PoleDetailRoute
@@ -63,6 +65,7 @@ private val bottomNavItems =
     listOf(
         BottomNavItem(Routes.Home.route, "Hôm nay", Icons.Rounded.Home),
         BottomNavItem(Routes.Survey.route, "Khảo sát", Icons.Rounded.CameraAlt),
+        BottomNavItem(Routes.History.route, "Lịch sử", Icons.Rounded.History),
         BottomNavItem(Routes.Map.route, "Bản đồ", Icons.Rounded.Map),
         BottomNavItem(Routes.Profile.route, "Cá nhân", Icons.Rounded.Person),
     )
@@ -181,6 +184,15 @@ fun NavGraph(navController: NavHostController = rememberNavController()) {
             }
             composable(Routes.Home.route) {
                 HomeRoute(
+                    onOpenWorkOrder = { workOrderId ->
+                        navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
+                    },
+                    unreadNotificationCount = unreadNotificationCount,
+                    onOpenNotifications = { navController.navigate(Routes.Notification.route) },
+                )
+            }
+            composable(Routes.History.route) {
+                HistoryRoute(
                     onOpenWorkOrder = { workOrderId ->
                         navController.navigate(Routes.WorkOrderDetail.createRoute(workOrderId))
                     },
