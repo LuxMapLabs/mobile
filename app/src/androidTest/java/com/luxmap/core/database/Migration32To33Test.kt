@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.luxmap.core.offline.LocalOfflineSnapshotEntity
 import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -17,7 +18,7 @@ import java.time.Instant
 @RunWith(AndroidJUnit4::class)
 class Migration32To33Test {
     @Test
-    fun upgrade_keeps_old_photos_without_a_label_and_adds_the_skip_table() =
+    fun upgrade_keeps_old_photos_without_a_label_and_adds_the_skip_and_snapshot_tables() =
         runTest {
             val context = ApplicationProvider.getApplicationContext<Context>()
             val name = "migration-32-33-test.db"
@@ -28,6 +29,7 @@ class Migration32To33Test {
             }
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
                 it.execSQL("DROP TABLE local_survey_pole_skip")
+                it.execSQL("DROP TABLE local_offline_snapshot")
                 it.execSQL("DROP TABLE local_pole_photo")
                 it.execSQL(
                     "CREATE TABLE local_pole_photo (photoId TEXT NOT NULL, workOrderId TEXT NOT NULL, " +
@@ -52,6 +54,8 @@ class Migration32To33Test {
             assertNull(dao.byId("PH1")!!.engineerObservation)
             dao.upsertSkip(LocalSurveyPoleSkipEntity("W", "POLE-2", "Bị che", Instant.ofEpochMilli(2000)))
             assertEquals("Bị che", dao.observeSkips("W").first().single().reason)
+            after.offlineSnapshotDao().put(LocalOfflineSnapshotEntity("home", "{}", Instant.ofEpochMilli(3000)))
+            assertEquals("{}", after.offlineSnapshotDao().get("home")?.json)
             after.close()
             context.deleteDatabase(name)
         }
