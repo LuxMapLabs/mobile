@@ -1,5 +1,7 @@
 package com.luxmap.feature.history.data
 
+import java.time.Instant
+
 data class HistoryItem(
     val workOrderId: String,
     val title: String,
@@ -13,4 +15,5 @@ data class HistoryItem(
 data class HistoryResult(
     val items: List<HistoryItem>,
     val isStale: Boolean,
+    val syncedAt: Instant? = null,
 )

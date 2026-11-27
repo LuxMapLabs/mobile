@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.io.IOException
-import java.time.Instant
 import javax.inject.Inject
 
 @HiltViewModel
@@ -59,7 +58,7 @@ class HistoryViewModel
                                     HistoryUiState.Success(
                                         items = result.items,
                                         isStale = result.isStale,
-                                        lastSyncedAt = Instant.now(),
+                                        lastSyncedAt = result.syncedAt,
                                     )
                                 }
                         }

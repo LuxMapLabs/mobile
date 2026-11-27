@@ -13,4 +13,5 @@ data class LocalHistoryItemEntity(
     val updatedAt: String,
     val scheduledDate: String?,
     val position: Int,
+    val fetchedAt: Long? = null,
 )

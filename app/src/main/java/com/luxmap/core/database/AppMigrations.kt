@@ -164,3 +164,10 @@ val MIGRATION_29_30: Migration =
             )
         }
     }
+
+val MIGRATION_30_31: Migration =
+    object : Migration(30, 31) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_history_item ADD COLUMN fetchedAt INTEGER")
+        }
+    }

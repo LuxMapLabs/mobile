@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 import java.io.IOException
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,8 +38,12 @@ class RealHistoryRepository
                     }
                     val items = workOrdersApi.list(assignedTo = userId, woStatus = CLOSED_STATUSES).items
                     ensureSession(sessionId)
-                    cacheDao.replaceAll(userId, items.mapIndexed { index, dto -> dto.toEntity(userId, index) })
-                    emit(HistoryResult(items.map { it.toDomain() }, isStale = false))
+                    val fetchedAt = Instant.now()
+                    cacheDao.replaceAll(
+                        userId,
+                        items.mapIndexed { index, dto -> dto.toEntity(userId, index, fetchedAt.toEpochMilli()) },
+                    )
+                    emit(HistoryResult(items.map { it.toDomain() }, isStale = false, syncedAt = fetchedAt))
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -48,7 +53,8 @@ class RealHistoryRepository
                         if (owner != null && tokenStore.cachedUserId() == owner) cacheDao.all(owner) else emptyList()
                     ensureSession(sessionId)
                     if (cached.isEmpty()) throw e
-                    emit(HistoryResult(cached.map { it.toDomain() }, isStale = true))
+                    val syncedAt = cached.firstNotNullOfOrNull { it.fetchedAt }?.let(Instant::ofEpochMilli)
+                    emit(HistoryResult(cached.map { it.toDomain() }, isStale = true, syncedAt = syncedAt))
                 }
             }
 
@@ -65,8 +71,18 @@ class RealHistoryRepository
         private fun WorkOrderItemDto.toEntity(
             ownerUserId: String,
             position: Int,
+            fetchedAt: Long,
         ) = LocalHistoryItemEntity(
-            ownerUserId, workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate, position,
+            ownerUserId = ownerUserId,
+            workOrderId = workOrderId,
+            title = title,
+            taskKind = taskKind,
+            woStatus = woStatus,
+            communeId = communeId,
+            updatedAt = updatedAt,
+            scheduledDate = scheduledDate,
+            position = position,
+            fetchedAt = fetchedAt,
         )
 
         private fun LocalHistoryItemEntity.toDomain() =

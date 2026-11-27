@@ -15,11 +15,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.IOException
+import java.time.Instant
 
 private const val CLOSED = "done,verified,cancelled"
 
@@ -50,18 +53,21 @@ private fun dto(
     scheduledDate = "2026-11-19",
 )
 
-private fun entity(id: String) =
-    LocalHistoryItemEntity(
-        ownerUserId = "U-1",
-        workOrderId = id,
-        title = "Lệnh $id",
-        taskKind = "repair",
-        woStatus = "verified",
-        communeId = "COM-001",
-        updatedAt = "2026-11-20T08:00:00Z",
-        scheduledDate = "2026-11-19",
-        position = 0,
-    )
+private fun entity(
+    id: String,
+    fetchedAt: Long? = null,
+) = LocalHistoryItemEntity(
+    ownerUserId = "U-1",
+    workOrderId = id,
+    title = "Lệnh $id",
+    taskKind = "repair",
+    woStatus = "verified",
+    communeId = "COM-001",
+    updatedAt = "2026-11-20T08:00:00Z",
+    scheduledDate = "2026-11-19",
+    position = 0,
+    fetchedAt = fetchedAt,
+)
 
 class RealHistoryRepositoryTest {
     private val users = mockk<UserApi>()
@@ -88,6 +94,7 @@ class RealHistoryRepositoryTest {
             assertEquals(listOf("WO-2", "WO-1"), result.items.map { it.workOrderId })
             assertEquals("survey", result.items.first().taskKind)
             assertEquals(false, result.isStale)
+            assertNotNull(result.syncedAt)
             coVerify { cache.replaceAll("U-1", match { rows -> rows.map { it.position } == listOf(0, 1) }) }
         }
 
@@ -98,7 +105,9 @@ class RealHistoryRepositoryTest {
 
             val result = repository.observeHistory().first()
 
-            assertEquals(HistoryResult(emptyList(), isStale = false), result)
+            assertEquals(emptyList<HistoryItem>(), result.items)
+            assertEquals(false, result.isStale)
+            assertNotNull(result.syncedAt)
             coVerify { cache.replaceAll("U-1", emptyList()) }
         }
 
@@ -106,12 +115,25 @@ class RealHistoryRepositoryTest {
     fun `network failure falls back to the cached list marked stale`() =
         runTest {
             coEvery { orders.list("U-1", null, CLOSED) } throws IOException("offline")
-            coEvery { cache.all("U-1") } returns listOf(entity("WO-1"))
+            coEvery { cache.all("U-1") } returns listOf(entity("WO-1", fetchedAt = 1_000L))
 
             val result = repository.observeHistory().first()
 
             assertEquals(listOf("WO-1"), result.items.map { it.workOrderId })
             assertEquals(true, result.isStale)
+            assertEquals(Instant.ofEpochMilli(1_000L), result.syncedAt)
+        }
+
+    @Test
+    fun `cache rows saved before the fetch time existed give no sync time`() =
+        runTest {
+            coEvery { orders.list("U-1", null, CLOSED) } throws IOException("offline")
+            coEvery { cache.all("U-1") } returns listOf(entity("WO-1"))
+
+            val result = repository.observeHistory().first()
+
+            assertEquals(true, result.isStale)
+            assertNull(result.syncedAt)
         }
 
     @Test

@@ -153,9 +153,9 @@ private fun HistoryContent(
         ) {
             if (isStale) {
                 item {
-                    val syncedAt = DateFormatUtils.formatInstant(lastSyncedAt)
+                    val syncedAt = lastSyncedAt?.let { ", cập nhật lúc ${DateFormatUtils.formatInstant(it)}" }.orEmpty()
                     LuxBanner(
-                        message = "Đang xem dữ liệu đã lưu, cập nhật lúc $syncedAt",
+                        message = "Đang xem dữ liệu đã lưu$syncedAt",
                         tone = LuxBannerTone.INFO,
                     )
                 }
