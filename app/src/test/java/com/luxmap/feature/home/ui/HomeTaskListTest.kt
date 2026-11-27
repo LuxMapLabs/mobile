@@ -62,7 +62,7 @@ class HomeTaskListTest {
     }
 
     @Test
-    fun `visible tasks keep only repair and inspection, dropping survey, pole gps and unknown kinds`() {
+    fun `visible tasks keep the four known kinds, dropping unknown kinds`() {
         val visible =
             data(
                 item("R", kind = "repair"),
@@ -71,7 +71,35 @@ class HomeTaskListTest {
                 item("G", kind = "pole_gps_update"),
                 item("X", kind = "audit"),
             ).visibleTasks()
-        assertEquals(listOf("R", "I"), visible.map { it.workOrderId })
+        assertEquals(listOf("R", "I", "S", "G"), visible.map { it.workOrderId })
+    }
+
+    @Test
+    fun `survey and pole gps tabs appear only when they have work`() {
+        assertEquals(
+            listOf(HomeTaskTab.REPAIR, HomeTaskTab.INSPECTION),
+            data(item("R")).visibleTasks().availableTabs(),
+        )
+        assertEquals(
+            listOf(HomeTaskTab.REPAIR, HomeTaskTab.INSPECTION, HomeTaskTab.SURVEY),
+            data(item("S", kind = "survey")).visibleTasks().availableTabs(),
+        )
+        assertEquals(
+            HomeTaskTab.entries,
+            data(item("S", kind = "survey"), item("G", kind = "pole_gps_update")).visibleTasks().availableTabs(),
+        )
+    }
+
+    @Test
+    fun `default tab falls to survey or pole gps when it is the only work`() {
+        assertEquals(
+            HomeTaskTab.SURVEY,
+            initialHomeTab(HomeUiState.Success(data(item("S", kind = "survey"))), null),
+        )
+        assertEquals(
+            HomeTaskTab.POLE_GPS_UPDATE,
+            initialHomeTab(HomeUiState.Success(data(item("G", kind = "pole_gps_update"))), null),
+        )
     }
 
     @Test
@@ -83,7 +111,7 @@ class HomeTaskListTest {
                 item("I1", kind = "inspection", status = "in_progress"),
                 item("S1", kind = "survey", status = "in_progress", due = "2026-11-01"),
             ).visibleTasks()
-        assertEquals(HomeSummary(total = 3, overdue = 1, inProgress = 2), visible.homeSummary(TODAY))
+        assertEquals(HomeSummary(total = 4, overdue = 2, inProgress = 3), visible.homeSummary(TODAY))
     }
 
     @Test

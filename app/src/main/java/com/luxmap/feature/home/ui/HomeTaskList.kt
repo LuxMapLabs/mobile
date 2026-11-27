@@ -8,7 +8,11 @@ import java.time.LocalDate
 enum class HomeTaskTab(val wireKind: String, val label: String) {
     REPAIR("repair", "Sửa chữa"),
     INSPECTION("inspection", "Kiểm tra"),
+    SURVEY("survey", "Khảo sát"),
+    POLE_GPS_UPDATE("pole_gps_update", "GPS cột"),
 }
+
+private val ALWAYS_VISIBLE_TABS = setOf(HomeTaskTab.REPAIR, HomeTaskTab.INSPECTION)
 
 data class HomeSummary(val total: Int, val overdue: Int, val inProgress: Int)
 
@@ -25,6 +29,9 @@ fun List<WorkOrderSummaryItem>.homeSummary(today: LocalDate): HomeSummary =
     )
 
 fun List<WorkOrderSummaryItem>.countFor(tab: HomeTaskTab): Int = count { it.taskKind == tab.wireKind }
+
+fun List<WorkOrderSummaryItem>.availableTabs(): List<HomeTaskTab> =
+    HomeTaskTab.entries.filter { it in ALWAYS_VISIBLE_TABS || countFor(it) > 0 }
 
 fun List<WorkOrderSummaryItem>.sortedFor(
     tab: HomeTaskTab,
@@ -46,11 +53,7 @@ internal fun initialHomeTab(
         HomeUiState.Empty -> HomeTaskTab.REPAIR
         is HomeUiState.Success -> {
             val tasks = state.data.visibleTasks()
-            if (tasks.countFor(HomeTaskTab.REPAIR) == 0 && tasks.countFor(HomeTaskTab.INSPECTION) > 0) {
-                HomeTaskTab.INSPECTION
-            } else {
-                HomeTaskTab.REPAIR
-            }
+            HomeTaskTab.entries.firstOrNull { tasks.countFor(it) > 0 } ?: HomeTaskTab.REPAIR
         }
     }
 }

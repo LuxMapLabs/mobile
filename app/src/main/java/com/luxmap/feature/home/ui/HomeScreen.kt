@@ -187,19 +187,21 @@ private fun HomeContent(
 ) {
     val today = remember { LocalDate.now() }
     val tasks = remember(data) { data.visibleTasks() }
+    val tabs = remember(tasks) { tasks.availableTabs() }
+    val currentTab = selectedTab.takeIf { it in tabs } ?: HomeTaskTab.REPAIR
     Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             LuxSegmented(
-                segments = HomeTaskTab.entries.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
-                selected = selectedTab,
+                segments = tabs.map { LuxSegment(it, "${it.label} (${tasks.countFor(it)})") },
+                selected = currentTab,
                 onSelect = onSelectTab,
                 branded = true,
             )
         }
-        val visibleItems = remember(tasks, selectedTab, today) { tasks.sortedFor(selectedTab, today) }
+        val visibleItems = remember(tasks, currentTab, today) { tasks.sortedFor(currentTab, today) }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = Spacing.lg, top = Spacing.xs, end = Spacing.lg, bottom = Spacing.lg),
@@ -216,7 +218,7 @@ private fun HomeContent(
                 }
             }
             if (visibleItems.isEmpty()) {
-                item { TabEmptyState(tab = selectedTab) }
+                item { TabEmptyState(tab = currentTab) }
             } else {
                 items(visibleItems, key = { it.workOrderId }) { item ->
                     HomeTaskCard(
@@ -264,6 +266,18 @@ private fun TabEmptyState(tab: HomeTaskTab) {
                 title = "Không có nhiệm vụ sửa chữa",
                 message = "Lệnh sửa chữa và bảo trì được giao sẽ hiện ở đây.",
                 icon = WorkOrderTaskKind.REPAIR.icon(),
+            )
+        HomeTaskTab.SURVEY ->
+            LuxEmptyState(
+                title = "Không có nhiệm vụ khảo sát",
+                message = "Lệnh khảo sát cột đèn được giao sẽ hiện ở đây.",
+                icon = WorkOrderTaskKind.SURVEY.icon(),
+            )
+        HomeTaskTab.POLE_GPS_UPDATE ->
+            LuxEmptyState(
+                title = "Không có nhiệm vụ cập nhật GPS cột",
+                message = "Lệnh đo lại vị trí cột đèn được giao sẽ hiện ở đây.",
+                icon = WorkOrderTaskKind.POLE_GPS_UPDATE.icon(),
             )
     }
 }

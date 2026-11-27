@@ -134,7 +134,7 @@ class HomeViewModelTest {
         }
 
     @Test
-    fun `emits Empty when the API only returns survey and pole gps work orders`() =
+    fun `emits Success when the API only returns survey and pole gps work orders`() =
         runTest {
             val repository = mockk<HomeRepository>()
             every { repository.observeHomeData() } returns
@@ -143,7 +143,8 @@ class HomeViewModelTest {
 
             viewModel.uiState.test {
                 assertEquals(HomeUiState.Loading, awaitItem())
-                assertEquals(HomeUiState.Empty, awaitItem())
+                val success = awaitItem() as HomeUiState.Success
+                assertEquals(listOf("S1", "G1"), success.data.visibleTasks().map { it.workOrderId })
             }
         }
 
