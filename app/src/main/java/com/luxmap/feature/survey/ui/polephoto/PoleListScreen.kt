@@ -19,8 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lightbulb
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Error
@@ -30,8 +28,10 @@ import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.WbIncandescent
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -317,7 +317,7 @@ private fun ReportMethodSheet(
                 label = "Video từ thư viện",
                 onClick = onChooseVideoGallery,
             )
-            ReportMethodOption(icon = Icons.Rounded.Block, label = "Bỏ qua cột này", onClick = onChooseSkip)
+            ReportMethodOption(icon = Icons.Rounded.SkipNext, label = "Bỏ qua cột này", onClick = onChooseSkip)
         }
     }
 }
@@ -384,7 +384,7 @@ private fun PoleListBottomBar(
                         PrimaryButton(
                             text = if (remaining == total) "Bắt đầu chụp" else "Chụp tiếp",
                             onClick = onStartRoute,
-                            trailingIcon = Icons.Rounded.CameraAlt,
+                            trailingIcon = Icons.Rounded.PhotoCamera,
                             branded = true,
                             modifier = Modifier.testTag("start_route_capture"),
                         )
@@ -468,7 +468,7 @@ private fun PoleRow(
                     StatusBadge(
                         text = "Bỏ qua: $reason",
                         colors = AssetCondition.UNKNOWN.badgeColors(),
-                        icon = Icons.Rounded.Block,
+                        icon = Icons.Rounded.SkipNext,
                     )
                 }
                 pole.aiVerdict?.let { verdict ->
@@ -500,7 +500,7 @@ private fun PoleRow(
                 )
             action is PoleRowAction.OpenReportSheet && pole.syncStatus == null ->
                 Icon(
-                    imageVector = Icons.Rounded.CameraAlt,
+                    imageVector = Icons.Rounded.PhotoCamera,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -524,8 +524,8 @@ private fun Observation.badge(): Triple<AssetCondition, String, ImageVector> =
 
 private fun PoleAiVerdict.badge(): Triple<AssetCondition, String, ImageVector> =
     when (this) {
-        PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Rounded.Lightbulb)
-        PoleAiVerdict.OFF -> Triple(AssetCondition.OUT, "Đèn tắt", Icons.Outlined.Lightbulb)
+        PoleAiVerdict.ON -> Triple(AssetCondition.NORMAL, "Đèn sáng", Icons.Rounded.WbIncandescent)
+        PoleAiVerdict.OFF -> Triple(AssetCondition.OUT, "Đèn tắt", Icons.Rounded.Lightbulb)
         PoleAiVerdict.INCONCLUSIVE -> Triple(AssetCondition.UNKNOWN, "Không xác định", Icons.Rounded.Help)
     }
 

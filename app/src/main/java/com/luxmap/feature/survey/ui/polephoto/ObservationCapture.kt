@@ -18,6 +18,7 @@ import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.WbIncandescent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,8 +53,8 @@ import com.luxmap.feature.survey.data.PoleListItem
 
 // The Field Engineer's own label for a pole photo, picked right after the shutter.
 enum class Observation(val wireValue: String, val label: String, val icon: ImageVector) {
-    ON("on", "Sáng", Icons.Rounded.Lightbulb),
-    OFF("off", "Tắt", Icons.Outlined.Lightbulb),
+    ON("on", "Sáng", Icons.Rounded.WbIncandescent),
+    OFF("off", "Tắt", Icons.Rounded.Lightbulb),
     UNSURE("unsure", "Không rõ", Icons.Rounded.Help),
     ;
 
