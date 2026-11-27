@@ -76,11 +76,13 @@ private fun WorkOrderDetailUiState.Success.hasPolePhoto(measurement: PoleMeasure
 internal fun WorkOrderDetailUiState.Success.hasInspectionPhoto(): Boolean =
     localEvidence.any { it.kind == "observation" }
 
+internal fun WorkOrderDetail.isClosed(): Boolean = woStatus == "verified" || woStatus == "cancelled"
+
 internal fun WorkOrderDetailUiState.Success.hasActiveLocalCompletion(): Boolean =
-    localCompletion?.let { it.submitStatus != "draft" && !isReturnedForRework(this) } == true
+    !detail.isClosed() && localCompletion?.let { it.submitStatus != "draft" && !isReturnedForRework(this) } == true
 
 fun WorkOrderDetailUiState.Success.syncStatus(): SyncStatus? =
-    when (localCompletion?.submitStatus) {
+    when (localCompletion?.submitStatus.takeUnless { detail.isClosed() }) {
         null -> null
         "pending" -> if (isOnline) SyncStatus.QUEUED_ONLINE else SyncStatus.QUEUED_OFFLINE
         "synced" -> SyncStatus.DONE
