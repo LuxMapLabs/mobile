@@ -20,8 +20,6 @@ import com.luxmap.feature.survey.data.PolePhotoRepository
 import com.luxmap.feature.survey.data.RealLuxReadingRepository
 import com.luxmap.feature.survey.data.RealPoleListRepository
 import com.luxmap.feature.survey.data.RealPolePhotoRepository
-import com.luxmap.feature.survey.data.RealSurveyRepository
-import com.luxmap.feature.survey.data.SurveyRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderCompletionRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderDetailRepository
 import com.luxmap.feature.workorder.data.RealWorkOrderDraftRepository
@@ -55,9 +53,6 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindHistoryRepository(impl: RealHistoryRepository): HistoryRepository
-
-    @Binds
-    abstract fun bindSurveyRepository(impl: RealSurveyRepository): SurveyRepository
 
     @Binds
     abstract fun bindWorkOrderDetailRepository(impl: RealWorkOrderDetailRepository): WorkOrderDetailRepository

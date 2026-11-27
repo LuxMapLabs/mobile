@@ -16,13 +16,12 @@ import com.luxmap.core.database.MIGRATION_27_28
 import com.luxmap.core.database.MIGRATION_28_29
 import com.luxmap.core.database.MIGRATION_29_30
 import com.luxmap.core.database.MIGRATION_30_31
+import com.luxmap.core.database.MIGRATION_31_32
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.history.data.dao.HistoryCacheDao
 import com.luxmap.feature.survey.data.dao.LuxReadingDao
-import com.luxmap.feature.survey.data.dao.PoleGpsOrderCacheDao
 import com.luxmap.feature.survey.data.dao.PoleListCacheDao
 import com.luxmap.feature.survey.data.dao.PolePhotoDao
-import com.luxmap.feature.survey.data.dao.SurveyRouteCacheDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderDraftDao
 import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
@@ -58,6 +57,7 @@ object DatabaseModule {
                 MIGRATION_28_29,
                 MIGRATION_29_30,
                 MIGRATION_30_31,
+                MIGRATION_31_32,
             )
             .build()
 
@@ -80,14 +80,6 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun providePoleListCacheDao(db: AppDatabase): PoleListCacheDao = db.poleListCacheDao()
-
-    @Provides
-    @Singleton
-    fun provideSurveyRouteCacheDao(db: AppDatabase): SurveyRouteCacheDao = db.surveyRouteCacheDao()
-
-    @Provides
-    @Singleton
-    fun providePoleGpsOrderCacheDao(db: AppDatabase): PoleGpsOrderCacheDao = db.poleGpsOrderCacheDao()
 
     @Provides
     @Singleton

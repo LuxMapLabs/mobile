@@ -18,6 +18,9 @@ interface HistoryCacheDao {
     @Query("DELETE FROM local_history_item WHERE ownerUserId = :ownerUserId")
     suspend fun deleteAll(ownerUserId: String)
 
+    @Query("DELETE FROM local_history_item")
+    suspend fun clear()
+
     @Transaction
     suspend fun replaceAll(
         ownerUserId: String,

@@ -171,3 +171,11 @@ val MIGRATION_30_31: Migration =
             db.execSQL("ALTER TABLE local_history_item ADD COLUMN fetchedAt INTEGER")
         }
     }
+
+val MIGRATION_31_32: Migration =
+    object : Migration(31, 32) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DROP TABLE IF EXISTS local_assigned_survey_route")
+            db.execSQL("DROP TABLE IF EXISTS local_assigned_pole_gps_order")
+        }
+    }

@@ -302,3 +302,78 @@ class Migration28To29Test {
         }
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class Migration29To32Test {
+    private lateinit var db: SupportSQLiteDatabase
+
+    @Before
+    fun openVersion29() {
+        val config =
+            SupportSQLiteOpenHelper.Configuration
+                .builder(ApplicationProvider.getApplicationContext())
+                .name(null)
+                .callback(
+                    object : SupportSQLiteOpenHelper.Callback(29) {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            db.execSQL(
+                                "CREATE TABLE local_assigned_survey_route (workOrderId TEXT NOT NULL PRIMARY KEY, " +
+                                    "title TEXT NOT NULL, communeId TEXT NOT NULL, woStatus TEXT NOT NULL, " +
+                                    "dueDate TEXT, scheduledDate TEXT, ownerUserId TEXT)",
+                            )
+                            db.execSQL(
+                                "CREATE TABLE local_assigned_pole_gps_order (ownerUserId TEXT NOT NULL, " +
+                                    "workOrderId TEXT NOT NULL, title TEXT NOT NULL, communeId TEXT NOT NULL, " +
+                                    "woStatus TEXT NOT NULL, dueDate TEXT, scheduledDate TEXT, " +
+                                    "PRIMARY KEY(ownerUserId, workOrderId))",
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) = Unit
+                    },
+                ).build()
+        db = FrameworkSQLiteOpenHelperFactory().create(config).writableDatabase
+        db.execSQL("INSERT INTO local_assigned_survey_route VALUES ('WO-1', 'T', 'C', 'assigned', NULL, NULL, 'U-1')")
+        MIGRATION_29_30.migrate(db)
+        MIGRATION_30_31.migrate(db)
+        MIGRATION_31_32.migrate(db)
+    }
+
+    @After
+    fun close() = db.close()
+
+    @Test
+    fun history_cache_accepts_a_row_with_and_without_a_fetch_time() {
+        db.execSQL(
+            "INSERT INTO local_history_item (ownerUserId, workOrderId, title, taskKind, woStatus, communeId, " +
+                "updatedAt, scheduledDate, position, fetchedAt) " +
+                "VALUES ('U-1', 'WO-1', 'T', 'repair', 'verified', 'C', '2026-11-20T08:00:00Z', NULL, 0, 1000)",
+        )
+        db.execSQL(
+            "INSERT INTO local_history_item (ownerUserId, workOrderId, title, taskKind, woStatus, communeId, " +
+                "updatedAt, scheduledDate, position) " +
+                "VALUES ('U-1', 'WO-2', 'T', 'survey', 'done', 'C', '2026-11-20T08:00:00Z', NULL, 1)",
+        )
+        db.query("SELECT fetchedAt FROM local_history_item ORDER BY position").use {
+            assertTrue(it.moveToFirst())
+            assertEquals(1000L, it.getLong(0))
+            assertTrue(it.moveToNext())
+            assertTrue(it.isNull(0))
+        }
+    }
+
+    @Test
+    fun hub_cache_tables_are_dropped() {
+        db.query(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN " +
+                "('local_assigned_survey_route', 'local_assigned_pole_gps_order')",
+        ).use {
+            assertTrue(it.moveToFirst())
+            assertEquals(0, it.getInt(0))
+        }
+    }
+}
