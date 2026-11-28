@@ -152,12 +152,19 @@ class PoleListViewModel
                 completionRepository.submitCompletion(
                     workOrderId = workOrderId,
                     taskKind = "survey",
-                    reportNote = "Đã xác nhận kết quả khảo sát ${state.confirmedCount} cột đèn.",
+                    reportNote = surveyReportNote(state.poles),
                     materialsUsed = null,
                     faultOutcomes = null,
                 )
                 _surveyCompleted.tryEmit(pendingReviews)
             }
+        }
+
+        fun onSkipPole(
+            poleId: String,
+            reason: String,
+        ) {
+            viewModelScope.launch { polePhotoRepository.skipPole(workOrderId, poleId, reason) }
         }
 
         // Saves the Field Engineer's correction locally only - sent later, in bulk, by
@@ -182,6 +189,11 @@ class PoleListViewModel
             val hasPendingDecision: Boolean,
             val aiVerdict: PoleAiVerdict?,
             val isConfirmed: Boolean,
+            val observation: Observation?,
+            val filePath: String,
+            val aiStatus: String?,
+            val cvState: String?,
+            val confidence: Double?,
         )
 
         private fun load() {
@@ -212,13 +224,24 @@ class PoleListViewModel
                                                         isConclusive(photo.draftFinalCvState ?: photo.finalCvState),
                                                     hasPendingDecision =
                                                         photo.reviewedBy != null && photo.decision == null,
+                                                    // A labelled photo keeps the AI out of
+                                                    // sight until the end-of-route check.
                                                     aiVerdict =
-                                                        poleAiVerdict(
-                                                            photo.aiStatus,
-                                                            photo.cvState,
-                                                            photo.finalCvState,
-                                                            photo.draftFinalCvState,
-                                                        ),
+                                                        if (photo.engineerObservation != null) {
+                                                            null
+                                                        } else {
+                                                            poleAiVerdict(
+                                                                photo.aiStatus,
+                                                                photo.cvState,
+                                                                photo.finalCvState,
+                                                                photo.draftFinalCvState,
+                                                            )
+                                                        },
+                                                    observation = Observation.fromWire(photo.engineerObservation),
+                                                    filePath = photo.filePath,
+                                                    aiStatus = photo.aiStatus,
+                                                    cvState = photo.cvState,
+                                                    confidence = photo.confidence,
                                                 )
                                             }
                                         }
@@ -227,7 +250,9 @@ class PoleListViewModel
                             infoByPoleFlow,
                             completionRepository.observeCompletion(workOrderId),
                             luxReadingRepository.observeReadings(workOrderId),
-                        ) { infoByPole, completion, luxReadings ->
+                            polePhotoRepository.observeSkips(workOrderId),
+                        ) { infoByPole, completion, luxReadings, skips ->
+                            val skipReasonByPole = skips.associate { it.poleId to it.reason }
                             PoleListUiState.Success(
                                 poles =
                                     poles.map { pole ->
@@ -247,6 +272,12 @@ class PoleListViewModel
                                                 info?.let { luxReadings.latestForPhoto(it.photoId) }?.let { reading ->
                                                     PoleLuxInfo(reading.luxValue, reading.syncStatus == "failed")
                                                 },
+                                            observation = info?.observation,
+                                            skipReason = skipReasonByPole[pole.poleId],
+                                            filePath = info?.filePath,
+                                            aiStatus = info?.aiStatus,
+                                            cvState = info?.cvState,
+                                            confidence = info?.confidence,
                                         )
                                     },
                                 isStale = result.isStale,
@@ -280,3 +311,16 @@ class PoleListViewModel
             const val WORK_ORDER_ID_ARG = "workOrderId"
         }
     }
+
+// Sent as the completion report: the backend has no per-pole skip field, so the skipped poles and
+// their reasons are listed here for the Manager.
+internal fun surveyReportNote(poles: List<PoleListRowState>): String {
+    val counts = poles.mapNotNull { it.observation }.groupingBy { it }.eachCount()
+    val skipped = poles.filter { it.skipReason != null }
+    val summary =
+        "Đã khảo sát ${poles.size - skipped.size}/${poles.size} cột: " +
+            Observation.entries.joinToString(", ") { "${it.label.lowercase()} ${counts[it] ?: 0}" } + "."
+    if (skipped.isEmpty()) return summary
+    return summary + " Bỏ qua ${skipped.size} cột: " +
+        skipped.joinToString("; ") { "${it.poleId} (${it.skipReason})" } + "."
+}

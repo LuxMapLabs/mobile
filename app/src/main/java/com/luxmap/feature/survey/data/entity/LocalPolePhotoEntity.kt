@@ -44,4 +44,8 @@ data class LocalPolePhotoEntity(
     // "photo" (camera or gallery) or "video" - decides which sync op capture()/captureVideo()
     // enqueues. Added for the pole-video feature; existing rows default to "photo".
     val mediaType: String = "photo",
+    // What the Field Engineer saw with their own eyes, picked right after the shutter and before
+    // any AI result exists: "on", "off" or "unsure". Never changed afterwards, so it stays an
+    // independent label next to cvState. Null for videos and for photos taken before this field.
+    val engineerObservation: String? = null,
 )

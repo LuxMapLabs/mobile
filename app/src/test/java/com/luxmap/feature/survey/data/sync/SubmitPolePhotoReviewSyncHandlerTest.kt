@@ -179,4 +179,50 @@ class SubmitPolePhotoReviewSyncHandlerTest {
 
             assertTrue(result is SyncOpResult.RetryLater)
         }
+
+    @Test
+    fun `a label picked at the pole that differs from the AI is sent with an explaining note`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            coEvery { dao.byId("PHOTO-1") } returns
+                draftPhoto(draftReviewNote = null).copy(engineerObservation = "off")
+            coEvery { api.reviewPolePhoto(any(), any(), any()) } returns reviewedItemDto()
+            val handler = SubmitPolePhotoReviewSyncHandler(api, dao)
+
+            val result = handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1"))) { _, _ -> }
+
+            assertTrue(result is SyncOpResult.Done)
+            coVerify {
+                api.reviewPolePhoto(
+                    "WO-1",
+                    "PPH-000001",
+                    PolePhotoReviewRequestDto(
+                        finalCvState = "off",
+                        reviewNote = "Kỹ sư quan sát trực tiếp tại cột, chọn trước khi có kết quả AI.",
+                    ),
+                )
+            }
+        }
+
+    @Test
+    fun `a label picked at the pole that matches the AI is sent without a note`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<PolePhotoDao>(relaxed = true)
+            coEvery { dao.byId("PHOTO-1") } returns
+                draftPhoto(draftFinalCvState = "on", draftReviewNote = null).copy(engineerObservation = "on")
+            coEvery { api.reviewPolePhoto(any(), any(), any()) } returns reviewedItemDto()
+            val handler = SubmitPolePhotoReviewSyncHandler(api, dao)
+
+            handler.handle(Json.encodeToString(PolePhotoSyncPayload("PHOTO-1"))) { _, _ -> }
+
+            coVerify {
+                api.reviewPolePhoto(
+                    "WO-1",
+                    "PPH-000001",
+                    PolePhotoReviewRequestDto(finalCvState = "on", reviewNote = null),
+                )
+            }
+        }
 }

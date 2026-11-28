@@ -34,6 +34,9 @@ class RealPoleListRepository
                 if (cached.isEmpty()) throw e
                 PoleListResult(cached, isStale = true)
             }
+
+        override suspend fun cachedPoles(workOrderId: String): List<PoleListItem> =
+            dao.byWorkOrder(workOrderId).map { it.toDomain() }
     }
 
 internal fun PoleListItemDto.toDomain() =

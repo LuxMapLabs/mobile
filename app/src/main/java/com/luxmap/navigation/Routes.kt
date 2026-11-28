@@ -1,5 +1,7 @@
 package com.luxmap.navigation
 
+import android.net.Uri
+
 sealed interface Routes {
     val route: String
 
@@ -31,13 +33,28 @@ sealed interface Routes {
     }
 
     data object PolePhotoCapture : Routes {
-        override val route = "survey/pole-photos/{workOrderId}/capture/{poleId}?source={source}"
+        override val route =
+            "survey/pole-photos/{workOrderId}/capture/{poleId}?source={source}&route={route}&saved={saved}"
 
+        // route = true walks the survey route pole by pole (see PolePhotoCaptureViewModel.isRouteMode);
+        // saved carries what happened to the previous pole (RouteHandoff.encode) for its banner.
         fun createRoute(
             workOrderId: String,
             poleId: String,
             source: String = "camera",
-        ) = "survey/pole-photos/$workOrderId/capture/$poleId?source=$source"
+            route: Boolean = false,
+            saved: String? = null,
+        ): String {
+            val base = "survey/pole-photos/$workOrderId/capture/$poleId?source=$source&route=$route"
+            return if (saved == null) base else "$base&saved=${Uri.encode(saved)}"
+        }
+    }
+
+    // End-of-route check before "Hoàn tất": poles where the AI disagrees with the engineer.
+    data object PolePhotoSummary : Routes {
+        override val route = "survey/pole-photos/{workOrderId}/summary"
+
+        fun createRoute(workOrderId: String) = "survey/pole-photos/$workOrderId/summary"
     }
 
     data object PoleVideoCapture : Routes {

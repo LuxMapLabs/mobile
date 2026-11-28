@@ -25,12 +25,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Help
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.WbIncandescent
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -57,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -354,7 +357,7 @@ private fun ConclusionCard(state: PolePhotoResultUiState.Success) {
                         modifier = Modifier.size(56.dp).background(colors.background, MaterialTheme.shapes.medium),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(imageVector = Icons.Rounded.Lightbulb, contentDescription = null, tint = colors.text)
+                        Icon(imageVector = verdictIcon(effective), contentDescription = null, tint = colors.text)
                     }
                     Text(
                         text = effective?.let(::cvStateLabel) ?: "Chưa có kết luận",
@@ -557,8 +560,8 @@ private fun ReviewCard(
                 LuxSegmented(
                     segments =
                         listOf(
-                            LuxSegment("on", "Đèn sáng", Icons.Rounded.Lightbulb),
-                            LuxSegment("off", "Đèn tắt", Icons.Outlined.Lightbulb),
+                            LuxSegment("on", "Đèn sáng", Icons.Rounded.WbIncandescent),
+                            LuxSegment("off", "Đèn tắt", Icons.Rounded.Lightbulb),
                         ),
                     selected = draft.selected,
                     onSelect = { draft.selected = it },
@@ -865,3 +868,11 @@ private fun PolePhotoDecisionCard(state: PolePhotoResultUiState.Success) {
         ).joinToString("\n")
     LuxBanner(title = title, message = message, tone = tone)
 }
+
+// Same pair as the engineer's Sáng/Tắt buttons, so a lamp state reads the same everywhere.
+private fun verdictIcon(state: String?): ImageVector =
+    when (state) {
+        "on" -> Icons.Rounded.WbIncandescent
+        "off" -> Icons.Rounded.Lightbulb
+        else -> Icons.Rounded.Help
+    }

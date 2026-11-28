@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,7 +73,11 @@ fun PoleIdentificationDetails(
             if (nearSensitivePoi == true) StatusBadge(text = "Gần trường/cầu", colors = LuxTheme.status.kind)
         }
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "Thông tin cột $poleId")
+            Icon(
+                Icons.Rounded.Info,
+                contentDescription = "Thông tin cột $poleId",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
     if (expanded) {

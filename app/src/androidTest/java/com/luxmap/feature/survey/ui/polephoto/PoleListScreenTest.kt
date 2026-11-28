@@ -82,7 +82,10 @@ class PoleListScreenTest {
                 }
                 PoleListScreen(
                     workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole(syncStatus = SyncStatus.DONE))),
+                    state =
+                        PoleListUiState.Success(
+                            poles = listOf(pole(syncStatus = SyncStatus.DONE).copy(observation = Observation.ON)),
+                        ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
                     snackbarHostState = host,
@@ -323,35 +326,9 @@ class PoleListScreenTest {
             .assertExists()
     }
 
-    // Found on a real device 2026-10-29: tapping "Hoan tat" used to call onComplete and navigate
-    // away in the same tap, with no confirmation and no way to tell afterward it worked. Now it
-    // only opens a confirmation dialog - onComplete fires after the user confirms there.
     @Test
-    fun completion_is_disabled_for_a_pole_with_only_an_ai_result() {
-        composeRule.setContent {
-            LuxMapTheme {
-                PoleListScreen(
-                    workOrderId = "WO-1",
-                    state =
-                        PoleListUiState.Success(
-                            poles =
-                                listOf(
-                                    pole(serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)
-                                        .copy(aiVerdict = PoleAiVerdict.ON),
-                                ),
-                        ),
-                    onCapturePole = { _, _ -> },
-                    onBack = {},
-                )
-            }
-        }
-        composeRule.onNodeWithText("1 cột có kết quả chưa xác nhận").assertExists()
-        composeRule.onNodeWithText("Hoàn tất").assertIsNotEnabled()
-    }
-
-    @Test
-    fun success_state_tapping_hoan_tat_opens_a_confirm_dialog_without_completing_yet() {
-        var completed = false
+    fun completion_waits_for_every_pole_and_the_button_walks_the_route_instead() {
+        var startedAt: String? = null
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
@@ -361,87 +338,74 @@ class PoleListScreenTest {
                             poles =
                                 listOf(
                                     pole(poleId = "POLE-1", serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)
-                                        .copy(isConfirmed = true),
-                                    pole(poleId = "POLE-2"),
+                                        .copy(observation = Observation.OFF),
+                                    pole(poleId = "POLE-2", position = 2),
                                 ),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = {},
-                    onComplete = { completed = true },
+                    onStartRoute = { startedAt = it },
                 )
             }
         }
-        composeRule.onNodeWithText("Hoàn tất").performClick()
-        composeRule.onNodeWithText("Hoàn tất khảo sát tuyến?").assertExists()
-        composeRule.onNodeWithText("Đã xác nhận kết quả của 1 cột. Gửi khảo sát để duyệt?").assertExists()
-        assertEquals(false, completed)
+        composeRule.onNodeWithText("1/2 cột chưa chụp").assertExists()
+        composeRule.onNodeWithText("Hoàn tất").assertDoesNotExist()
+        composeRule.onNodeWithTag("start_route_capture").performClick()
+        assertEquals("POLE-2", startedAt)
     }
 
     @Test
-    fun confirm_dialog_tapping_kiem_tra_lai_dismisses_without_completing() {
-        var completed = false
-        composeRule.setContent {
-            LuxMapTheme {
-                PoleListScreen(
-                    workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole().copy(isConfirmed = true))),
-                    onCapturePole = { _, _ -> },
-                    onBack = {},
-                    onComplete = { completed = true },
-                )
-            }
-        }
-        composeRule.onNodeWithText("Hoàn tất").performClick()
-        composeRule.onNodeWithText("Kiểm tra lại").performClick()
-        composeRule.onNodeWithText("Hoàn tất khảo sát tuyến?").assertDoesNotExist()
-        assertEquals(false, completed)
-    }
-
-    @Test
-    fun confirm_dialog_confirming_calls_onComplete() {
-        var completed = false
-        composeRule.setContent {
-            LuxMapTheme {
-                PoleListScreen(
-                    workOrderId = "WO-1",
-                    state = PoleListUiState.Success(poles = listOf(pole().copy(isConfirmed = true))),
-                    onCapturePole = { _, _ -> },
-                    onBack = {},
-                    onComplete = { completed = true },
-                )
-            }
-        }
-        composeRule.onNodeWithText("Hoàn tất").performClick()
-        // The dialog's confirm button also reads "Hoan tat", same as the bottom bar button behind
-        // it - testTag disambiguates instead of relying on text/position.
-        composeRule.onNodeWithTag("confirm_survey_complete").performClick()
-        assertEquals(true, completed)
-    }
-
-    // Found on a real device 2026-10-29: the back arrow used to also silently call onComplete()
-    // (it reused the same callback as the bottom bar button), so leaving the screen after
-    // capturing just 1 photo marked the whole survey complete even without tapping "Hoan tat".
-    @Test
-    fun tapping_the_back_arrow_only_calls_onBack_not_onComplete() {
-        var backCalled = false
-        var completed = false
+    fun a_pole_skipped_with_a_reason_counts_and_hoan_tat_opens_the_summary() {
+        var summaryOpened = false
         composeRule.setContent {
             LuxMapTheme {
                 PoleListScreen(
                     workOrderId = "WO-1",
                     state =
                         PoleListUiState.Success(
-                            poles = listOf(pole(serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)),
+                            poles =
+                                listOf(
+                                    pole(poleId = "POLE-1").copy(observation = Observation.ON),
+                                    pole(poleId = "POLE-2", position = 2).copy(skipReason = "Bị cây che"),
+                                ),
+                        ),
+                    onCapturePole = { _, _ -> },
+                    onBack = {},
+                    onOpenSummary = { summaryOpened = true },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Bỏ qua: Bị cây che").assertExists()
+        composeRule.onNodeWithText("Bạn: Sáng").assertExists()
+        composeRule.onNodeWithTag("open_survey_summary").performClick()
+        assertEquals(true, summaryOpened)
+    }
+
+    @Test
+    fun tapping_the_back_arrow_only_calls_onBack_not_the_summary() {
+        var backCalled = false
+        var summaryOpened = false
+        composeRule.setContent {
+            LuxMapTheme {
+                PoleListScreen(
+                    workOrderId = "WO-1",
+                    state =
+                        PoleListUiState.Success(
+                            poles =
+                                listOf(
+                                    pole(serverPhotoId = "PH-1", syncStatus = SyncStatus.DONE)
+                                        .copy(observation = Observation.ON),
+                                ),
                         ),
                     onCapturePole = { _, _ -> },
                     onBack = { backCalled = true },
-                    onComplete = { completed = true },
+                    onOpenSummary = { summaryOpened = true },
                 )
             }
         }
         composeRule.onNodeWithContentDescription("Quay lại").performClick()
         assertEquals(true, backCalled)
-        assertEquals(false, completed)
+        assertEquals(false, summaryOpened)
     }
 
     @Test

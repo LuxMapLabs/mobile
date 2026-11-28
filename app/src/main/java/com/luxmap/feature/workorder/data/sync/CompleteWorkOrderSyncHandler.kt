@@ -72,6 +72,15 @@ class CompleteWorkOrderSyncHandler
                 return SyncOpResult.Failed("Evidence upload failed: ${failed.key}")
             }
             if (evidenceStates.values.any { it != "done" }) return SyncOpResult.WaitingForDependency
+            // A media row without a queue op has nothing left to send, so only queued ops count.
+            val mediaStates =
+                payload.poleMediaClientOpIds.orEmpty().mapNotNull { id -> dao.operationStatus(id)?.let { id to it } }
+            val blockedMedia = mediaStates.firstOrNull { it.second in terminalReviewErrors }
+            if (blockedMedia != null) {
+                dao.updateCompletionSubmitStatus(payload.workOrderId, "failed")
+                return SyncOpResult.Failed("Pole media upload failed: ${blockedMedia.first}")
+            }
+            if (mediaStates.any { it.second != "done" }) return SyncOpResult.WaitingForDependency
             val reviewStates =
                 payload.poleReviewClientOpIds.orEmpty().associateWith {
                     dao.submissionOperation(it, "submit_pole_photo_review")?.status

@@ -13,6 +13,7 @@ import com.luxmap.feature.survey.data.dao.PolePhotoDao
 import com.luxmap.feature.survey.data.entity.LocalLuxReadingEntity
 import com.luxmap.feature.survey.data.entity.LocalPoleListItemEntity
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import com.luxmap.feature.workorder.data.dao.WorkOrderCompletionDao
 import com.luxmap.feature.workorder.data.dao.WorkOrderDraftDao
 import com.luxmap.feature.workorder.data.entity.LocalWorkOrderCompletionEntity
@@ -40,8 +41,9 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalPoleGpsRouteEntity::class,
         LocalLuxReadingEntity::class,
         LocalHistoryItemEntity::class,
+        LocalSurveyPoleSkipEntity::class,
     ],
-    version = 32,
+    version = 33,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)

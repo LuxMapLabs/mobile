@@ -77,6 +77,22 @@ class CompleteWorkOrderSyncHandlerTest {
         }
 
     @Test
+    fun `survey completion waits for a pole photo that is still uploading`() =
+        runTest {
+            val api = mockk<WorkOrdersApi>()
+            val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
+            coEvery { dao.completionByWorkOrderId("WO-1") } returns completion()
+            coEvery { dao.operationStatus("PH-UNSURE") } returns "queued"
+            coEvery { dao.operationStatus("PH-GONE") } returns null
+            val payload = CompletionSyncPayload("WO-1", poleMediaClientOpIds = listOf("PH-UNSURE", "PH-GONE"))
+
+            val result = CompleteWorkOrderSyncHandler(api, dao, legacyGps()).handle(Json.encodeToString(payload))
+
+            assertEquals(SyncOpResult.WaitingForDependency, result)
+            coVerify(exactly = 0) { api.complete(any(), any()) }
+        }
+
+    @Test
     fun `completion waits for the older photo when the newer photo has already synced`() =
         runTest {
             val api = mockk<WorkOrdersApi>()

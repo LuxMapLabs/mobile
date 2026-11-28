@@ -26,7 +26,37 @@ data class PoleListRowState(
     val isConfirmed: Boolean = false,
     val identification: com.luxmap.feature.survey.data.PoleListItem? = null,
     val lux: PoleLuxInfo? = null,
+    // The engineer's own label picked at capture time (latest photo), or null for videos and
+    // photos taken before this existed - those still go through the AI result review.
+    val observation: Observation? = null,
+    val skipReason: String? = null,
+    val filePath: String? = null,
+    val aiStatus: String? = null,
+    val cvState: String? = null,
+    val confidence: Double? = null,
+) {
+    // Every route pole needs an answer before "Hoàn tất": a labelled photo, a skip reason, or a
+    // confirmed AI result for a video.
+    val isCovered: Boolean get() = skipReason != null || observation != null || isConfirmed
+}
+
+// A pole on the end-of-route check: the AI either read the photo differently from the engineer
+// or could not decide. Never changes the engineer's label by itself.
+data class AiMismatch(
+    val poleId: String,
+    val position: Int?,
+    val filePath: String,
+    val observation: Observation,
+    val cvState: String?,
+    val confidence: Double?,
 )
+
+fun PoleListRowState.aiMismatch(): AiMismatch? {
+    val seen = observation ?: return null
+    val path = filePath ?: return null
+    if (aiStatus == null || (isConclusive(cvState) && cvState == seen.wireValue)) return null
+    return AiMismatch(poleId, position, path, seen, cvState, confidence)
+}
 
 sealed interface PoleListUiState {
     data object Loading : PoleListUiState
@@ -41,9 +71,15 @@ sealed interface PoleListUiState {
         // tapping "Hoan tat" gave no feedback at all and the screen looked completely unchanged.
         val isCompleted: Boolean = false,
     ) : PoleListUiState {
-        val unconfirmedCount: Int get() = poles.count { it.aiVerdict != null && !it.isConfirmed }
-        val confirmedCount: Int get() = poles.count { it.isConfirmed }
-        val canComplete: Boolean get() = !isCompleted && poles.isNotEmpty() && unconfirmedCount == 0
+        val remainingCount: Int get() = poles.count { !it.isCovered }
+        val firstRemainingPoleId: String? get() = poles.firstOrNull { !it.isCovered }?.poleId
+        val canComplete: Boolean get() = !isCompleted && poles.isNotEmpty() && remainingCount == 0
+        val aiMismatches: List<AiMismatch> get() = poles.mapNotNull { it.aiMismatch() }
+
+        val aiReadCount: Int get() = poles.count { it.observation != null && it.aiStatus != null }
+
+        // Labelled photos the AI has not read yet (still queued, or offline).
+        val awaitingAiCount: Int get() = poles.count { it.observation != null && it.aiStatus == null }
     }
 
     data object Empty : PoleListUiState

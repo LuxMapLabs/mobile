@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
@@ -122,4 +123,16 @@ interface PolePhotoDao {
         draftFinalCvState: String?,
         draftReviewNote: String?,
     )
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSkip(skip: LocalSurveyPoleSkipEntity)
+
+    @Query("DELETE FROM local_survey_pole_skip WHERE workOrderId = :workOrderId AND poleId = :poleId")
+    suspend fun deleteSkip(
+        workOrderId: String,
+        poleId: String,
+    )
+
+    @Query("SELECT * FROM local_survey_pole_skip WHERE workOrderId = :workOrderId")
+    fun observeSkips(workOrderId: String): Flow<List<LocalSurveyPoleSkipEntity>>
 }

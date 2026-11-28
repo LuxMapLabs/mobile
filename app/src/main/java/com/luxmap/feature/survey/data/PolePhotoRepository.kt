@@ -1,6 +1,7 @@
 package com.luxmap.feature.survey.data
 
 import com.luxmap.feature.survey.data.entity.LocalPolePhotoEntity
+import com.luxmap.feature.survey.data.entity.LocalSurveyPoleSkipEntity
 import kotlinx.coroutines.flow.Flow
 
 interface PolePhotoRepository {
@@ -8,12 +9,17 @@ interface PolePhotoRepository {
 
     fun observeUploadStatuses(photoIds: List<String>): Flow<Map<String, String>>
 
+    // observation is the Field Engineer's own label picked right after the shutter ("on", "off"
+    // or "unsure"). An "on"/"off" observation is also staged as the draft review, so it reaches
+    // PATCH .../review on "Hoàn tất" without the engineer ever opening the AI result. Saving a
+    // photo also clears any earlier skip of that pole.
     suspend fun capture(
         workOrderId: String,
         poleId: String,
         filePath: String,
         lat: Double,
         lng: Double,
+        observation: String? = null,
     ): LocalPolePhotoEntity
 
     // Same shape as capture(), for a recorded video clip instead of a still photo. Writes
@@ -57,4 +63,12 @@ interface PolePhotoRepository {
     // caller (PoleListViewModel.onComplete) can report it. Called exactly once, when "Hoàn tất"
     // is tapped — never at saveDraftReview time, so a draft is never sent before that.
     suspend fun enqueuePendingReviews(workOrderId: String): Int
+
+    fun observeSkips(workOrderId: String): Flow<List<LocalSurveyPoleSkipEntity>>
+
+    suspend fun skipPole(
+        workOrderId: String,
+        poleId: String,
+        reason: String,
+    )
 }

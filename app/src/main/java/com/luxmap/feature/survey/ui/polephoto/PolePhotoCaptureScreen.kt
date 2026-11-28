@@ -31,6 +31,7 @@ import com.luxmap.core.theme.LuxMapTheme
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.feature.profile.ui.luxmeter.LuxMeterPairingViewModel
+import com.luxmap.feature.survey.data.PoleListItem
 import com.luxmap.feature.survey.ui.polephoto.lux.LuxCardViewModel
 import com.luxmap.feature.survey.ui.polephoto.lux.LuxMeasureSection
 import kotlinx.coroutines.launch
@@ -41,6 +42,8 @@ fun PolePhotoCaptureRoute(
     poleId: String,
     source: PolePhotoCaptureSource = PolePhotoCaptureSource.CAMERA,
     onDone: () -> Unit,
+    onNextPole: (poleId: String, handoff: String) -> Unit = { _, _ -> },
+    onOpenMap: (PoleListItem) -> Unit = {},
     viewModel: PolePhotoCaptureViewModel = hiltViewModel(),
     luxCardViewModel: LuxCardViewModel = hiltViewModel(),
     luxPairingViewModel: LuxMeterPairingViewModel = hiltViewModel(),
@@ -52,6 +55,35 @@ fun PolePhotoCaptureRoute(
     var isSaving by remember { mutableStateOf(false) }
     var hasRequestedPermissions by rememberSaveable { mutableStateOf(false) }
     val locationMissing by viewModel.locationMissing.collectAsState()
+    val progress by viewModel.progress.collectAsState()
+    val pole by viewModel.pole.collectAsState()
+    val saveFailed by viewModel.saveFailed.collectAsState()
+    var observation by remember { mutableStateOf<Observation?>(null) }
+
+    // Route mode starts on the pole card rather than straight in the camera.
+    var showRoutePrompt by rememberSaveable { mutableStateOf(viewModel.isRouteMode) }
+    var cameraWasClosed by rememberSaveable { mutableStateOf(false) }
+    var showSkipReasons by rememberSaveable { mutableStateOf(false) }
+
+    fun finish(
+        outcome: String,
+        nextPoleId: String?,
+    ) {
+        if (nextPoleId != null) onNextPole(nextPoleId, RouteHandoff(poleId, outcome).encode()) else onDone()
+    }
+
+    fun saved(nextPoleId: String?) = finish(observation?.wireValue.orEmpty(), nextPoleId)
+
+    // Leaving the camera or the preview without a photo: in route mode stay on this pole and
+    // offer retry/skip/stop instead of dropping the engineer back on the list.
+    fun leaveWithoutPhoto() {
+        if (viewModel.isRouteMode) {
+            cameraWasClosed = true
+            showRoutePrompt = true
+        } else {
+            onDone()
+        }
+    }
 
     val takePictureLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
@@ -62,7 +94,7 @@ fun PolePhotoCaptureRoute(
                 // Room/sync_queue at all, so retake can simply overwrite this file.
                 previewFile = file
             } else {
-                onDone()
+                leaveWithoutPhoto()
             }
         }
 
@@ -86,10 +118,12 @@ fun PolePhotoCaptureRoute(
 
     fun closePreview() {
         previewFile?.delete()
-        onDone()
+        previewFile = null
+        leaveWithoutPhoto()
     }
 
     fun launchCamera() {
+        showRoutePrompt = false
         val file = viewModel.outputFile(context.filesDir)
         pendingFile = file
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -109,7 +143,7 @@ fun PolePhotoCaptureRoute(
             if (result[Manifest.permission.CAMERA] == true) {
                 launchCamera()
             } else {
-                onDone()
+                leaveWithoutPhoto()
             }
         }
 
@@ -120,37 +154,46 @@ fun PolePhotoCaptureRoute(
 
     val retryLocationLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            previewFile?.let { viewModel.onPhotoCaptured(it, luxCardViewModel.recordedReading, onDone) }
+            val file = previewFile
+            val picked = observation
+            if (file != null && picked != null) {
+                viewModel.onPhotoCaptured(file, picked.wireValue, luxCardViewModel.recordedReading, ::saved)
+            }
         }
 
     fun retryLocation() {
         val file = previewFile ?: return
+        val picked = observation ?: return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
         ) {
-            viewModel.onPhotoCaptured(file, luxCardViewModel.recordedReading, onDone)
+            viewModel.onPhotoCaptured(file, picked.wireValue, luxCardViewModel.recordedReading, ::saved)
         } else {
             retryLocationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
-    LaunchedEffect(Unit) {
-        when (source) {
-            PolePhotoCaptureSource.CAMERA -> {
-                val cameraGranted =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
-                when {
-                    cameraGranted -> launchCamera()
-                    hasRequestedPermissions -> onDone()
-                    else -> {
-                        hasRequestedPermissions = true
-                        permissionsLauncher.launch(
-                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
-                        )
-                    }
-                }
+    fun requestCamera() {
+        val cameraGranted =
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        when {
+            cameraGranted -> launchCamera()
+            hasRequestedPermissions && !viewModel.isRouteMode -> onDone()
+            else -> {
+                hasRequestedPermissions = true
+                permissionsLauncher.launch(
+                    arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION),
+                )
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Route mode waits on the pole card (also after rotation or process death).
+        if (showRoutePrompt) return@LaunchedEffect
+        when (source) {
+            PolePhotoCaptureSource.CAMERA -> requestCamera()
             PolePhotoCaptureSource.GALLERY -> {
                 if (hasRequestedPermissions) {
                     launchGalleryPicker()
@@ -166,21 +209,49 @@ fun PolePhotoCaptureRoute(
     // following the system theme, and this screen is reached straight from the camera intent.
     LuxMapTheme(forceDark = true) {
         val fileToPreview = previewFile
-        if (fileToPreview != null) {
+        if (showRoutePrompt && fileToPreview == null) {
+            RoutePoleCard(
+                poleId = poleId,
+                progress = progress,
+                pole = pole,
+                previous = viewModel.previousPole,
+                cameraWasClosed = cameraWasClosed,
+                onCapture = ::requestCamera,
+                onSkip = { showSkipReasons = true },
+                onStop = onDone,
+                onOpenMap = { pole?.let(onOpenMap) },
+            )
+            if (showSkipReasons) {
+                SkipReasonSheet(
+                    poleId = poleId,
+                    onDismiss = { showSkipReasons = false },
+                    onPick = { reason ->
+                        showSkipReasons = false
+                        viewModel.onSkip(reason) { next -> finish(RouteHandoff.SKIPPED, next) }
+                    },
+                )
+            }
+        } else if (fileToPreview != null) {
             PolePhotoPreview(
                 file = fileToPreview,
-                poleId = poleId,
+                title = routeTitle(poleId, progress),
                 footer =
                     if (source == PolePhotoCaptureSource.CAMERA) {
                         { LuxMeasureSection(luxCardViewModel, luxPairingViewModel, isEnabled = !isSaving) }
                     } else {
                         null
                     },
-                isSaving = isSaving && !locationMissing,
+                isSaving = isSaving && !locationMissing && !saveFailed,
                 retakeLabel = if (source == PolePhotoCaptureSource.GALLERY) "Chọn ảnh khác" else "Chụp lại",
-                onConfirm = {
+                onObserve = { picked ->
+                    observation = picked
                     isSaving = true
-                    viewModel.onPhotoCaptured(fileToPreview, luxCardViewModel.recordedReading, onDone)
+                    viewModel.onPhotoCaptured(
+                        fileToPreview,
+                        picked.wireValue,
+                        luxCardViewModel.recordedReading,
+                        ::saved,
+                    )
                 },
                 onRetake = {
                     fileToPreview.delete()
@@ -192,13 +263,38 @@ fun PolePhotoCaptureRoute(
                 },
                 onClose = ::closePreview,
             )
+            if (saveFailed) {
+                LuxConfirmDialog(
+                    title = "Chưa lưu được ảnh",
+                    message = "Ảnh và nhãn chưa được ghi vào máy. Thử lưu lại, hoặc bỏ ảnh này và chụp lại.",
+                    confirmLabel = "Thử lưu lại",
+                    onConfirm = {
+                        observation?.let { picked ->
+                            viewModel.onPhotoCaptured(
+                                fileToPreview,
+                                picked.wireValue,
+                                luxCardViewModel.recordedReading,
+                                ::saved,
+                            )
+                        }
+                    },
+                    onDismiss = {
+                        isSaving = false
+                        closePreview()
+                    },
+                    dismissLabel = "Bỏ ảnh",
+                )
+            }
             if (locationMissing) {
                 LuxConfirmDialog(
                     title = "Chưa lấy được vị trí",
                     message = "Ảnh cột cần vị trí GPS thật. Bật định vị rồi thử lại, hoặc bỏ ảnh này.",
                     confirmLabel = "Thử lại",
                     onConfirm = ::retryLocation,
-                    onDismiss = ::closePreview,
+                    onDismiss = {
+                        isSaving = false
+                        closePreview()
+                    },
                     dismissLabel = "Bỏ ảnh",
                 )
             }
@@ -215,29 +311,27 @@ fun PolePhotoCaptureRoute(
 @Composable
 private fun PolePhotoPreview(
     file: File,
-    poleId: String,
+    title: String,
     footer: (@Composable () -> Unit)?,
     isSaving: Boolean,
     retakeLabel: String,
-    onConfirm: () -> Unit,
+    onObserve: (Observation) -> Unit,
     onRetake: () -> Unit,
     onClose: () -> Unit,
 ) {
-    PoleMediaPreviewFrame(
-        poleId = poleId,
+    PoleMediaPreviewScaffold(
+        poleId = title,
         isSaving = isSaving,
         footer = footer,
-        retakeLabel = retakeLabel,
-        confirmLabel = "Dùng ảnh này",
         onClose = onClose,
-        onRetake = onRetake,
-        onConfirm = onConfirm,
-    ) {
-        AsyncImage(
-            model = file,
-            contentDescription = "Ảnh cột đèn vừa chụp",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
+        actions = { ObservationActions(isSaving, retakeLabel, onObserve, onRetake) },
+        media = {
+            AsyncImage(
+                model = file,
+                contentDescription = "Ảnh cột đèn vừa chụp",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        },
+    )
 }

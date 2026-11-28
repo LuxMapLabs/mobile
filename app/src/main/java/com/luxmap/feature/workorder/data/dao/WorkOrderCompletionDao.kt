@@ -136,6 +136,23 @@ interface WorkOrderCompletionDao {
     )
     suspend fun pendingLatestPoleReviewIds(workOrderId: String): List<String>
 
+    // The upload op of a pole photo/video uses the local photoId as its clientOpId.
+    @Query(
+        """
+        SELECT photo.photoId FROM local_pole_photo AS photo
+        WHERE photo.workOrderId = :workOrderId
+            AND photo.photoId = (
+                SELECT latest.photoId FROM local_pole_photo AS latest
+                WHERE latest.workOrderId = photo.workOrderId AND latest.poleId = photo.poleId
+                ORDER BY latest.capturedAt DESC, latest.rowid DESC LIMIT 1
+            )
+        """,
+    )
+    suspend fun latestPoleMediaIds(workOrderId: String): List<String>
+
+    @Query("SELECT status FROM sync_queue WHERE clientOpId = :clientOpId ORDER BY id DESC LIMIT 1")
+    suspend fun operationStatus(clientOpId: String): String?
+
     @Query("DELETE FROM sync_queue WHERE id = :id AND status = 'failed'")
     suspend fun deleteFailedOperation(id: Long)
 
