@@ -26,6 +26,8 @@ data class WorkOrderItemDto(
     @SerialName("priority_score") val priorityScore: Double? = null,
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String,
+    @SerialName("completed_at") val completedAt: String? = null,
+    @SerialName("closed_at") val closedAt: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
     @SerialName("scheduled_date") val scheduledDate: String? = null,
     @SerialName("pole_ids") val poleIds: List<String> = emptyList(),

@@ -34,6 +34,7 @@ interface WorkOrdersApi {
         @Query("assigned_to") assignedTo: String,
         @Query("task_kind") taskKind: String? = null,
         @Query("wo_status") woStatus: String? = null,
+        @Query("sort") sort: String? = null,
         @Query("page") page: Int = 1,
         @Query("page_size") pageSize: Int = 200,
     ): PagedResultDto<WorkOrderItemDto>

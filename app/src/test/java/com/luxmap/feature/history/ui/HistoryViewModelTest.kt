@@ -120,6 +120,17 @@ class HistoryViewModelTest {
         }
 
     @Test
+    fun `date caption follows the status and falls back to the update time for rows cached before the new fields`() {
+        val verified = item("A").copy(closedAt = "2026-11-25T08:00:00Z")
+        val done = item("B", status = "done").copy(completedAt = "2026-11-24T08:00:00Z")
+        val legacy = item("C", status = "cancelled")
+
+        assertEquals("Đã duyệt 25/11/2026", verified.dateCaption())
+        assertEquals("Đã nộp 24/11/2026", done.dateCaption())
+        assertEquals("Đã hủy 20/11/2026", legacy.dateCaption())
+    }
+
+    @Test
     fun `filters count and narrow by task kind, offering only kinds that have work`() {
         val items = listOf(item("R1"), item("R2"), item("S1", "survey"), item("X1", "audit"))
 

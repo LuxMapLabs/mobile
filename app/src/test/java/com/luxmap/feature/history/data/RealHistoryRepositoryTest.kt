@@ -40,6 +40,8 @@ private fun dto(
     id: String,
     kind: String = "repair",
     status: String = "verified",
+    completedAt: String? = null,
+    closedAt: String? = null,
 ) = WorkOrderItemDto(
     workOrderId = id,
     title = "Lệnh $id",
@@ -51,6 +53,8 @@ private fun dto(
     createdAt = "2026-11-01T00:00:00Z",
     updatedAt = "2026-11-20T08:00:00Z",
     scheduledDate = "2026-11-19",
+    completedAt = completedAt,
+    closedAt = closedAt,
 )
 
 private fun entity(
@@ -86,7 +90,7 @@ class RealHistoryRepositoryTest {
     @Test
     fun `fetches closed work orders of every kind for the current user and caches them in order`() =
         runTest {
-            coEvery { orders.list("U-1", null, CLOSED) } returns
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } returns
                 PagedResultDto(1, 200, 2, listOf(dto("WO-2", "survey", "cancelled"), dto("WO-1")))
 
             val result = repository.observeHistory().first()
@@ -99,9 +103,41 @@ class RealHistoryRepositoryTest {
         }
 
     @Test
+    fun `work orders awaiting review come first, newest submission on top, then the closed ones in server order`() =
+        runTest {
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } returns
+                PagedResultDto(
+                    1,
+                    200,
+                    4,
+                    listOf(
+                        dto("V2", closedAt = "2026-11-25T08:00:00Z"),
+                        dto("V1", closedAt = "2026-11-20T08:00:00Z"),
+                        dto("D1", status = "done", completedAt = "2026-11-26T08:00:00.5Z"),
+                        dto("D2", status = "done", completedAt = "2026-11-26T08:00:00Z"),
+                    ),
+                )
+
+            val result = repository.observeHistory().first()
+
+            assertEquals(listOf("D1", "D2", "V2", "V1"), result.items.map { it.workOrderId })
+            assertEquals("2026-11-25T08:00:00Z", result.items[2].closedAt)
+            assertEquals("2026-11-26T08:00:00.5Z", result.items[0].completedAt)
+            coVerify {
+                cache.replaceAll(
+                    "U-1",
+                    match {
+                            rows ->
+                        rows.map { it.workOrderId } == listOf("D1", "D2", "V2", "V1")
+                    },
+                )
+            }
+        }
+
+    @Test
     fun `empty server list is a fresh empty result and clears the cache`() =
         runTest {
-            coEvery { orders.list("U-1", null, CLOSED) } returns PagedResultDto(1, 200, 0, emptyList())
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } returns PagedResultDto(1, 200, 0, emptyList())
 
             val result = repository.observeHistory().first()
 
@@ -114,7 +150,7 @@ class RealHistoryRepositoryTest {
     @Test
     fun `network failure falls back to the cached list marked stale`() =
         runTest {
-            coEvery { orders.list("U-1", null, CLOSED) } throws IOException("offline")
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } throws IOException("offline")
             coEvery { cache.all("U-1") } returns listOf(entity("WO-1", fetchedAt = 1_000L))
 
             val result = repository.observeHistory().first()
@@ -127,7 +163,7 @@ class RealHistoryRepositoryTest {
     @Test
     fun `cache rows saved before the fetch time existed give no sync time`() =
         runTest {
-            coEvery { orders.list("U-1", null, CLOSED) } throws IOException("offline")
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } throws IOException("offline")
             coEvery { cache.all("U-1") } returns listOf(entity("WO-1"))
 
             val result = repository.observeHistory().first()
@@ -139,7 +175,7 @@ class RealHistoryRepositoryTest {
     @Test
     fun `network failure with an empty cache surfaces the error`() =
         runTest {
-            coEvery { orders.list("U-1", null, CLOSED) } throws IOException("offline")
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } throws IOException("offline")
             coEvery { cache.all("U-1") } returns emptyList()
 
             val error = runCatching { repository.observeHistory().first() }.exceptionOrNull()
@@ -151,7 +187,7 @@ class RealHistoryRepositoryTest {
     fun `auth failure is never answered from the cache`() =
         runTest {
             val unauthorized = HttpException(Response.error<Any>(401, "".toResponseBody()))
-            coEvery { orders.list("U-1", null, CLOSED) } throws unauthorized
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } throws unauthorized
             coEvery { cache.all("U-1") } returns listOf(entity("WO-1"))
 
             val error = runCatching { repository.observeHistory().first() }.exceptionOrNull()
