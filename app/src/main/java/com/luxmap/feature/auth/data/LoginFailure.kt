@@ -8,6 +8,9 @@ enum class LoginFailureReason {
     MissingPassword,
     InvalidCredentials,
     AccountLocked,
+
+    // Too many sign-in attempts from this device (HTTP 429): the server blocks it for a while.
+    RateLimited,
     Network,
     Unknown,
 

@@ -530,6 +530,7 @@ private fun errorPlacementFor(error: LoginUiState.Error): ErrorPlacement =
         LoginFailureReason.InvalidCredentials ->
             ErrorPlacement(passwordMessage = error.message, identifierInvalid = true, passwordInvalid = true)
         LoginFailureReason.AccountLocked,
+        LoginFailureReason.RateLimited,
         LoginFailureReason.Network,
         LoginFailureReason.Unknown,
         LoginFailureReason.GoogleSignInFailed,
