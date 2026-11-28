@@ -93,11 +93,11 @@ class HomeScreenTest {
     }
 
     @Test
-    fun an_expired_schedule_shows_a_lock_instead_of_due_today() {
+    fun an_expired_schedule_shows_late_instead_of_due_today() {
         val scheduled = LocalDate.now().minusDays(3).toString()
         setContent(uiState = successWith(item("WO-LOCK", scheduled = scheduled, due = LocalDate.now().toString())))
         composeTestRule.onNodeWithText(
-            "Đã khoá, quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}",
+            "Quá lịch ${DateFormatUtils.formatPlainDate(scheduled)}",
             useUnmergedTree = true,
         ).assertExists()
         composeTestRule.onNodeWithText("Hạn hôm nay", useUnmergedTree = true).assertDoesNotExist()

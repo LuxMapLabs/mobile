@@ -113,15 +113,21 @@ class WorkOrderDraftTest {
         }
 
     @Test
-    fun `locked finished and already submitted orders do not restore or save drafts`() =
+    fun `an order past its scheduled date still restores its draft`() =
         runTest {
             val fixture = DetailViewModelFixture()
             coEvery { fixture.drafts.load("U", "W") } returns draft
-            val details =
-                listOf(
-                    fixture.detail().copy(scheduledDate = LocalDate.now().minusDays(1).toString()),
-                    fixture.detail().copy(woStatus = "done", allowedActions = emptyList()),
-                )
+            val vm = fixture.create(fixture.detail().copy(scheduledDate = LocalDate.now().minusDays(1).toString()))
+            runCurrent()
+            assertTrue(vm.success.hasDraft)
+        }
+
+    @Test
+    fun `finished and already submitted orders do not restore or save drafts`() =
+        runTest {
+            val fixture = DetailViewModelFixture()
+            coEvery { fixture.drafts.load("U", "W") } returns draft
+            val details = listOf(fixture.detail().copy(woStatus = "done", allowedActions = emptyList()))
             for (detail in details) {
                 val vm = fixture.create(detail)
                 runCurrent()

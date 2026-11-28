@@ -34,7 +34,7 @@ fun workOrderMessages(
     today: LocalDate,
 ): WorkOrderMessages {
     val status = workOrderStatusFromWire(detail.woStatus)
-    val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
+    val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today).isPastSchedule
     val candidates = mutableListOf<WorkOrderMessage>()
     if (detail.startPendingSync) {
         candidates +=
@@ -47,17 +47,17 @@ fun workOrderMessages(
     if (isPastSchedule && status == WorkOrderStatus.IN_PROGRESS) {
         candidates +=
             WorkOrderMessage(
-                title = "Quá hạn nộp báo cáo",
-                body = "Biểu mẫu đã khoá. Liên hệ Quản lý.",
-                tone = WorkOrderMessageTone.ERROR,
+                title = "Đã quá lịch",
+                body = "Bạn vẫn làm và nộp báo cáo được. Quản lý sẽ thấy phiếu này trễ lịch.",
+                tone = WorkOrderMessageTone.WARNING,
             )
     }
     if (isPastSchedule && status == WorkOrderStatus.ASSIGNED) {
         candidates +=
             WorkOrderMessage(
-                title = "Quá hạn bắt đầu",
-                body = "Liên hệ Quản lý để được giao lại.",
-                tone = WorkOrderMessageTone.ERROR,
+                title = "Đã quá lịch",
+                body = "Bạn vẫn bắt đầu được. Quản lý sẽ thấy phiếu này trễ lịch.",
+                tone = WorkOrderMessageTone.WARNING,
             )
     }
     val reviewNote = detail.reviewNote?.takeIf { it.isNotBlank() }

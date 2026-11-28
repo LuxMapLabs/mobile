@@ -257,7 +257,7 @@ class WorkOrderDetailScreenTest {
             repairDetail(allowedActions = listOf("complete"))
                 .copy(scheduledDate = yesterday, reviewNote = "Bổ sung ảnh", note = "Ưu tiên trước mưa")
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Đã quá lịch").assertExists()
         composeRule.onNodeWithText("Ghi chú & lịch sử").assertExists()
         composeRule.onNodeWithText("Quản lý yêu cầu bổ sung").assertExists()
         composeRule.onNodeWithText("Ghi chú giao việc").assertExists()
@@ -265,13 +265,14 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun an_overdue_report_shows_one_short_hint_above_the_locked_button() {
+    fun a_late_report_warns_but_keeps_the_form_open() {
         val yesterday = LocalDate.now().minusDays(1).toString()
         val detail = repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Đã khoá do quá hạn").assertExists()
-        composeRule.onNodeWithText("liên hệ Quản lý để xử lý", substring = true).assertDoesNotExist()
-        composeRule.onNodeWithText("Biểu mẫu đã khoá. Liên hệ Quản lý.").assertExists()
+        composeRule.onNodeWithText("Đã khoá do quá hạn").assertDoesNotExist()
+        composeRule.onNodeWithText(
+            "Bạn vẫn làm và nộp báo cáo được. Quản lý sẽ thấy phiếu này trễ lịch.",
+        ).assertExists()
     }
 
     @Test
@@ -281,7 +282,7 @@ class WorkOrderDetailScreenTest {
         val detail =
             repairDetail(allowedActions = listOf("complete")).copy(scheduledDate = yesterday, dueDate = later)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail))
-        composeRule.onNodeWithText("Quá hạn nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("Đã quá lịch").assertExists()
         composeRule.onNodeWithText("Đã qua lịch").assertExists()
         composeRule.onNodeWithText("Quá hạn", substring = true).assertExists()
     }

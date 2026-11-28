@@ -76,21 +76,10 @@ internal fun workOrderCtaState(
                 icon = Icons.Rounded.PlayArrow,
                 enabled = !state.isStarting,
                 onClick = onStart,
+                hint = pastScheduleHint(detail.scheduledDate, scheduleWindow),
+                hintColor = LuxTheme.colors.dueToday,
             )
-        // Two different reasons the window is closed - too early (unlocksOn still set) vs the
-        // work order went overdue without ever being started (unlocksOn cleared, see
-        // workOrderScheduleWindow). scheduleWindow.unlocksOn is only null when there is no
-        // scheduled_date (canActOnSchedule = true then, never reaching this branch) or when
-        // isOverdueToComplete is true, so the two conditions never both apply.
-        "start" in detail.allowedActions && scheduleWindow.isOverdueToComplete ->
-            WorkOrderCtaState(
-                text = "Bắt đầu",
-                icon = Icons.Rounded.Lock,
-                enabled = false,
-                onClick = {},
-                hint = "Đã khoá do quá hạn",
-                hintColor = MaterialTheme.colorScheme.error,
-            )
+        // Only reached before the window opens: canActOnSchedule stays true once it has.
         "start" in detail.allowedActions ->
             WorkOrderCtaState(
                 text = "Bắt đầu",
@@ -113,7 +102,9 @@ internal fun workOrderCtaState(
                 icon = if (canSubmitNow) Icons.Rounded.Check else Icons.Rounded.Lock,
                 enabled = canSubmitNow,
                 onClick = onSubmit,
-                hint = submitLock?.first ?: missingRequirementsHint(repairRequirements(state)),
+                hint =
+                    submitLock?.first ?: missingRequirementsHint(repairRequirements(state))
+                        ?: pastScheduleHint(detail.scheduledDate, scheduleWindow),
                 hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 requiresConfirmation = true,
             )
@@ -129,7 +120,7 @@ internal fun workOrderCtaState(
                     submitLock?.first ?: when {
                         !state.hasInspectionPhoto() -> "Cần có ít nhất 1 ảnh hiện trường"
                         missingCount > 0 -> "Còn $missingCount sự cố chưa có kết quả"
-                        else -> null
+                        else -> pastScheduleHint(detail.scheduledDate, scheduleWindow)
                     },
                 hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 progressText = "$recordedCount/${detail.faults.size} sự cố đã có kết quả",
@@ -150,7 +141,7 @@ internal fun workOrderCtaState(
                     submitLock?.first ?: when {
                         missingPhotos > 0 -> "Còn $missingPhotos cột thiếu ảnh"
                         missing > 0 -> "Còn $missing cột chưa chụp"
-                        else -> null
+                        else -> pastScheduleHint(detail.scheduledDate, scheduleWindow)
                     },
                 hintColor = submitLock?.second ?: LuxTheme.colors.dueToday,
                 requiresConfirmation = true,
@@ -169,10 +160,20 @@ internal fun workOrderCtaState(
     }
 }
 
+// A late work order stays workable; the engineer just sees that it is late.
+internal fun pastScheduleHint(
+    scheduledDate: String?,
+    window: WorkOrderScheduleWindow,
+): String? =
+    if (window.isPastSchedule && scheduledDate != null) {
+        "Đã quá lịch " + DateFormatUtils.formatPlainDate(scheduledDate) + ", vẫn làm tiếp được"
+    } else {
+        null
+    }
+
 @Composable
 private fun scheduleSubmitLock(window: WorkOrderScheduleWindow): Pair<String, Color>? =
     when {
-        window.isOverdueToComplete -> "Đã khoá do quá hạn" to MaterialTheme.colorScheme.error
         window.submitOpensOn != null ->
             "Nộp được từ " + DateFormatUtils.formatPlainDate(window.submitOpensOn.toString()) to
                 MaterialTheme.colorScheme.onSurfaceVariant

@@ -11,7 +11,7 @@ class WorkOrderScheduleWindowTest {
     fun schedule_window_is_closed_more_than_a_day_before_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-08"))
         assertFalse(window.canActOnSchedule)
-        assertFalse(window.isOverdueToComplete)
+        assertFalse(window.isPastSchedule)
         assertEquals(LocalDate.parse("2026-11-09"), window.unlocksOn)
     }
 
@@ -19,21 +19,21 @@ class WorkOrderScheduleWindowTest {
     fun schedule_window_opens_exactly_one_day_before_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-09"))
         assertTrue(window.canActOnSchedule)
-        assertFalse(window.isOverdueToComplete)
+        assertFalse(window.isPastSchedule)
     }
 
     @Test
     fun schedule_window_stays_open_on_the_scheduled_date_itself() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-10"))
         assertTrue(window.canActOnSchedule)
-        assertFalse(window.isOverdueToComplete)
+        assertFalse(window.isPastSchedule)
     }
 
     @Test
-    fun schedule_window_closes_again_and_flags_overdue_after_the_scheduled_date() {
+    fun schedule_window_stays_open_and_flags_late_after_the_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-10", today = LocalDate.parse("2026-11-11"))
-        assertFalse(window.canActOnSchedule)
-        assertTrue(window.isOverdueToComplete)
+        assertTrue(window.canActOnSchedule)
+        assertTrue(window.isPastSchedule)
         assertEquals(null, window.unlocksOn)
     }
 
@@ -41,7 +41,7 @@ class WorkOrderScheduleWindowTest {
     fun schedule_window_does_not_apply_when_there_is_no_scheduled_date() {
         val window = workOrderScheduleWindow(null, today = LocalDate.parse("2026-11-11"))
         assertTrue(window.canActOnSchedule)
-        assertFalse(window.isOverdueToComplete)
+        assertFalse(window.isPastSchedule)
         assertEquals(null, window.submitOpensOn)
     }
 
@@ -56,13 +56,13 @@ class WorkOrderScheduleWindowTest {
     fun submit_opens_on_the_scheduled_date() {
         val window = workOrderScheduleWindow("2026-11-18", today = LocalDate.parse("2026-11-18"))
         assertEquals(null, window.submitOpensOn)
-        assertFalse(window.isOverdueToComplete)
+        assertFalse(window.isPastSchedule)
     }
 
     @Test
     fun submit_opens_on_is_cleared_once_overdue() {
         val window = workOrderScheduleWindow("2026-11-18", today = LocalDate.parse("2026-11-19"))
         assertEquals(null, window.submitOpensOn)
-        assertTrue(window.isOverdueToComplete)
+        assertTrue(window.isPastSchedule)
     }
 }
