@@ -139,7 +139,7 @@ class RealAuthRepositoryTest {
                     ),
                 )
             coEvery { authApi.login(any()) } throws blocked
-            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true), mockk(relaxed = true))
 
             val failure = repository.login("crew", "x", rememberMe = true).exceptionOrNull() as? LoginFailedException
 
@@ -155,7 +155,7 @@ class RealAuthRepositoryTest {
         runTest {
             val authApi = mockk<AuthApi>()
             coEvery { authApi.login(any()) } throws httpException(429, "RATE_LIMITED")
-            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, mockk(), mockk(relaxed = true), mockk(relaxed = true))
 
             val failure = repository.login("crew", "x", rememberMe = true).exceptionOrNull() as? LoginFailedException
 
