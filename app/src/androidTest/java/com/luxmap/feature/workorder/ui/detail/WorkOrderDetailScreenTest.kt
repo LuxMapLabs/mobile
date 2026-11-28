@@ -3,6 +3,8 @@ package com.luxmap.feature.workorder.ui.detail
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -538,7 +540,8 @@ class WorkOrderDetailScreenTest {
             )
         setContent(uiState = WorkOrderDetailUiState.Success(detail = detail, localCompletion = completion))
         composeRule.onNodeWithText("Hoàn thành lệnh").assertDoesNotExist()
-        composeRule.onNodeWithText("Đã nộp — Chờ đồng bộ").assertExists().assertIsNotEnabled()
+        composeRule.onNode(hasText("Đã nộp báo cáo") and hasClickAction()).assertExists().assertIsNotEnabled()
+        composeRule.onAllNodesWithText("Chờ đồng bộ", substring = true).onFirst().assertExists()
     }
 
     @Test

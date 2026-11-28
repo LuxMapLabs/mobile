@@ -91,7 +91,7 @@ internal fun workOrderCtaState(
             )
         "complete" in detail.allowedActions && state.hasActiveLocalCompletion() ->
             WorkOrderCtaState(
-                text = "Đã nộp" + (state.syncStatus()?.label()?.let { " — $it" } ?: ""),
+                text = "Đã nộp báo cáo",
                 icon = Icons.Rounded.HourglassTop,
                 enabled = false,
                 onClick = {},

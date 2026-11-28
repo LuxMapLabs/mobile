@@ -154,7 +154,7 @@ fun WorkOrderStatus.label(): String =
         WorkOrderStatus.OPEN -> "Mở"
         WorkOrderStatus.ASSIGNED -> "Chưa bắt đầu"
         WorkOrderStatus.IN_PROGRESS -> "Đang thực hiện"
-        WorkOrderStatus.DONE -> "Hoàn tất"
+        WorkOrderStatus.DONE -> "Đã nộp"
         WorkOrderStatus.VERIFIED -> "Đã nghiệm thu"
         WorkOrderStatus.CANCELLED -> "Đã huỷ"
     }
