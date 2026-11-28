@@ -195,3 +195,11 @@ val MIGRATION_32_33: Migration =
             )
         }
     }
+
+val MIGRATION_33_34: Migration =
+    object : Migration(33, 34) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_history_item ADD COLUMN completedAt TEXT")
+            db.execSQL("ALTER TABLE local_history_item ADD COLUMN closedAt TEXT")
+        }
+    }

@@ -46,7 +46,7 @@ import com.luxmap.feature.workorder.polegps.data.PoleGpsDao
         LocalSurveyPoleSkipEntity::class,
         LocalOfflineSnapshotEntity::class,
     ],
-    version = 33,
+    version = 34,
     exportSchema = false,
 )
 @TypeConverters(InstantConverters::class)

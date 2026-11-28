@@ -101,7 +101,7 @@ fun HistoryCard(
                     modifier = Modifier.size(16.dp),
                 )
                 Text(
-                    text = "Cập nhật ${DateFormatUtils.formatIsoDateOnly(item.updatedAt)}",
+                    text = item.dateCaption(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -114,4 +114,14 @@ fun HistoryCard(
             }
         }
     }
+}
+
+internal fun HistoryItem.dateCaption(): String {
+    val (label, iso) =
+        when (woStatus) {
+            "verified" -> "Đã duyệt" to (closedAt ?: updatedAt)
+            "cancelled" -> "Đã hủy" to (closedAt ?: updatedAt)
+            else -> "Đã nộp" to (completedAt ?: updatedAt)
+        }
+    return "$label ${DateFormatUtils.formatIsoDateOnly(iso)}"
 }

@@ -16,6 +16,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val CLOSED_STATUSES = "done,verified,cancelled"
+private const val CLOSED_SORT = "-closed_at"
 
 @Singleton
 class RealHistoryRepository
@@ -36,7 +37,12 @@ class RealHistoryRepository
                     if (!tokenStore.saveCachedUserIdForSession(userId, sessionId)) {
                         throw CancellationException("Session changed")
                     }
-                    val items = workOrdersApi.list(assignedTo = userId, woStatus = CLOSED_STATUSES).items
+                    val items =
+                        workOrdersApi.list(
+                            assignedTo = userId,
+                            woStatus = CLOSED_STATUSES,
+                            sort = CLOSED_SORT,
+                        ).items.pendingReviewFirst()
                     ensureSession(sessionId)
                     val fetchedAt = Instant.now()
                     cacheDao.replaceAll(
@@ -65,8 +71,15 @@ class RealHistoryRepository
         private fun Exception.isTemporaryFailure(): Boolean =
             this is IOException || this is HttpException && (code() >= 500 || code() == 408 || code() == 429)
 
+        private fun List<WorkOrderItemDto>.pendingReviewFirst(): List<WorkOrderItemDto> {
+            val (pending, closed) = partition { it.closedAt == null }
+            return pending.sortedByDescending { it.completedAt?.let(Instant::parse) } + closed
+        }
+
         private fun WorkOrderItemDto.toDomain() =
-            HistoryItem(workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate)
+            HistoryItem(
+                workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate, completedAt, closedAt,
+            )
 
         private fun WorkOrderItemDto.toEntity(
             ownerUserId: String,
@@ -83,8 +96,12 @@ class RealHistoryRepository
             scheduledDate = scheduledDate,
             position = position,
             fetchedAt = fetchedAt,
+            completedAt = completedAt,
+            closedAt = closedAt,
         )
 
         private fun LocalHistoryItemEntity.toDomain() =
-            HistoryItem(workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate)
+            HistoryItem(
+                workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate, completedAt, closedAt,
+            )
     }
