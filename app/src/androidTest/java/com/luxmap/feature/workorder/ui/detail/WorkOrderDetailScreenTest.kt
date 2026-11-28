@@ -190,12 +190,24 @@ class WorkOrderDetailScreenTest {
     }
 
     @Test
-    fun local_save_event_shows_pending_sync_wording() {
+    fun local_save_event_shows_submitted_dialog_until_acknowledged() {
         val events = MutableSharedFlow<ReportSubmitEvent>(extraBufferCapacity = 1)
         setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()), submitEvents = events)
         composeRule.runOnIdle { events.tryEmit(ReportSubmitEvent.SavedLocally) }
-        composeRule.onNodeWithText("Đã lưu báo cáo trên máy, đang đồng bộ").assertExists()
+        composeRule.onNodeWithTag("submitted_dialog").assertExists()
+        composeRule.onNodeWithText("Đã nộp báo cáo").assertExists()
+        composeRule.onNodeWithText("lưu trên máy và sẽ tự gửi lên khi có mạng", substring = true).assertExists()
         composeRule.onNodeWithText("Nộp báo cáo thành công", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithTag("submitted_dialog_confirm").performClick()
+        composeRule.onNodeWithTag("submitted_dialog").assertDoesNotExist()
+    }
+
+    @Test
+    fun local_save_failure_does_not_show_submitted_dialog() {
+        val events = MutableSharedFlow<ReportSubmitEvent>(extraBufferCapacity = 1)
+        setContent(uiState = WorkOrderDetailUiState.Success(detail = repairDetail()), submitEvents = events)
+        composeRule.runOnIdle { events.tryEmit(ReportSubmitEvent.Failed("disk full")) }
+        composeRule.onNodeWithTag("submitted_dialog").assertDoesNotExist()
     }
 
     @Test

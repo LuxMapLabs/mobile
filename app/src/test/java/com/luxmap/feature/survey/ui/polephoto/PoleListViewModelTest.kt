@@ -718,6 +718,51 @@ class PoleListViewModelTest {
         }
 
     @Test
+    fun `onComplete reports a failed local save instead of completing`() =
+        runTest {
+            val poleListRepository = mockk<PoleListRepository>()
+            val polePhotoRepository = mockk<PolePhotoRepository>()
+            val completionRepository = mockk<WorkOrderCompletionRepository>(relaxed = true)
+            coEvery { poleListRepository.poles(WORK_ORDER_ID) } returns
+                Result.success(
+                    PoleListResult(
+                        listOf(PoleListItem("POLE-1", 1, lat = null, lng = null, fixtureStatus = "normal")),
+                        isStale = false,
+                    ),
+                )
+            every { polePhotoRepository.observeSkips(WORK_ORDER_ID) } returns flowOf(emptyList())
+            every { polePhotoRepository.observePhotos(WORK_ORDER_ID) } returns
+                flowOf(listOf(photo("POLE-1", serverPhotoId = "SERVER-PH-POLE-1").copy(draftFinalCvState = "on")))
+            every { polePhotoRepository.observeUploadStatuses(listOf("PH-POLE-1")) } returns
+                flowOf(mapOf("PH-POLE-1" to "done"))
+            every { completionRepository.observeCompletion(WORK_ORDER_ID) } returns flowOf(null)
+            coEvery { polePhotoRepository.enqueuePendingReviews(WORK_ORDER_ID) } returns 0
+            coEvery { completionRepository.submitCompletion(any(), any(), any(), any(), any()) } throws
+                IllegalStateException("disk full")
+            val vm =
+                PoleListViewModel(
+                    savedStateHandle(),
+                    poleListRepository,
+                    polePhotoRepository,
+                    completionRepository,
+                    mockk<TokenStore>(relaxed = true),
+                    luxReadings(),
+                )
+            vm.uiState.test {
+                awaitItem()
+                awaitItem()
+            }
+
+            vm.surveyCompleted.test {
+                vm.surveyCompleteFailed.test {
+                    vm.onComplete()
+                    assertEquals("disk full", awaitItem())
+                }
+                expectNoEvents()
+            }
+        }
+
+    @Test
     fun `a pole's row carries hasPendingReview when its latest photo has an unsent draft`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>()

@@ -104,6 +104,7 @@ import com.luxmap.core.ui.components.LuxLoadingRegion
 import com.luxmap.core.ui.components.LuxSecondaryButton
 import com.luxmap.core.ui.components.LuxSkeleton
 import com.luxmap.core.ui.components.LuxSnackbarHost
+import com.luxmap.core.ui.components.LuxSubmittedDialog
 import com.luxmap.core.ui.components.PrimaryButton
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.workorder.data.EvidenceKind
@@ -238,18 +239,22 @@ fun WorkOrderDetailScreen(
 ) {
     var showSubmitConfirm by rememberSaveable { mutableStateOf(false) }
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
+    var showSubmitted by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(submitEvents) {
         submitEvents.collect { event ->
-            snackbarHostState.showSnackbar(
-                when (event) {
-                    ReportSubmitEvent.SavedLocally -> "Đã lưu báo cáo trên máy, đang đồng bộ"
-                    is ReportSubmitEvent.Failed -> "Không lưu được báo cáo: ${event.reason}"
-                },
-            )
+            when (event) {
+                ReportSubmitEvent.SavedLocally -> showSubmitted = true
+                is ReportSubmitEvent.Failed ->
+                    snackbarHostState.showSnackbar("Không lưu được báo cáo: ${event.reason}")
+            }
         }
+    }
+
+    if (showSubmitted) {
+        LuxSubmittedDialog(onDismiss = { showSubmitted = false })
     }
 
     Scaffold(
