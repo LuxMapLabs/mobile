@@ -16,4 +16,5 @@ data class LocalHistoryItemEntity(
     val fetchedAt: Long? = null,
     val completedAt: String? = null,
     val closedAt: String? = null,
+    val communeName: String? = null,
 )

@@ -203,3 +203,10 @@ val MIGRATION_33_34: Migration =
             db.execSQL("ALTER TABLE local_history_item ADD COLUMN closedAt TEXT")
         }
     }
+
+val MIGRATION_34_35: Migration =
+    object : Migration(34, 35) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE local_history_item ADD COLUMN communeName TEXT")
+        }
+    }

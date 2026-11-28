@@ -12,6 +12,7 @@ data class HistoryItem(
     val scheduledDate: String?,
     val completedAt: String? = null,
     val closedAt: String? = null,
+    val communeName: String? = null,
 )
 
 data class HistoryResult(

@@ -125,9 +125,9 @@ class HistoryViewModelTest {
         val done = item("B", status = "done").copy(completedAt = "2026-11-24T08:00:00Z")
         val legacy = item("C", status = "cancelled")
 
-        assertEquals("Đã duyệt 25/11/2026", verified.dateCaption())
-        assertEquals("Đã nộp 24/11/2026", done.dateCaption())
-        assertEquals("Đã hủy 20/11/2026", legacy.dateCaption())
+        assertEquals("Ngày duyệt 25/11/2026", verified.dateCaption())
+        assertEquals("Ngày nộp 24/11/2026", done.dateCaption())
+        assertEquals("Ngày hủy 20/11/2026", legacy.dateCaption())
     }
 
     @Test

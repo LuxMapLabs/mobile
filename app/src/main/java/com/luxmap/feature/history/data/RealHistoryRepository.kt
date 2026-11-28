@@ -32,7 +32,9 @@ class RealHistoryRepository
                 val sessionId = tokenStore.identitySessionId() ?: throw CancellationException("No active session")
                 var ownerUserId = tokenStore.cachedUserId()
                 try {
-                    val userId = userApi.me().userId
+                    val me = userApi.me()
+                    val userId = me.userId
+                    val communeNames = me.communes.associate { it.communeId to it.name }
                     ownerUserId = userId
                     if (!tokenStore.saveCachedUserIdForSession(userId, sessionId)) {
                         throw CancellationException("Session changed")
@@ -47,9 +49,20 @@ class RealHistoryRepository
                     val fetchedAt = Instant.now()
                     cacheDao.replaceAll(
                         userId,
-                        items.mapIndexed { index, dto -> dto.toEntity(userId, index, fetchedAt.toEpochMilli()) },
+                        items.mapIndexed {
+                                index,
+                                dto,
+                            ->
+                            dto.toEntity(userId, index, fetchedAt.toEpochMilli(), communeNames[dto.communeId])
+                        },
                     )
-                    emit(HistoryResult(items.map { it.toDomain() }, isStale = false, syncedAt = fetchedAt))
+                    emit(
+                        HistoryResult(
+                            items.map { it.toDomain(communeNames[it.communeId]) },
+                            isStale = false,
+                            syncedAt = fetchedAt,
+                        ),
+                    )
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -76,15 +89,17 @@ class RealHistoryRepository
             return pending.sortedByDescending { it.completedAt?.let(Instant::parse) } + closed
         }
 
-        private fun WorkOrderItemDto.toDomain() =
+        private fun WorkOrderItemDto.toDomain(communeName: String?) =
             HistoryItem(
                 workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate, completedAt, closedAt,
+                communeName,
             )
 
         private fun WorkOrderItemDto.toEntity(
             ownerUserId: String,
             position: Int,
             fetchedAt: Long,
+            communeName: String?,
         ) = LocalHistoryItemEntity(
             ownerUserId = ownerUserId,
             workOrderId = workOrderId,
@@ -98,10 +113,12 @@ class RealHistoryRepository
             fetchedAt = fetchedAt,
             completedAt = completedAt,
             closedAt = closedAt,
+            communeName = communeName,
         )
 
         private fun LocalHistoryItemEntity.toDomain() =
             HistoryItem(
                 workOrderId, title, taskKind, woStatus, communeId, updatedAt, scheduledDate, completedAt, closedAt,
+                communeName,
             )
     }

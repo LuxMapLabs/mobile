@@ -132,7 +132,7 @@ fun PoleSurveySummaryScreen(
                         tone = LuxBannerTone.SUCCESS,
                     )
                 }
-            } else {
+            } else if (mismatches.isNotEmpty()) {
                 item {
                     Text(
                         text = "AI thấy khác bạn ở ${mismatches.size} cột",
