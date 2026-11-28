@@ -81,4 +81,23 @@ class PoleSurveySummaryScreenTest {
         composeRule.onNodeWithTag("confirm_survey_complete").performClick()
         assertEquals(true, submitted)
     }
+
+    @Test
+    fun a_route_with_every_pole_skipped_shows_no_ai_comparison() {
+        show(
+            listOf(
+                PoleListRowState(
+                    poleId = "POLE-1",
+                    position = 1,
+                    fixtureStatus = "normal",
+                    serverPhotoId = null,
+                    syncStatus = null,
+                    skipReason = "Không tiếp cận được",
+                ),
+            ),
+        )
+        composeRule.onNodeWithText("AI thấy khác bạn", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("AI đồng ý với bạn", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("Gửi khảo sát").assertExists()
+    }
 }
