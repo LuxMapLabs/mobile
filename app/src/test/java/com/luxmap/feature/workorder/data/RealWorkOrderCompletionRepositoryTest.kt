@@ -116,7 +116,7 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `captureEvidence saves one draft per image without starting an upload`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueue = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueue = mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val repository =
                 RealWorkOrderCompletionRepository(
                     dao,
@@ -155,7 +155,8 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `captureAfterEvidence writes the local row then enqueues an upload op with no dependency`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val repository =
                 RealWorkOrderCompletionRepository(
                     dao,
@@ -191,7 +192,8 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `submitCompletion for a repair stages all after photos before triggering sync`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             coEvery { dao.stageEvidenceCompletion(any(), "after") } returns true
             val repository =
                 RealWorkOrderCompletionRepository(
@@ -220,7 +222,8 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `submitCompletion for an inspection stages observation photos and keeps fault outcomes`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             coEvery { dao.stageEvidenceCompletion(any(), "observation") } returns true
             val repository =
                 RealWorkOrderCompletionRepository(
@@ -291,7 +294,8 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `retakeEvidence deletes the local row and file when the previous capture has not synced yet`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val tempFile = java.io.File.createTempFile("evidence", ".jpg")
             val pending =
                 LocalWorkOrderEvidenceEntity(
@@ -325,7 +329,8 @@ class RealWorkOrderCompletionRepositoryTest {
     fun `retakeEvidence leaves the local row and file alone once the previous capture has synced`() =
         runTest {
             val dao = mockk<WorkOrderCompletionDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val synced =
                 LocalWorkOrderEvidenceEntity(
                     clientOpId = "OP-1",

@@ -36,6 +36,14 @@ fun workOrderMessages(
     val status = workOrderStatusFromWire(detail.woStatus)
     val isPastSchedule = workOrderScheduleWindow(detail.scheduledDate, today).isOverdueToComplete
     val candidates = mutableListOf<WorkOrderMessage>()
+    if (detail.startPendingSync) {
+        candidates +=
+            WorkOrderMessage(
+                title = "Đã bắt đầu khi không có mạng",
+                body = "Ảnh và báo cáo được lưu trên máy, tự gửi khi có mạng trở lại.",
+                tone = WorkOrderMessageTone.INFO,
+            )
+    }
     if (isPastSchedule && status == WorkOrderStatus.IN_PROGRESS) {
         candidates +=
             WorkOrderMessage(

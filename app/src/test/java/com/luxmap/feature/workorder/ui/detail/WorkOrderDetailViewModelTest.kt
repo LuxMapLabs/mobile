@@ -22,6 +22,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -320,6 +321,36 @@ class WorkOrderDetailViewModelTest {
                 assertFalse(started.isStarting)
             }
             coVerify(exactly = 1) { detailRepository.start(WORK_ORDER_ID) }
+        }
+
+    @Test
+    fun `an offline start reloads the detail once the start reaches the server`() =
+        runTest {
+            val detailRepository = mockk<WorkOrderDetailRepository>()
+            val sent = CompletableDeferred<Unit>()
+            coEvery { detailRepository.start(WORK_ORDER_ID) } returns
+                Result.success(repairDetail(allowedActions = listOf("complete")).copy(startPendingSync = true))
+            coEvery { detailRepository.awaitStartSent(WORK_ORDER_ID) } coAnswers { sent.await() }
+            var loads = 0
+            val vm =
+                viewModel(
+                    detailFlow =
+                        flow {
+                            loads++
+                            emit(repairDetail(allowedActions = if (loads == 1) listOf("start") else listOf("complete")))
+                        },
+                    detailRepository = detailRepository,
+                )
+            advanceUntilIdle()
+            vm.start()
+            advanceUntilIdle()
+            assertTrue((vm.uiState.value as WorkOrderDetailUiState.Success).detail.startPendingSync)
+
+            sent.complete(Unit)
+            advanceUntilIdle()
+
+            assertEquals(2, loads)
+            assertFalse((vm.uiState.value as WorkOrderDetailUiState.Success).detail.startPendingSync)
         }
 
     @Test
@@ -684,7 +715,7 @@ class WorkOrderDetailViewModelTest {
         }
 
     @Test
-    fun `a survey order never refreshes the pole list`() =
+    fun `a survey order saves its pole list on the device once for offline use`() =
         runTest {
             val poleListRepository = mockk<PoleListRepository>(relaxed = true)
             val vm =
@@ -695,7 +726,7 @@ class WorkOrderDetailViewModelTest {
                 awaitItem()
             }
 
-            coVerify(exactly = 0) { poleListRepository.poles(any()) }
+            coVerify(exactly = 1) { poleListRepository.poles(WORK_ORDER_ID) }
         }
 
     @Test

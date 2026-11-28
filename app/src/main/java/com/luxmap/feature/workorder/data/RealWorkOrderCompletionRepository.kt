@@ -166,6 +166,7 @@ class RealWorkOrderCompletionRepository
                 opType = "upload_work_order_evidence",
                 payloadJson = json.encodeToString(EvidenceSyncPayload(clientOpId)),
                 clientOpId = clientOpId,
+                dependsOnClientOpId = syncQueueManager.pendingStartOf(workOrderId),
             )
         }
 
@@ -215,6 +216,7 @@ class RealWorkOrderCompletionRepository
                 opType = "complete_work_order",
                 payloadJson = json.encodeToString(payload),
                 clientOpId = clientOpId,
+                dependsOnClientOpId = syncQueueManager.pendingStartOf(workOrderId),
             )
         }
 

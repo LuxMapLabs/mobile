@@ -18,6 +18,7 @@ import com.luxmap.core.database.MIGRATION_29_30
 import com.luxmap.core.database.MIGRATION_30_31
 import com.luxmap.core.database.MIGRATION_31_32
 import com.luxmap.core.database.MIGRATION_32_33
+import com.luxmap.core.offline.OfflineSnapshotDao
 import com.luxmap.core.sync.SyncQueueDao
 import com.luxmap.feature.history.data.dao.HistoryCacheDao
 import com.luxmap.feature.survey.data.dao.LuxReadingDao
@@ -94,4 +95,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideHistoryCacheDao(db: AppDatabase): HistoryCacheDao = db.historyCacheDao()
+
+    @Provides
+    @Singleton
+    fun provideOfflineSnapshotDao(db: AppDatabase): OfflineSnapshotDao = db.offlineSnapshotDao()
 }

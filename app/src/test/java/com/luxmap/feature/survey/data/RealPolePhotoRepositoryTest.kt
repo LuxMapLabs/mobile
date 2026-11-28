@@ -76,11 +76,37 @@ private fun queueRow(
 
 class RealPolePhotoRepositoryTest {
     @Test
+    fun `a photo taken after an offline start waits for that start before uploading`() =
+        runTest {
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf("WO-1") } returns "start:WO-1" }
+            val repository =
+                RealPolePhotoRepository(
+                    mockk(relaxed = true),
+                    mockk(relaxed = true),
+                    syncQueueManager,
+                    mockk(relaxed = true),
+                )
+
+            val result = repository.capture("WO-1", "POLE-1", "/data/photo.jpg", 10.97, 106.49, observation = "on")
+
+            coVerify {
+                syncQueueManager.enqueue(
+                    opType = "upload_pole_photo",
+                    payloadJson = any(),
+                    clientOpId = result.photoId,
+                    dependsOnClientOpId = "start:WO-1",
+                )
+            }
+        }
+
+    @Test
     fun `capture writes the local row then enqueues an upload op keyed by the photo id`() =
         runTest {
             val api = mockk<WorkOrdersApi>(relaxed = true)
             val dao = mockk<PolePhotoDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
             val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
 
@@ -115,7 +141,8 @@ class RealPolePhotoRepositoryTest {
         runTest {
             val api = mockk<WorkOrdersApi>(relaxed = true)
             val dao = mockk<PolePhotoDao>(relaxed = true)
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val syncQueueDao = mockk<SyncQueueDao>(relaxed = true)
             val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)
 
@@ -284,7 +311,8 @@ class RealPolePhotoRepositoryTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val syncQueueDao = mockk<SyncQueueDao>()
             every { dao.observeByWorkOrder("WO-1") } returns
                 flowOf(
@@ -315,7 +343,8 @@ class RealPolePhotoRepositoryTest {
         runTest {
             val api = mockk<WorkOrdersApi>()
             val dao = mockk<PolePhotoDao>()
-            val syncQueueManager = mockk<SyncQueueManager>(relaxed = true)
+            val syncQueueManager =
+                mockk<SyncQueueManager>(relaxed = true) { coEvery { pendingStartOf(any()) } returns null }
             val syncQueueDao = mockk<SyncQueueDao>()
             every { dao.observeByWorkOrder("WO-1") } returns flowOf(listOf(localPhoto()))
             val repository = RealPolePhotoRepository(api, dao, syncQueueManager, syncQueueDao)

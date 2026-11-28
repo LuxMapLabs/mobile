@@ -26,6 +26,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -76,6 +79,10 @@ class WorkOrderDetailViewModel
 
         init {
             load()
+            // Back in coverage after a failed load: try again without waiting for a tap.
+            viewModelScope.launch {
+                connectivityObserver.isOnline.distinctUntilChanged().drop(1).filter { it }.collect { retry() }
+            }
         }
 
         fun retry() {
@@ -119,6 +126,17 @@ class WorkOrderDetailViewModel
                             poleReferencesState.value = poleGpsRepository.poleReferences(workOrderId)
                         }
                         detailState.value = detail
+                        // Started without signal: reload once the start reaches the server, so the
+                        // "Đã bắt đầu khi không có mạng" notice goes away on its own.
+                        if (detail.startPendingSync) {
+                            launch {
+                                detailRepository.awaitStartSent(workOrderId)
+                                load()
+                            }
+                        }
+                        // Saves the route's poles on the device while there is signal, so the
+                        // survey can still be walked if it drops later.
+                        if (detail.taskKind == "survey") launch { poleListRepository.poles(workOrderId) }
                         if (detail.taskKind in setOf("inspection", "repair")) {
                             retryPoles()
                         }
@@ -237,6 +255,12 @@ class WorkOrderDetailViewModel
                     onSuccess = { detail ->
                         updateSuccess { it.copy(detail = detail, isStarting = false, startError = null) }
                         detailState.value = detail
+                        if (detail.startPendingSync) {
+                            viewModelScope.launch {
+                                detailRepository.awaitStartSent(workOrderId)
+                                load()
+                            }
+                        }
                         if (detail.taskKind == "survey") {
                             _startedSurveyWorkOrderId.tryEmit(workOrderId)
                         }

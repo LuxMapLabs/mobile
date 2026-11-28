@@ -2,6 +2,7 @@ package com.luxmap.feature.home.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.luxmap.core.network.ConnectivityObserver
 import com.luxmap.feature.auth.data.AuthRepository
 import com.luxmap.feature.home.data.HomeRepository
 import com.luxmap.feature.workorder.data.WorkOrderCompletionRepository
@@ -13,6 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -26,6 +30,7 @@ class HomeViewModel
         private val repository: HomeRepository,
         private val completionRepository: WorkOrderCompletionRepository,
         authRepository: AuthRepository,
+        connectivityObserver: ConnectivityObserver,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -45,6 +50,14 @@ class HomeViewModel
 
         init {
             load()
+            // Coming back into coverage reloads a failed or offline Home on its own, instead of
+            // waiting for the engineer to find the "Thử lại" button.
+            viewModelScope.launch {
+                connectivityObserver.isOnline.distinctUntilChanged().drop(1).filter { it }.collect {
+                    val state = _uiState.value
+                    if (state is HomeUiState.Error || (state is HomeUiState.Success && state.isStale)) load()
+                }
+            }
         }
 
         fun retry() {
@@ -79,7 +92,8 @@ class HomeViewModel
                                 } else {
                                     HomeUiState.Success(
                                         data = data,
-                                        lastSyncedAt = Instant.now(),
+                                        isStale = data.cachedAt != null,
+                                        lastSyncedAt = data.cachedAt ?: Instant.now(),
                                         completionSyncStates = syncStates,
                                     )
                                 }

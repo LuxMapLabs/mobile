@@ -58,6 +58,7 @@ class RealLuxReadingRepository
                 opType = UploadLuxReadingSyncHandler.OP_TYPE,
                 payloadJson = Json.encodeToString(LuxReadingSyncPayload(entity.clientOpId)),
                 clientOpId = entity.clientOpId,
+                dependsOnClientOpId = syncQueueManager.pendingStartOf(workOrderId),
             )
             return entity.toLuxReading(syncStatus = "queued")
         }

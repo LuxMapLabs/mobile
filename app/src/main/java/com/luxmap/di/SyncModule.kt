@@ -8,6 +8,7 @@ import com.luxmap.feature.survey.data.sync.UploadLuxReadingSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPolePhotoSyncHandler
 import com.luxmap.feature.survey.data.sync.UploadPoleVideoSyncHandler
 import com.luxmap.feature.workorder.data.sync.CompleteWorkOrderSyncHandler
+import com.luxmap.feature.workorder.data.sync.StartWorkOrderSyncHandler
 import com.luxmap.feature.workorder.data.sync.UploadWorkOrderEvidenceSyncHandler
 import dagger.Binds
 import dagger.Module
@@ -48,4 +49,8 @@ abstract class SyncModule {
     @Binds
     @IntoSet
     abstract fun bindUploadLuxReadingSyncHandler(impl: UploadLuxReadingSyncHandler): SyncOpHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindStartWorkOrderSyncHandler(impl: StartWorkOrderSyncHandler): SyncOpHandler
 }

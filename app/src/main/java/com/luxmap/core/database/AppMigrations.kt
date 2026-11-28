@@ -189,5 +189,9 @@ val MIGRATION_32_33: Migration =
                     "poleId TEXT NOT NULL, reason TEXT NOT NULL, skippedAt INTEGER NOT NULL, " +
                     "PRIMARY KEY(workOrderId, poleId))",
             )
+            db.execSQL(
+                "CREATE TABLE IF NOT EXISTS local_offline_snapshot (`key` TEXT NOT NULL, json TEXT NOT NULL, " +
+                    "fetchedAt INTEGER NOT NULL, PRIMARY KEY(`key`))",
+            )
         }
     }

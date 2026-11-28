@@ -42,7 +42,7 @@ class RealAuthRepositoryTest {
             val tokens = mockk<TokenStore>(relaxed = true)
             val history = mockk<com.luxmap.feature.history.data.dao.HistoryCacheDao>(relaxed = true)
             coEvery { auth.login(any()) } returns TOKENS
-            val result = RealAuthRepository(auth, tokens, history).login("B", "password", true)
+            val result = RealAuthRepository(auth, tokens, history, mockk(relaxed = true)).login("B", "password", true)
             assertTrue(result.isSuccess)
             coVerify(exactly = 1) { tokens.clearCachedUserId() }
             coVerify(exactly = 1) { history.clear() }
@@ -56,7 +56,7 @@ class RealAuthRepositoryTest {
             val history = mockk<com.luxmap.feature.history.data.dao.HistoryCacheDao>(relaxed = true)
             coEvery { tokens.currentTokens() } returns com.luxmap.core.security.SessionTokens("a", "r", 1)
             coEvery { auth.logout(any()) } throws java.io.IOException("offline")
-            RealAuthRepository(auth, tokens, history).logout()
+            RealAuthRepository(auth, tokens, history, mockk(relaxed = true)).logout()
             coVerify(exactly = 1) { tokens.clear() }
             coVerify(exactly = 1) { history.clear() }
         }
@@ -69,7 +69,7 @@ class RealAuthRepositoryTest {
             coEvery { authApi.google(GoogleLoginRequestDto("id-token-1")) } returns TOKENS
             coJustRun { tokenStore.clearCachedUserId() }
             coJustRun { tokenStore.saveSession(any(), any(), any(), any(), any()) }
-            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true), mockk(relaxed = true))
 
             val result = repository.loginWithGoogle("id-token-1", rememberMe = true, displayName = "fe1@luxmap.vn")
 
@@ -85,7 +85,7 @@ class RealAuthRepositoryTest {
             val authApi = mockk<AuthApi>()
             val tokenStore = mockk<TokenStore>()
             coEvery { authApi.google(any()) } throws httpException(401, "INVALID_CREDENTIALS")
-            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true), mockk(relaxed = true))
 
             val result = repository.loginWithGoogle("id-token-1", rememberMe = true, displayName = "fe1@luxmap.vn")
 
@@ -99,7 +99,7 @@ class RealAuthRepositoryTest {
             val authApi = mockk<AuthApi>()
             val tokenStore = mockk<TokenStore>()
             coEvery { authApi.google(any()) } throws httpException(403, "ACCOUNT_LOCKED")
-            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true), mockk(relaxed = true))
 
             val result = repository.loginWithGoogle("id-token-1", rememberMe = true, displayName = "fe1@luxmap.vn")
 
@@ -113,7 +113,7 @@ class RealAuthRepositoryTest {
             val authApi = mockk<AuthApi>()
             val tokenStore = mockk<TokenStore>()
             coEvery { authApi.login(any()) } throws httpException(401, "INVALID_CREDENTIALS")
-            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true))
+            val repository = RealAuthRepository(authApi, tokenStore, mockk(relaxed = true), mockk(relaxed = true))
 
             val result = repository.login("fe1", "wrong-password", rememberMe = true)
 

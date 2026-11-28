@@ -1,5 +1,7 @@
 package com.luxmap.feature.home.data
 
+import java.time.Instant
+
 // F02 spec (mục B1, C3): 4 thẻ số liệu ở đầu màn — lệnh được giao / đang xử lý / quá hạn (từ
 // work_order.status) và đợt khảo sát đã lên kế hoạch (từ survey_sweep.status = planned).
 // plannedSweepCount is null, not 0 - the backend has no survey-sweep API yet (see
@@ -44,4 +46,7 @@ data class HomeData(
     val metrics: HomeMetrics,
     val clusters: List<WorkOrderCluster>,
     val fullName: String? = null,
+    // Set when this is the copy saved on the device because the network failed: when it was
+    // fetched. Null for a live answer.
+    val cachedAt: Instant? = null,
 )
