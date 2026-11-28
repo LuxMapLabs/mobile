@@ -4,6 +4,7 @@ import com.luxmap.core.network.UserApi
 import com.luxmap.core.network.WorkOrdersApi
 import com.luxmap.core.network.dto.PagedResultDto
 import com.luxmap.core.security.TokenStore
+import com.luxmap.feature.auth.data.CommuneSummaryDto
 import com.luxmap.feature.auth.data.CurrentUserResponseDto
 import com.luxmap.feature.history.data.dao.HistoryCacheDao
 import com.luxmap.feature.history.data.entity.LocalHistoryItemEntity
@@ -194,5 +195,30 @@ class RealHistoryRepositoryTest {
 
             assertTrue(error is HttpException)
             coVerify(exactly = 0) { cache.all(any()) }
+        }
+
+    @Test
+    fun `commune names come from the user's assigned communes and are cached for offline use`() =
+        runTest {
+            coEvery { users.me() } returns
+                currentUser().copy(communes = listOf(CommuneSummaryDto(communeId = "COM-001", name = "Long Bình")))
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } returns
+                PagedResultDto(1, 200, 1, listOf(dto("WO-1")))
+
+            val result = repository.observeHistory().first()
+
+            assertEquals("Long Bình", result.items.single().communeName)
+            coVerify { cache.replaceAll("U-1", match { rows -> rows.single().communeName == "Long Bình" }) }
+        }
+
+    @Test
+    fun `the cached commune name is shown when offline`() =
+        runTest {
+            coEvery { orders.list("U-1", null, CLOSED, "-closed_at") } throws IOException("offline")
+            coEvery { cache.all("U-1") } returns listOf(entity("WO-1").copy(communeName = "Long Bình"))
+
+            val result = repository.observeHistory().first()
+
+            assertEquals("Long Bình", result.items.single().communeName)
         }
 }

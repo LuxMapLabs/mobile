@@ -2,11 +2,8 @@ package com.luxmap.feature.history.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -34,7 +31,6 @@ import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.StatusBadge
 import com.luxmap.feature.history.data.HistoryItem
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HistoryCard(
     item: HistoryItem,
@@ -54,29 +50,23 @@ fun HistoryCard(
         contentPadding = PaddingValues(Spacing.lg),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    Icon(
-                        imageVector = kind.icon(),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Text(
-                        text = "${kind.label()} ${item.workOrderId}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
+                Icon(
+                    imageVector = kind.icon(),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = "${kind.label()} ${item.workOrderId}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+            StatusBadge(text = status.label(), colors = status.badgeColors(), icon = status.icon())
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleMedium,
@@ -85,7 +75,7 @@ fun HistoryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = communeLabel(item.communeId, null),
+                text = communeLabel(item.communeId, item.communeName),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -119,9 +109,9 @@ fun HistoryCard(
 internal fun HistoryItem.dateCaption(): String {
     val (label, iso) =
         when (woStatus) {
-            "verified" -> "Đã duyệt" to (closedAt ?: updatedAt)
-            "cancelled" -> "Đã hủy" to (closedAt ?: updatedAt)
-            else -> "Đã nộp" to (completedAt ?: updatedAt)
+            "verified" -> "Ngày duyệt" to (closedAt ?: updatedAt)
+            "cancelled" -> "Ngày hủy" to (closedAt ?: updatedAt)
+            else -> "Ngày nộp" to (completedAt ?: updatedAt)
         }
     return "$label ${DateFormatUtils.formatIsoDateOnly(iso)}"
 }

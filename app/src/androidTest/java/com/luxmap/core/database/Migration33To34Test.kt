@@ -40,7 +40,7 @@ class Migration33To34Test {
             }
             val after =
                 Room.databaseBuilder(context, AppDatabase::class.java, name)
-                    .addMigrations(MIGRATION_33_34)
+                    .addMigrations(MIGRATION_33_34, MIGRATION_34_35)
                     .build()
             val row = after.historyCacheDao().all("U-1").single()
             assertEquals("WO-1", row.workOrderId)
