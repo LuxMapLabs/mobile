@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -37,6 +39,8 @@ import com.luxmap.core.ui.components.LuxCard
 import com.luxmap.core.ui.components.LuxChildTopBar
 import com.luxmap.core.ui.components.LuxConfirmDialog
 import com.luxmap.core.ui.components.LuxSecondaryButton
+import com.luxmap.core.ui.components.LuxSnackbarHost
+import com.luxmap.core.ui.components.LuxSubmittedDialog
 import com.luxmap.core.ui.components.PrimaryButton
 import kotlin.math.roundToInt
 
@@ -48,8 +52,15 @@ fun PoleSurveySummaryRoute(
     onSurveyCompleted: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsState()
+    var showSubmitted by rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
-        viewModel.surveyCompleted.collect { onSurveyCompleted() }
+        viewModel.surveyCompleted.collect { showSubmitted = true }
+    }
+    LaunchedEffect(Unit) {
+        viewModel.surveyCompleteFailed.collect { reason ->
+            snackbarHostState.showSnackbar("Không lưu được báo cáo: $reason")
+        }
     }
     (state as? PoleListUiState.Success)?.let { success ->
         PoleSurveySummaryScreen(
@@ -57,6 +68,12 @@ fun PoleSurveySummaryRoute(
             onBack = onBack,
             onRetake = onRetake,
             onSubmit = viewModel::onComplete,
+            snackbarHostState = snackbarHostState,
+            showSubmitted = showSubmitted,
+            onSubmittedAcknowledged = {
+                showSubmitted = false
+                onSurveyCompleted()
+            },
         )
     }
 }
@@ -71,12 +88,19 @@ fun PoleSurveySummaryScreen(
     onBack: () -> Unit,
     onRetake: (poleId: String) -> Unit,
     onSubmit: () -> Unit,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    showSubmitted: Boolean = false,
+    onSubmittedAcknowledged: () -> Unit = {},
 ) {
+    if (showSubmitted) {
+        LuxSubmittedDialog(onDismiss = onSubmittedAcknowledged)
+    }
     var keptPoleIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var showConfirm by rememberSaveable { mutableStateOf(false) }
     val mismatches = state.aiMismatches
     Scaffold(
         topBar = { LuxChildTopBar(title = "Kiểm tra trước khi gửi", onBack = onBack) },
+        snackbarHost = { LuxSnackbarHost(snackbarHostState) },
         bottomBar = {
             SummaryBottomBar(
                 canSubmit = state.canComplete,

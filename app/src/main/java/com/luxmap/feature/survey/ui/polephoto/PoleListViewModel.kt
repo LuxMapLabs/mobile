@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.IOException
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -56,6 +57,9 @@ class PoleListViewModel
         // one-shot event lets the Route show a toast right on this screen instead.
         private val _surveyCompleted = MutableSharedFlow<Int>(extraBufferCapacity = 1)
         val surveyCompleted: SharedFlow<Int> = _surveyCompleted.asSharedFlow()
+
+        private val _surveyCompleteFailed = MutableSharedFlow<String>(extraBufferCapacity = 1)
+        val surveyCompleteFailed: SharedFlow<String> = _surveyCompleteFailed.asSharedFlow()
 
         init {
             load()
@@ -148,15 +152,21 @@ class PoleListViewModel
             val state = _uiState.value as? PoleListUiState.Success ?: return
             if (!state.canComplete) return
             viewModelScope.launch {
-                val pendingReviews = polePhotoRepository.enqueuePendingReviews(workOrderId)
-                completionRepository.submitCompletion(
-                    workOrderId = workOrderId,
-                    taskKind = "survey",
-                    reportNote = surveyReportNote(state.poles),
-                    materialsUsed = null,
-                    faultOutcomes = null,
-                )
-                _surveyCompleted.tryEmit(pendingReviews)
+                try {
+                    val pendingReviews = polePhotoRepository.enqueuePendingReviews(workOrderId)
+                    completionRepository.submitCompletion(
+                        workOrderId = workOrderId,
+                        taskKind = "survey",
+                        reportNote = surveyReportNote(state.poles),
+                        materialsUsed = null,
+                        faultOutcomes = null,
+                    )
+                    _surveyCompleted.tryEmit(pendingReviews)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _surveyCompleteFailed.tryEmit(e.message ?: "Không lưu được báo cáo.")
+                }
             }
         }
 

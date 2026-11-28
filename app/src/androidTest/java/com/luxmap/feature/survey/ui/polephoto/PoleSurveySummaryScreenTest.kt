@@ -35,6 +35,8 @@ class PoleSurveySummaryScreenTest {
         poles: List<PoleListRowState>,
         onRetake: (String) -> Unit = {},
         onSubmit: () -> Unit = {},
+        showSubmitted: Boolean = false,
+        onSubmittedAcknowledged: () -> Unit = {},
     ) {
         composeRule.setContent {
             LuxMapTheme {
@@ -43,9 +45,31 @@ class PoleSurveySummaryScreenTest {
                     onBack = {},
                     onRetake = onRetake,
                     onSubmit = onSubmit,
+                    showSubmitted = showSubmitted,
+                    onSubmittedAcknowledged = onSubmittedAcknowledged,
                 )
             }
         }
+    }
+
+    @Test
+    fun submitted_dialog_leaves_the_summary_only_after_acknowledged() {
+        var acknowledged = 0
+        show(
+            listOf(labelled("POLE-1", Observation.ON, cvState = "on")),
+            showSubmitted = true,
+            onSubmittedAcknowledged = { acknowledged++ },
+        )
+        composeRule.onNodeWithText("Đã nộp báo cáo").assertExists()
+        assertEquals(0, acknowledged)
+        composeRule.onNodeWithTag("submitted_dialog_confirm").performClick()
+        assertEquals(1, acknowledged)
+    }
+
+    @Test
+    fun no_submitted_dialog_before_sending() {
+        show(listOf(labelled("POLE-1", Observation.ON, cvState = "on")))
+        composeRule.onNodeWithTag("submitted_dialog").assertDoesNotExist()
     }
 
     @Test
